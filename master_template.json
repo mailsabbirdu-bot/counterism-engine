@@ -1,15 +1,5 @@
 {
   "project_name": "Counterism_Omni_Engine_V1",
-  "schema_dictionary": {
-    "layers": "A scene can now have multiple 'text_layers' and 'image_layers'. Each layer has its own position and animation.",
-    "animations": {
-      "in_type": "Options: slide_up, slide_down, slide_left, slide_right, fade, scale_up, scale_down, typewriter.",
-      "easing": "Options: ease-in, ease-out, ease-in-out, ease-back-out (bouncy), spring."
-    },
-    "transitions": "Visual effects between scenes. Options: wipe_right, wipe_left, fade_cross, zoom_out, glitch.",
-    "image_layers": "Allows you to overlay transparent PNGs (icons, logos) on top of the stock footage.",
-    "z_index": "Higher numbers appear on top of lower numbers (e.g., text on top of the textbox)."
-  },
   "global_settings": {
     "font_family": "Noto Sans Bengali",
     "resolution": { "width": 1920, "height": 1080 },
@@ -20,51 +10,26 @@
   "scenes": [
     {
       "scene_id": "SC_01",
+      "text_content": "গভীর সমুদ্রের রহস্য উন্মোচন করছি আজ।",
       "voiceover_path": "/content/audio/SC_01.wav",
       "scout_config": {
         "primary_keywords": ["deep ocean", "underwater cinematic"],
         "must_have": ["blue water", "bubbles"],
         "exclude": ["diver", "boat"],
         "min_resolution": "1080p",
-        "clip_threshold": 0.85
+        "clip_threshold": 0.85,
+        "fallback_broll": ["dark blue ocean", "sea waves"]
       },
       "visual_elements": {
-        "background_video": "auto_scouted",
         "text_layers": [
           {
-            "layer_id": "main_heading",
+            "layer_id": "main_text",
             "content": "গভীর সমুদ্রের রহস্য",
-            "style": { "font_size": 80, "color": "#ffffff", "font_weight": "bold" },
-            "layout": { "x": 960, "y": 400, "anchor": "center" },
-            "animation": { "in": "scale_up", "out": "fade", "start_frame": 10, "duration": 20 }
-          },
-          {
-            "layer_id": "sub_caption",
-            "content": "উন্মোচন করছি আজ।",
-            "style": { "font_size": 50, "color": "#FFD700", "font_weight": "normal" },
-            "layout": { "x": 960, "y": 550, "anchor": "center" },
-            "animation": { "in": "slide_up", "out": "fade", "start_frame": 25, "duration": 15 }
+            "style": { "font_size": 80, "color": "#ffffff" },
+            "animation": { "in_type": "slide_up", "start_frame": 0 }
           }
         ],
-        "image_layers": [
-          {
-            "image_path": "/content/assets/logo.png",
-            "layout": { "x": 100, "y": 100, "width": 200, "height": "auto" },
-            "opacity": 0.8,
-            "animation": { "in": "fade", "start_frame": 0 }
-          }
-        ],
-        "textbox": {
-          "enabled": true,
-          "style": "futuristic_minimal",
-          "padding": 40,
-          "background_color": "rgba(0, 0, 0, 0.6)",
-          "border": { "color": "#00FFFF", "width": 2, "side": "bottom" }
-        }
-      },
-      "transition": {
-        "type": "glitch",
-        "duration_frames": 12
+        "textbox": { "enabled": true, "style": "futuristic_minimal" }
       },
       "sync_data": {
         "audio_start_offset": 0.5,
