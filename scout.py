@@ -340,7 +340,16 @@ def batch_semantic_filter(
     if not remaining_imgs:
         return None
 
-    target_texts = keywords + must_have
+    # Natural language prompt construction for better CLIP performance
+    main_concept = ", ".join(keywords)
+    details = ", ".join(must_have)
+
+    target_texts = [
+        f"a cinematic video of {main_concept}",
+        f"clear footage showing {details}",
+        f"{main_concept} with {details}",
+        "high quality professional b-roll"
+    ]
 
     inputs = CLIP_PROCESSOR(
         text=target_texts,
@@ -375,9 +384,10 @@ def batch_semantic_filter(
         image_features @ text_features.t()
     )
 
-    max_sims, _ = torch.max(similarity, dim=1)
+    # Use mean similarity across prompts for more stable concept matching
+    avg_sims = similarity.mean(dim=1)
 
-    for i, sim in enumerate(max_sims):
+    for i, sim in enumerate(avg_sims):
         remaining_candidates[i]['clip_score'] = sim.item()
 
     worthy = [
@@ -477,6 +487,12 @@ def process_scene(scene, existing_hashes):
         'clip_threshold',
         0.28
     )
+
+    # Sanity check: cap threshold for thumbnail-based scouting
+    # Values above 0.40 are rarely achieved with mean similarity on thumbnails
+    if clip_threshold > 0.40:
+        print(f"Adjusting unrealistically high threshold {clip_threshold} -> 0.30")
+        clip_threshold = 0.30
 
     min_width, min_height = 1920, 1080
 
