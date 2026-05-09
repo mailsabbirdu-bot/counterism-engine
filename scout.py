@@ -111,11 +111,16 @@ def search_pexels(query, min_width=1920, min_height=1080):
         candidates = []
 
         for video in data.get('videos', []):
+            if not isinstance(video, dict):
+                continue
+
             video_files = video.get('video_files', [])
+            if not isinstance(video_files, list):
+                continue
 
             suitable_files = [
                 f for f in video_files
-                if (
+                if isinstance(f, dict) and (
                     f.get('width', 0) >= min_width and
                     f.get('height', 0) >= min_height
                 )
@@ -125,9 +130,9 @@ def search_pexels(query, min_width=1920, min_height=1080):
                 best_file = suitable_files[0]
 
                 candidates.append({
-                    'url': best_file['link'],
+                    'url': best_file.get('link'),
                     'thumb_url': video.get('image'),
-                    'id': f"pexels_{video['id']}",
+                    'id': f"pexels_{video.get('id', 'unknown')}",
                     'source': 'pexels'
                 })
 
@@ -155,7 +160,12 @@ def search_pixabay(query):
         candidates = []
 
         for video in data.get('hits', []):
+            if not isinstance(video, dict):
+                continue
+
             video_types = video.get('videos', {})
+            if not isinstance(video_types, dict):
+                continue
 
             best_file = (
                 video_types.get('large') or
@@ -163,7 +173,7 @@ def search_pixabay(query):
                 video_types.get('small')
             )
 
-            if best_file and best_file.get('url'):
+            if isinstance(best_file, dict) and best_file.get('url'):
                 picture_id = video.get('picture_id')
 
                 if picture_id:
@@ -176,9 +186,9 @@ def search_pixabay(query):
 
                 if thumb_url:
                     candidates.append({
-                        'url': best_file['url'],
+                        'url': best_file.get('url'),
                         'thumb_url': thumb_url,
-                        'id': f"pixabay_{video['id']}",
+                        'id': f"pixabay_{video.get('id', 'unknown')}",
                         'source': 'pixabay'
                     })
 
@@ -332,32 +342,24 @@ def batch_semantic_filter(
     ).to(device)
 
     with torch.no_grad():
-        outputs = CLIP_MODEL(
-            pixel_values=inputs['pixel_values'],
+        image_features = CLIP_MODEL.get_image_features(
+            pixel_values=inputs['pixel_values']
+        )
+        text_features = CLIP_MODEL.get_text_features(
             input_ids=inputs['input_ids'],
-            attention_mask=inputs.get('attention_mask'),
-            return_dict=True
+            attention_mask=inputs.get('attention_mask')
         )
 
-        image_features = outputs.image_embeds
-        text_features = outputs.text_embeds
-
-    image_features = (
-        image_features /
-        image_features.norm(
-            p=2,
-            dim=-1,
-            keepdim=True
-        )
+    image_features = torch.nn.functional.normalize(
+        image_features,
+        p=2,
+        dim=-1
     )
 
-    text_features = (
-        text_features /
-        text_features.norm(
-            p=2,
-            dim=-1,
-            keepdim=True
-        )
+    text_features = torch.nn.functional.normalize(
+        text_features,
+        p=2,
+        dim=-1
     )
 
     similarity = (
@@ -412,32 +414,24 @@ def temporal_validate(
     ).to(device)
 
     with torch.no_grad():
-        outputs = CLIP_MODEL(
-            pixel_values=inputs['pixel_values'],
+        img_feats = CLIP_MODEL.get_image_features(
+            pixel_values=inputs['pixel_values']
+        )
+        txt_feats = CLIP_MODEL.get_text_features(
             input_ids=inputs['input_ids'],
-            attention_mask=inputs.get('attention_mask'),
-            return_dict=True
+            attention_mask=inputs.get('attention_mask')
         )
 
-        img_feats = outputs.image_embeds
-        txt_feats = outputs.text_embeds
-
-    img_feats = (
-        img_feats /
-        img_feats.norm(
-            p=2,
-            dim=-1,
-            keepdim=True
-        )
+    img_feats = torch.nn.functional.normalize(
+        img_feats,
+        p=2,
+        dim=-1
     )
 
-    txt_feats = (
-        txt_feats /
-        txt_feats.norm(
-            p=2,
-            dim=-1,
-            keepdim=True
-        )
+    txt_feats = torch.nn.functional.normalize(
+        txt_feats,
+        p=2,
+        dim=-1
     )
 
     avg_sim = (
