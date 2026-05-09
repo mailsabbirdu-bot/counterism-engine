@@ -1,4 +1,3 @@
-
 import os
 import json
 import requests
@@ -105,16 +104,10 @@ def search_pexels(query, min_width=1920, min_height=1080):
     }
 
     try:
-        response = requests.get(
-            url,
-            headers=headers,
-            timeout=30
-        )
-
+        response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()
 
         data = response.json()
-
         candidates = []
 
         for video in data.get('videos', []):
@@ -122,8 +115,10 @@ def search_pexels(query, min_width=1920, min_height=1080):
 
             suitable_files = [
                 f for f in video_files
-                if f.get('width', 0) >= min_width
-                and f.get('height', 0) >= min_height
+                if (
+                    f.get('width', 0) >= min_width and
+                    f.get('height', 0) >= min_height
+                )
             ]
 
             if suitable_files:
@@ -131,7 +126,7 @@ def search_pexels(query, min_width=1920, min_height=1080):
 
                 candidates.append({
                     'url': best_file['link'],
-                    'thumb_url': video['image'],
+                    'thumb_url': video.get('image'),
                     'id': f"pexels_{video['id']}",
                     'source': 'pexels'
                 })
@@ -148,40 +143,44 @@ def search_pixabay(query):
         return []
 
     url = (
-        f"https://pixabay.com/api/videos/?"
-        f"key={PIXABAY_API_KEY}&q={query}"
+        f"https://pixabay.com/api/videos/"
+        f"?key={PIXABAY_API_KEY}&q={query}"
     )
 
     try:
         response = requests.get(url, timeout=30)
-
         response.raise_for_status()
 
         data = response.json()
-
         candidates = []
 
         for video in data.get('hits', []):
             video_types = video.get('videos', {})
 
             best_file = (
-                video_types.get('large')
-                or video_types.get('medium')
-                or video_types.get('small')
+                video_types.get('large') or
+                video_types.get('medium') or
+                video_types.get('small')
             )
 
             if best_file and best_file.get('url'):
-                thumb_url = (
-                    f"https://i.vimeocdn.com/video/"
-                    f"{video['picture_id']}_640x360.jpg"
-                )
+                picture_id = video.get('picture_id')
 
-                candidates.append({
-                    'url': best_file['url'],
-                    'thumb_url': thumb_url,
-                    'id': f"pixabay_{video['id']}",
-                    'source': 'pixabay'
-                })
+                if picture_id:
+                    thumb_url = (
+                        f"https://i.vimeocdn.com/video/"
+                        f"{picture_id}_640x360.jpg"
+                    )
+                else:
+                    thumb_url = video.get('userImageURL')
+
+                if thumb_url:
+                    candidates.append({
+                        'url': best_file['url'],
+                        'thumb_url': thumb_url,
+                        'id': f"pixabay_{video['id']}",
+                        'source': 'pixabay'
+                    })
 
         return candidates
 
@@ -191,6 +190,9 @@ def search_pixabay(query):
 
 
 def download_resource(url, dest_path):
+    if not url:
+        return False
+
     try:
         response = requests.get(
             url,
@@ -212,25 +214,18 @@ def download_resource(url, dest_path):
 
 
 def extract_frames(video_path, frame_paths):
-    """
-    Extracts multiple frames for temporal validation.
-    """
-
     try:
         cap = cv2.VideoCapture(video_path)
 
         if not cap.isOpened():
             return False
 
-        total_frames = int(
-            cap.get(cv2.CAP_PROP_FRAME_COUNT)
-        )
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
         if total_frames <= 0:
             cap.release()
             return False
 
-        # Sample 25%, 50%, 75%
         indices = [
             total_frames // 4,
             total_frames // 2,
@@ -269,14 +264,9 @@ def batch_semantic_filter(
     exclude,
     threshold=0.28
 ):
-    """
-    Batch processes thumbnails to find the best candidate.
-    """
-
     if not candidates:
         return None
 
-    # Load images for batch processing
     imgs = []
     active_candidates = []
 
@@ -291,9 +281,6 @@ def batch_semantic_filter(
     if not imgs:
         return None
 
-    # -----------------------------
-    # STAGE 1: Batch BLIP
-    # -----------------------------
     inputs = BLIP_PROCESSOR(
         imgs,
         return_tensors="pt",
@@ -322,25 +309,19 @@ def batch_semantic_filter(
 
         if not is_excluded:
             remaining_imgs.append(imgs[i])
-            remaining_candidates.append(
-                active_candidates[i]
-            )
+            remaining_candidates.append(active_candidates[i])
 
             active_candidates[i]['caption'] = caption
 
         else:
             print(
                 f"Excluding "
-                f"{active_candidates[i]['id']}: "
-                f"{caption}"
+                f"{active_candidates[i]['id']}: {caption}"
             )
 
     if not remaining_imgs:
         return None
 
-    # -----------------------------
-    # STAGE 2: Batch CLIP
-    # -----------------------------
     target_texts = keywords + must_have
 
     inputs = CLIP_PROCESSOR(
@@ -351,28 +332,34 @@ def batch_semantic_filter(
     ).to(device)
 
     with torch.no_grad():
-        image_features = CLIP_MODEL.get_image_features(
-            pixel_values=inputs['pixel_values']
+        outputs = CLIP_MODEL(
+            pixel_values=inputs['pixel_values'],
+            input_ids=inputs['input_ids'],
+            attention_mask=inputs.get('attention_mask'),
+            return_dict=True
         )
 
-        text_features = CLIP_MODEL.get_text_features(
-            input_ids=inputs['input_ids']
+        image_features = outputs.image_embeds
+        text_features = outputs.text_embeds
+
+    image_features = (
+        image_features /
+        image_features.norm(
+            p=2,
+            dim=-1,
+            keepdim=True
         )
-
-    # Normalize and score
-    image_features = image_features / image_features.norm(
-        p=2,
-        dim=-1,
-        keepdim=True
     )
 
-    text_features = text_features / text_features.norm(
-        p=2,
-        dim=-1,
-        keepdim=True
+    text_features = (
+        text_features /
+        text_features.norm(
+            p=2,
+            dim=-1,
+            keepdim=True
+        )
     )
 
-    # Cosine similarity matrix
     similarity = (
         image_features @ text_features.t()
     )
@@ -401,10 +388,6 @@ def temporal_validate(
     keywords,
     threshold=0.28
 ):
-    """
-    Sample multiple frames and average CLIP score.
-    """
-
     temp_frames = [
         os.path.join(
             FRAME_DIR,
@@ -429,24 +412,32 @@ def temporal_validate(
     ).to(device)
 
     with torch.no_grad():
-        img_feats = CLIP_MODEL.get_image_features(
-            pixel_values=inputs['pixel_values']
+        outputs = CLIP_MODEL(
+            pixel_values=inputs['pixel_values'],
+            input_ids=inputs['input_ids'],
+            attention_mask=inputs.get('attention_mask'),
+            return_dict=True
         )
 
-        txt_feats = CLIP_MODEL.get_text_features(
-            input_ids=inputs['input_ids']
-        )
+        img_feats = outputs.image_embeds
+        txt_feats = outputs.text_embeds
 
-    img_feats = img_feats / img_feats.norm(
-        p=2,
-        dim=-1,
-        keepdim=True
+    img_feats = (
+        img_feats /
+        img_feats.norm(
+            p=2,
+            dim=-1,
+            keepdim=True
+        )
     )
 
-    txt_feats = txt_feats / txt_feats.norm(
-        p=2,
-        dim=-1,
-        keepdim=True
+    txt_feats = (
+        txt_feats /
+        txt_feats.norm(
+            p=2,
+            dim=-1,
+            keepdim=True
+        )
     )
 
     avg_sim = (
@@ -461,7 +452,6 @@ def temporal_validate(
 
 def process_scene(scene, existing_hashes):
     scene_id = scene.get('scene_id')
-
     config = scene.get('scout_config', {})
 
     primary_keywords = config.get(
@@ -527,13 +517,13 @@ def process_scene(scene, existing_hashes):
                 )
             )
 
-            for res in p_results + b_results:
-                all_candidates.extend(res)
+            for res_set in [p_results, b_results]:
+                for batch in res_set:
+                    all_candidates.extend(batch)
 
         if not all_candidates:
             continue
 
-        # De-duplicate
         unique_candidates = list({
             c['id']: c
             for c in all_candidates
@@ -561,9 +551,6 @@ def process_scene(scene, existing_hashes):
                 c['thumb_path'] = thumb_path
                 processed_candidates.append(c)
 
-        # -----------------------------
-        # Batch semantic validation
-        # -----------------------------
         winner = batch_semantic_filter(
             processed_candidates,
             queries,
@@ -588,7 +575,6 @@ def process_scene(scene, existing_hashes):
                 winner['url'],
                 final_video
             ):
-                # Temporal Validation
                 valid, avg_sim = temporal_validate(
                     final_video,
                     scene_id,
@@ -597,7 +583,6 @@ def process_scene(scene, existing_hashes):
                 )
 
                 if valid:
-                    # Perceptual Deduplication
                     extract_frames(
                         final_video,
                         [
@@ -626,7 +611,8 @@ def process_scene(scene, existing_hashes):
                             "Skipping."
                         )
 
-                        os.remove(final_video)
+                        if os.path.exists(final_video):
+                            os.remove(final_video)
 
                     else:
                         print(
@@ -635,9 +621,9 @@ def process_scene(scene, existing_hashes):
                             f"(Avg Sim: {avg_sim:.4f})"
                         )
 
-                        # Cleanup thumbs
                         for c in processed_candidates:
-                            os.remove(c['thumb_path'])
+                            if os.path.exists(c['thumb_path']):
+                                os.remove(c['thumb_path'])
 
                         return True
 
@@ -647,18 +633,18 @@ def process_scene(scene, existing_hashes):
                         f"({avg_sim:.4f})."
                     )
 
-                    os.remove(final_video)
+                    if os.path.exists(final_video):
+                        os.remove(final_video)
 
-        # Cleanup thumbs if no winner
         for c in processed_candidates:
-            os.remove(c['thumb_path'])
+            if os.path.exists(c['thumb_path']):
+                os.remove(c['thumb_path'])
 
     return False
 
 
 def main():
     template = load_template()
-
     manifest = load_manifest()
 
     existing_hashes = []
@@ -680,9 +666,8 @@ def main():
             sid = scene.get('scene_id')
 
             if (
-                not sid
-                or manifest.get(sid, {}).get('status')
-                == 'completed'
+                not sid or
+                manifest.get(sid, {}).get('status') == 'completed'
             ):
                 continue
 
