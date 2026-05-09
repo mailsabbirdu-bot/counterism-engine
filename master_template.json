@@ -13,12 +13,12 @@
       "text_content": "গভীর সমুদ্রের রহস্য উন্মোচন করছি আজ।",
       "voiceover_path": "/content/audio/SC_01.wav",
       "scout_config": {
-        "primary_keywords": ["deep ocean", "underwater cinematic"],
-        "must_have": ["blue water", "bubbles"],
+        "primary_keywords": ["tiger in water", "underwater tiger cinematic"],
+        "must_have": ["water", "tiger"],
         "exclude": ["diver", "boat"],
         "min_resolution": "1080p",
         "clip_threshold": 0.28,
-        "fallback_broll": ["dark blue ocean", "sea waves"]
+        "fallback_broll": ["whale ocean", "sea waves whale"]
       },
       "visual_elements": {
         "text_layers": [
