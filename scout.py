@@ -17,9 +17,9 @@ import gc
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
-# Hardcoded API Keys for ease of use in Colab
-PEXELS_API_KEY = '2DSzg1JdB7OB3DBf1eEPpyjRkAKWqDGzrOLhTTQBHTN1N1nplYD5srZ3'
-PIXABAY_API_KEY = '55426706-88c01ac01bdf3ded9bde88edc'
+# API Keys - managed via environment variables
+PEXELS_API_KEY = os.getenv('PEXELS_API_KEY')
+PIXABAY_API_KEY = os.getenv('PIXABAY_API_KEY')
 
 # Device Configuration
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -111,30 +111,34 @@ def search_pexels(query, min_width=1920, min_height=1080):
         candidates = []
 
         for video in data.get('videos', []):
-            if not isinstance(video, dict):
+            try:
+                if not isinstance(video, dict):
+                    continue
+
+                video_files = video.get('video_files', [])
+                if not isinstance(video_files, list):
+                    continue
+
+                suitable_files = [
+                    f for f in video_files
+                    if isinstance(f, dict) and (
+                        f.get('width', 0) >= min_width and
+                        f.get('height', 0) >= min_height
+                    )
+                ]
+
+                if suitable_files:
+                    best_file = suitable_files[0]
+
+                    candidates.append({
+                        'url': best_file.get('link'),
+                        'thumb_url': video.get('image'),
+                        'id': f"pexels_{video.get('id', 'unknown')}",
+                        'source': 'pexels'
+                    })
+            except Exception as e:
+                print(f"Error processing Pexels video: {e}")
                 continue
-
-            video_files = video.get('video_files', [])
-            if not isinstance(video_files, list):
-                continue
-
-            suitable_files = [
-                f for f in video_files
-                if isinstance(f, dict) and (
-                    f.get('width', 0) >= min_width and
-                    f.get('height', 0) >= min_height
-                )
-            ]
-
-            if suitable_files:
-                best_file = suitable_files[0]
-
-                candidates.append({
-                    'url': best_file.get('link'),
-                    'thumb_url': video.get('image'),
-                    'id': f"pexels_{video.get('id', 'unknown')}",
-                    'source': 'pexels'
-                })
 
         return candidates
 
@@ -160,37 +164,41 @@ def search_pixabay(query):
         candidates = []
 
         for video in data.get('hits', []):
-            if not isinstance(video, dict):
+            try:
+                if not isinstance(video, dict):
+                    continue
+
+                video_types = video.get('videos', {})
+                if not isinstance(video_types, dict):
+                    continue
+
+                best_file = (
+                    video_types.get('large') or
+                    video_types.get('medium') or
+                    video_types.get('small')
+                )
+
+                if isinstance(best_file, dict) and best_file.get('url'):
+                    picture_id = video.get('picture_id')
+
+                    if picture_id:
+                        thumb_url = (
+                            f"https://i.vimeocdn.com/video/"
+                            f"{picture_id}_640x360.jpg"
+                        )
+                    else:
+                        thumb_url = video.get('userImageURL')
+
+                    if thumb_url:
+                        candidates.append({
+                            'url': best_file.get('url'),
+                            'thumb_url': thumb_url,
+                            'id': f"pixabay_{video.get('id', 'unknown')}",
+                            'source': 'pixabay'
+                        })
+            except Exception as e:
+                print(f"Error processing Pixabay video: {e}")
                 continue
-
-            video_types = video.get('videos', {})
-            if not isinstance(video_types, dict):
-                continue
-
-            best_file = (
-                video_types.get('large') or
-                video_types.get('medium') or
-                video_types.get('small')
-            )
-
-            if isinstance(best_file, dict) and best_file.get('url'):
-                picture_id = video.get('picture_id')
-
-                if picture_id:
-                    thumb_url = (
-                        f"https://i.vimeocdn.com/video/"
-                        f"{picture_id}_640x360.jpg"
-                    )
-                else:
-                    thumb_url = video.get('userImageURL')
-
-                if thumb_url:
-                    candidates.append({
-                        'url': best_file.get('url'),
-                        'thumb_url': thumb_url,
-                        'id': f"pixabay_{video.get('id', 'unknown')}",
-                        'source': 'pixabay'
-                    })
 
         return candidates
 
@@ -342,13 +350,14 @@ def batch_semantic_filter(
     ).to(device)
 
     with torch.no_grad():
-        image_features = CLIP_MODEL.get_image_features(
-            pixel_values=inputs['pixel_values']
-        )
-        text_features = CLIP_MODEL.get_text_features(
+        outputs = CLIP_MODEL(
+            pixel_values=inputs['pixel_values'],
             input_ids=inputs['input_ids'],
-            attention_mask=inputs.get('attention_mask')
+            attention_mask=inputs.get('attention_mask'),
+            return_dict=True
         )
+        image_features = outputs.image_embeds
+        text_features = outputs.text_embeds
 
     image_features = torch.nn.functional.normalize(
         image_features,
@@ -414,13 +423,14 @@ def temporal_validate(
     ).to(device)
 
     with torch.no_grad():
-        img_feats = CLIP_MODEL.get_image_features(
-            pixel_values=inputs['pixel_values']
-        )
-        txt_feats = CLIP_MODEL.get_text_features(
+        outputs = CLIP_MODEL(
+            pixel_values=inputs['pixel_values'],
             input_ids=inputs['input_ids'],
-            attention_mask=inputs.get('attention_mask')
+            attention_mask=inputs.get('attention_mask'),
+            return_dict=True
         )
+        img_feats = outputs.image_embeds
+        txt_feats = outputs.text_embeds
 
     img_feats = torch.nn.functional.normalize(
         img_feats,
