@@ -17,7 +17,7 @@
         "must_have": ["blue water", "bubbles"],
         "exclude": ["diver", "boat"],
         "min_resolution": "1080p",
-        "clip_threshold": 0.85,
+        "clip_threshold": 0.28,
         "fallback_broll": ["dark blue ocean", "sea waves"]
       },
       "visual_elements": {
