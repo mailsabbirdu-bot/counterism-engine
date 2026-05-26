@@ -1,0 +1,64 @@
+{
+  "project_name": "Counterism_Demo_V4",
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "scenes": [
+    {
+      "scene_id": "SC-01",
+      "video_path": "renders/scene_SC_01.mp4",
+      "duration_in_frames": 150,
+      "overlays": [
+        {
+          "id": "t1",
+          "type": "text",
+          "content": "THE FUTURE OF AUTOMATION",
+          "start": 10,
+          "duration": 60,
+          "font": "Montserrat",
+          "animation": "wordByWord",
+          "style": "text-white text-7xl font-bold tracking-tighter"
+        },
+        {
+          "id": "ui1",
+          "type": "ui_panel",
+          "title": "SYSTEM STATUS",
+          "description": "All systems operational. Cinematic engine initialized.",
+          "start": 30,
+          "duration": 90,
+          "position": { "x": 100, "y": 700 },
+          "variant": "glass"
+        },
+        {
+          "id": "sh1",
+          "type": "shape",
+          "shape_type": "circle",
+          "start": 0,
+          "duration": 150,
+          "animation": "pulse",
+          "color": "#3b82f6"
+        },
+        {
+          "id": "ch1",
+          "type": "chart",
+          "chart_type": "line",
+          "start": 80,
+          "duration": 70,
+          "data": [
+            { "id": "efficiency", "data": [{ "x": 0, "y": 10 }, { "x": 1, "y": 40 }, { "x": 2, "y": 35 }, { "x": 3, "y": 80 }] }
+          ]
+        },
+        {
+          "id": "gr1",
+          "type": "graph",
+          "start": 100,
+          "duration": 50,
+          "nodes": 20,
+          "links": 30
+        }
+      ]
+    }
+  ]
+}

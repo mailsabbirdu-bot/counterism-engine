@@ -1,0 +1,90 @@
+
+> counterism-studio-v4@4.0.0 start
+> remotion preview
+
+Server ready - Local: http://localhost:3000, Network: http://192.168.0.2:3000
+Building...
+Built in 10175ms
+To restart - Local: http://localhost:3000, Network: http://192.168.0.2:3000
+To restart - Local: http://localhost:3000, Network: http://192.168.0.2:3000
+Building...
+Built in 8838ms
+Building...
+WARNING in ./src/Root.tsx 21:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+Built in 3942ms
+Building...
+WARNING in ./src/Root.tsx 21:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+Built in 1478ms
+Building...
+WARNING in ./src/Root.tsx 21:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+Built in 2787ms
+Building...
+WARNING in ./src/Root.tsx 21:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+Built in 1182ms
+Building...
+WARNING in ./src/Root.tsx 21:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+Built in 1164ms
+Building...
+WARNING in ./src/Root.tsx 21:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+Built in 2830ms
+Building...
+WARNING in ./src/Root.tsx 21:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+Built in 901ms
+Building...
+WARNING in ./src/Root.tsx 21:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+ERROR in ./src/components/ui/card.tsx 4:0-33
+Module not found: Error: Can't resolve '@/lib/utils' in '/app/src/components/ui'
+ERROR in ./src/components/ui/progress.tsx 5:0-33
+Module not found: Error: Can't resolve '@/lib/utils' in '/app/src/components/ui'
+Built in 1596ms
+Building...
+WARNING in ./src/Root.tsx 21:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+ERROR in ./src/components/ui/card.tsx 4:0-33
+Module not found: Error: Can't resolve '@/lib/utils' in '/app/src/components/ui'
+ERROR in ./src/components/ui/progress.tsx 5:0-33
+Module not found: Error: Can't resolve '@/lib/utils' in '/app/src/components/ui'
+Built in 736ms
+Building...
+WARNING in ./src/Root.tsx 21:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+Built in 1521ms
+Building...
+WARNING in ./src/Root.tsx 21:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+Built in 1577ms
+Building...
+WARNING in ./src/Root.tsx 21:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+Built in 789ms
+Building...
+Built in 952ms
+Building...
+Built in 418ms
+To restart - Local: http://localhost:3000, Network: http://192.168.0.2:3000
+Building...
+WARNING in ./src/Root.tsx 22:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+Built in 7694ms
+Building...
+WARNING in ./src/Root.tsx 22:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+Built in 4268ms
+Building...
+WARNING in ./src/Root.tsx 22:28-36
+export 'loadFont' (imported as 'loadFont') was not found in '@remotion/google-fonts' (possible exports: getAvailableFonts)
+Built in 1166ms
+Building...
+Built in 4362ms
+Building...
+Built in 1333ms
+Building...
+Built in 461ms

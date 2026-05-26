@@ -1,0 +1,47 @@
+{
+  "name": "counterism-studio-v4",
+  "version": "4.0.0",
+  "description": "JSON-driven video automation pipeline built on Remotion",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "remotion preview",
+    "build": "remotion bundle",
+    "render": "node --loader ts-node/esm render.ts",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@nivo/bar": "^0.88.0",
+    "@nivo/core": "^0.88.0",
+    "@nivo/line": "^0.88.0",
+    "@radix-ui/react-progress": "^1.1.8",
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@remotion/cli": "^4.0.222",
+    "@remotion/google-fonts": "^4.0.222",
+    "@remotion/renderer": "^4.0.222",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "d3": "^7.9.0",
+    "framer-motion": "^11.11.11",
+    "gsap": "^3.12.5",
+    "lucide-react": "^0.454.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.222",
+    "split-type": "^0.3.4",
+    "tailwind-merge": "^2.5.4",
+    "tailwindcss-animate": "^1.0.7"
+  },
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}
