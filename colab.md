@@ -1,20 +1,12 @@
 # ☁️ Google Colab Setup (Counterism Studio V4)
 
-Run these cells in a Google Colab environment:
+Run the following cell in Google Colab to automate the entire process:
 
-## 1. Install System Dependencies
-```bash
+```python
+# Install dependencies, clone repository, and run the rendering pipeline
 !apt-get update && apt-get install -y ffmpeg build-essential
-```
-
-## 2. Clone and Setup
-```bash
-!git clone <your-repo-url>
-%cd counterism-studio-v4
+!git clone https://github.com/mailsabbirdu-bot/counterism-engine
+%cd counterism-engine
 !npm install
-```
-
-## 3. Render
-```bash
 !npm run render
 ```
