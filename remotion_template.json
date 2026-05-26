@@ -1,5 +1,5 @@
 {
-  "project_name": "Counterism_Demo_V4",
+  "project_name": "Counterism_Master_Template_V4",
   "global_settings": {
     "width": 1920,
     "height": 1080,
@@ -7,56 +7,96 @@
   },
   "scenes": [
     {
-      "scene_id": "SC-01",
+      "scene_id": "SC-MASTER",
       "video_path": "renders/scene_SC_01.mp4",
-      "duration_in_frames": 150,
+      "duration_in_frames": 300,
       "overlays": [
         {
-          "id": "t1",
+          "id": "bg-graph",
+          "type": "graph",
+          "start": 0,
+          "duration": 300,
+          "nodes": 40,
+          "links": 60,
+          "speed": 0.2,
+          "nodeColor": "#3b82f6",
+          "linkColor": "rgba(255,255,255,0.05)"
+        },
+        {
+          "id": "main-title",
           "type": "text",
-          "content": "THE FUTURE OF AUTOMATION",
-          "start": 10,
-          "duration": 60,
+          "content": "THE FUTURE OF CINEMATIC AUTOMATION",
+          "start": 15,
+          "duration": 270,
           "font": "Montserrat",
-          "animation": "wordByWord",
-          "style": "text-white text-7xl font-bold tracking-tighter"
+          "splitMode": "word",
+          "stagger": 0.1,
+          "animation": "cinematicGlow",
+          "style": "text-white text-8xl font-black tracking-tighter uppercase"
         },
         {
-          "id": "ui1",
+          "id": "status-panel",
           "type": "ui_panel",
-          "title": "SYSTEM STATUS",
-          "description": "All systems operational. Cinematic engine initialized.",
-          "start": 30,
-          "duration": 90,
-          "position": { "x": 100, "y": 700 },
-          "variant": "glass"
+          "title": "CORE ENGINE STATUS",
+          "description": "Neural processing units at 98% efficiency. All cinematic layers synchronized with background telemetry.",
+          "iconType": "cpu",
+          "nodeId": "STUDIO-V4-ALPHA",
+          "start": 45,
+          "duration": 240,
+          "position": { "x": 80, "y": 620 },
+          "variant": "glass",
+          "initialProgress": 20,
+          "targetProgress": 98.4
         },
         {
-          "id": "sh1",
+          "id": "deco-shape",
           "type": "shape",
           "shape_type": "circle",
           "start": 0,
-          "duration": 150,
+          "duration": 300,
           "animation": "pulse",
-          "color": "#3b82f6"
+          "color": "#3b82f6",
+          "size": 120,
+          "position": { "x": 305, "y": 782 },
+          "decorated": true
         },
         {
-          "id": "ch1",
+          "id": "data-chart",
           "type": "chart",
           "chart_type": "line",
-          "start": 80,
-          "duration": 70,
+          "title": "SYSTEM PERFORMANCE",
+          "subtitle": "THROUGHPUT ANALYTICS",
+          "start": 100,
+          "duration": 180,
+          "width": 700,
+          "height": 400,
+          "position": { "x": 1140, "y": 520 },
+          "colors": { "scheme": "spectral" },
           "data": [
-            { "id": "efficiency", "data": [{ "x": 0, "y": 10 }, { "x": 1, "y": 40 }, { "x": 2, "y": 35 }, { "x": 3, "y": 80 }] }
+            {
+              "id": "efficiency",
+              "data": [
+                { "x": "T-10", "y": 45 },
+                { "x": "T-08", "y": 52 },
+                { "x": "T-06", "y": 48 },
+                { "x": "T-04", "y": 61 },
+                { "x": "T-02", "y": 55 },
+                { "x": "NOW", "y": 89 }
+              ]
+            }
           ]
         },
         {
-          "id": "gr1",
-          "type": "graph",
-          "start": 100,
-          "duration": 50,
-          "nodes": 20,
-          "links": 30
+          "id": "secondary-title",
+          "type": "text",
+          "content": "REMOTION ENGINE V4.0",
+          "start": 200,
+          "duration": 90,
+          "font": "Inter",
+          "splitMode": "char",
+          "stagger": 0.03,
+          "animation": "slideUp",
+          "style": "text-blue-400 text-2xl font-mono tracking-[0.5em] absolute top-20 left-20"
         }
       ]
     }
