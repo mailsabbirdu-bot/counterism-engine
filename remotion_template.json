@@ -10,48 +10,48 @@
       "scene_id": "SC-01-PROCEDURAL",
       "background_type": "procedural",
       "procedural_config": {
-        "speed": 2,
+        "speed": 1.5,
         "type": "cosmic_gradient"
       },
-      "duration_in_frames": 450,
+      "duration_in_frames": 600,
       "overlays": [
         {
           "id": "bg-graph",
           "type": "graph",
           "start": 0,
-          "duration": 450,
-          "nodes": 60,
-          "links": 90,
-          "speed": 0.3,
+          "duration": 600,
+          "nodes": 40,
+          "links": 60,
+          "speed": 0.05,
           "nodeColor": "#60a5fa",
           "linkColor": "rgba(255,255,255,0.1)"
         },
         {
           "id": "main-title",
           "type": "text",
-          "content": "PROCEDURAL GENERATION ACTIVE",
-          "start": 30,
-          "duration": 390,
+          "content": "PROCEDURAL ENGINE V4",
+          "start": 60,
+          "duration": 480,
           "font": "Montserrat",
-          "fontSize": "120px",
+          "fontSize": "150px",
           "splitMode": "word",
-          "stagger": 0.15,
+          "stagger": 0.2,
           "animation": "cinematicGlow",
           "style": "text-white font-black tracking-tighter uppercase"
         },
         {
           "id": "status-panel",
           "type": "ui_panel",
-          "title": "ENGINE METRICS",
-          "description": "Procedural background rendering via React state-driven particle systems.",
+          "title": "SYSTEM ARCHITECTURE",
+          "description": "Next-generation procedural background rendering with frame-sync precision.",
           "iconType": "cpu",
-          "nodeId": "PROC-001",
-          "start": 90,
-          "duration": 300,
-          "position": { "x": 100, "y": 600 },
+          "nodeId": "CORE-PROC-01",
+          "start": 120,
+          "duration": 400,
+          "position": { "x": 100, "y": 550 },
           "variant": "glass",
           "initialProgress": 0,
-          "targetProgress": 95
+          "targetProgress": 98
         }
       ]
     },
@@ -59,52 +59,56 @@
       "scene_id": "SC-02-VIDEO",
       "background_type": "video",
       "video_path": "renders/scene_SC_02.mp4",
-      "duration_in_frames": 450,
+      "duration_in_frames": 600,
       "overlays": [
         {
           "id": "deco-shape",
           "type": "shape",
           "shape_type": "circle",
           "start": 0,
-          "duration": 450,
+          "duration": 600,
           "animation": "pulse",
           "color": "#f472b6",
-          "size": 300,
+          "size": 400,
           "position": { "x": 960, "y": 540 },
-          "decorated": true
+          "decorated": true,
+          "speed": 0.5
         },
         {
           "id": "main-title",
           "type": "text",
-          "content": "VIDEO BACKGROUND SYNC",
-          "start": 45,
-          "duration": 360,
+          "content": "SMOOTH VIDEO SYNC",
+          "start": 60,
+          "duration": 480,
           "font": "Montserrat",
-          "fontSize": "100px",
+          "fontSize": "120px",
           "splitMode": "word",
-          "stagger": 0.1,
+          "stagger": 0.15,
           "animation": "slideUp",
-          "style": "text-pink-400 font-extrabold uppercase"
+          "style": "text-pink-500 font-extrabold uppercase"
         },
         {
           "id": "data-chart",
           "type": "chart",
           "chart_type": "line",
-          "title": "ANALYTICS OVERLAY",
-          "subtitle": "REAL-TIME DATA PROCESSING",
-          "start": 120,
-          "duration": 300,
-          "width": 800,
-          "height": 450,
-          "position": { "x": 560, "y": 500 },
+          "title": "PERFORMANCE METRICS",
+          "subtitle": "REAL-TIME FRAME EVALUATION",
+          "start": 150,
+          "duration": 400,
+          "width": 1000,
+          "height": 600,
+          "position": { "x": 460, "y": 420 },
           "colors": { "scheme": "nivo" },
           "data": [
             {
-              "id": "processing",
+              "id": "frame_stability",
               "data": [
-                { "x": "START", "y": 10 },
-                { "x": "MID", "y": 80 },
-                { "x": "END", "y": 100 }
+                { "x": "0s", "y": 30 },
+                { "x": "1s", "y": 60 },
+                { "x": "2s", "y": 45 },
+                { "x": "3s", "y": 90 },
+                { "x": "4s", "y": 85 },
+                { "x": "5s", "y": 100 }
               ]
             }
           ]
@@ -115,61 +119,61 @@
       "scene_id": "SC-03-STRESS",
       "background_type": "procedural",
       "procedural_config": {
-        "speed": 5
+        "speed": 3
       },
-      "duration_in_frames": 600,
+      "duration_in_frames": 750,
       "overlays": [
         {
           "id": "complex-graph",
           "type": "graph",
           "start": 0,
-          "duration": 600,
-          "nodes": 120,
-          "links": 200,
-          "speed": 0.8,
+          "duration": 750,
+          "nodes": 100,
+          "links": 150,
+          "speed": 0.08,
           "nodeColor": "#a78bfa",
           "linkColor": "rgba(255,255,255,0.15)"
         },
         {
           "id": "main-title",
           "type": "text",
-          "content": "MAXIMUM STRESS LOAD",
-          "start": 60,
-          "duration": 480,
+          "content": "MAXIMUM ENGINE STRESS",
+          "start": 90,
+          "duration": 600,
           "font": "Montserrat",
-          "fontSize": "140px",
+          "fontSize": "160px",
           "splitMode": "char",
-          "stagger": 0.05,
+          "stagger": 0.04,
           "animation": "cinematicGlow",
           "style": "text-violet-500 font-black uppercase"
         },
         {
           "id": "ui-1",
           "type": "ui_panel",
-          "title": "SYSTEM LOAD",
-          "description": "Evaluating multi-layer performance.",
+          "title": "RENDER CAPACITY",
+          "description": "Testing concurrent multi-layered motion systems.",
           "iconType": "activity",
-          "nodeId": "STRESS-A",
-          "start": 150,
-          "duration": 400,
-          "position": { "x": 100, "y": 100 },
+          "nodeId": "STRESS-X1",
+          "start": 180,
+          "duration": 500,
+          "position": { "x": 50, "y": 50 },
           "variant": "dark",
-          "initialProgress": 20,
+          "initialProgress": 10,
           "targetProgress": 100
         },
         {
           "id": "ui-2",
           "type": "ui_panel",
-          "title": "RENDER PIPELINE",
-          "description": "Concurrent scene processing test.",
+          "title": "MEMORY BUFFER",
+          "description": "Optimized frame interpolation active.",
           "iconType": "terminal",
-          "nodeId": "STRESS-B",
-          "start": 200,
-          "duration": 350,
-          "position": { "x": 1300, "y": 600 },
+          "nodeId": "STRESS-X2",
+          "start": 240,
+          "duration": 450,
+          "position": { "x": 1300, "y": 550 },
           "variant": "glass",
-          "initialProgress": 10,
-          "targetProgress": 88
+          "initialProgress": 5,
+          "targetProgress": 92
         }
       ]
     },
@@ -177,33 +181,33 @@
       "scene_id": "SC-04-MEDIA",
       "background_type": "procedural",
       "procedural_config": {
-        "speed": 1
+        "speed": 0.5
       },
-      "duration_in_frames": 450,
+      "duration_in_frames": 600,
       "overlays": [
         {
           "id": "overlay-video",
           "type": "video",
           "src": "renders/scene_SC_01.mp4",
-          "start": 30,
-          "duration": 300,
-          "position": { "x": 200, "y": 200 },
+          "start": 60,
+          "duration": 480,
+          "position": { "x": 640, "y": 360 },
           "width": 640,
           "height": 360,
-          "borderRadius": 20,
+          "borderRadius": 40,
           "shadow": true,
-          "border": { "width": 4, "color": "#ffffff" }
+          "border": { "width": 8, "color": "#ffffff" }
         },
         {
           "id": "media-text",
           "type": "text",
           "content": "PICTURE IN PICTURE",
-          "start": 60,
-          "duration": 240,
+          "start": 120,
+          "duration": 400,
           "font": "Montserrat",
-          "fontSize": "80px",
+          "fontSize": "100px",
           "animation": "slideUp",
-          "style": "text-white font-bold absolute bottom-20 left-20"
+          "style": "text-white font-black absolute bottom-20 left-20"
         }
       ]
     }

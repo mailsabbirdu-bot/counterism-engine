@@ -13,10 +13,14 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
       case 'video':
         if (!sceneData.video_path) return null;
         return (
-          <OffthreadVideo
-            src={staticFile(sceneData.video_path)}
-            className="w-full h-full object-cover"
-          />
+          <>
+            <OffthreadVideo
+              src={staticFile(sceneData.video_path)}
+              className="w-full h-full object-cover"
+            />
+            {/* Dark overlay for readability */}
+            <AbsoluteFill className="bg-black/40" />
+          </>
         );
       case 'procedural':
         return <ProceduralBackground config={sceneData.procedural_config || {}} />;
@@ -26,10 +30,13 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
         // Fallback to video if video_path is present, otherwise none
         if (sceneData.video_path) {
           return (
-            <OffthreadVideo
-              src={staticFile(sceneData.video_path)}
-              className="w-full h-full object-cover"
-            />
+            <>
+              <OffthreadVideo
+                src={staticFile(sceneData.video_path)}
+                className="w-full h-full object-cover"
+              />
+              <AbsoluteFill className="bg-black/40" />
+            </>
           );
         }
         return null;
