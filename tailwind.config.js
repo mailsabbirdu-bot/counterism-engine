@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   content: [
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
@@ -12,6 +12,15 @@ module.exports = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      keyframes: {
+        scan: {
+          '0%': { transform: 'translateY(-100%)' },
+          '100%': { transform: 'translateY(500%)' }
+        }
+      },
+      animation: {
+        scan: 'scan 4s linear infinite'
       }
     },
   },
