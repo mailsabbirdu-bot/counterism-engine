@@ -31,22 +31,30 @@ else:
 
 # 3. Handle External Assets (Renders & Audio)
 print("🔗 Linking Drive assets to project...")
-!mkdir -p public/renders
-!mkdir -p public/audio
+# Ensure local directories exist
+os.makedirs("public/renders", exist_ok=True)
+os.makedirs("public/audio", exist_ok=True)
 
-# Sync renders folder (using symlinks for nested structures from Drive)
-if os.path.exists(f"{DRIVE_BASE_PATH}/renders"):
-    print("✅ Found 'renders' in Drive. Linking files...")
-    !cp -rs {DRIVE_BASE_PATH}/renders/* public/renders/ 2>/dev/null || true
+# Robust sync for renders folder
+drive_renders = f"{DRIVE_BASE_PATH}/renders"
+if os.path.exists(drive_renders):
+    print(f"✅ Found 'renders' in Drive ({drive_renders}). Linking files...")
+    # Using recursive copy for symlinks to handle nested directories correctly
+    !cp -rs {drive_renders}/* public/renders/ 2>/dev/null || true
+
+    # Verification check
+    linked_files = os.listdir("public/renders")
+    print(f"📁 Linked files in public/renders: {linked_files}")
 else:
-    print("⚠️ 'renders' folder not found in Drive.")
+    print(f"⚠️ 'renders' folder not found in Drive at: {drive_renders}")
 
 # Sync audio folder
-if os.path.exists(f"{DRIVE_BASE_PATH}/audio"):
-    print("✅ Found 'audio' in Drive. Linking files...")
-    !cp -rs {DRIVE_BASE_PATH}/audio/* public/audio/ 2>/dev/null || true
+drive_audio = f"{DRIVE_BASE_PATH}/audio"
+if os.path.exists(drive_audio):
+    print(f"✅ Found 'audio' in Drive ({drive_audio}). Linking files...")
+    !cp -rs {drive_audio}/* public/audio/ 2>/dev/null || true
 else:
-    print("⚠️ 'audio' folder not found in Drive.")
+    print(f"⚠️ 'audio' folder not found in Drive at: {drive_audio}")
 
 # 4. Install System & Node Dependencies
 print("🛠️ Installing system dependencies (ffmpeg, build-essential)...")
@@ -55,12 +63,13 @@ print("🛠️ Installing system dependencies (ffmpeg, build-essential)...")
 print("📦 Installing Node.js dependencies...")
 !npm install
 
-# 5. Render Pipeline with Ultra-Debugging
+# 5. Render Pipeline with Optimized Concurrency
 print("\n🎬 STARTING RENDERING PIPELINE...")
 print("--------------------------------------------------------------------------------")
-!DEBUG=remotion:* npm run render -- --verbose 2>&1 | tee render_debug.log
+# The render.ts is already configured with concurrency: 4 for speed
+!npm run render
 
-# 6. Automatic Drive Upload
+# 6. Automatic Drive Upload (Recursive)
 print("\n--------------------------------------------------------------------------------")
 print("💾 SAVING RESULTS TO GOOGLE DRIVE...")
 
@@ -71,13 +80,9 @@ if os.path.exists(LOCAL_RENDER_DIR):
     print(f"📂 Creating destination in Drive: {DRIVE_RENDER_DIR}")
     os.makedirs(DRIVE_RENDER_DIR, exist_ok=True)
 
-    print(f"📤 Copying rendered files to Drive...")
-    for filename in os.listdir(LOCAL_RENDER_DIR):
-        if filename.endswith(".mp4") or filename.endswith(".webm"):
-            src = os.path.join(LOCAL_RENDER_DIR, filename)
-            dst = os.path.join(DRIVE_RENDER_DIR, filename)
-            print(f"   -> {filename}")
-            shutil.copy2(src, dst)
+    print(f"📤 Uploading rendered files to Drive...")
+    # Using 'cp' to handle recursive directory structures if any
+    !cp -rv {LOCAL_RENDER_DIR}/* {DRIVE_RENDER_DIR}/
 
     print("\n✅ All rendered scenes have been saved to your Google Drive!")
 else:
