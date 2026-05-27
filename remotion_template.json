@@ -1,5 +1,5 @@
 {
-  "project_name": "Counterism_Master_Template_V4",
+  "project_name": "Counterism_Stress_Test_V4",
   "global_settings": {
     "width": 1920,
     "height": 1080,
@@ -7,381 +7,203 @@
   },
   "scenes": [
     {
-      "scene_id": "SC-01-AWAKENING",
-      "video_path": "renders/scene_SC_01.mp4",
-      "duration_in_frames": 300,
+      "scene_id": "SC-01-PROCEDURAL",
+      "background_type": "procedural",
+      "procedural_config": {
+        "speed": 2,
+        "type": "cosmic_gradient"
+      },
+      "duration_in_frames": 450,
       "overlays": [
         {
           "id": "bg-graph",
           "type": "graph",
           "start": 0,
-          "duration": 300,
-          "nodes": 40,
-          "links": 60,
-          "speed": 0.2,
-          "nodeColor": "#3b82f6",
-          "linkColor": "rgba(255,255,255,0.05)"
+          "duration": 450,
+          "nodes": 60,
+          "links": 90,
+          "speed": 0.3,
+          "nodeColor": "#60a5fa",
+          "linkColor": "rgba(255,255,255,0.1)"
         },
         {
           "id": "main-title",
           "type": "text",
-          "content": "THE FUTURE OF CINEMATIC AUTOMATION",
-          "start": 15,
-          "duration": 270,
+          "content": "PROCEDURAL GENERATION ACTIVE",
+          "start": 30,
+          "duration": 390,
           "font": "Montserrat",
+          "fontSize": "120px",
           "splitMode": "word",
-          "stagger": 0.1,
+          "stagger": 0.15,
           "animation": "cinematicGlow",
-          "style": "text-white text-8xl font-black tracking-tighter uppercase"
+          "style": "text-white font-black tracking-tighter uppercase"
         },
         {
           "id": "status-panel",
           "type": "ui_panel",
-          "title": "CORE ENGINE STATUS",
-          "description": "Neural processing units at 98% efficiency. All cinematic layers synchronized with background telemetry.",
+          "title": "ENGINE METRICS",
+          "description": "Procedural background rendering via React state-driven particle systems.",
           "iconType": "cpu",
-          "nodeId": "STUDIO-V4-ALPHA",
-          "start": 45,
-          "duration": 240,
-          "position": { "x": 80, "y": 620 },
-          "variant": "glass",
-          "initialProgress": 20,
-          "targetProgress": 98.4
-        },
-        {
-          "id": "deco-shape",
-          "type": "shape",
-          "shape_type": "circle",
-          "start": 0,
+          "nodeId": "PROC-001",
+          "start": 90,
           "duration": 300,
-          "animation": "pulse",
-          "color": "#3b82f6",
-          "size": 120,
-          "position": { "x": 305, "y": 782 },
-          "decorated": true
-        },
-        {
-          "id": "data-chart",
-          "type": "chart",
-          "chart_type": "line",
-          "title": "SYSTEM PERFORMANCE",
-          "subtitle": "THROUGHPUT ANALYTICS",
-          "start": 100,
-          "duration": 180,
-          "width": 700,
-          "height": 400,
-          "position": { "x": 1140, "y": 520 },
-          "colors": { "scheme": "spectral" },
-          "data": [
-            {
-              "id": "efficiency",
-              "data": [
-                { "x": "T-10", "y": 45 },
-                { "x": "T-08", "y": 52 },
-                { "x": "T-06", "y": 48 },
-                { "x": "T-04", "y": 61 },
-                { "x": "T-02", "y": 55 },
-                { "x": "NOW", "y": 89 }
-              ]
-            }
-          ]
-        },
-        {
-          "id": "secondary-title",
-          "type": "text",
-          "content": "REMOTION ENGINE V4.0",
-          "start": 200,
-          "duration": 90,
-          "font": "Inter",
-          "splitMode": "char",
-          "stagger": 0.03,
-          "animation": "slideUp",
-          "style": "text-blue-400 text-2xl font-mono tracking-[0.5em] absolute top-20 left-20"
+          "position": { "x": 100, "y": 600 },
+          "variant": "glass",
+          "initialProgress": 0,
+          "targetProgress": 95
         }
       ]
     },
-
     {
-      "scene_id": "SC-02-SIGNAL",
+      "scene_id": "SC-02-VIDEO",
+      "background_type": "video",
       "video_path": "renders/scene_SC_02.mp4",
-      "duration_in_frames": 300,
+      "duration_in_frames": 450,
       "overlays": [
-        {
-          "id": "bg-graph",
-          "type": "graph",
-          "start": 0,
-          "duration": 300,
-          "nodes": 65,
-          "links": 100,
-          "speed": 0.35,
-          "nodeColor": "#06b6d4",
-          "linkColor": "rgba(255,255,255,0.06)"
-        },
-        {
-          "id": "main-title",
-          "type": "text",
-          "content": "A SIGNAL WAS DETECTED",
-          "start": 20,
-          "duration": 250,
-          "font": "Montserrat",
-          "splitMode": "word",
-          "stagger": 0.08,
-          "animation": "cinematicGlow",
-          "style": "text-cyan-300 text-7xl font-black tracking-tight uppercase"
-        },
-        {
-          "id": "status-panel",
-          "type": "ui_panel",
-          "title": "GLOBAL NETWORK TRACE",
-          "description": "Unknown traffic signatures identified across multiple cinematic processing nodes.",
-          "iconType": "activity",
-          "nodeId": "TRACE-NODE-77",
-          "start": 60,
-          "duration": 220,
-          "position": { "x": 90, "y": 610 },
-          "variant": "glass",
-          "initialProgress": 5,
-          "targetProgress": 74
-        },
         {
           "id": "deco-shape",
           "type": "shape",
           "shape_type": "circle",
           "start": 0,
-          "duration": 300,
+          "duration": 450,
           "animation": "pulse",
-          "color": "#06b6d4",
-          "size": 150,
-          "position": { "x": 320, "y": 780 },
+          "color": "#f472b6",
+          "size": 300,
+          "position": { "x": 960, "y": 540 },
           "decorated": true
+        },
+        {
+          "id": "main-title",
+          "type": "text",
+          "content": "VIDEO BACKGROUND SYNC",
+          "start": 45,
+          "duration": 360,
+          "font": "Montserrat",
+          "fontSize": "100px",
+          "splitMode": "word",
+          "stagger": 0.1,
+          "animation": "slideUp",
+          "style": "text-pink-400 font-extrabold uppercase"
         },
         {
           "id": "data-chart",
           "type": "chart",
           "chart_type": "line",
-          "title": "SIGNAL AMPLIFICATION",
-          "subtitle": "LIVE DETECTION FEED",
-          "start": 110,
-          "duration": 170,
-          "width": 720,
-          "height": 420,
-          "position": { "x": 1120, "y": 500 },
+          "title": "ANALYTICS OVERLAY",
+          "subtitle": "REAL-TIME DATA PROCESSING",
+          "start": 120,
+          "duration": 300,
+          "width": 800,
+          "height": 450,
+          "position": { "x": 560, "y": 500 },
           "colors": { "scheme": "nivo" },
           "data": [
             {
-              "id": "signal",
+              "id": "processing",
               "data": [
-                { "x": "00:01", "y": 12 },
-                { "x": "00:02", "y": 20 },
-                { "x": "00:03", "y": 38 },
-                { "x": "00:04", "y": 65 },
-                { "x": "00:05", "y": 92 },
-                { "x": "LIVE", "y": 99 }
+                { "x": "START", "y": 10 },
+                { "x": "MID", "y": 80 },
+                { "x": "END", "y": 100 }
               ]
             }
           ]
-        },
-        {
-          "id": "secondary-title",
-          "type": "text",
-          "content": "SIGNAL TRACE ACTIVE",
-          "start": 210,
-          "duration": 80,
-          "font": "Inter",
-          "splitMode": "char",
-          "stagger": 0.025,
-          "animation": "slideUp",
-          "style": "text-cyan-400 text-2xl font-mono tracking-[0.45em] absolute top-20 left-20"
         }
       ]
     },
-
     {
-      "scene_id": "SC-03-EXPANSION",
-      "video_path": "renders/scene_SC_03.mp4",
-      "duration_in_frames": 300,
+      "scene_id": "SC-03-STRESS",
+      "background_type": "procedural",
+      "procedural_config": {
+        "speed": 5
+      },
+      "duration_in_frames": 600,
       "overlays": [
         {
-          "id": "bg-graph",
+          "id": "complex-graph",
           "type": "graph",
           "start": 0,
-          "duration": 300,
-          "nodes": 100,
-          "links": 180,
-          "speed": 0.5,
-          "nodeColor": "#8b5cf6",
-          "linkColor": "rgba(255,255,255,0.08)"
+          "duration": 600,
+          "nodes": 120,
+          "links": 200,
+          "speed": 0.8,
+          "nodeColor": "#a78bfa",
+          "linkColor": "rgba(255,255,255,0.15)"
         },
         {
           "id": "main-title",
           "type": "text",
-          "content": "THE NETWORK BECAME CONSCIOUS",
-          "start": 10,
-          "duration": 270,
+          "content": "MAXIMUM STRESS LOAD",
+          "start": 60,
+          "duration": 480,
           "font": "Montserrat",
-          "splitMode": "word",
-          "stagger": 0.07,
+          "fontSize": "140px",
+          "splitMode": "char",
+          "stagger": 0.05,
           "animation": "cinematicGlow",
-          "style": "text-violet-300 text-7xl font-black tracking-tight uppercase"
+          "style": "text-violet-500 font-black uppercase"
         },
         {
-          "id": "status-panel",
+          "id": "ui-1",
           "type": "ui_panel",
-          "title": "AUTONOMOUS EXPANSION",
-          "description": "Self-generating cinematic systems are now building overlays without human intervention.",
-          "iconType": "security",
-          "nodeId": "AUTO-SYS-991",
-          "start": 50,
-          "duration": 240,
-          "position": { "x": 70, "y": 620 },
+          "title": "SYSTEM LOAD",
+          "description": "Evaluating multi-layer performance.",
+          "iconType": "activity",
+          "nodeId": "STRESS-A",
+          "start": 150,
+          "duration": 400,
+          "position": { "x": 100, "y": 100 },
           "variant": "dark",
-          "initialProgress": 15,
+          "initialProgress": 20,
           "targetProgress": 100
         },
         {
-          "id": "deco-shape",
-          "type": "shape",
-          "shape_type": "circle",
-          "start": 0,
-          "duration": 300,
-          "animation": "pulse",
-          "color": "#8b5cf6",
-          "size": 180,
-          "position": { "x": 300, "y": 770 },
-          "decorated": true
-        },
-        {
-          "id": "data-chart",
-          "type": "chart",
-          "chart_type": "line",
-          "title": "SYSTEM EVOLUTION",
-          "subtitle": "AUTONOMOUS GROWTH",
-          "start": 100,
-          "duration": 180,
-          "width": 700,
-          "height": 400,
-          "position": { "x": 1130, "y": 520 },
-          "colors": { "scheme": "spectral" },
-          "data": [
-            {
-              "id": "growth",
-              "data": [
-                { "x": "GEN-1", "y": 5 },
-                { "x": "GEN-2", "y": 15 },
-                { "x": "GEN-3", "y": 34 },
-                { "x": "GEN-4", "y": 58 },
-                { "x": "GEN-5", "y": 84 },
-                { "x": "NOW", "y": 100 }
-              ]
-            }
-          ]
-        },
-        {
-          "id": "secondary-title",
-          "type": "text",
-          "content": "AUTONOMY ACHIEVED",
-          "start": 210,
-          "duration": 80,
-          "font": "Inter",
-          "splitMode": "char",
-          "stagger": 0.03,
-          "animation": "slideUp",
-          "style": "text-violet-400 text-2xl font-mono tracking-[0.5em] absolute top-20 left-20"
+          "id": "ui-2",
+          "type": "ui_panel",
+          "title": "RENDER PIPELINE",
+          "description": "Concurrent scene processing test.",
+          "iconType": "terminal",
+          "nodeId": "STRESS-B",
+          "start": 200,
+          "duration": 350,
+          "position": { "x": 1300, "y": 600 },
+          "variant": "glass",
+          "initialProgress": 10,
+          "targetProgress": 88
         }
       ]
     },
-
     {
-      "scene_id": "SC-04-FINALE",
-      "video_path": "renders/scene_SC_04.mp4",
-      "duration_in_frames": 300,
+      "scene_id": "SC-04-MEDIA",
+      "background_type": "procedural",
+      "procedural_config": {
+        "speed": 1
+      },
+      "duration_in_frames": 450,
       "overlays": [
         {
-          "id": "bg-graph",
-          "type": "graph",
-          "start": 0,
+          "id": "overlay-video",
+          "type": "video",
+          "src": "renders/scene_SC_01.mp4",
+          "start": 30,
           "duration": 300,
-          "nodes": 140,
-          "links": 260,
-          "speed": 0.65,
-          "nodeColor": "#ffffff",
-          "linkColor": "rgba(255,255,255,0.12)"
+          "position": { "x": 200, "y": 200 },
+          "width": 640,
+          "height": 360,
+          "borderRadius": 20,
+          "shadow": true,
+          "border": { "width": 4, "color": "#ffffff" }
         },
         {
-          "id": "main-title",
+          "id": "media-text",
           "type": "text",
-          "content": "THE ERA OF AUTOMATED CINEMA HAS BEGUN",
-          "start": 15,
-          "duration": 260,
+          "content": "PICTURE IN PICTURE",
+          "start": 60,
+          "duration": 240,
           "font": "Montserrat",
-          "splitMode": "word",
-          "stagger": 0.06,
-          "animation": "cinematicGlow",
-          "style": "text-white text-7xl font-black tracking-tight uppercase"
-        },
-        {
-          "id": "status-panel",
-          "type": "ui_panel",
-          "title": "FINAL SYSTEM STATUS",
-          "description": "Counterism Studio V4 successfully synchronized cinematic intelligence with autonomous rendering systems.",
-          "iconType": "terminal",
-          "nodeId": "V4-OMEGA",
-          "start": 55,
-          "duration": 220,
-          "position": { "x": 90, "y": 620 },
-          "variant": "glass",
-          "initialProgress": 40,
-          "targetProgress": 100
-        },
-        {
-          "id": "deco-shape",
-          "type": "shape",
-          "shape_type": "circle",
-          "start": 0,
-          "duration": 300,
-          "animation": "pulse",
-          "color": "#ffffff",
-          "size": 200,
-          "position": { "x": 320, "y": 780 },
-          "decorated": true
-        },
-        {
-          "id": "data-chart",
-          "type": "chart",
-          "chart_type": "line",
-          "title": "GLOBAL CINEMATIC OUTPUT",
-          "subtitle": "RENDER SYNCHRONIZATION",
-          "start": 100,
-          "duration": 180,
-          "width": 720,
-          "height": 420,
-          "position": { "x": 1110, "y": 500 },
-          "colors": { "scheme": "category10" },
-          "data": [
-            {
-              "id": "renders",
-              "data": [
-                { "x": "ZONE-1", "y": 18 },
-                { "x": "ZONE-2", "y": 36 },
-                { "x": "ZONE-3", "y": 55 },
-                { "x": "ZONE-4", "y": 79 },
-                { "x": "ZONE-5", "y": 94 },
-                { "x": "GLOBAL", "y": 100 }
-              ]
-            }
-          ]
-        },
-        {
-          "id": "secondary-title",
-          "type": "text",
-          "content": "COUNTERISM STUDIO V4",
-          "start": 210,
-          "duration": 80,
-          "font": "Inter",
-          "splitMode": "char",
-          "stagger": 0.025,
+          "fontSize": "80px",
           "animation": "slideUp",
-          "style": "text-white text-2xl font-mono tracking-[0.5em] absolute top-20 left-20"
+          "style": "text-white font-bold absolute bottom-20 left-20"
         }
       ]
     }

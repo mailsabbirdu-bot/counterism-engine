@@ -4,6 +4,7 @@ import { UISystem } from './engines/UISystem';
 import { ShapesEngine } from './engines/ShapesEngine';
 import { ChartsEngine } from './engines/ChartsEngine';
 import { GraphsEngine } from './engines/GraphsEngine';
+import { MediaEngine } from './engines/MediaEngine';
 
 export const OverlayManager: React.FC<{ overlays: any[] }> = ({ overlays }) => {
   return (
@@ -20,6 +21,9 @@ export const OverlayManager: React.FC<{ overlays: any[] }> = ({ overlays }) => {
             return <ChartsEngine key={overlay.id} overlay={overlay} />;
           case 'graph':
             return <GraphsEngine key={overlay.id} overlay={overlay} />;
+          case 'video':
+          case 'image':
+            return <MediaEngine key={overlay.id} overlay={overlay} />;
           default:
             return null;
         }
