@@ -179,14 +179,12 @@
     },
     {
       "scene_id": "SC-04-MEDIA",
-      "background_type": "procedural",
-      "procedural_config": {
-        "speed": 0.5
-      },
+      "background_type": "video",
+      "video_path": "renders/scene_SC_04.mp4",
       "duration_in_frames": 600,
       "overlays": [
         {
-          "id": "overlay-video",
+          "id": "overlay-video-pip",
           "type": "video",
           "src": "renders/scene_SC_01.mp4",
           "start": 60,

@@ -47,6 +47,7 @@ const start = async () => {
       codec: 'h264',
       outputLocation,
       inputProps: { sceneData: scene },
+      concurrency: 4, // Maximize CPU usage on Colab (usually 2-4 cores)
       onProgress: ({ progress }: { progress: number }) => {
         process.stdout.write(`\rProgress: ${(progress * 100).toFixed(1)}%`);
       },
