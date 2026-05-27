@@ -1,0 +1,53 @@
+I am using Counterism Studio V4, a Remotion-based cinematic automation engine. I need you to generate a `remotion_template.json` file based on the following guideline.
+
+### SCHEMA GUIDELINE:
+
+1. ROOT CONFIGURATION:
+- project_name: string
+- global_settings: { width: 1920, height: 1080, fps: 30 }
+- scenes: array of scene objects
+
+2. SCENE OBJECT:
+- scene_id: string (e.g., "SC_01")
+- background_type: "video" | "procedural" | "none"
+- video_path: string (path to MP4 in public/renders/)
+- procedural_config: { particles: number, primaryColor: string, secondaryColor: string }
+- duration_in_frames: number (30fps base)
+- overlays: array of overlay objects
+
+3. OVERLAY TYPES:
+
+A. "text":
+- content: string
+- splitMode: "word" | "char"
+- animation: "cinematicGlow" | "slideUp" | "wordByWord"
+- stagger: number (seconds)
+- font: string (Google Font)
+- style: string (Tailwind classes like "text-white text-9xl font-black")
+
+B. "ui_panel":
+- title, description, nodeId: string
+- iconType: "terminal" | "security" | "activity" | "cpu" | "box"
+- variant: "glass" | "dark"
+- initialProgress, targetProgress: number (0-100)
+- position: { x, y }
+
+C. "shape":
+- shape_type: "circle" | "rect" | "line"
+- animation: "pulse" | "float" | "morph"
+- size: number, color: Hex string, decorated: boolean
+- position: { x, y }
+
+D. "chart":
+- chart_type: "line" | "bar"
+- title, subtitle: string
+- data: array (Nivo schema)
+- colors: { scheme: "nivo" | "spectral" | "category10" }
+- width, height: number, position: { x, y }
+
+E. "graph":
+- nodes, links: number
+- speed: number, nodeColor: Hex, linkColor: RGBA
+
+### TASK:
+Generate a cinematic JSON with multiple scenes that tells a futuristic story using these features. Ensure text is large (text-9xl) and scenes are long enough (240+ frames) for visual evaluation.

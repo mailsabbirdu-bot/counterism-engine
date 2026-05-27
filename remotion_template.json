@@ -1,5 +1,5 @@
 {
-  "project_name": "Counterism_Master_Template_V4",
+  "project_name": "Counterism_Stress_Test_V4",
   "global_settings": {
     "width": 1920,
     "height": 1080,
@@ -7,96 +7,154 @@
   },
   "scenes": [
     {
-      "scene_id": "SC-MASTER",
+      "scene_id": "SC-01-INTRO",
+      "background_type": "video",
       "video_path": "renders/scene_SC_01.mp4",
+      "duration_in_frames": 240,
+      "overlays": [
+        {
+          "id": "intro-title",
+          "type": "text",
+          "content": "SYSTEM ARCHITECTURE INITIALIZED",
+          "start": 20,
+          "duration": 200,
+          "font": "Montserrat",
+          "splitMode": "word",
+          "stagger": 0.15,
+          "animation": "cinematicGlow",
+          "style": "text-white text-9xl font-black tracking-tighter uppercase text-center"
+        },
+        {
+          "id": "intro-panel",
+          "type": "ui_panel",
+          "title": "PROTOCOL V4.0",
+          "description": "Established connection to neural processing core. All systems operational for cinematic execution.",
+          "iconType": "security",
+          "nodeId": "SECURE-LINK-01",
+          "start": 60,
+          "duration": 160,
+          "position": { "x": 100, "y": 650 },
+          "variant": "glass",
+          "initialProgress": 0,
+          "targetProgress": 100
+        }
+      ]
+    },
+    {
+      "scene_id": "SC-02-DATA",
+      "background_type": "procedural",
+      "procedural_config": {
+        "particles": 150,
+        "primaryColor": "#020617",
+        "secondaryColor": "#1e1b4b"
+      },
       "duration_in_frames": 300,
       "overlays": [
         {
-          "id": "bg-graph",
+          "id": "data-graph",
           "type": "graph",
           "start": 0,
           "duration": 300,
-          "nodes": 40,
-          "links": 60,
-          "speed": 0.2,
-          "nodeColor": "#3b82f6",
-          "linkColor": "rgba(255,255,255,0.05)"
-        },
-        {
-          "id": "main-title",
-          "type": "text",
-          "content": "THE FUTURE OF CINEMATIC AUTOMATION",
-          "start": 15,
-          "duration": 270,
-          "font": "Montserrat",
-          "splitMode": "word",
-          "stagger": 0.1,
-          "animation": "cinematicGlow",
-          "style": "text-white text-8xl font-black tracking-tighter uppercase"
-        },
-        {
-          "id": "status-panel",
-          "type": "ui_panel",
-          "title": "CORE ENGINE STATUS",
-          "description": "Neural processing units at 98% efficiency. All cinematic layers synchronized with background telemetry.",
-          "iconType": "cpu",
-          "nodeId": "STUDIO-V4-ALPHA",
-          "start": 45,
-          "duration": 240,
-          "position": { "x": 80, "y": 620 },
-          "variant": "glass",
-          "initialProgress": 20,
-          "targetProgress": 98.4
-        },
-        {
-          "id": "deco-shape",
-          "type": "shape",
-          "shape_type": "circle",
-          "start": 0,
-          "duration": 300,
-          "animation": "pulse",
-          "color": "#3b82f6",
-          "size": 120,
-          "position": { "x": 305, "y": 782 },
-          "decorated": true
+          "nodes": 60,
+          "links": 100,
+          "speed": 0.3,
+          "nodeColor": "#6366f1",
+          "linkColor": "rgba(99,102,241,0.1)"
         },
         {
           "id": "data-chart",
           "type": "chart",
-          "chart_type": "line",
-          "title": "SYSTEM PERFORMANCE",
-          "subtitle": "THROUGHPUT ANALYTICS",
-          "start": 100,
-          "duration": 180,
-          "width": 700,
-          "height": 400,
-          "position": { "x": 1140, "y": 520 },
-          "colors": { "scheme": "spectral" },
+          "chart_type": "bar",
+          "title": "NEURAL THROUGHPUT",
+          "subtitle": "SCALABILITY METRICS",
+          "start": 30,
+          "duration": 240,
+          "width": 900,
+          "height": 550,
+          "position": { "x": 950, "y": 450 },
+          "keys": ["value"],
+          "indexBy": "label",
+          "colors": { "scheme": "category10" },
           "data": [
-            {
-              "id": "efficiency",
-              "data": [
-                { "x": "T-10", "y": 45 },
-                { "x": "T-08", "y": 52 },
-                { "x": "T-06", "y": 48 },
-                { "x": "T-04", "y": 61 },
-                { "x": "T-02", "y": 55 },
-                { "x": "NOW", "y": 89 }
-              ]
-            }
+            { "label": "ALPHA", "value": 85 },
+            { "label": "BETA", "value": 92 },
+            { "label": "GAMMA", "value": 78 },
+            { "label": "DELTA", "value": 96 },
+            { "label": "EPSILON", "value": 88 }
           ]
         },
         {
-          "id": "secondary-title",
+          "id": "data-panel",
+          "type": "ui_panel",
+          "title": "ANALYTICS ENGINE",
+          "description": "Processing high-density data streams through D3 and Nivo procedural pipelines.",
+          "iconType": "activity",
+          "nodeId": "DATA-CORE-02",
+          "start": 80,
+          "duration": 200,
+          "position": { "x": 100, "y": 100 },
+          "variant": "dark",
+          "initialProgress": 45,
+          "targetProgress": 91.2
+        }
+      ]
+    },
+    {
+      "scene_id": "SC-03-CHOREO",
+      "background_type": "video",
+      "video_path": "renders/scene_SC_01.mp4",
+      "duration_in_frames": 240,
+      "overlays": [
+        {
+          "id": "choreo-shape-1",
+          "type": "shape",
+          "shape_type": "circle",
+          "start": 0,
+          "duration": 240,
+          "animation": "pulse",
+          "color": "#f43f5e",
+          "size": 150,
+          "position": { "x": 300, "y": 300 },
+          "decorated": true
+        },
+        {
+          "id": "choreo-shape-2",
+          "type": "shape",
+          "shape_type": "rect",
+          "start": 30,
+          "duration": 210,
+          "animation": "float",
+          "color": "#10b981",
+          "size": 100,
+          "radius": 20,
+          "position": { "x": 1600, "y": 750 },
+          "decorated": true
+        },
+        {
+          "id": "choreo-text",
           "type": "text",
-          "content": "REMOTION ENGINE V4.0",
-          "start": 200,
-          "duration": 90,
+          "content": "MULTILAYERED MOTION CHOREOGRAPHY",
+          "start": 50,
+          "duration": 160,
           "font": "Inter",
           "splitMode": "char",
-          "stagger": 0.03,
+          "stagger": 0.04,
           "animation": "slideUp",
-          "style": "text-blue-400 text-2xl font-mono tracking-[0.5em] absolute top-20 left-20"
+          "style": "text-blue-500 text-6xl font-bold tracking-widest text-center"
+        },
+        {
+          "id": "choreo-panel",
+          "type": "ui_panel",
+          "title": "GSAP COORDINATOR",
+          "description": "Synchronizing SVG path animations with cinematic video playback.",
+          "iconType": "cpu",
+          "nodeId": "CHOREO-V4-03",
+          "start": 90,
+          "duration": 130,
+          "position": { "x": 700, "y": 600 },
+          "variant": "glass",
+          "initialProgress": 10,
+          "targetProgress": 85
         }
       ]
     }
