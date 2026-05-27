@@ -157,6 +157,100 @@
           "targetProgress": 85
         }
       ]
+    },
+    {
+      "scene_id": "SC-04-SIGNAL",
+      "video_path": "renders/scene_SC_01.mp4",
+      "duration_in_frames": 300,
+      "overlays": [
+        {
+          "id": "bg-graph",
+          "type": "graph",
+          "start": 0,
+          "duration": 300,
+          "nodes": 65,
+          "links": 100,
+          "speed": 0.35,
+          "nodeColor": "#06b6d4",
+          "linkColor": "rgba(255,255,255,0.06)"
+        },
+        {
+          "id": "main-title",
+          "type": "text",
+          "content": "A SIGNAL WAS DETECTED",
+          "start": 20,
+          "duration": 250,
+          "font": "Montserrat",
+          "splitMode": "word",
+          "stagger": 0.08,
+          "animation": "cinematicGlow",
+          "style": "text-cyan-300 text-7xl font-black tracking-tight uppercase"
+        },
+        {
+          "id": "status-panel",
+          "type": "ui_panel",
+          "title": "GLOBAL NETWORK TRACE",
+          "description": "Unknown traffic signatures identified across multiple cinematic processing nodes.",
+          "iconType": "activity",
+          "nodeId": "TRACE-NODE-77",
+          "start": 60,
+          "duration": 220,
+          "position": { "x": 90, "y": 610 },
+          "variant": "glass",
+          "initialProgress": 5,
+          "targetProgress": 74
+        },
+        {
+          "id": "deco-shape",
+          "type": "shape",
+          "shape_type": "circle",
+          "start": 0,
+          "duration": 300,
+          "animation": "pulse",
+          "color": "#06b6d4",
+          "size": 150,
+          "position": { "x": 320, "y": 780 },
+          "decorated": true
+        },
+        {
+          "id": "data-chart",
+          "type": "chart",
+          "chart_type": "line",
+          "title": "SIGNAL AMPLIFICATION",
+          "subtitle": "LIVE DETECTION FEED",
+          "start": 110,
+          "duration": 170,
+          "width": 720,
+          "height": 420,
+          "position": { "x": 1120, "y": 500 },
+          "colors": { "scheme": "nivo" },
+          "data": [
+            {
+              "id": "signal",
+              "data": [
+                { "x": "00:01", "y": 12 },
+                { "x": "00:02", "y": 20 },
+                { "x": "00:03", "y": 38 },
+                { "x": "00:04", "y": 65 },
+                { "x": "00:05", "y": 92 },
+                { "x": "LIVE", "y": 99 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "secondary-title",
+          "type": "text",
+          "content": "SIGNAL TRACE ACTIVE",
+          "start": 210,
+          "duration": 80,
+          "font": "Inter",
+          "splitMode": "char",
+          "stagger": 0.025,
+          "animation": "slideUp",
+          "style": "text-cyan-400 text-2xl font-mono tracking-[0.45em] absolute top-20 left-20"
+        }
+      ]
     }
   ]
 }
