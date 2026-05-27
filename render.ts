@@ -1,16 +1,26 @@
 import pkg from '@remotion/bundler';
 const { bundle } = pkg;
-import { renderMedia, getCompositions, RenderMediaOptions } from '@remotion/renderer';
+import { renderMedia, getCompositions } from '@remotion/renderer';
 import path from 'path';
 import fs from 'fs';
 import { enableTailwind } from '@remotion/tailwind';
 
-const templatePath = path.join(process.cwd(), 'remotion_template.json');
+// Parse command line arguments
+const args = process.argv.slice(2);
+const templateArg = args.find(arg => arg.startsWith('--template='))?.split('=')[1];
+const outputArg = args.find(arg => arg.startsWith('--output='))?.split('=')[1];
+
+const templatePath = path.join(process.cwd(), templateArg || 'remotion_template.json');
+if (!fs.existsSync(templatePath)) {
+  console.error(`❌ Template file not found: ${templatePath}`);
+  process.exit(1);
+}
+
 const template = JSON.parse(fs.readFileSync(templatePath, 'utf8'));
 
 const start = async () => {
   try {
-    console.log('🚀 Starting Counterism Studio V4 Rendering Pipeline...');
+    console.log(`🚀 Starting Counterism Studio V4 Rendering Pipeline (Template: ${path.basename(templatePath)})...`);
 
     const entry = path.join(process.cwd(), 'src/index.ts');
     console.log('📦 Bundling project...');
@@ -19,7 +29,10 @@ const start = async () => {
       webpackOverride: (config) => enableTailwind(config),
     });
 
-    const compositions = await getCompositions(bundleLocation);
+    console.log('🔍 Extracting compositions...');
+    const compositions = await getCompositions(bundleLocation, {
+      inputProps: { templateData: template }
+    });
 
     const outputDir = path.join(process.cwd(), 'renders/overlays/remotion');
     if (!fs.existsSync(outputDir)) {
@@ -35,10 +48,16 @@ const start = async () => {
         continue;
       }
 
-      const outputLocation = path.join(
-        outputDir,
-        `updated_scene_${scene.scene_id}.mp4`
-      );
+      // Determine output location
+      let outputLocation: string;
+      if (outputArg && template.scenes.length === 1) {
+        outputLocation = path.join(outputDir, outputArg);
+      } else {
+        outputLocation = path.join(
+          outputDir,
+          `updated_scene_${scene.scene_id}.mp4`
+        );
+      }
 
       console.log(`⏳ Rendering ${scene.scene_id}...`);
 
@@ -47,7 +66,7 @@ const start = async () => {
         serveUrl: bundleLocation,
         codec: 'h264',
         outputLocation,
-        inputProps: { sceneData: scene },
+        inputProps: { sceneData: scene, templateData: template },
         concurrency: 2,
         publicDir: path.join(process.cwd(), 'public'),
         onProgress: ({ progress }: { progress: number }) => {
