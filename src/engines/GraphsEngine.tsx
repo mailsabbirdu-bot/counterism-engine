@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useMemo } from 'react';
-import { useCurrentFrame, useVideoConfig } from 'remotion';
+import { useCurrentFrame, useVideoConfig, interpolate, spring, Easing } from 'remotion';
 import * as d3 from 'd3';
 
 interface Node extends d3.SimulationNodeDatum {
@@ -36,13 +36,13 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     svg.selectAll("*").remove();
 
     const simulation = d3.forceSimulation<Node>(nodes)
-      .force("link", d3.forceLink<Node, Link>(links).id(d => d.id).distance(150))
-      .force("charge", d3.forceManyBody().strength(-100))
+      .force("link", d3.forceLink<Node, Link>(links).id(d => d.id).distance(200))
+      .force("charge", d3.forceManyBody().strength(-150))
       .force("center", d3.forceCenter(width / 2, height / 2))
       .stop();
 
     // Pre-calculate positions
-    for (let i = 0; i < 100; ++i) simulation.tick();
+    for (let i = 0; i < 150; ++i) simulation.tick();
 
     const g = svg.append("g");
 
@@ -51,8 +51,8 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       .data(links)
       .enter()
       .append("line")
-      .attr("stroke", overlay.linkColor || "rgba(255,255,255,0.1)")
-      .attr("stroke-width", 1)
+      .attr("stroke", overlay.linkColor || "rgba(255,255,255,0.15)")
+      .attr("stroke-width", 1.5)
       .attr("x1", d => (d.source as Node).x!)
       .attr("y1", d => (d.source as Node).y!)
       .attr("x2", d => (d.target as Node).x!)
@@ -63,16 +63,19 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       .data(nodes)
       .enter()
       .append("circle")
-      .attr("r", 4)
+      .attr("r", 6)
       .attr("fill", overlay.nodeColor || "#3b82f6")
       .attr("cx", d => d.x!)
       .attr("cy", d => d.y!)
-      .style("filter", "drop-shadow(0 0 5px rgba(59,130,246,0.8))");
+      .style("filter", "drop-shadow(0 0 10px rgba(59,130,246,0.6))");
 
-    // Animate container
-    const rotation = frame * (overlay.speed || 0.1);
-    const scale = 1 + Math.sin(frame / 30) * 0.05;
-    g.attr("transform", `translate(${width/2}, ${height/2}) scale(${scale}) rotate(${rotation}) translate(${-width/2}, ${-height/2})`);
+    // Smooth container animation
+    const rotation = frame * (overlay.speed || 0.05);
+    const scale = 1 + Math.sin(frame / 60) * 0.03;
+    const driftY = Math.sin(frame / 45) * 10;
+    const driftX = Math.cos(frame / 50) * 10;
+
+    g.attr("transform", `translate(${width/2 + driftX}, ${height/2 + driftY}) scale(${scale}) rotate(${rotation}) translate(${-width/2}, ${-height/2})`);
 
   }, [nodes, links, frame, width, height, overlay]);
 
@@ -80,8 +83,17 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     return null;
   }
 
+  const entrance = spring({
+    frame: frame - overlay.start,
+    fps,
+    config: { damping: 20 },
+  });
+
   return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden bg-transparent">
+    <div
+      className="absolute inset-0 pointer-events-none overflow-hidden bg-transparent"
+      style={{ opacity: entrance }}
+    >
       <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} />
     </div>
   );

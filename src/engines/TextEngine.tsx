@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCurrentFrame, interpolate, spring, useVideoConfig } from 'remotion';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
@@ -15,39 +15,44 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     ? overlay.content.split('')
     : overlay.content.split(' ');
 
+  // Base font size - if not provided, use a large default
+  const baseFontSize = overlay.fontSize || "120px";
+
   return (
     <div
       className={`absolute inset-0 flex items-center justify-center pointer-events-none p-20 ${overlay.style}`}
-      style={{ fontFamily: overlay.font }}
+      style={{
+        fontFamily: overlay.font || 'Inter',
+        fontSize: baseFontSize,
+        // Add a subtle text shadow for better readability on light backgrounds
+        textShadow: '0 4px 30px rgba(0,0,0,0.5), 0 0 100px rgba(0,0,0,0.2)'
+      }}
     >
-      <div className="flex flex-wrap justify-center gap-x-2">
+      <div className="flex flex-wrap justify-center gap-x-6 gap-y-6 max-w-[80%] text-center">
         {items.map((item: string, i: number) => {
-          const delay = i * (overlay.stagger || 0.05);
-
-          const progress = spring({
-            frame: relativeFrame,
-            fps,
-            config: { damping: 12 },
-            delay: delay * fps,
-          });
+          const delay = i * (overlay.stagger || 0.1);
 
           let initial = {};
           let animate = {};
           let transition = {
-            duration: 0.8,
+            duration: 1.2,
             ease: [0.16, 1, 0.3, 1], // easeOutExpo
             delay: delay,
           };
 
           if (overlay.animation === 'cinematicGlow') {
-            initial = { opacity: 0, filter: 'blur(10px) brightness(2)', y: 10 };
-            animate = { opacity: 1, filter: 'blur(0px) brightness(1)', y: 0 };
+            initial = { opacity: 0, filter: 'blur(20px) brightness(3)', y: 20, scale: 0.9 };
+            animate = { opacity: 1, filter: 'blur(0px) brightness(1)', y: 0, scale: 1 };
           } else if (overlay.animation === 'slideUp') {
-            initial = { opacity: 0, y: 100 };
+            initial = { opacity: 0, y: 150 };
             animate = { opacity: 1, y: 0 };
           } else if (overlay.animation === 'wordByWord') {
-            initial = { opacity: 0, scale: 0.8 };
+            initial = { opacity: 0, scale: 0.5 };
             animate = { opacity: 1, scale: 1 };
+          } else {
+             // Default fade in
+             initial = { opacity: 0 };
+             animate = { opacity: 1 };
           }
 
           return (
@@ -59,7 +64,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
               style={{
                 display: 'inline-block',
                 whiteSpace: item === ' ' ? 'pre' : 'normal',
-                textShadow: overlay.animation === 'cinematicGlow' ? '0 0 15px rgba(255,255,255,0.3)' : 'none'
+                fontWeight: 900, // Force extra bold for cinematic impact
               }}
             >
               {item}
