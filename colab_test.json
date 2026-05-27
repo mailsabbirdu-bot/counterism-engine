@@ -1,0 +1,51 @@
+{
+  "project_name": "Overlay_Test_Quick",
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "scenes": [
+    {
+      "scene_id": "OVERLAY-TEST-SCENE",
+      "background_type": "none",
+      "duration_in_frames": 150,
+      "overlays": [
+        {
+          "id": "test-bg-color",
+          "type": "shape",
+          "shape_type": "rect",
+          "start": 0,
+          "duration": 150,
+          "size": 2000,
+          "color": "#1e293b",
+          "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "test-video-overlay",
+          "type": "video",
+          "src": "renders/scene_SC_01.mp4",
+          "start": 15,
+          "duration": 120,
+          "position": { "x": 560, "y": 300 },
+          "width": 800,
+          "height": 450,
+          "borderRadius": 20,
+          "shadow": true,
+          "border": { "width": 10, "color": "#3b82f6" }
+        },
+        {
+          "id": "test-text",
+          "type": "text",
+          "content": "OVERLAY TEST ACTIVE",
+          "start": 0,
+          "duration": 150,
+          "font": "Montserrat",
+          "fontSize": "80px",
+          "animation": "slideUp",
+          "style": "text-white font-bold absolute bottom-20 w-full text-center"
+        }
+      ]
+    }
+  ]
+}

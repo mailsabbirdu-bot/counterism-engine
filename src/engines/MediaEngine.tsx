@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCurrentFrame, interpolate, staticFile, OffthreadVideo, Img, useVideoConfig, Sequence } from 'remotion';
+import { useCurrentFrame, interpolate, staticFile, OffthreadVideo, Img, useVideoConfig, Sequence, AbsoluteFill } from 'remotion';
 
 export const MediaEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   if (!overlay.src) {
@@ -17,9 +17,12 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
+  // Defensive check for duration to prevent non-monotonic interpolation
+  const fadeDuration = Math.min(15, Math.floor(overlay.duration / 2));
+
   const opacity = interpolate(
     frame,
-    [0, 15, overlay.duration - 15, overlay.duration],
+    [0, fadeDuration, overlay.duration - fadeDuration, overlay.duration],
     [0, 1, 1, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
@@ -46,20 +49,22 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
   };
 
   return (
-    <div style={style}>
-      {overlay.type === 'video' ? (
-        <OffthreadVideo
-          src={staticFile(overlay.src)}
-          className="w-full h-full object-cover"
-          startFrom={overlay.startFrom || 0}
-          muted={overlay.muted !== false}
-        />
-      ) : (
-        <Img
-          src={staticFile(overlay.src)}
-          className="w-full h-full object-cover"
-        />
-      )}
-    </div>
+    <AbsoluteFill className="pointer-events-none">
+      <div style={style}>
+        {overlay.type === 'video' ? (
+          <OffthreadVideo
+            src={staticFile(overlay.src)}
+            className="w-full h-full object-cover"
+            startFrom={overlay.startFrom || 0}
+            muted={overlay.muted !== false}
+          />
+        ) : (
+          <Img
+            src={staticFile(overlay.src)}
+            className="w-full h-full object-cover"
+          />
+        )}
+      </div>
+    </AbsoluteFill>
   );
 };

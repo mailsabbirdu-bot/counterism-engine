@@ -1,7 +1,10 @@
 import React, { useEffect } from 'react';
-import { Composition, delayRender, continueRender, staticFile } from 'remotion';
+import { Composition, delayRender, continueRender, staticFile, getInputProps } from 'remotion';
 import { Scene } from './Scene';
-import template from '../remotion_template.json';
+import defaultTemplate from '../remotion_template.json';
+
+const inputProps = getInputProps();
+const template = (inputProps as any)?.templateData || defaultTemplate;
 
 export const RemotionRoot: React.FC = () => {
   // Pre-load fonts from template
