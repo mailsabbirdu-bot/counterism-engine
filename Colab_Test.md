@@ -46,7 +46,8 @@ print("📦 Installing dependencies...")
 print("\n🎬 STARTING QUICK OVERLAY TEST...")
 print("--------------------------------------------------------------------------------")
 # This command uses the specialized Colab_Test.json and outputs to overlay_test.mp4
-!npm run render -- --template=Colab_Test.json --output=overlay_test.mp4
+# Concurrency is set to 1 for maximum stability during overlay testing
+!npm run render -- --template=Colab_Test.json --output=overlay_test.mp4 --concurrency=1
 
 # 6. Save Result to Drive
 LOCAL_TEST_FILE = "renders/overlays/remotion/overlay_test.mp4"
