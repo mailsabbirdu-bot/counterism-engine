@@ -37,7 +37,7 @@
         {
           "id": "test-text",
           "type": "text",
-          "content": "OVERLAY TEST ACTIVE",
+          "content": "OVERLAY TEST (VIDEO SUPPORT)",
           "start": 0,
           "duration": 150,
           "font": "Montserrat",
