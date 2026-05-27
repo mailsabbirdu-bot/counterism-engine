@@ -88,6 +88,19 @@
           "style": "text-pink-500 font-extrabold uppercase"
         },
         {
+          "id": "overlay-video-pip",
+          "type": "video",
+          "src": "renders/scene_SC_01.mp4",
+          "start": 60,
+          "duration": 480,
+          "position": { "x": 100, "y": 100 },
+          "width": 480,
+          "height": 270,
+          "borderRadius": 20,
+          "shadow": true,
+          "border": { "width": 4, "color": "#ffffff" }
+        },
+        {
           "id": "data-chart",
           "type": "chart",
           "chart_type": "line",
