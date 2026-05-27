@@ -1,24 +1,31 @@
 import React from 'react';
-import { useCurrentFrame, interpolate, staticFile, OffthreadVideo, Img, useVideoConfig } from 'remotion';
+import { useCurrentFrame, interpolate, staticFile, OffthreadVideo, Img, useVideoConfig, Sequence } from 'remotion';
 
 export const MediaEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const relativeFrame = frame - overlay.start;
-
-  if (frame < overlay.start || frame > overlay.start + overlay.duration) {
+  if (!overlay.src) {
     return null;
   }
 
+  return (
+    <Sequence from={overlay.start} durationInFrames={overlay.duration}>
+      <MediaContent overlay={overlay} />
+    </Sequence>
+  );
+};
+
+const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
   const opacity = interpolate(
-    relativeFrame,
+    frame,
     [0, 15, overlay.duration - 15, overlay.duration],
     [0, 1, 1, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
 
   const scale = interpolate(
-    relativeFrame,
+    frame,
     [0, overlay.duration],
     [1, 1.05],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
