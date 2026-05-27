@@ -9,6 +9,7 @@ import { enableTailwind } from '@remotion/tailwind';
 const args = process.argv.slice(2);
 const templateArg = args.find(arg => arg.startsWith('--template='))?.split('=')[1];
 const outputArg = args.find(arg => arg.startsWith('--output='))?.split('=')[1];
+const concurrencyArg = args.find(arg => arg.startsWith('--concurrency='))?.split('=')[1];
 
 const templatePath = path.join(process.cwd(), templateArg || 'remotion_template.json');
 if (!fs.existsSync(templatePath)) {
@@ -39,6 +40,8 @@ const start = async () => {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
+    const concurrency = concurrencyArg ? parseInt(concurrencyArg, 10) : 1;
+
     for (const scene of template.scenes) {
       console.log(`\n🎬 Processing Scene: ${scene.scene_id}`);
 
@@ -59,7 +62,7 @@ const start = async () => {
         );
       }
 
-      console.log(`⏳ Rendering ${scene.scene_id}...`);
+      console.log(`⏳ Rendering ${scene.scene_id} (Concurrency: ${concurrency})...`);
 
       const renderOptions: any = {
         composition,
@@ -67,7 +70,7 @@ const start = async () => {
         codec: 'h264',
         outputLocation,
         inputProps: { sceneData: scene, templateData: template },
-        concurrency: 2,
+        concurrency: concurrency,
         publicDir: path.join(process.cwd(), 'public'),
         onProgress: ({ progress }: { progress: number }) => {
           process.stdout.write(`\rProgress: ${(progress * 100).toFixed(1)}%`);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCurrentFrame, interpolate, staticFile, OffthreadVideo, Img, useVideoConfig, Sequence, AbsoluteFill } from 'remotion';
+import { useCurrentFrame, interpolate, staticFile, Video, Img, useVideoConfig, Sequence } from 'remotion';
 
 export const MediaEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   if (!overlay.src) {
@@ -38,8 +38,8 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
     position: 'absolute',
     left: overlay.position?.x ?? 0,
     top: overlay.position?.y ?? 0,
-    width: overlay.width ?? 'auto',
-    height: overlay.height ?? 'auto',
+    width: overlay.width ? `${overlay.width}px` : 'auto',
+    height: overlay.height ? `${overlay.height}px` : 'auto',
     opacity,
     transform: `scale(${scale})`,
     borderRadius: overlay.borderRadius ?? 0,
@@ -49,22 +49,20 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
   };
 
   return (
-    <AbsoluteFill className="pointer-events-none">
-      <div style={style}>
-        {overlay.type === 'video' ? (
-          <OffthreadVideo
-            src={staticFile(overlay.src)}
-            className="w-full h-full object-cover"
-            startFrom={overlay.startFrom || 0}
-            muted={overlay.muted !== false}
-          />
-        ) : (
-          <Img
-            src={staticFile(overlay.src)}
-            className="w-full h-full object-cover"
-          />
-        )}
-      </div>
-    </AbsoluteFill>
+    <div style={style}>
+      {overlay.type === 'video' ? (
+        <Video
+          src={staticFile(overlay.src)}
+          className="w-full h-full object-cover"
+          startFrom={overlay.startFrom || 0}
+          muted={overlay.muted !== false}
+        />
+      ) : (
+        <Img
+          src={staticFile(overlay.src)}
+          className="w-full h-full object-cover"
+        />
+      )}
+    </div>
   );
 };
