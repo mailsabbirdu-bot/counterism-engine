@@ -9,6 +9,7 @@ Run the following cell in Google Colab to automate the entire process with ultra
 # One-cell solution to setup, link Drive, and render.
 
 import os
+import shutil
 
 # 1. Mount Google Drive
 from google.colab import drive
@@ -20,33 +21,34 @@ PROJECT_NAME = "counterism-engine"
 DRIVE_BASE_PATH = "/content/drive/MyDrive/Counterism_Studio_V4"
 REPO_URL = "https://github.com/mailsabbirdu-bot/counterism-engine"
 
-print(f"🚀 Cloning repository: {REPO_URL}")
-!git clone {REPO_URL}
+if not os.path.exists(PROJECT_NAME):
+    print(f"🚀 Cloning repository: {REPO_URL}")
+    !git clone {REPO_URL}
+else:
+    print(f"✅ Project folder '{PROJECT_NAME}' already exists.")
+
 %cd {PROJECT_NAME}
 
 # 3. Handle External Assets (Renders & Audio)
-# We symlink Drive folders to the Project's public folder to ensure Remotion finds them.
 print("🔗 Linking Drive assets to project...")
 !mkdir -p public/renders
 !mkdir -p public/audio
 
-# Sync renders folder
+# Sync renders folder (using symlinks for nested structures from Drive)
 if os.path.exists(f"{DRIVE_BASE_PATH}/renders"):
-    print("✅ Found 'renders' in Drive. Linking...")
-    # Using 'cp' might be safer than symlinks for some Node/Remotion edge cases in Colab
-    !cp -rv {DRIVE_BASE_PATH}/renders/* public/renders/
+    print("✅ Found 'renders' in Drive. Linking files...")
+    !cp -rs {DRIVE_BASE_PATH}/renders/* public/renders/ 2>/dev/null || true
 else:
-    print("⚠️ 'renders' folder not found in Drive. Using default project assets.")
+    print("⚠️ 'renders' folder not found in Drive.")
 
 # Sync audio folder
 if os.path.exists(f"{DRIVE_BASE_PATH}/audio"):
-    print("✅ Found 'audio' in Drive. Linking...")
-    !cp -rv {DRIVE_BASE_PATH}/audio/* public/audio/
+    print("✅ Found 'audio' in Drive. Linking files...")
+    !cp -rs {DRIVE_BASE_PATH}/audio/* public/audio/ 2>/dev/null || true
 else:
     print("⚠️ 'audio' folder not found in Drive.")
 
 # 4. Install System & Node Dependencies
-# Note: node_modules stays in Colab local memory (outside Drive) to prevent sync errors.
 print("🛠️ Installing system dependencies (ffmpeg, build-essential)...")
 !apt-get update -y && apt-get install -y ffmpeg build-essential
 
@@ -56,13 +58,30 @@ print("📦 Installing Node.js dependencies...")
 # 5. Render Pipeline with Ultra-Debugging
 print("\n🎬 STARTING RENDERING PIPELINE...")
 print("--------------------------------------------------------------------------------")
-# We use --verbose and pipe output to catch every detail
 !DEBUG=remotion:* npm run render -- --verbose 2>&1 | tee render_debug.log
 
+# 6. Automatic Drive Upload
 print("\n--------------------------------------------------------------------------------")
-print("🏁 RENDERING PROCESS COMPLETE.")
-print("📁 Output files are located in 'renders/overlays/remotion/' within the project folder.")
-print("💾 Remember to copy them back to your Drive if needed:")
-print(f"!mkdir -p {DRIVE_BASE_PATH}/renders/overlays/remotion")
-print(f"!cp -rv renders/overlays/remotion/* {DRIVE_BASE_PATH}/renders/overlays/remotion/")
+print("💾 SAVING RESULTS TO GOOGLE DRIVE...")
+
+LOCAL_RENDER_DIR = "renders/overlays/remotion"
+DRIVE_RENDER_DIR = f"{DRIVE_BASE_PATH}/renders/overlays/remotion"
+
+if os.path.exists(LOCAL_RENDER_DIR):
+    print(f"📂 Creating destination in Drive: {DRIVE_RENDER_DIR}")
+    os.makedirs(DRIVE_RENDER_DIR, exist_ok=True)
+
+    print(f"📤 Copying rendered files to Drive...")
+    for filename in os.listdir(LOCAL_RENDER_DIR):
+        if filename.endswith(".mp4") or filename.endswith(".webm"):
+            src = os.path.join(LOCAL_RENDER_DIR, filename)
+            dst = os.path.join(DRIVE_RENDER_DIR, filename)
+            print(f"   -> {filename}")
+            shutil.copy2(src, dst)
+
+    print("\n✅ All rendered scenes have been saved to your Google Drive!")
+else:
+    print("❌ No rendered files found in local 'renders/overlays/remotion' directory.")
+
+print("\n🏁 PROCESS COMPLETE.")
 ```

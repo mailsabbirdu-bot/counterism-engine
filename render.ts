@@ -3,6 +3,7 @@ const { bundle } = pkg;
 import { renderMedia, getCompositions } from '@remotion/renderer';
 import path from 'path';
 import fs from 'fs';
+import { enableTailwind } from '@remotion/tailwind';
 
 const templatePath = path.join(process.cwd(), 'remotion_template.json');
 const template = JSON.parse(fs.readFileSync(templatePath, 'utf8'));
@@ -12,7 +13,10 @@ const start = async () => {
 
   const entry = path.join(process.cwd(), 'src/index.ts');
   console.log('📦 Bundling project...');
-  const bundleLocation = await bundle(entry);
+  const bundleLocation = await bundle({
+    entryPoint: entry,
+    webpackOverride: (config) => enableTailwind(config),
+  });
 
   const compositions = await getCompositions(bundleLocation);
 

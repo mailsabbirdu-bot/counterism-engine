@@ -20,6 +20,7 @@
     "@remotion/cli": "^4.0.222",
     "@remotion/google-fonts": "^4.0.222",
     "@remotion/renderer": "^4.0.222",
+    "@remotion/tailwind": "^4.0.467",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "d3": "^7.9.0",
