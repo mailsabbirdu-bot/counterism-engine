@@ -32,7 +32,7 @@ You are an expert motion graphics designer and JSON engineer. Your task is to ge
 - `type`: "text", "ui_panel", "shape", "chart", "graph", "video", "image".
 - `start`: Start frame.
 - `duration`: Duration in frames.
-- `zIndex`: Number (Higher values stack on top).
+- `zIndex`: Number (Stacking order. Suggested defaults: Shapes=10, Graphs=25, Charts=30, UI=40, Text=50, Media=100).
 
 #### Type: Text
 - `content`: String.
