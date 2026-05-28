@@ -126,7 +126,8 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         left: overlay.position?.x || 1000,
         top: overlay.position?.y || 500,
         opacity: entrance,
-        transform: `scale(${0.9 + entrance * 0.1}) translateY(${(1 - entrance) * 100}px)`
+        transform: `scale(${0.9 + entrance * 0.1}) translateY(${(1 - entrance) * 100}px)`,
+        zIndex: overlay.zIndex ?? 40
       }}
     >
       <div className="flex justify-between items-center mb-10">

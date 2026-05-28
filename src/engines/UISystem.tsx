@@ -47,7 +47,8 @@ export const UISystem: React.FC<{ overlay: any }> = ({ overlay }) => {
         top: overlay.position?.y ?? 100,
         opacity,
         transform: `perspective(2000px) rotateY(${(1 - entrance) * 30}deg) scale(${0.85 + entrance * 0.15})`,
-        filter: `blur(${(1 - opacity) * 10}px)`
+        filter: `blur(${(1 - opacity) * 10}px)`,
+        zIndex: overlay.zIndex ?? 50
       }}
     >
       <Card className={`

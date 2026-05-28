@@ -8,10 +8,20 @@
   "scenes": [
     {
       "scene_id": "OVERLAY-TEST-SCENE",
-      "background_type": "video",
-      "video_path": "renders/scene_SC_02.mp4",
+      "background_type": "none",
       "duration_in_frames": 150,
       "overlays": [
+        {
+          "id": "test-bg-color",
+          "type": "shape",
+          "shape_type": "rect",
+          "start": 0,
+          "duration": 150,
+          "size": 2000,
+          "color": "#1e293b",
+          "position": { "x": 960, "y": 540 },
+          "zIndex": 1
+        },
         {
           "id": "test-video-overlay",
           "type": "video",
@@ -23,18 +33,20 @@
           "height": 450,
           "borderRadius": 20,
           "shadow": true,
-          "border": { "width": 10, "color": "#10b981" }
+          "border": { "width": 10, "color": "#3b82f6" },
+          "zIndex": 100
         },
         {
           "id": "test-text",
           "type": "text",
-          "content": "TESTING VIDEO OVERLAY SUPPORT",
+          "content": "QUICK OVERLAY TEST ACTIVE",
           "start": 0,
           "duration": 150,
           "font": "Montserrat",
           "fontSize": "80px",
           "animation": "slideUp",
-          "style": "text-white font-bold absolute bottom-20 w-full text-center"
+          "style": "text-white font-bold absolute bottom-20 w-full text-center",
+          "zIndex": 150
         }
       ]
     }
