@@ -85,7 +85,7 @@ export const ShapesEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   };
 
   return (
-    <AbsoluteFill className="pointer-events-none">
+    <AbsoluteFill className="pointer-events-none" style={{ zIndex: overlay.zIndex ?? 10 }}>
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`}>
         <g
           style={{
