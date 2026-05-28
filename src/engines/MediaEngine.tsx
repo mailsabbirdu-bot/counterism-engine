@@ -1,5 +1,6 @@
 import React from 'react';
-import { useCurrentFrame, interpolate, staticFile, Video, Img, useVideoConfig, Sequence, AbsoluteFill } from 'remotion';
+import { useCurrentFrame, interpolate, Video, Img, useVideoConfig, Sequence, AbsoluteFill } from 'remotion';
+import { resolveAsset } from '../lib/resolveAsset';
 
 export const MediaEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   if (!overlay.src) {
@@ -54,8 +55,8 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
     objectFit: 'cover',
   };
 
-  const mediaUrl = staticFile(overlay.src);
-  console.log(`[MediaEngine] ${overlay.type.toUpperCase()} Path: ${overlay.src} -> URL: ${mediaUrl}`);
+  const mediaUrl = resolveAsset(overlay.src);
+  console.log(`[MediaEngine] ${overlay.type.toUpperCase()} Path: ${overlay.src} -> Resolved URL: ${mediaUrl}`);
 
   return (
     <AbsoluteFill className="pointer-events-none" style={{ zIndex: overlay.zIndex ?? 100 }}>
@@ -70,7 +71,7 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
           />
         ) : (
           <Img
-            src={staticFile(overlay.src)}
+            src={mediaUrl}
             style={mediaStyle}
           />
         )}

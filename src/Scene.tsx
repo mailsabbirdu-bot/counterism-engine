@@ -1,7 +1,8 @@
 import React from 'react';
-import { AbsoluteFill, Video, staticFile } from 'remotion';
+import { AbsoluteFill, Video } from 'remotion';
 import { OverlayManager } from './OverlayManager';
 import { ProceduralBackground } from './engines/ProceduralBackground';
+import { resolveAsset } from './lib/resolveAsset';
 
 export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
   if (!sceneData) {
@@ -12,8 +13,8 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
     switch (sceneData.background_type) {
       case 'video':
         if (!sceneData.video_path) return null;
-        const bgUrl = staticFile(sceneData.video_path);
-        console.log(`[Scene Background] Path: ${sceneData.video_path} -> URL: ${bgUrl}`);
+        const bgUrl = resolveAsset(sceneData.video_path);
+        console.log(`[Scene Background] Path: ${sceneData.video_path} -> Resolved URL: ${bgUrl}`);
         return (
           <>
             <Video
@@ -34,10 +35,11 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
       default:
         // Fallback to video if video_path is present, otherwise none
         if (sceneData.video_path) {
+          const fallbackUrl = resolveAsset(sceneData.video_path);
           return (
             <>
               <Video
-                src={staticFile(sceneData.video_path)}
+                src={fallbackUrl}
                 className="w-full h-full object-cover"
                 playRemoteVideo={true}
                 muted
