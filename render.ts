@@ -1,6 +1,8 @@
 import pkg from '@remotion/bundler';
 const { bundle } = pkg;
 import { renderMedia, getCompositions } from '@remotion/renderer';
+import { getVideoMetadata } from '@remotion/media-utils';
+import ffprobeStatic from 'ffprobe-static';
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
@@ -58,30 +60,31 @@ const start = async () => {
       }
     }
 
-    console.log('\n🔍 Extracting compositions...');
-    const compositions = await getCompositions(bundleLocation, {
-      inputProps: { templateData: template }
-    });
-
-    const outputDir = path.join(process.cwd(), 'renders/overlays/remotion');
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-
-    const concurrency = concurrencyArg ? parseInt(concurrencyArg, 10) : 1;
-
-    console.log('\n🔍 Pre-render Asset Verification:');
+    console.log('\n🔍 Pre-render Asset Verification & Duration Detection:');
     let assetsMissing = false;
 
     for (const scene of template.scenes) {
       console.log(`\n--- Scene: ${scene.scene_id} ---`);
 
-      // Verify background video
+      // Verify background video and calculate duration
       if (scene.background_type === 'video' && scene.video_path) {
         const bgPath = path.join(process.cwd(), 'public', scene.video_path);
         if (fs.existsSync(bgPath)) {
           const stats = fs.statSync(bgPath);
           console.log(`✅ Background Video FOUND: ${scene.video_path} (${(stats.size / (1024 * 1024)).toFixed(2)} MB)`);
+
+          try {
+            console.log('⏳ Calculating dynamic duration from background video...');
+            const metadata = await getVideoMetadata(bgPath, { ffprobePath: ffprobeStatic.path });
+            const calculatedFrames = Math.floor(metadata.durationInSeconds * template.global_settings.fps);
+
+            console.log(`📈 Dynamic Duration: ${metadata.durationInSeconds.toFixed(2)}s (${calculatedFrames} frames)`);
+            console.log(`📝 Overriding duration_in_frames: ${scene.duration_in_frames} -> ${calculatedFrames}`);
+
+            scene.duration_in_frames = calculatedFrames;
+          } catch (e) {
+            console.error(`❌ Failed to calculate duration for ${scene.video_path}:`, e);
+          }
         } else {
           console.error(`❌ Background Video MISSING: ${bgPath}`);
           assetsMissing = true;
@@ -108,8 +111,20 @@ const start = async () => {
     if (assetsMissing) {
       console.warn('\n⚠️  WARNING: Some assets are missing. Rendering may fail or show placeholders.');
     } else {
-      console.log('\n✨ All assets verified successfully!');
+      console.log('\n✨ All assets verified and durations calculated!');
     }
+
+    console.log('\n🔍 Extracting compositions with updated durations...');
+    const compositions = await getCompositions(bundleLocation, {
+      inputProps: { templateData: template }
+    });
+
+    const outputDir = path.join(process.cwd(), 'renders/overlays/remotion');
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const concurrency = concurrencyArg ? parseInt(concurrencyArg, 10) : 1;
 
     for (const scene of template.scenes) {
       console.log(`\n🎬 Processing Scene: ${scene.scene_id}`);
