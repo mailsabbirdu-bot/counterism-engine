@@ -24,6 +24,7 @@ This document defines the comprehensive JSON schema for `remotion_template.json`
 | `scene_id` | `string` | Unique ID (used for output filename). |
 | `background_type` | `string` | `"video"` \| `"procedural"` \| `"none"`. |
 | `video_path` | `string` | (Required for video) Path relative to `public/`. |
+| `audio_enabled` | `boolean` | Enable/disable audio for background video. |
 | `procedural_config` | `object` | `{ speed: number, type: string }`. |
 | `duration_in_frames` | `number` | Total frames for this scene. |
 | `overlays` | `array` | Collection of all visual layers. |
@@ -87,6 +88,7 @@ This document defines the comprehensive JSON schema for `remotion_template.json`
 | Field | Type | Options / Description |
 | :--- | :--- | :--- |
 | `src` | `string` | Path relative to `public/`. |
+| `audio_enabled` | `boolean` | Enable/disable audio for video overlay. |
 | `position` | `object` | `{ x: number, y: number }`. |
 | `width`, `height` | `number` | Dimensions. |
 | `borderRadius` | `number` | Corner rounding. |

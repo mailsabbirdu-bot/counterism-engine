@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Video } from 'remotion';
+import { AbsoluteFill, OffthreadVideo } from 'remotion';
 import { OverlayManager } from './OverlayManager';
 import { ProceduralBackground } from './engines/ProceduralBackground';
 import { resolveAsset } from './lib/resolveAsset';
@@ -17,11 +17,10 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
         console.log(`[Scene Background] Path: ${sceneData.video_path} -> Resolved URL: ${bgUrl}`);
         return (
           <>
-            <Video
+            <OffthreadVideo
               src={bgUrl}
               className="w-full h-full object-cover"
-              playRemoteVideo={true}
-              muted
+              muted={sceneData.audio_enabled !== true}
               loop
             />
             {/* Dark overlay for readability */}
@@ -38,11 +37,10 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
           const fallbackUrl = resolveAsset(sceneData.video_path);
           return (
             <>
-              <Video
+              <OffthreadVideo
                 src={fallbackUrl}
                 className="w-full h-full object-cover"
-                playRemoteVideo={true}
-                muted
+                muted={sceneData.audio_enabled !== true}
                 loop
               />
               <AbsoluteFill className="bg-black/40" />
