@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCurrentFrame, interpolate, Video, Img, useVideoConfig, Sequence, AbsoluteFill } from 'remotion';
+import { useCurrentFrame, interpolate, OffthreadVideo, Img, useVideoConfig, Sequence, AbsoluteFill } from 'remotion';
 import { resolveAsset } from '../lib/resolveAsset';
 
 export const MediaEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
@@ -62,12 +62,11 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
     <AbsoluteFill className="pointer-events-none" style={{ zIndex: overlay.zIndex ?? 100 }}>
       <div style={containerStyle}>
         {overlay.type === 'video' ? (
-          <Video
+          <OffthreadVideo
             src={mediaUrl}
             style={mediaStyle}
             startFrom={overlay.startFrom || 0}
-            muted={overlay.muted !== false}
-            playRemoteVideo={true}
+            muted={overlay.audio_enabled !== true}
           />
         ) : (
           <Img
