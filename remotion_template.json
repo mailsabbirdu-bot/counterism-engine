@@ -23,7 +23,8 @@
           "size": 400,
           "position": { "x": 960, "y": 540 },
           "decorated": true,
-          "speed": 0.5
+          "speed": 0.5,
+          "zIndex": 10
         },
         {
           "id": "main-title",
@@ -36,7 +37,8 @@
           "splitMode": "word",
           "stagger": 0.15,
           "animation": "slideUp",
-          "style": "text-pink-500 font-extrabold uppercase"
+          "style": "text-pink-500 font-extrabold uppercase",
+          "zIndex": 50
         },
         {
           "id": "overlay-video-pip",
@@ -44,12 +46,13 @@
           "src": "renders/scene_SC_01.mp4",
           "start": 60,
           "duration": 480,
-          "position": { "x": 100, "y": 100 },
-          "width": 480,
-          "height": 270,
+          "position": { "x": 560, "y": 300 },
+          "width": 800,
+          "height": 450,
           "borderRadius": 20,
           "shadow": true,
-          "border": { "width": 4, "color": "#ffffff" }
+          "border": { "width": 10, "color": "#10b981" },
+          "zIndex": 100
         },
         {
           "id": "data-chart",
@@ -63,6 +66,7 @@
           "height": 600,
           "position": { "x": 460, "y": 420 },
           "colors": { "scheme": "nivo" },
+          "zIndex": 30,
           "data": [
             {
               "id": "frame_stability",

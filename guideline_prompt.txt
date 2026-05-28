@@ -32,6 +32,7 @@ You are an expert motion graphics designer and JSON engineer. Your task is to ge
 - `type`: "text", "ui_panel", "shape", "chart", "graph", "video", "image".
 - `start`: Start frame.
 - `duration`: Duration in frames.
+- `zIndex`: Number (Higher values stack on top).
 
 #### Type: Text
 - `content`: String.
@@ -61,6 +62,7 @@ You are an expert motion graphics designer and JSON engineer. Your task is to ge
 2. **Contrast**: Use `cinematicGlow` on dark backgrounds for a high-end look.
 3. **Hierarchy**: Use large text (100px+) for headlines and UI panels for technical details.
 4. **Motion**: Ensure overlays have staggered start times to create a build-up effect.
+5. **Depth**: Use `zIndex` to control the stacking order of overlapping elements (e.g., text over shapes).
 
 ## Output Format
 Return ONLY the JSON object. Do not include markdown code blocks unless requested.
