@@ -35,34 +35,28 @@ else:
 %cd {PROJECT_NAME}
 
 # 3. Handle External Assets (Renders & Audio)
-print_banner("🔍 ASSET VERIFICATION & LINKING")
+print_banner("🔍 ASSET VERIFICATION & COPYING")
 
 # Ensure local directories exist
 os.makedirs("public/renders", exist_ok=True)
 os.makedirs("public/audio", exist_ok=True)
 
-# Robust sync for renders folder
+# Use real copies instead of symlinks for maximum compatibility in headless environments
 drive_renders = f"{DRIVE_BASE_PATH}/renders"
 if os.path.exists(drive_renders):
     print(f"📡 Found Drive renders folder: {drive_renders}")
-    print("🔗 Creating symbolic links...")
-    # Clear existing to avoid nested links or duplicates
+    print("📦 Copying assets to local public/renders (this may take a moment)...")
     !rm -rf public/renders/*
-    # Link all files individually to be safe
-    for item in os.listdir(drive_renders):
-        s = os.path.join(drive_renders, item)
-        d = os.path.join("public/renders", item)
-        if os.path.exists(d): os.remove(d)
-        os.symlink(s, d)
+    !cp -r {drive_renders}/* public/renders/
 
     print("\n🧐 VERIFYING public/renders CONTENT:")
-    !ls -lA public/renders/
+    !ls -lsh public/renders/
 
     print("\n✅ CHECKING FOR CRITICAL ASSETS:")
     for f in ["scene_SC_01.mp4", "scene_SC_02.mp4"]:
         path = f"public/renders/{f}"
         if os.path.exists(path):
-            print(f"  [OK] {path} -> {os.path.realpath(path)} ({os.path.getsize(path)/(1024*1024):.2f} MB)")
+            print(f"  [OK] {path} ({os.path.getsize(path)/(1024*1024):.2f} MB)")
         else:
             print(f"  [!!] {path} is MISSING!")
 else:
@@ -73,8 +67,8 @@ drive_audio = f"{DRIVE_BASE_PATH}/audio"
 if os.path.exists(drive_audio):
     print(f"\n📡 Found Drive audio folder: {drive_audio}")
     !rm -rf public/audio/*
-    !cp -rs {drive_audio}/* public/audio/ 2>/dev/null || true
-    print(f"✅ Linked {len(os.listdir('public/audio'))} audio files.")
+    !cp -r {drive_audio}/* public/audio/
+    print(f"✅ Copied {len(os.listdir('public/audio'))} audio files.")
 
 print_banner("📂 PROJECT STRUCTURE (DEBUG)")
 !find public -maxdepth 2 -not -path '*/.*'

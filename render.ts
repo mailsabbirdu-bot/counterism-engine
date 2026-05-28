@@ -3,6 +3,7 @@ const { bundle } = pkg;
 import { renderMedia, getCompositions } from '@remotion/renderer';
 import path from 'path';
 import fs from 'fs';
+import { execSync } from 'child_process';
 import { enableTailwind } from '@remotion/tailwind';
 
 // Parse command line arguments
@@ -36,7 +37,28 @@ const start = async () => {
     console.log(`📡 Bundle Location: ${bundleLocation}`);
     console.log(`📂 Public Directory: ${publicDir}`);
 
-    console.log('🔍 Extracting compositions...');
+    console.log('🚚 Ensuring public assets are correctly placed in bundle root...');
+    try {
+      // Manually copy public content to bundle root to bypass potential bundling quirks in Colab
+      execSync(`cp -R ${publicDir}/* ${bundleLocation}/ 2>/dev/null || true`);
+      console.log('✅ Manual asset synchronization complete.');
+    } catch (e) {
+      console.warn('⚠️  Manual asset copy encountered an issue, continuing with bundler defaults.');
+    }
+
+    console.log('\n📦 Inspecting Bundle for Public Assets:');
+    if (fs.existsSync(bundleLocation)) {
+      const bundleFiles = fs.readdirSync(bundleLocation);
+      console.log(`- Bundle Files: ${bundleFiles.join(', ')}`);
+
+      // Check for assets directory or files
+      const assetsPath = path.join(bundleLocation, 'assets');
+      if (fs.existsSync(assetsPath)) {
+        console.log(`- Assets folder found: ${fs.readdirSync(assetsPath).slice(0, 5).join(', ')}...`);
+      }
+    }
+
+    console.log('\n🔍 Extracting compositions...');
     const compositions = await getCompositions(bundleLocation, {
       inputProps: { templateData: template }
     });
