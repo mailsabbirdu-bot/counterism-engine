@@ -11,18 +11,14 @@ import os
 import shutil
 import subprocess
 
-def check_file(path):
-    if os.path.exists(path):
-        size = os.path.getsize(path) / (1024 * 1024)
-        print(f"✅ [FOUND] {path} ({size:.2f} MB)")
-        return True
-    else:
-        print(f"❌ [MISSING] {path}")
-        return False
+def print_banner(text):
+    print("\n" + "="*80)
+    print(f" {text}")
+    print("="*80)
 
 # 1. Mount Google Drive
+print_banner("📂 MOUNTING GOOGLE DRIVE")
 from google.colab import drive
-print("📂 Mounting Google Drive...")
 drive.mount('/content/drive')
 
 # 2. Setup Project Environment
@@ -39,8 +35,7 @@ else:
 %cd {PROJECT_NAME}
 
 # 3. Handle External Assets (Renders & Audio)
-print("\n🔍 ASSET VERIFICATION & LINKING...")
-print("--------------------------------------------------------------------------------")
+print_banner("🔍 ASSET VERIFICATION & LINKING")
 
 # Ensure local directories exist
 os.makedirs("public/renders", exist_ok=True)
@@ -51,29 +46,27 @@ drive_renders = f"{DRIVE_BASE_PATH}/renders"
 if os.path.exists(drive_renders):
     print(f"📡 Found Drive renders folder: {drive_renders}")
     print("🔗 Creating symbolic links...")
-    # Clear existing links to avoid duplicates/errors
+    # Clear existing to avoid nested links or duplicates
     !rm -rf public/renders/*
-    !cp -rs {drive_renders}/* public/renders/ 2>/dev/null || true
+    # Link all files individually to be safe
+    for item in os.listdir(drive_renders):
+        s = os.path.join(drive_renders, item)
+        d = os.path.join("public/renders", item)
+        if os.path.exists(d): os.remove(d)
+        os.symlink(s, d)
 
-    # Comprehensive Verification
-    print("\n🧐 Verifying linked files in 'public/renders':")
-    files = os.listdir("public/renders")
-    if not files:
-        print("⚠️ Warning: No files found in 'public/renders' after linking!")
-    else:
-        for f in files:
-            local_path = os.path.join("public/renders", f)
-            if os.path.islink(local_path):
-                target = os.readlink(local_path)
-                if os.path.exists(target):
-                    print(f"✅ LINK OK: {f} -> {target} ({os.path.getsize(target)/(1024*1024):.2f} MB)")
-                else:
-                    print(f"❌ BROKEN LINK: {f} -> {target} (Target does not exist!)")
-            else:
-                print(f"📄 FILE (Not Link): {f} ({os.path.getsize(local_path)/(1024*1024):.2f} MB)")
+    print("\n🧐 VERIFYING public/renders CONTENT:")
+    !ls -lA public/renders/
+
+    print("\n✅ CHECKING FOR CRITICAL ASSETS:")
+    for f in ["scene_SC_01.mp4", "scene_SC_02.mp4"]:
+        path = f"public/renders/{f}"
+        if os.path.exists(path):
+            print(f"  [OK] {path} -> {os.path.realpath(path)} ({os.path.getsize(path)/(1024*1024):.2f} MB)")
+        else:
+            print(f"  [!!] {path} is MISSING!")
 else:
-    print(f"❌ FATAL: 'renders' folder NOT FOUND in Drive at: {drive_renders}")
-    print("   Please check your Drive folder structure: Counterism_Studio_V4/renders/")
+    print(f"❌ FATAL: 'renders' folder NOT FOUND in Drive: {drive_renders}")
 
 # Sync audio folder
 drive_audio = f"{DRIVE_BASE_PATH}/audio"
@@ -82,42 +75,36 @@ if os.path.exists(drive_audio):
     !rm -rf public/audio/*
     !cp -rs {drive_audio}/* public/audio/ 2>/dev/null || true
     print(f"✅ Linked {len(os.listdir('public/audio'))} audio files.")
-else:
-    print(f"⚠️ 'audio' folder not found in Drive at: {drive_audio}")
+
+print_banner("📂 PROJECT STRUCTURE (DEBUG)")
+!find public -maxdepth 2 -not -path '*/.*'
 
 # 4. Install System & Node Dependencies
-print("\n🛠️ INSTALLING DEPENDENCIES...")
-print("--------------------------------------------------------------------------------")
-print("📦 Installing system dependencies (ffmpeg, build-essential)...")
+print_banner("🛠️ INSTALLING DEPENDENCIES")
+print("📦 Installing system dependencies...")
 !apt-get update -y && apt-get install -y ffmpeg build-essential
 
 print("📦 Installing Node.js dependencies...")
 !npm install
 
 # 5. Render Pipeline with Optimized Concurrency
-print("\n🎬 STARTING RENDERING PIPELINE...")
-print("--------------------------------------------------------------------------------")
-# Pass concurrency=1 for maximum stability in Colab
+print_banner("🎬 STARTING RENDERING PIPELINE")
+# Concurrency=1 is safest for Colab to avoid Protocol Errors
 !npm run render -- --concurrency=1
 
 # 6. Automatic Drive Upload (Recursive)
-print("\n--------------------------------------------------------------------------------")
-print("💾 SAVING RESULTS TO GOOGLE DRIVE...")
+print_banner("💾 SAVING RESULTS TO GOOGLE DRIVE")
 
 LOCAL_RENDER_DIR = "renders/overlays/remotion"
 DRIVE_RENDER_DIR = f"{DRIVE_BASE_PATH}/renders/overlays/remotion"
 
 if os.path.exists(LOCAL_RENDER_DIR):
-    print(f"📂 Destination in Drive: {DRIVE_RENDER_DIR}")
+    print(f"📂 Destination: {DRIVE_RENDER_DIR}")
     os.makedirs(DRIVE_RENDER_DIR, exist_ok=True)
-
-    print(f"📤 Uploading rendered files...")
-    # Use -u (update) and -v (verbose)
     !cp -uv {LOCAL_RENDER_DIR}/* {DRIVE_RENDER_DIR}/
-
-    print("\n✅ Rendered scenes saved successfully!")
+    print("\n✅ Upload complete.")
 else:
-    print("❌ No rendered files found to upload.")
+    print("❌ No rendered files found.")
 
-print("\n🏁 PROCESS COMPLETE.")
+print_banner("🏁 PROCESS COMPLETE")
 ```
