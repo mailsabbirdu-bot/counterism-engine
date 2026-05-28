@@ -42,6 +42,47 @@ const start = async () => {
 
     const concurrency = concurrencyArg ? parseInt(concurrencyArg, 10) : 1;
 
+    console.log('\n🔍 Pre-render Asset Verification:');
+    let assetsMissing = false;
+
+    for (const scene of template.scenes) {
+      console.log(`\n--- Scene: ${scene.scene_id} ---`);
+
+      // Verify background video
+      if (scene.background_type === 'video' && scene.video_path) {
+        const bgPath = path.join(process.cwd(), 'public', scene.video_path);
+        if (fs.existsSync(bgPath)) {
+          const stats = fs.statSync(bgPath);
+          console.log(`✅ Background Video FOUND: ${scene.video_path} (${(stats.size / (1024 * 1024)).toFixed(2)} MB)`);
+        } else {
+          console.error(`❌ Background Video MISSING: ${bgPath}`);
+          assetsMissing = true;
+        }
+      }
+
+      // Verify overlays
+      if (scene.overlays) {
+        for (const overlay of scene.overlays) {
+          if ((overlay.type === 'video' || overlay.type === 'image') && overlay.src) {
+            const overlayPath = path.join(process.cwd(), 'public', overlay.src);
+            if (fs.existsSync(overlayPath)) {
+              const stats = fs.statSync(overlayPath);
+              console.log(`✅ Overlay Asset [${overlay.id}] FOUND: ${overlay.src} (${(stats.size / (1024 * 1024)).toFixed(2)} MB)`);
+            } else {
+              console.error(`❌ Overlay Asset [${overlay.id}] MISSING: ${overlayPath}`);
+              assetsMissing = true;
+            }
+          }
+        }
+      }
+    }
+
+    if (assetsMissing) {
+      console.warn('\n⚠️  WARNING: Some assets are missing. Rendering may fail or show placeholders.');
+    } else {
+      console.log('\n✨ All assets verified successfully!');
+    }
+
     for (const scene of template.scenes) {
       console.log(`\n🎬 Processing Scene: ${scene.scene_id}`);
 
@@ -74,6 +115,9 @@ const start = async () => {
         publicDir: path.join(process.cwd(), 'public'),
         onProgress: ({ progress }: { progress: number }) => {
           process.stdout.write(`\rProgress: ${(progress * 100).toFixed(1)}%`);
+        },
+        onLog: (log: any) => {
+          console.log(`[Browser Log] ${log.level}: ${log.text}`);
         },
       };
 

@@ -12,6 +12,7 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
     switch (sceneData.background_type) {
       case 'video':
         if (!sceneData.video_path) return null;
+        console.log(`[Scene Background] Loading: ${sceneData.video_path}`);
         return (
           <>
             <Video

@@ -9,7 +9,7 @@
     {
       "scene_id": "SC-02-VIDEO",
       "background_type": "video",
-      "video_path": "renders/scene_SC_02.mp4",
+      "video_path": "renders/scene_SC_01.mp4",
       "duration_in_frames": 600,
       "overlays": [
         {

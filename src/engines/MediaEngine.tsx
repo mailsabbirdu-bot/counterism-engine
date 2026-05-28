@@ -54,6 +54,8 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
     objectFit: 'cover',
   };
 
+  console.log(`[MediaEngine] ${overlay.type.toUpperCase()} Loading: ${overlay.src}`);
+
   return (
     <AbsoluteFill className="pointer-events-none" style={{ zIndex: overlay.zIndex ?? 100 }}>
       <div style={containerStyle}>
