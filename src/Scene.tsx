@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, OffthreadVideo, staticFile } from 'remotion';
+import { AbsoluteFill, Video, staticFile } from 'remotion';
 import { OverlayManager } from './OverlayManager';
 import { ProceduralBackground } from './engines/ProceduralBackground';
 
@@ -14,9 +14,12 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
         if (!sceneData.video_path) return null;
         return (
           <>
-            <OffthreadVideo
+            <Video
               src={staticFile(sceneData.video_path)}
               className="w-full h-full object-cover"
+              playRemoteVideo={true}
+              muted
+              loop
             />
             {/* Dark overlay for readability */}
             <AbsoluteFill className="bg-black/40" />
@@ -31,9 +34,12 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
         if (sceneData.video_path) {
           return (
             <>
-              <OffthreadVideo
+              <Video
                 src={staticFile(sceneData.video_path)}
                 className="w-full h-full object-cover"
+                playRemoteVideo={true}
+                muted
+                loop
               />
               <AbsoluteFill className="bg-black/40" />
             </>

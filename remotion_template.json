@@ -1,5 +1,5 @@
 {
-  "project_name": "Counterism_Stress_Test_V4",
+  "project_name": "Counterism_Studio_V4_Master",
   "global_settings": {
     "width": 1920,
     "height": 1080,
@@ -27,32 +27,18 @@
           "zIndex": 10
         },
         {
-          "id": "main-title",
-          "type": "text",
-          "content": "SMOOTH VIDEO SYNC",
-          "start": 60,
-          "duration": 480,
-          "font": "Montserrat",
-          "fontSize": "120px",
-          "splitMode": "word",
-          "stagger": 0.15,
-          "animation": "slideUp",
-          "style": "text-pink-500 font-extrabold uppercase",
-          "zIndex": 50
-        },
-        {
           "id": "overlay-video-pip",
           "type": "video",
           "src": "renders/scene_SC_01.mp4",
-          "start": 60,
-          "duration": 480,
+          "start": 15,
+          "duration": 150,
           "position": { "x": 560, "y": 300 },
           "width": 800,
           "height": 450,
           "borderRadius": 20,
           "shadow": true,
           "border": { "width": 10, "color": "#10b981" },
-          "zIndex": 100
+          "zIndex": 20
         },
         {
           "id": "data-chart",
@@ -80,6 +66,35 @@
               ]
             }
           ]
+        },
+        {
+          "id": "ui-panel-tech",
+          "type": "ui_panel",
+          "title": "SYSTEM SYNC",
+          "description": "Video layers and shapes synced via zIndex layering system.",
+          "iconType": "cpu",
+          "nodeId": "CORE-SC-02",
+          "start": 300,
+          "duration": 250,
+          "position": { "x": 100, "y": 100 },
+          "variant": "glass",
+          "initialProgress": 20,
+          "targetProgress": 95,
+          "zIndex": 40
+        },
+        {
+          "id": "main-title",
+          "type": "text",
+          "content": "SMOOTH VIDEO SYNC",
+          "start": 60,
+          "duration": 480,
+          "font": "Montserrat",
+          "fontSize": "120px",
+          "splitMode": "word",
+          "stagger": 0.15,
+          "animation": "slideUp",
+          "style": "text-pink-500 font-extrabold uppercase",
+          "zIndex": 50
         }
       ]
     }

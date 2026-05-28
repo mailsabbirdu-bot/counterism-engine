@@ -24,7 +24,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       style={{
         fontFamily: overlay.font || 'Inter',
         fontSize: baseFontSize,
-        zIndex: overlay.zIndex,
+        zIndex: overlay.zIndex ?? 50,
         // Add a subtle text shadow for better readability on light backgrounds
         textShadow: '0 4px 30px rgba(0,0,0,0.5), 0 0 100px rgba(0,0,0,0.2)'
       }}

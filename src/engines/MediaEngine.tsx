@@ -46,7 +46,6 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
     overflow: 'hidden',
     boxShadow: overlay.shadow ? '0 20px 50px rgba(0,0,0,0.5)' : 'none',
     border: overlay.border ? `${overlay.border.width}px solid ${overlay.border.color}` : 'none',
-    zIndex: overlay.zIndex ?? 100, // Ensure it's above background
   };
 
   const mediaStyle: React.CSSProperties = {
@@ -56,7 +55,7 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
   };
 
   return (
-    <AbsoluteFill className="pointer-events-none">
+    <AbsoluteFill className="pointer-events-none" style={{ zIndex: overlay.zIndex ?? 100 }}>
       <div style={containerStyle}>
         {overlay.type === 'video' ? (
           <Video
