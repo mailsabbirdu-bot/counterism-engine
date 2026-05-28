@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCurrentFrame, interpolate, staticFile, Video, Img, useVideoConfig, Sequence } from 'remotion';
+import { useCurrentFrame, interpolate, staticFile, Video, Img, useVideoConfig, Sequence, AbsoluteFill } from 'remotion';
 
 export const MediaEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   if (!overlay.src) {
@@ -34,35 +34,44 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
 
-  const style: React.CSSProperties = {
+  const containerStyle: React.CSSProperties = {
     position: 'absolute',
-    left: overlay.position?.x ?? 0,
-    top: overlay.position?.y ?? 0,
+    left: `${overlay.position?.x ?? 0}px`,
+    top: `${overlay.position?.y ?? 0}px`,
     width: overlay.width ? `${overlay.width}px` : 'auto',
     height: overlay.height ? `${overlay.height}px` : 'auto',
     opacity,
     transform: `scale(${scale})`,
-    borderRadius: overlay.borderRadius ?? 0,
+    borderRadius: `${overlay.borderRadius ?? 0}px`,
     overflow: 'hidden',
     boxShadow: overlay.shadow ? '0 20px 50px rgba(0,0,0,0.5)' : 'none',
     border: overlay.border ? `${overlay.border.width}px solid ${overlay.border.color}` : 'none',
+    zIndex: 100, // Ensure it's above background
+  };
+
+  const mediaStyle: React.CSSProperties = {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
   };
 
   return (
-    <div style={style}>
-      {overlay.type === 'video' ? (
-        <Video
-          src={staticFile(overlay.src)}
-          className="w-full h-full object-cover"
-          startFrom={overlay.startFrom || 0}
-          muted={overlay.muted !== false}
-        />
-      ) : (
-        <Img
-          src={staticFile(overlay.src)}
-          className="w-full h-full object-cover"
-        />
-      )}
-    </div>
+    <AbsoluteFill className="pointer-events-none">
+      <div style={containerStyle}>
+        {overlay.type === 'video' ? (
+          <Video
+            src={staticFile(overlay.src)}
+            style={mediaStyle}
+            startFrom={overlay.startFrom || 0}
+            muted={overlay.muted !== false}
+          />
+        ) : (
+          <Img
+            src={staticFile(overlay.src)}
+            style={mediaStyle}
+          />
+        )}
+      </div>
+    </AbsoluteFill>
   );
 };
