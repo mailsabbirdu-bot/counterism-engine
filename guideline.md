@@ -99,3 +99,4 @@ This document defines the comprehensive JSON schema for `remotion_template.json`
 - `id`: `string` (Unique layer identifier)
 - `start`: `number` (Frame to appear)
 - `duration`: `number` (Frames to stay visible)
+- `zIndex`: `number` (Layer stacking order; higher values appear on top)

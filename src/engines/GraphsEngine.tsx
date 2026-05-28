@@ -61,7 +61,7 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   return (
     <div
       className="absolute inset-0 pointer-events-none overflow-hidden"
-      style={{ opacity: entrance }}
+      style={{ opacity: entrance, zIndex: overlay.zIndex }}
     >
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`}>
         <g transform={`translate(${width/2 + driftX}, ${height/2 + driftY}) scale(${scale}) rotate(${rotation}) translate(${-width/2}, ${-height/2})`}>
