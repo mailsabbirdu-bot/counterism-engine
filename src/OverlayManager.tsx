@@ -20,7 +20,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({
 }) => {
   return (
     <div
-      className="absolute inset-0"
+      className="absolute"
       style={{
         // Create the virtual overlay world (e.g., 4000x4000 centered)
         width: '4000px',
@@ -55,7 +55,21 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({
         };
 
         return (
-          <div key={overlay.id} style={parallaxStyle}>
+          <div
+            key={overlay.id}
+            style={{
+              position: 'absolute',
+              width: '1920px',
+              height: '1080px',
+              // Shift coordinates so that JSON 0,0 is viewport top-left
+              // In a 4000x4000 world centered on a 1920x1080 viewport:
+              // Viewport Top-Left (0, 0) starts at World (1040, 1460)
+              left: '1040px',
+              top: '1460px',
+              zIndex: overlay.zIndex,
+              ...parallaxStyle
+            }}
+          >
             {renderEngine()}
           </div>
         );

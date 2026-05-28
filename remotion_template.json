@@ -1,5 +1,5 @@
 {
-  "project_name": "Counterism_Studio_V4_Master",
+  "project_name": "Counterism_Studio_V4_Pro_Cinematic",
   "global_settings": {
     "width": 1920,
     "height": 1080,
@@ -7,96 +7,126 @@
   },
   "scenes": [
     {
-      "scene_id": "SC-02-VIDEO",
+      "scene_id": "SC-01-INTRO",
       "background_type": "video",
       "video_path": "renders/scene_SC_01.mp4",
       "audio_enabled": true,
-      "duration_in_frames": 600,
+      "duration_in_frames": 150,
+      "camera": {
+        "enabled": true,
+        "preset": "slowPushIn"
+      },
       "overlays": [
         {
-          "id": "deco-shape",
-          "type": "shape",
-          "shape_type": "circle",
+          "id": "title-main",
+          "type": "text",
+          "content": "COUNTERISM V4",
           "start": 0,
-          "duration": 600,
-          "animation": "pulse",
-          "color": "#f472b6",
-          "size": 400,
-          "position": { "x": 960, "y": 540 },
-          "decorated": true,
-          "speed": 0.5,
-          "zIndex": 10
+          "duration": 150,
+          "font": "Montserrat",
+          "fontSize": "180px",
+          "style": "text-white font-black tracking-tighter",
+          "zIndex": 100,
+          "depth": 1.2
         },
         {
-          "id": "overlay-video-pip",
+          "id": "sub-title",
+          "type": "text",
+          "content": "THE FUTURE OF CINEMATIC AUTOMATION",
+          "start": 30,
+          "duration": 120,
+          "font": "Montserrat",
+          "fontSize": "40px",
+          "position": { "x": 0, "y": 200 },
+          "style": "text-blue-400 font-bold tracking-[0.5em]",
+          "zIndex": 90,
+          "depth": 0.8
+        }
+      ]
+    },
+    {
+      "scene_id": "SC-02-DYNAMICS",
+      "background_type": "video",
+      "video_path": "renders/scene_SC_02.mp4",
+      "audio_enabled": true,
+      "duration_in_frames": 300,
+      "camera": {
+        "enabled": true,
+        "preset": "panRight",
+        "keyframes": [
+          { "frame": 0, "x": 400, "y": 0, "zoom": 1 },
+          { "frame": 150, "x": 0, "y": 0, "zoom": 1.1 },
+          { "frame": 300, "x": -400, "y": 0, "zoom": 1.05 }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "pip-video",
           "type": "video",
           "src": "renders/scene_SC_01.mp4",
-          "audio_enabled": true,
-          "start": 15,
-          "duration": 150,
-          "position": { "x": 560, "y": 300 },
+          "start": 0,
+          "duration": 300,
+          "position": { "x": 1000, "y": 200 },
           "width": 800,
           "height": 450,
-          "borderRadius": 20,
+          "borderRadius": 40,
           "shadow": true,
-          "border": { "width": 10, "color": "#10b981" },
-          "zIndex": 20
+          "border": { "width": 10, "color": "#3b82f6" },
+          "zIndex": 20,
+          "depth": 1.5,
+          "audio_enabled": false
         },
         {
-          "id": "data-chart",
+          "id": "stats-panel",
+          "type": "ui_panel",
+          "title": "ENGINE STATUS",
+          "description": "Dynamic camera and parallax depth active.",
+          "iconType": "activity",
+          "start": 60,
+          "duration": 240,
+          "position": { "x": 100, "y": 100 },
+          "variant": "glass",
+          "initialProgress": 0,
+          "targetProgress": 100,
+          "zIndex": 40,
+          "depth": 0.5
+        }
+      ]
+    },
+    {
+      "scene_id": "SC-03-FLOAT",
+      "background_type": "video",
+      "video_path": "renders/scene_SC_03.mp4",
+      "audio_enabled": true,
+      "duration_in_frames": 240,
+      "camera": {
+        "enabled": true,
+        "preset": "cinematicFloat"
+      },
+      "overlays": [
+        {
+          "id": "data-viz",
           "type": "chart",
           "chart_type": "line",
-          "title": "PERFORMANCE METRICS",
-          "subtitle": "REAL-TIME FRAME EVALUATION",
-          "start": 150,
-          "duration": 400,
-          "width": 1000,
-          "height": 600,
-          "position": { "x": 460, "y": 420 },
-          "colors": { "scheme": "nivo" },
+          "title": "NETWORK STABILITY",
+          "start": 0,
+          "duration": 240,
+          "width": 1200,
+          "height": 700,
+          "position": { "x": 360, "y": 190 },
           "zIndex": 30,
+          "depth": 1.0,
           "data": [
             {
-              "id": "frame_stability",
+              "id": "latency",
               "data": [
-                { "x": "0s", "y": 30 },
-                { "x": "1s", "y": 60 },
-                { "x": "2s", "y": 45 },
-                { "x": "3s", "y": 90 },
-                { "x": "4s", "y": 85 },
-                { "x": "5s", "y": 100 }
+                { "x": "0ms", "y": 10 },
+                { "x": "10ms", "y": 40 },
+                { "x": "20ms", "y": 25 },
+                { "x": "30ms", "y": 80 }
               ]
             }
           ]
-        },
-        {
-          "id": "ui-panel-tech",
-          "type": "ui_panel",
-          "title": "SYSTEM SYNC",
-          "description": "Video layers and shapes synced via zIndex layering system.",
-          "iconType": "cpu",
-          "nodeId": "CORE-SC-02",
-          "start": 300,
-          "duration": 250,
-          "position": { "x": 100, "y": 100 },
-          "variant": "glass",
-          "initialProgress": 20,
-          "targetProgress": 95,
-          "zIndex": 40
-        },
-        {
-          "id": "main-title",
-          "type": "text",
-          "content": "SMOOTH VIDEO SYNC",
-          "start": 60,
-          "duration": 480,
-          "font": "Montserrat",
-          "fontSize": "120px",
-          "splitMode": "word",
-          "stagger": 0.15,
-          "animation": "slideUp",
-          "style": "text-pink-500 font-extrabold uppercase",
-          "zIndex": 50
         }
       ]
     }

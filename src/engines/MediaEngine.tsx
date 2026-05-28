@@ -39,6 +39,7 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
     position: 'absolute',
     left: `${overlay.position?.x ?? 0}px`,
     top: `${overlay.position?.y ?? 0}px`,
+    zIndex: overlay.zIndex,
     width: overlay.width ? `${overlay.width}px` : 'auto',
     height: overlay.height ? `${overlay.height}px` : 'auto',
     opacity,
