@@ -1,6 +1,7 @@
 import React from 'react';
 import { useCurrentFrame, interpolate, spring, useVideoConfig } from 'remotion';
 import { motion } from 'framer-motion';
+import { cn } from '../lib/utils';
 
 export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
@@ -20,11 +21,16 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
 
   return (
     <div
-      className={`absolute inset-0 flex items-center justify-center pointer-events-none p-20 ${overlay.style}`}
+      className={cn(
+        "absolute flex items-center justify-center pointer-events-none",
+        !overlay.position && "inset-0 p-20",
+        overlay.style
+      )}
       style={{
         fontFamily: overlay.font || 'Inter',
         fontSize: baseFontSize,
-        zIndex: overlay.zIndex ?? 50,
+        left: overlay.position?.x,
+        top: overlay.position?.y,
         // Add a subtle text shadow for better readability on light backgrounds
         textShadow: '0 4px 30px rgba(0,0,0,0.5), 0 0 100px rgba(0,0,0,0.2)'
       }}

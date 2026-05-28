@@ -1,6 +1,6 @@
 # ☁️ Google Colab Setup (Counterism Studio V4)
 
-Run the following cell in Google Colab to automate the entire process with dynamic duration adjustment and Drive-based manifests.
+Run the following cell in Google Colab to automate the process with dynamic duration adjustment and Drive-based manifests.
 
 ```python
 # ==============================================================================
