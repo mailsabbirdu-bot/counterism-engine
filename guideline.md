@@ -26,7 +26,7 @@ This document defines the comprehensive JSON schema for `remotion_template.json`
 | `video_path` | `string` | (Required for video) Path relative to `public/`. |
 | `audio_enabled` | `boolean` | Enable/disable audio for background video. |
 | `procedural_config` | `object` | `{ speed: number, type: string }`. |
-| `duration_in_frames` | `number` | Total frames for this scene. |
+| `duration_in_frames` | `number` | Total frames for this scene. (Note: If background_type is "video", this will be automatically updated to match the video length). |
 | `overlays` | `array` | Collection of all visual layers. |
 
 ---
