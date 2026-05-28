@@ -28,6 +28,12 @@ This document defines the comprehensive JSON schema for `remotion_template.json`
 | `procedural_config` | `object` | `{ speed: number, type: string }`. |
 | `duration_in_frames` | `number` | Total frames for this scene. (Note: If background_type is "video", this will be automatically updated to match the video length). |
 | `overlays` | `array` | Collection of all visual layers. |
+| `camera` | `object` | Cinematic camera configuration (optional). |
+
+### `camera`
+- `enabled`: `boolean` (Enable camera movement)
+- `preset`: `string` (`"slowPushIn"`, `"slowZoomOut"`, `"panLeft"`, `"panRight"`, `"cinematicFloat"`)
+- `keyframes`: `array` (Custom animation points: `[{ frame: 0, x: 0, y: 0, zoom: 1 }]`)
 
 ---
 
@@ -102,3 +108,4 @@ This document defines the comprehensive JSON schema for `remotion_template.json`
 - `start`: `number` (Frame to appear)
 - `duration`: `number` (Frames to stay visible)
 - `zIndex`: `number` (Layer stacking order; higher values appear on top. Default values: Shape=10, Graph=25, Chart=30, UI=40, Text=50, Media=100)
+- `depth`: `number` (Parallax multiplier. 0.3 = distant, 1.0 = normal, 1.5 = foreground)
