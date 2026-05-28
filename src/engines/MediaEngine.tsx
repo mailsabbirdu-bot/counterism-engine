@@ -54,14 +54,15 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
     objectFit: 'cover',
   };
 
-  console.log(`[MediaEngine] ${overlay.type.toUpperCase()} Loading: ${overlay.src}`);
+  const mediaUrl = staticFile(overlay.src);
+  console.log(`[MediaEngine] ${overlay.type.toUpperCase()} Path: ${overlay.src} -> URL: ${mediaUrl}`);
 
   return (
     <AbsoluteFill className="pointer-events-none" style={{ zIndex: overlay.zIndex ?? 100 }}>
       <div style={containerStyle}>
         {overlay.type === 'video' ? (
           <Video
-            src={staticFile(overlay.src)}
+            src={mediaUrl}
             style={mediaStyle}
             startFrom={overlay.startFrom || 0}
             muted={overlay.muted !== false}

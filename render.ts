@@ -24,11 +24,17 @@ const start = async () => {
     console.log(`🚀 Starting Counterism Studio V4 Rendering Pipeline (Template: ${path.basename(templatePath)})...`);
 
     const entry = path.join(process.cwd(), 'src/index.ts');
+    const publicDir = path.join(process.cwd(), 'public');
+
     console.log('📦 Bundling project...');
     const bundleLocation = await bundle({
       entryPoint: entry,
+      publicDir: publicDir,
       webpackOverride: (config) => enableTailwind(config),
     });
+
+    console.log(`📡 Bundle Location: ${bundleLocation}`);
+    console.log(`📂 Public Directory: ${publicDir}`);
 
     console.log('🔍 Extracting compositions...');
     const compositions = await getCompositions(bundleLocation, {

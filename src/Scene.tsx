@@ -12,11 +12,12 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
     switch (sceneData.background_type) {
       case 'video':
         if (!sceneData.video_path) return null;
-        console.log(`[Scene Background] Loading: ${sceneData.video_path}`);
+        const bgUrl = staticFile(sceneData.video_path);
+        console.log(`[Scene Background] Path: ${sceneData.video_path} -> URL: ${bgUrl}`);
         return (
           <>
             <Video
-              src={staticFile(sceneData.video_path)}
+              src={bgUrl}
               className="w-full h-full object-cover"
               playRemoteVideo={true}
               muted
