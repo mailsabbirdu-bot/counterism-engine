@@ -29,13 +29,11 @@ else:
 
 # 3. Link Drive Assets
 print("🔗 Linking Drive assets to project...")
-os.makedirs("public/renders", exist_ok=True)
-drive_renders = f"{DRIVE_BASE_PATH}/renders"
-if os.path.exists(drive_renders):
-    !cp -rs {drive_renders}/* public/renders/ 2>/dev/null || true
-    print(f"✅ Assets linked from {drive_renders}")
-else:
-    print(f"⚠️ 'renders' folder not found in Drive at: {drive_renders}")
+# Create a robust symbolic link to the renders directory
+!rm -rf public/renders
+!ln -s "{DRIVE_BASE_PATH}/renders" public/renders
+print(f"✅ Assets linked from {DRIVE_BASE_PATH}/renders:")
+!ls public/renders/
 
 # 4. Install Dependencies
 print("📦 Installing dependencies...")
@@ -46,7 +44,7 @@ print("📦 Installing dependencies...")
 print("\n🎬 STARTING QUICK OVERLAY TEST...")
 print("--------------------------------------------------------------------------------")
 # This command uses the specialized Colab_Test.json and outputs to overlay_test.mp4
-# Concurrency is set to 1 for maximum stability during overlay testing
+# Concurrency is set to 1 for maximum stability
 !npm run render -- --template=Colab_Test.json --output=overlay_test.mp4 --concurrency=1
 
 # 6. Save Result to Drive

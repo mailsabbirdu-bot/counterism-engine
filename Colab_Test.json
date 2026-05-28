@@ -8,19 +8,10 @@
   "scenes": [
     {
       "scene_id": "OVERLAY-TEST-SCENE",
-      "background_type": "none",
+      "background_type": "video",
+      "video_path": "renders/scene_SC_02.mp4",
       "duration_in_frames": 150,
       "overlays": [
-        {
-          "id": "test-bg-color",
-          "type": "shape",
-          "shape_type": "rect",
-          "start": 0,
-          "duration": 150,
-          "size": 2000,
-          "color": "#000000",
-          "position": { "x": 960, "y": 540 }
-        },
         {
           "id": "test-video-overlay",
           "type": "video",
@@ -32,12 +23,12 @@
           "height": 450,
           "borderRadius": 20,
           "shadow": true,
-          "border": { "width": 10, "color": "#3b82f6" }
+          "border": { "width": 10, "color": "#10b981" }
         },
         {
           "id": "test-text",
           "type": "text",
-          "content": "OVERLAY TEST (VIDEO SUPPORT)",
+          "content": "TESTING VIDEO OVERLAY SUPPORT",
           "start": 0,
           "duration": 150,
           "font": "Montserrat",
