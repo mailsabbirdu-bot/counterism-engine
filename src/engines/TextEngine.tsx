@@ -21,23 +21,31 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
 
   return (
     <div
-      className={cn(
-        "absolute flex items-center justify-center pointer-events-none",
-        !overlay.position && "inset-0 p-20",
-        overlay.style
-      )}
+      className="absolute pointer-events-none"
       style={{
+        display: 'flex',
+        alignItems: overlay.position ? 'flex-start' : 'center',
+        justifyContent: overlay.position ? 'flex-start' : 'center',
+        padding: overlay.position ? '0' : '80px',
         fontFamily: overlay.font || 'Inter',
         fontSize: baseFontSize,
         zIndex: overlay.zIndex,
-        // VITAL: Always use explicit pixel units
-        left: overlay.position ? `${overlay.position.x}px` : undefined,
-        top: overlay.position ? `${overlay.position.y}px` : undefined,
-        // Add a subtle text shadow for better readability on light backgrounds
-        textShadow: '0 4px 30px rgba(0,0,0,0.5), 0 0 100px rgba(0,0,0,0.2)'
+        left: overlay.position ? `${overlay.position.x}px` : '0',
+        top: overlay.position ? `${overlay.position.y}px` : '0',
+        width: overlay.position ? 'auto' : '100%',
+        height: overlay.position ? 'auto' : '100%',
+        textShadow: '0 4px 30px rgba(0,0,0,0.5), 0 0 100px rgba(0,0,0,0.2)',
+        color: 'white'
       }}
     >
-      <div className="flex flex-wrap justify-center gap-x-6 gap-y-6 max-w-[80%] text-center">
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '24px',
+        justifyContent: overlay.position ? 'flex-start' : 'center',
+        textAlign: overlay.position ? 'left' : 'center',
+        maxWidth: overlay.position ? '100%' : '80%'
+      }}>
         {items.map((item: string, i: number) => {
           const delay = i * (overlay.stagger || 0.1);
 

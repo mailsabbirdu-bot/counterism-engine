@@ -89,7 +89,7 @@ export const CameraEngine: React.FC<{
     return Math.min(5, maxScale * 1.1);
   }, [config?.keyframes, config?.perspective, width, height]);
 
-  const cameraState = useMemo(() => {
+  const computeCameraState = useMemo(() => (f: number) => {
     if (sortedKeyframes.length === 0) {
       return { x: 0, y: 0, z: 0, zoom: 1, rotationX: 0, rotationY: 0, rotationZ: 0 };
     }
@@ -110,11 +110,11 @@ export const CameraEngine: React.FC<{
     // Find the current segment
     let startIdx = 0;
     for (let i = 0; i < sortedKeyframes.length - 1; i++) {
-      if (frame >= sortedKeyframes[i].frame && frame <= sortedKeyframes[i + 1].frame) {
+      if (f >= sortedKeyframes[i].frame && f <= sortedKeyframes[i + 1].frame) {
         startIdx = i;
         break;
       }
-      if (frame > sortedKeyframes[i + 1].frame) {
+      if (f > sortedKeyframes[i + 1].frame) {
         startIdx = i;
       }
     }
@@ -159,7 +159,7 @@ export const CameraEngine: React.FC<{
     const interpolateProp = (prop: keyof CameraKeyframe, defaultValue: number) => {
       if (startK.frame === endK.frame) return (startK[prop] as number) ?? defaultValue;
 
-      const t = (frame - startK.frame) / (endK.frame - startK.frame);
+      const t = (f - startK.frame) / (endK.frame - startK.frame);
       const easedT = easing(t);
 
       if (config?.pathSmoothing && ['x', 'y', 'z'].includes(prop as string)) {
@@ -177,7 +177,7 @@ export const CameraEngine: React.FC<{
       }
 
       return interpolate(
-        frame,
+        f,
         [startK.frame, endK.frame],
         [(startK[prop] as number) ?? defaultValue, (endK[prop] as number) ?? defaultValue],
         {
@@ -195,9 +195,9 @@ export const CameraEngine: React.FC<{
     let lookAtRotation = { x: 0, y: 0 };
     if (startK.lookAt && endK.lookAt) {
       // Proper lookAt interpolation
-      const targetX = interpolate(frame, [startK.frame, endK.frame], [startK.lookAt.x, endK.lookAt.x], { easing, extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-      const targetY = interpolate(frame, [startK.frame, endK.frame], [startK.lookAt.y, endK.lookAt.y], { easing, extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-      const targetZ = interpolate(frame, [startK.frame, endK.frame], [startK.lookAt.z, endK.lookAt.z], { easing, extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const targetX = interpolate(f, [startK.frame, endK.frame], [startK.lookAt.x, endK.lookAt.x], { easing, extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const targetY = interpolate(f, [startK.frame, endK.frame], [startK.lookAt.y, endK.lookAt.y], { easing, extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const targetZ = interpolate(f, [startK.frame, endK.frame], [startK.lookAt.z, endK.lookAt.z], { easing, extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
 
       // Calculate vector from camera to target
       const dx = targetX - x;
@@ -205,9 +205,6 @@ export const CameraEngine: React.FC<{
       const dz = targetZ - z;
 
       // Calculate rotations
-      // rotationY is pan (around Y axis), rotationX is tilt (around X axis)
-      // We negate them because we are transforming the SCENE, not the CAMERA
-      // Using -dz because the camera default view is along -Z axis
       const yaw = -Math.atan2(dx, -dz) * (180 / Math.PI);
       const pitch = Math.atan2(dy, Math.sqrt(dx * dx + dz * dz)) * (180 / Math.PI);
 
@@ -223,42 +220,50 @@ export const CameraEngine: React.FC<{
       rotationY: startK.lookAt ? lookAtRotation.y : interpolateProp('rotationY', 0),
       rotationZ: interpolateProp('rotationZ', 0),
     };
-  }, [frame, sortedKeyframes, config?.pathSmoothing]);
+  }, [sortedKeyframes, config?.pathSmoothing]);
 
-  // Calculate velocity for motion blur (lightweight approach)
+  const cameraState = useMemo(() => computeCameraState(frame), [computeCameraState, frame]);
+
+  // Calculate velocity for motion blur (High precision frame-to-frame delta)
   const motionBlurStyle = useMemo(() => {
-    if (!config?.motionBlur?.enabled || frame === 0) return {};
+    if (!config?.motionBlur?.enabled) return {};
 
     const intensity = config.motionBlur.intensity ?? 0.5;
 
-    let startIdx = 0;
-    for (let i = 0; i < sortedKeyframes.length - 1; i++) {
-      if (frame >= sortedKeyframes[i].frame && frame <= sortedKeyframes[i + 1].frame) {
-        startIdx = i;
-        break;
-      }
-    }
+    // We sample at frame and frame + 0.5 to get the "shutter" velocity
+    const curr = cameraState;
+    const next = computeCameraState(frame + 0.5);
 
-    const s = sortedKeyframes[startIdx];
-    const e = sortedKeyframes[startIdx + 1];
+    // Position delta
+    const dx = next.x - curr.x;
+    const dy = next.y - curr.y;
+    const dz = next.z - curr.z;
 
-    if (!s || !e || s.frame === e.frame) return {};
+    // Zoom delta (weighted heavily as it creates high visual flux)
+    const dZoom = next.zoom - curr.zoom;
 
-    const duration = e.frame - s.frame;
-    const dx = ((e.x ?? 0) - (s.x ?? 0)) / duration;
-    const dy = ((e.y ?? 0) - (s.y ?? 0)) / duration;
-    const dz = ((e.z ?? 0) - (s.z ?? 0)) / duration;
-    const dZoom = ((e.zoom ?? 1) - (s.zoom ?? 1)) / duration;
+    // Rotation delta
+    const drX = next.rotationX - curr.rotationX;
+    const drY = next.rotationY - curr.rotationY;
+    const drZ = next.rotationZ - curr.rotationZ;
 
-    const totalVelocity = Math.sqrt(dx * dx + dy * dy + dz * dz) + Math.abs(dZoom * 1000);
-    const blurAmount = Math.min(8, totalVelocity * 0.01 * intensity);
+    // Combined visual velocity
+    const posVelocity = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const rotVelocity = Math.sqrt(drX * drX + drY * drY + drZ * drZ) * 5; // Scale rotations
+    const zoomVelocity = Math.abs(dZoom) * 1000;
+
+    const totalVelocity = posVelocity + rotVelocity + zoomVelocity;
+
+    // blurAmount is pixels of blur.
+    // On CPU, we cap it strictly to prevent expensive large kernels.
+    const blurAmount = Math.min(6, totalVelocity * 0.05 * intensity);
 
     if (blurAmount < 0.2) return {};
 
     return {
       filter: `blur(${blurAmount.toFixed(1)}px)`,
     };
-  }, [frame, sortedKeyframes, config?.motionBlur]);
+  }, [frame, computeCameraState, cameraState, config?.motionBlur]);
 
   // Handle subtle camera shake if enabled
   const shakeOffset = useMemo(() => {
@@ -293,27 +298,33 @@ export const CameraEngine: React.FC<{
 
   // Overlays use the full 3D cinematic stack (including perspective, lookAt rotations, and Z translation)
   const overlayStyle: React.CSSProperties = {
-    width: '100%',
-    height: '100%',
     transformStyle: 'preserve-3d',
     willChange: 'transform',
     backfaceVisibility: 'hidden',
+    transformOrigin: 'center center',
     ...motionBlurStyle,
-    transform: `translate3d(${cx}px, ${cy}px, 0) scale3d(${cameraState.zoom}, ${cameraState.zoom}, 1) rotateX(${cameraState.rotationX}deg) rotateY(${cameraState.rotationY}deg) rotateZ(${cameraState.rotationZ + (shakeOffset.rz || 0)}deg) translate3d(${-cameraState.x + shakeOffset.x}px, ${-cameraState.y + shakeOffset.y}px, ${-cameraState.z}px) translate3d(${-cx}px, ${-cy}px, 0)`,
+    transform: `
+      translate3d(${cx}px, ${cy}px, 0)
+      scale3d(${cameraState.zoom.toFixed(4)}, ${cameraState.zoom.toFixed(4)}, 1)
+      rotateX(${cameraState.rotationX.toFixed(2)}deg)
+      rotateY(${cameraState.rotationY.toFixed(2)}deg)
+      rotateZ(${(cameraState.rotationZ + (shakeOffset.rz || 0)).toFixed(2)}deg)
+      translate3d(${(-cameraState.x + shakeOffset.x).toFixed(1)}px, ${(-cameraState.y + shakeOffset.y).toFixed(1)}px, ${-cameraState.z.toFixed(1)}px)
+      translate3d(${-cx}px, ${-cy}px, 0)
+    `,
   };
 
   // Background uses only 2D functionalities: Panning (X, Y) and Scaling (Zoom)
-  // VITAL: To maintain sync during pans, the translation offset MUST be divided by the scale
-  // if we scale BEFORE translating, or adjusted if we translate then scale.
-  // Using a clean matrix-like stack:
+  // VITAL: To maintain sync during pans, the translation offset MUST be divided by the coverScale
+  // so that the background pixels move at exactly the same screen rate as the overlays.
   const backgroundStyle: React.CSSProperties = {
-    width: '100%',
-    height: '100%',
     willChange: 'transform',
+    transformOrigin: 'center center',
+    ...motionBlurStyle,
     transform: `
       translate3d(${cx}px, ${cy}px, 0)
-      scale3d(${cameraState.zoom * coverScale}, ${cameraState.zoom * coverScale}, 1)
-      translate3d(${( -cameraState.x + shakeOffset.x ) / coverScale}px, ${( -cameraState.y + shakeOffset.y ) / coverScale}px, 0)
+      scale3d(${(cameraState.zoom * coverScale).toFixed(4)}, ${(cameraState.zoom * coverScale).toFixed(4)}, 1)
+      translate3d(${((-cameraState.x + shakeOffset.x) / coverScale).toFixed(1)}px, ${((-cameraState.y + shakeOffset.y) / coverScale).toFixed(1)}px, 0)
       translate3d(${-cx}px, ${-cy}px, 0)
     `,
   };
@@ -330,9 +341,9 @@ export const CameraEngine: React.FC<{
       </AbsoluteFill>
 
       {/* Overlay layer: FULL 3D */}
-      <div style={overlayStyle}>
+      <AbsoluteFill style={overlayStyle}>
         {overlays}
-      </div>
+      </AbsoluteFill>
     </div>
   );
 };
