@@ -54,29 +54,53 @@ export const CameraEngine: React.FC<{
 
   // Calculate the maximum possible pan and zoom to determine a safe "Cover" scale for background
   const coverScale = useMemo(() => {
-    if (!config?.keyframes || config.keyframes.length === 0) return 1;
+    if (!config?.keyframes || config.keyframes.length === 0) return 1.1;
 
-    let maxPanX = 0;
-    let maxPanY = 0;
+    const perspective = config.perspective || 1000;
+    let minEffectiveScale = 1;
+    let maxAbsX = 0;
+    let maxAbsY = 0;
+    let maxRot = 0;
 
     config.keyframes.forEach(k => {
-      maxPanX = Math.max(maxPanX, Math.abs(k.x ?? 0));
-      maxPanY = Math.max(maxPanY, Math.abs(k.y ?? 0));
+      const zoom = k.zoom ?? 1;
+      const z = k.z ?? 0;
+      // CSS Perspective scale formula: scale = d / (d + z_translated)
+      // Our translation is -k.z
+      const zScale = perspective / (perspective + z);
+      const effectiveScale = zoom * zScale;
+
+      if (effectiveScale < minEffectiveScale) {
+        minEffectiveScale = effectiveScale;
+      }
+
+      maxAbsX = Math.max(maxAbsX, Math.abs(k.x ?? 0));
+      maxAbsY = Math.max(maxAbsY, Math.abs(k.y ?? 0));
+
+      const rot = Math.max(Math.abs(k.rotationX ?? 0), Math.abs(k.rotationY ?? 0), Math.abs(k.rotationZ ?? 0));
+      maxRot = Math.max(maxRot, rot);
     });
 
-    // The required scale to cover a pan is roughly: 1 + (maxPan * 2 / dimension)
-    // We add a safety margin and factor in zoom if necessary
-    const panScaleX = 1 + (maxPanX * 2) / width;
-    const panScaleY = 1 + (maxPanY * 2) / height;
+    // 1. Account for zooming out (effectiveScale < 1)
+    const zoomOverscan = 1 / Math.max(0.1, minEffectiveScale);
 
-    let minZoom = 1;
-    config.keyframes.forEach(k => {
-      minZoom = Math.min(minZoom, k.zoom ?? 1);
-    });
-    const zoomScale = 1 / minZoom;
+    // 2. Account for panning
+    // To cover a pan of maxAbsX, we need to scale by (1 + 2 * maxAbsX / width)
+    const panOverscanX = 1 + (maxAbsX * 2) / width;
+    const panOverscanY = 1 + (maxAbsY * 2) / height;
+    const panOverscan = Math.max(panOverscanX, panOverscanY);
 
-    return Math.max(panScaleX, panScaleY) * zoomScale * 1.05;
-  }, [config?.keyframes, width, height]);
+    // 3. Account for rotation
+    // Rotating a rectangle reveals corners. Max reveal at 45deg is ~1.41x (sqrt 2)
+    const rotationOverscan = 1 + (maxRot / 45) * 0.42;
+
+    // Total required scale to ensure no black edges
+    const totalScale = zoomOverscan * panOverscan * rotationOverscan;
+
+    // Optimization: Cap the scale to 5x. Extremely large textures slow down rendering.
+    // Also add a 5% safety margin.
+    return Math.min(5, totalScale * 1.05);
+  }, [config?.keyframes, config?.perspective, width, height]);
 
   const cameraState = useMemo(() => {
     if (sortedKeyframes.length === 0) {
@@ -240,12 +264,12 @@ export const CameraEngine: React.FC<{
     const dZoom = ((e.zoom ?? 1) - (s.zoom ?? 1)) / duration;
 
     const totalVelocity = Math.sqrt(dx * dx + dy * dy + dz * dz) + Math.abs(dZoom * 1000);
-    const blurAmount = Math.min(10, totalVelocity * 0.01 * intensity);
+    const blurAmount = Math.min(8, totalVelocity * 0.01 * intensity);
 
-    if (blurAmount < 0.1) return {};
+    if (blurAmount < 0.2) return {};
 
     return {
-      filter: `blur(${blurAmount.toFixed(2)}px)`,
+      filter: `blur(${blurAmount.toFixed(1)}px)`,
     };
   }, [frame, sortedKeyframes, config?.motionBlur]);
 
@@ -287,15 +311,7 @@ export const CameraEngine: React.FC<{
     willChange: 'transform',
     backfaceVisibility: 'hidden',
     ...motionBlurStyle,
-    transform: `
-      translate3d(${cx}px, ${cy}px, 0)
-      scale3d(${cameraState.zoom}, ${cameraState.zoom}, 1)
-      rotateX(${cameraState.rotationX}deg)
-      rotateY(${cameraState.rotationY}deg)
-      rotateZ(${cameraState.rotationZ + (shakeOffset.rz || 0)}deg)
-      translate3d(${-cameraState.x + shakeOffset.x}px, ${-cameraState.y + shakeOffset.y}px, ${-cameraState.z}px)
-      translate3d(${-cx}px, ${-cy}px, 0)
-    `,
+    transform: `translate3d(${cx}px, ${cy}px, 0) scale3d(${cameraState.zoom}, ${cameraState.zoom}, 1) rotateX(${cameraState.rotationX}deg) rotateY(${cameraState.rotationY}deg) rotateZ(${cameraState.rotationZ + (shakeOffset.rz || 0)}deg) translate3d(${-cameraState.x + shakeOffset.x}px, ${-cameraState.y + shakeOffset.y}px, ${-cameraState.z}px) translate3d(${-cx}px, ${-cy}px, 0)`,
   };
 
   // The background needs to be scaled up independently to ensure it covers the viewport
