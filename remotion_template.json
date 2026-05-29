@@ -107,8 +107,8 @@
         {
           "id": "CENTER",
           "type": "ui_panel",
-          "title": "3D TOUR SYSTEM",
-          "description": "Navigating through virtual space",
+          "title": "AUTO-COVER SYSTEM",
+          "description": "Background video scales to fill during pans",
           "iconType": "cpu",
           "variant": "glass",
           "position": { "x": 960, "y": 540 },
