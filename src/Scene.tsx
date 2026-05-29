@@ -55,10 +55,8 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
   return (
     <AbsoluteFill className="bg-black">
       <CameraEngine config={sceneData.camera}>
-        {/* Background is now inside the camera engine to ensure it moves with pans and zooms */}
-        <AbsoluteFill>
-          {renderBackground()}
-        </AbsoluteFill>
+        {/* The first child is treated as the background by CameraEngine and scaled for "Auto-Cover" */}
+        {renderBackground() || <div />}
 
         <OverlayManager overlays={sceneData.overlays || []} />
       </CameraEngine>

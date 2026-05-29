@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useCurrentFrame, interpolate, Easing, useVideoConfig } from 'remotion';
+import { useCurrentFrame, interpolate, Easing, useVideoConfig, AbsoluteFill } from 'remotion';
 
 export interface CameraEasing {
   type: 'ease' | 'linear' | 'bezier' | 'step';
@@ -51,6 +51,32 @@ export const CameraEngine: React.FC<{
     if (!config?.keyframes) return [];
     return [...config.keyframes].sort((a, b) => a.frame - b.frame);
   }, [config?.keyframes]);
+
+  // Calculate the maximum possible pan and zoom to determine a safe "Cover" scale for background
+  const coverScale = useMemo(() => {
+    if (!config?.keyframes || config.keyframes.length === 0) return 1;
+
+    let maxPanX = 0;
+    let maxPanY = 0;
+
+    config.keyframes.forEach(k => {
+      maxPanX = Math.max(maxPanX, Math.abs(k.x ?? 0));
+      maxPanY = Math.max(maxPanY, Math.abs(k.y ?? 0));
+    });
+
+    // The required scale to cover a pan is roughly: 1 + (maxPan * 2 / dimension)
+    // We add a safety margin and factor in zoom if necessary
+    const panScaleX = 1 + (maxPanX * 2) / width;
+    const panScaleY = 1 + (maxPanY * 2) / height;
+
+    let minZoom = 1;
+    config.keyframes.forEach(k => {
+      minZoom = Math.min(minZoom, k.zoom ?? 1);
+    });
+    const zoomScale = 1 / minZoom;
+
+    return Math.max(panScaleX, panScaleY) * zoomScale * 1.05;
+  }, [config?.keyframes, width, height]);
 
   const cameraState = useMemo(() => {
     if (sortedKeyframes.length === 0) {
@@ -194,8 +220,6 @@ export const CameraEngine: React.FC<{
 
     const intensity = config.motionBlur.intensity ?? 0.5;
 
-    // We compare current state with a slight offset to estimate velocity
-    // Instead of full recalculation, we'll just look at the keyframe delta if we're in a segment
     let startIdx = 0;
     for (let i = 0; i < sortedKeyframes.length - 1; i++) {
       if (frame >= sortedKeyframes[i].frame && frame <= sortedKeyframes[i + 1].frame) {
@@ -215,7 +239,6 @@ export const CameraEngine: React.FC<{
     const dz = ((e.z ?? 0) - (s.z ?? 0)) / duration;
     const dZoom = ((e.zoom ?? 1) - (s.zoom ?? 1)) / duration;
 
-    // Total perceived movement
     const totalVelocity = Math.sqrt(dx * dx + dy * dy + dz * dz) + Math.abs(dZoom * 1000);
     const blurAmount = Math.min(10, totalVelocity * 0.01 * intensity);
 
@@ -234,7 +257,6 @@ export const CameraEngine: React.FC<{
     const speed = config.shake.speed ?? 1;
     const rIntensity = config.shake.rotationIntensity ?? 0.2;
 
-    // Smooth multi-frequency sine waves for handheld feel
     const x = Math.sin(frame * 0.15 * speed) * intensity + Math.sin(frame * 0.07 * speed) * (intensity * 0.4);
     const y = Math.cos(frame * 0.12 * speed) * intensity + Math.cos(frame * 0.05 * speed) * (intensity * 0.4);
     const rz = Math.sin(frame * 0.1 * speed) * rIntensity;
@@ -258,14 +280,6 @@ export const CameraEngine: React.FC<{
     overflow: 'hidden',
   };
 
-  // Professional Camera Transform Matrix
-  // We use a specific order:
-  // 1. Move to center (cx, cy)
-  // 2. Apply Zoom (Scale)
-  // 3. Apply Camera Rotations (including subtle shake rotation)
-  // 4. Move by Camera Offset (x, y, z) + Shake Offset
-  // 5. Move back from center (-cx, -cy)
-  // This ensures zoom and rotations happen relative to the camera's viewport center
   const sceneStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
@@ -284,10 +298,26 @@ export const CameraEngine: React.FC<{
     `,
   };
 
+  // The background needs to be scaled up independently to ensure it covers the viewport
+  // during pans. We apply the inverse of the camera's zoom if we want it to feel like
+  // a static surface, but the user wants it to be panned/zoomed too, just without
+  // revealing black bars.
+  const backgroundStyle: React.CSSProperties = {
+    transform: `scale(${coverScale})`,
+    transformOrigin: 'center center',
+  };
+
+  const childrenArray = React.Children.toArray(children);
+  const background = childrenArray[0];
+  const overlays = childrenArray.slice(1);
+
   return (
     <div style={containerStyle}>
       <div style={sceneStyle}>
-        {children}
+        <AbsoluteFill style={backgroundStyle}>
+          {background}
+        </AbsoluteFill>
+        {overlays}
       </div>
     </div>
   );
