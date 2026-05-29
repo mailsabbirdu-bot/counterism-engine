@@ -8,11 +8,9 @@
   "scenes": [
     {
       "scene_id": "DIGITAL-AWAKENING",
-      "background_type": "procedural",
-      "procedural_config": {
-        "speed": 2,
-        "type": "nebula"
-      },
+      "background_type": "video",
+      "video_path": "renders/scene_SC_01.mp4",
+      "audio_enabled": false,
       "duration_in_frames": 300,
       "camera": {
         "enabled": true,
