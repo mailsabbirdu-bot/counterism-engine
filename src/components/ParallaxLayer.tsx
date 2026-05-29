@@ -10,7 +10,7 @@ export const ParallaxLayer: React.FC<{
     <AbsoluteFill
       style={{
         transformStyle: 'preserve-3d',
-        transform: depth !== 0 ? `translateZ(${depth}px)` : undefined,
+        transform: depth !== 0 ? `translate3d(0, 0, ${depth}px)` : undefined,
         zIndex,
       }}
     >

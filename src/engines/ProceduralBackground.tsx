@@ -7,15 +7,15 @@ export const ProceduralBackground: React.FC<{ config: any }> = ({ config }) => {
 
   // Simple animated gradient for now
   const hue = (frame * (config.speed || 1)) % 360;
-  const color1 = `hsl(${hue}, 70%, 20%)`;
-  const color2 = `hsl(${(hue + 60) % 360}, 70%, 10%)`;
+  const color1 = config.color || `hsl(${hue}, 70%, 50%)`;
+  const color2 = config.color2 || `hsl(${(hue + 60) % 360}, 70%, 40%)`;
 
   return (
     <div
       style={{
         width: '100%',
         height: '100%',
-        background: `linear-gradient(135deg, ${color1}, ${color2})`,
+        background: config.color ? config.color : `linear-gradient(135deg, ${color1}, ${color2})`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
