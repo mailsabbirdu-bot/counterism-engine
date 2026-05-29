@@ -1,4 +1,5 @@
 import React from 'react';
+import { ParallaxLayer } from './components/ParallaxLayer';
 import { TextEngine } from './engines/TextEngine';
 import { UISystem } from './engines/UISystem';
 import { ShapesEngine } from './engines/ShapesEngine';
@@ -14,23 +15,34 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays }) => {
   return (
     <>
       {overlays.map((overlay) => {
-        switch (overlay.type) {
-          case 'text':
-            return <TextEngine key={overlay.id} overlay={overlay} />;
-          case 'ui_panel':
-            return <UISystem key={overlay.id} overlay={overlay} />;
-          case 'shape':
-            return <ShapesEngine key={overlay.id} overlay={overlay} />;
-          case 'chart':
-            return <ChartsEngine key={overlay.id} overlay={overlay} />;
-          case 'graph':
-            return <GraphsEngine key={overlay.id} overlay={overlay} />;
-          case 'video':
-          case 'image':
-            return <MediaEngine key={overlay.id} overlay={overlay} />;
-          default:
-            return null;
-        }
+        const renderOverlay = () => {
+          switch (overlay.type) {
+            case 'text':
+              return <TextEngine overlay={overlay} />;
+            case 'ui_panel':
+              return <UISystem overlay={overlay} />;
+            case 'shape':
+              return <ShapesEngine overlay={overlay} />;
+            case 'chart':
+              return <ChartsEngine overlay={overlay} />;
+            case 'graph':
+              return <GraphsEngine overlay={overlay} />;
+            case 'video':
+            case 'image':
+              return <MediaEngine overlay={overlay} />;
+            default:
+              return null;
+          }
+        };
+
+        const content = renderOverlay();
+        if (!content) return null;
+
+        return (
+          <ParallaxLayer key={overlay.id} depth={overlay.depth} zIndex={overlay.zIndex}>
+            {content}
+          </ParallaxLayer>
+        );
       })}
     </>
   );

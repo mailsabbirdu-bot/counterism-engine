@@ -97,8 +97,25 @@ This document defines the comprehensive JSON schema for `remotion_template.json`
 
 ---
 
+## 🎥 Camera System (Cinematic)
+| Key | Type | Description |
+| :--- | :--- | :--- |
+| `camera` | `object` | Optional scene-level camera configuration. |
+
+### `camera` object
+- `enabled`: `boolean`
+- `perspective`: `number` (Default: 1000. Higher = flatter perspective).
+- `keyframes`: `array` of camera states.
+  - `frame`: `number`
+  - `x`, `y`, `z`: `number` (Translation).
+  - `zoom`: `number` (Default: 1).
+  - `rotationX`, `rotationY`, `rotationZ`: `number` (Degrees).
+
+---
+
 ## 🎨 Shared Fields (All Overlays)
 - `id`: `string` (Unique layer identifier)
 - `start`: `number` (Frame to appear)
 - `duration`: `number` (Frames to stay visible)
+- `depth`: `number` (Optional. Z-axis position for parallax. Positive is closer to camera).
 - `zIndex`: `number` (Layer stacking order; higher values appear on top. Default values: Shape=10, Graph=25, Chart=30, UI=40, Text=50, Media=100)

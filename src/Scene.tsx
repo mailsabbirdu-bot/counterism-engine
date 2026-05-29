@@ -2,6 +2,7 @@ import React from 'react';
 import { AbsoluteFill, OffthreadVideo, useVideoConfig } from 'remotion';
 import { OverlayManager } from './OverlayManager';
 import { ProceduralBackground } from './engines/ProceduralBackground';
+import { CameraEngine } from './engines/CameraEngine';
 import { resolveAsset } from './lib/resolveAsset';
 
 export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
@@ -53,11 +54,15 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
 
   return (
     <AbsoluteFill className="bg-black">
-      {/* STEP 1 — Load Background */}
-      {renderBackground()}
+      <CameraEngine config={sceneData.camera}>
+        {/* STEP 1 — Load Background */}
+        <AbsoluteFill>
+          {renderBackground()}
+        </AbsoluteFill>
 
-      {/* STEP 2-4 — Composite Layers */}
-      <OverlayManager overlays={sceneData.overlays || []} />
+        {/* STEP 2-4 — Composite Layers */}
+        <OverlayManager overlays={sceneData.overlays || []} />
+      </CameraEngine>
     </AbsoluteFill>
   );
 };

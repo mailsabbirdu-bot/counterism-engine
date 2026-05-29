@@ -1,0 +1,63 @@
+{
+  "project_name": "Camera_Cinematic_Test",
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "scenes": [
+    {
+      "scene_id": "CAMERA-TEST-SCENE",
+      "background_type": "procedural",
+      "procedural_config": { "speed": 1, "type": "gradient" },
+      "duration_in_frames": 150,
+      "camera": {
+        "enabled": true,
+        "perspective": 1000,
+        "keyframes": [
+          { "frame": 0, "x": 0, "y": 0, "zoom": 1, "rotationY": 0 },
+          { "frame": 150, "x": 200, "y": 0, "zoom": 1.5, "rotationY": 15 }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "background-text",
+          "type": "text",
+          "content": "FAR AWAY",
+          "start": 0,
+          "duration": 150,
+          "depth": -500,
+          "font": "Montserrat",
+          "fontSize": "150px",
+          "style": "text-white/20 font-bold",
+          "zIndex": 5
+        },
+        {
+          "id": "midground-shape",
+          "type": "shape",
+          "shape_type": "circle",
+          "start": 0,
+          "duration": 150,
+          "animation": "pulse",
+          "color": "#3b82f6",
+          "size": 300,
+          "position": { "x": 960, "y": 540 },
+          "depth": 0,
+          "zIndex": 10
+        },
+        {
+          "id": "foreground-text",
+          "type": "text",
+          "content": "CLOSE UP",
+          "start": 0,
+          "duration": 150,
+          "depth": 300,
+          "font": "Montserrat",
+          "fontSize": "120px",
+          "style": "text-pink-500 font-black",
+          "zIndex": 50
+        }
+      ]
+    }
+  ]
+}
