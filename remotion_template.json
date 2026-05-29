@@ -1,157 +1,158 @@
 {
-"project_name": "Counterism_Studio_V4",
-"global_settings": {
-"width": 1920,
-"height": 1080,
-"fps": 30
-},
-"scenes": [
-{
-"scene_id": "CAMERA-TEST-SCENE",
-"background_type": "procedural",
-"procedural_config": { "speed": 1, "type": "gradient" },
-"duration_in_frames": 150,
-"camera": {
-"enabled": true,
-"perspective": 1000,
-"keyframes": [
-{ "frame": 0, "x": 0, "y": 0, "zoom": 1, "rotationY": 0 },
-{ "frame": 150, "x": 200, "y": 0, "zoom": 1.5, "rotationY": 15 }
-]
-},
-"overlays": [
-{
-"id": "background-text",
-"type": "text",
-"content": "FAR AWAY",
-"start": 0,
-"duration": 150,
-"depth": -500,
-"font": "Montserrat",
-"fontSize": "150px",
-"style": "text-white/20 font-bold",
-"zIndex": 5
-},
-{
-"id": "midground-shape",
-"type": "shape",
-"shape_type": "circle",
-"start": 0,
-"duration": 150,
-"animation": "pulse",
-"color": "#3b82f6",
-"size": 300,
-"position": { "x": 960, "y": 540 },
-"depth": 0,
-"zIndex": 10
-},
-{
-"id": "foreground-text",
-"type": "text",
-"content": "CLOSE UP",
-"start": 0,
-"duration": 150,
-"depth": 300,
-"font": "Montserrat",
-"fontSize": "120px",
-"style": "text-pink-500 font-black",
-"zIndex": 50
-}
-]
-},
-{
-"scene_id": "SC-02-VIDEO",
-"background_type": "video",
-"video_path": "renders/scene_SC_01.mp4",
-"audio_enabled": true,
-"duration_in_frames": 600,
-"overlays": [
-{
-"id": "deco-shape",
-"type": "shape",
-"shape_type": "circle",
-"start": 0,
-"duration": 600,
-"animation": "pulse",
-"color": "#f472b6",
-"size": 400,
-"position": { "x": 960, "y": 540 },
-"decorated": true,
-"speed": 0.5,
-"zIndex": 10
-},
-{
-"id": "overlay-video-pip",
-"type": "video",
-"src": "renders/scene_SC_01.mp4",
-"audio_enabled": true,
-"start": 15,
-"duration": 150,
-"position": { "x": 560, "y": 300 },
-"width": 800,
-"height": 450,
-"borderRadius": 20,
-"shadow": true,
-"border": { "width": 10, "color": "#10b981" },
-"zIndex": 20
-},
-{
-"id": "data-chart",
-"type": "chart",
-"chart_type": "line",
-"title": "PERFORMANCE METRICS",
-"subtitle": "REAL-TIME FRAME EVALUATION",
-"start": 150,
-"duration": 400,
-"width": 1000,
-"height": 600,
-"position": { "x": 460, "y": 420 },
-"colors": { "scheme": "nivo" },
-"zIndex": 30,
-"data": [
-{
-"id": "frame_stability",
-"data": [
-{ "x": "0s", "y": 30 },
-{ "x": "1s", "y": 60 },
-{ "x": "2s", "y": 45 },
-{ "x": "3s", "y": 90 },
-{ "x": "4s", "y": 85 },
-{ "x": "5s", "y": 100 }
-]
-}
-]
-},
-{
-"id": "ui-panel-tech",
-"type": "ui_panel",
-"title": "SYSTEM SYNC",
-"description": "Video layers and shapes synced via zIndex layering system.",
-"iconType": "cpu",
-"nodeId": "CORE-SC-02",
-"start": 300,
-"duration": 250,
-"position": { "x": 100, "y": 100 },
-"variant": "glass",
-"initialProgress": 20,
-"targetProgress": 95,
-"zIndex": 40
-},
-{
-"id": "main-title",
-"type": "text",
-"content": "SMOOTH VIDEO SYNC",
-"start": 60,
-"duration": 480,
-"font": "Montserrat",
-"fontSize": "120px",
-"splitMode": "word",
-"stagger": 0.15,
-"animation": "slideUp",
-"style": "text-pink-500 font-extrabold uppercase",
-"zIndex": 50
-}
-]
-}
-]
+  "project_name": "Digital Awakening Stress Test",
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "scenes": [
+    {
+      "scene_id": "DIGITAL-AWAKENING",
+      "background_type": "procedural",
+      "procedural_config": {
+        "speed": 2,
+        "type": "nebula"
+      },
+      "duration_in_frames": 300,
+      "camera": {
+        "enabled": true,
+        "perspective": 800,
+        "pathSmoothing": true,
+        "motionBlur": {
+          "enabled": true,
+          "intensity": 1.2
+        },
+        "shake": {
+          "enabled": true,
+          "intensity": 5,
+          "speed": 2,
+          "rotationIntensity": 1.0
+        },
+        "keyframes": [
+          {
+            "frame": 0,
+            "x": 0,
+            "y": 0,
+            "z": 5000,
+            "zoom": 0.5,
+            "lookAt": { "x": 0, "y": 0, "z": 0 },
+            "easing": "ease"
+          },
+          {
+            "frame": 60,
+            "x": 0,
+            "y": 0,
+            "z": 1000,
+            "zoom": 1,
+            "lookAt": { "x": 0, "y": 0, "z": 0 },
+            "easing": { "type": "bezier", "bezier": [0.85, 0, 0.15, 1] }
+          },
+          {
+            "frame": 120,
+            "x": 1000,
+            "y": -500,
+            "z": 1500,
+            "zoom": 2,
+            "lookAt": { "x": 0, "y": 0, "z": -500 },
+            "easing": "ease"
+          },
+          {
+            "frame": 180,
+            "x": -1000,
+            "y": 500,
+            "z": 1500,
+            "zoom": 2,
+            "lookAt": { "x": 0, "y": 0, "z": -500 },
+            "easing": "ease"
+          },
+          {
+            "frame": 240,
+            "x": 0,
+            "y": 0,
+            "z": 800,
+            "zoom": 3,
+            "lookAt": { "x": 0, "y": 0, "z": 0 },
+            "easing": { "type": "bezier", "bezier": [0.22, 1, 0.36, 1] }
+          },
+          {
+            "frame": 299,
+            "x": 0,
+            "y": 0,
+            "z": -2000,
+            "zoom": 5,
+            "lookAt": { "x": 0, "y": 0, "z": 0 }
+          }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "CORE-SPARK",
+          "type": "shape",
+          "shape_type": "circle",
+          "size": 150,
+          "color": "#00f2ff",
+          "position": { "x": 960, "y": 540 },
+          "start": 30,
+          "duration": 270,
+          "depth": 0,
+          "decorated": true
+        },
+        {
+          "id": "ORBIT-1",
+          "type": "shape",
+          "shape_type": "triangle",
+          "size": 100,
+          "color": "#ff00ea",
+          "position": { "x": 600, "y": 300 },
+          "start": 60,
+          "duration": 240,
+          "depth": -400
+        },
+        {
+          "id": "ORBIT-2",
+          "type": "shape",
+          "shape_type": "rect",
+          "size": 80,
+          "color": "#fffb00",
+          "position": { "x": 1320, "y": 780 },
+          "start": 90,
+          "duration": 210,
+          "depth": 400
+        },
+        {
+          "id": "TEXT-1",
+          "type": "text",
+          "content": "INITIALIZING",
+          "font": "Montserrat",
+          "fontSize": "80px",
+          "style": "text-white font-bold tracking-widest",
+          "start": 0,
+          "duration": 60,
+          "depth": 200
+        },
+        {
+          "id": "TEXT-2",
+          "type": "text",
+          "content": "AWAKENING",
+          "font": "Montserrat",
+          "fontSize": "160px",
+          "style": "text-cyan-400 font-black drop-shadow-[0_0_20px_rgba(34,211,238,0.8)]",
+          "start": 60,
+          "duration": 240,
+          "depth": 0
+        },
+        {
+          "id": "TEXT-3",
+          "type": "text",
+          "content": "THE MATRIX IS BORN",
+          "font": "Montserrat",
+          "fontSize": "60px",
+          "style": "text-white/50 font-light italic",
+          "start": 180,
+          "duration": 120,
+          "depth": -800
+        }
+      ]
+    }
+  ]
 }
