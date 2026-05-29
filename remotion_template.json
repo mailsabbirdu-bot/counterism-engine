@@ -1,5 +1,5 @@
 {
-  "project_name": "Camera_Stress_Test_V4",
+  "project_name": "Counterism_Studio_V4",
   "global_settings": {
     "width": 1920,
     "height": 1080,
@@ -7,30 +7,97 @@
   },
   "scenes": [
     {
-      "scene_id": "STRESS-TEST",
+      "scene_id": "SC-02-VIDEO",
       "background_type": "video",
       "video_path": "renders/scene_SC_01.mp4",
+      "audio_enabled": true,
       "duration_in_frames": 600,
-      "debug_camera": true,
-      "camera": {
-        "enabled": true,
-        "keyframes": [
-          { "frame": 0, "x": 1200, "y": 900, "zoom": 1, "rotation": 0 },
-          { "frame": 150, "x": -1200, "y": -900, "zoom": 1.8, "rotation": 15 },
-          { "frame": 300, "x": 0, "y": 0, "zoom": 0.4, "rotation": -15 },
-          { "frame": 450, "x": 1000, "y": -1000, "zoom": 2.5, "rotation": 30 },
-          { "frame": 600, "x": 0, "y": 0, "zoom": 1, "rotation": 0 }
-        ]
-      },
       "overlays": [
-        { "id": "t1", "type": "text", "content": "CENTER ANCHOR", "start": 0, "duration": 600, "fontSize": "180px", "style": "text-white font-black", "zIndex": 100, "depth": 1.0 },
-        { "id": "t2", "type": "text", "content": "NORTH CLUSTER", "start": 0, "duration": 600, "fontSize": "96px", "position": { "x": 0, "y": -1200 }, "style": "text-blue-400", "zIndex": 90, "depth": 0.5 },
-        { "id": "t3", "type": "text", "content": "SOUTH CLUSTER", "start": 0, "duration": 600, "fontSize": "96px", "position": { "x": 0, "y": 1200 }, "style": "text-red-400", "zIndex": 90, "depth": 1.5 },
-        { "id": "t4", "type": "text", "content": "EAST DATA", "start": 0, "duration": 600, "fontSize": "96px", "position": { "x": 1500, "y": 0 }, "style": "text-emerald-400", "zIndex": 90, "depth": 1.2 },
-        { "id": "t5", "type": "text", "content": "WEST DATA", "start": 0, "duration": 600, "fontSize": "96px", "position": { "x": -1500, "y": 0 }, "style": "text-amber-400", "zIndex": 90, "depth": 0.8 },
-        { "id": "ui1", "type": "ui_panel", "title": "PARALLAX_X", "description": "DEPTH 1.5 ACTIVE", "iconType": "cpu", "start": 0, "duration": 600, "position": { "x": 1000, "y": 600 }, "zIndex": 80, "depth": 1.5 },
-        { "id": "ui2", "type": "ui_panel", "title": "PARALLAX_Y", "description": "DEPTH 0.3 ACTIVE", "iconType": "activity", "start": 0, "duration": 600, "position": { "x": -1000, "y": -600 }, "zIndex": 80, "depth": 0.3 },
-        { "id": "s1", "type": "shape", "shape_type": "circle", "start": 0, "duration": 600, "size": 1500, "color": "#ffffff05", "position": { "x": 960, "y": 540 }, "decorated": true, "zIndex": 5, "depth": 0.1 }
+        {
+          "id": "deco-shape",
+          "type": "shape",
+          "shape_type": "circle",
+          "start": 0,
+          "duration": 600,
+          "animation": "pulse",
+          "color": "#f472b6",
+          "size": 400,
+          "position": { "x": 960, "y": 540 },
+          "decorated": true,
+          "speed": 0.5,
+          "zIndex": 10
+        },
+        {
+          "id": "overlay-video-pip",
+          "type": "video",
+          "src": "renders/scene_SC_01.mp4",
+          "audio_enabled": true,
+          "start": 15,
+          "duration": 150,
+          "position": { "x": 560, "y": 300 },
+          "width": 800,
+          "height": 450,
+          "borderRadius": 20,
+          "shadow": true,
+          "border": { "width": 10, "color": "#10b981" },
+          "zIndex": 20
+        },
+        {
+          "id": "data-chart",
+          "type": "chart",
+          "chart_type": "line",
+          "title": "PERFORMANCE METRICS",
+          "subtitle": "REAL-TIME FRAME EVALUATION",
+          "start": 150,
+          "duration": 400,
+          "width": 1000,
+          "height": 600,
+          "position": { "x": 460, "y": 420 },
+          "colors": { "scheme": "nivo" },
+          "zIndex": 30,
+          "data": [
+            {
+              "id": "frame_stability",
+              "data": [
+                { "x": "0s", "y": 30 },
+                { "x": "1s", "y": 60 },
+                { "x": "2s", "y": 45 },
+                { "x": "3s", "y": 90 },
+                { "x": "4s", "y": 85 },
+                { "x": "5s", "y": 100 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ui-panel-tech",
+          "type": "ui_panel",
+          "title": "SYSTEM SYNC",
+          "description": "Video layers and shapes synced via zIndex layering system.",
+          "iconType": "cpu",
+          "nodeId": "CORE-SC-02",
+          "start": 300,
+          "duration": 250,
+          "position": { "x": 100, "y": 100 },
+          "variant": "glass",
+          "initialProgress": 20,
+          "targetProgress": 95,
+          "zIndex": 40
+        },
+        {
+          "id": "main-title",
+          "type": "text",
+          "content": "SMOOTH VIDEO SYNC",
+          "start": 60,
+          "duration": 480,
+          "font": "Montserrat",
+          "fontSize": "120px",
+          "splitMode": "word",
+          "stagger": 0.15,
+          "animation": "slideUp",
+          "style": "text-pink-500 font-extrabold uppercase",
+          "zIndex": 50
+        }
       ]
     }
   ]

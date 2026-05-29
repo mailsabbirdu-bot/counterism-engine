@@ -3,7 +3,6 @@ import { AbsoluteFill, OffthreadVideo, useVideoConfig } from 'remotion';
 import { OverlayManager } from './OverlayManager';
 import { ProceduralBackground } from './engines/ProceduralBackground';
 import { resolveAsset } from './lib/resolveAsset';
-import { CameraRig } from './components/CameraRig';
 
 export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
   const { durationInFrames } = useVideoConfig();
@@ -54,24 +53,11 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
 
   return (
     <AbsoluteFill className="bg-black">
-      {/* STEP 1 — Load Background (Static) */}
+      {/* STEP 1 — Load Background */}
       {renderBackground()}
 
-      {/* STEP 2 — Cinematic Camera Rig (Overlay World) */}
-      <CameraRig
-        config={sceneData.camera}
-        debug={sceneData.debug_camera}
-        durationInFrames={durationInFrames}
-      >
-        {(cameraState) => (
-          <OverlayManager
-            overlays={sceneData.overlays || []}
-            cameraX={cameraState.x}
-            cameraY={cameraState.y}
-            debug={sceneData.debug_camera}
-          />
-        )}
-      </CameraRig>
+      {/* STEP 2-4 — Composite Layers */}
+      <OverlayManager overlays={sceneData.overlays || []} />
     </AbsoluteFill>
   );
 };

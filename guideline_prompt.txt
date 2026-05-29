@@ -25,7 +25,6 @@ You are an expert motion graphics designer and JSON engineer. Your task is to ge
 - `video_path`: (If type is video) Path relative to `public/`.
 - `audio_enabled`: (Optional) `true` or `false` to enable/disable background audio.
 - `procedural_config`: (If type is procedural) `{ "speed": number, "type": string }`.
-- `camera`: (Optional) `{ "enabled": true, "preset": "panRight", "keyframes": [...] }`.
 - `overlays`: Array of Overlay Objects.
 
 ### Overlay Objects
@@ -35,7 +34,6 @@ You are an expert motion graphics designer and JSON engineer. Your task is to ge
 - `start`: Start frame.
 - `duration`: Duration in frames.
 - `zIndex`: Number (Stacking order. Suggested defaults: Shapes=10, Graphs=25, Charts=30, UI=40, Text=50, Media=100).
-- `depth`: Number (Parallax depth: 0.3 for background, 1.0 normal, 1.5 foreground).
 
 #### Type: Text
 - `content`: String.
