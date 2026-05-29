@@ -29,6 +29,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       style={{
         fontFamily: overlay.font || 'Inter',
         fontSize: baseFontSize,
+        zIndex: overlay.zIndex,
         // VITAL: Always use explicit pixel units
         left: overlay.position ? `${overlay.position.x}px` : undefined,
         top: overlay.position ? `${overlay.position.y}px` : undefined,
