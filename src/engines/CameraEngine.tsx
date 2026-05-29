@@ -90,7 +90,6 @@ export const CameraEngine: React.FC<{
   };
 
   // Professional transform order: Translation first, then rotation
-  // We use scale3d for zoom and translate3d for camera position (including Z depth)
   const sceneStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
