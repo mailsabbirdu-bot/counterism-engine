@@ -1,349 +1,238 @@
 import React, { useMemo } from 'react';
-import { useCurrentFrame, interpolate, Easing, useVideoConfig, AbsoluteFill } from 'remotion';
-
-export interface CameraEasing {
-  type: 'ease' | 'linear' | 'bezier' | 'step';
-  bezier?: [number, number, number, number];
-}
-
-export interface CameraKeyframe {
-  frame: number;
-  x?: number;
-  y?: number;
-  z?: number;
-  zoom?: number;
-  rotationX?: number;
-  rotationY?: number;
-  rotationZ?: number;
-  easing?: 'ease' | 'linear' | 'bezier' | 'step' | CameraEasing;
-  lookAt?: {
-    x: number;
-    y: number;
-    z: number;
-  };
-}
+import { useCurrentFrame, useVideoConfig, interpolate, Easing } from 'remotion';
+import { getPresetKeyframes, CameraPreset, CameraKeyframe } from '../lib/cameraPresets';
 
 export interface CameraConfig {
   enabled: boolean;
   perspective?: number;
-  pathSmoothing?: boolean;
-  motionBlur?: {
-    enabled: boolean;
-    intensity?: number;
-  };
+  preset?: CameraPreset;
+  keyframes?: CameraKeyframe[];
   shake?: {
     enabled: boolean;
     intensity?: number;
     speed?: number;
     rotationIntensity?: number;
   };
-  keyframes: CameraKeyframe[];
+  motionBlur?: {
+    enabled: boolean;
+    intensity?: number;
+  };
 }
 
-export const CameraEngine: React.FC<{
-  config?: CameraConfig;
-  children: React.ReactNode;
-}> = ({ config, children }) => {
-  const frame = useCurrentFrame();
-  const { width, height } = useVideoConfig();
+// Catmull-Rom Spline Interpolation for smooth spatial paths
+const catmullRom = (p0: number, p1: number, p2: number, p3: number, t: number) => {
+  const v0 = (p2 - p0) * 0.5;
+  const v1 = (p3 - p1) * 0.5;
+  const t2 = t * t;
+  const t3 = t * t2;
+  return (2 * p1 - 2 * p2 + v0 + v1) * t3 + (-3 * p1 + 3 * p2 - 2 * v0 - v1) * t2 + v0 * t + p1;
+};
 
-  const sortedKeyframes = useMemo(() => {
-    if (!config?.keyframes) return [];
-    return [...config.keyframes].sort((a, b) => a.frame - b.frame);
-  }, [config?.keyframes]);
-
-  // Calculate the maximum possible pan and zoom to determine a safe "Cover" scale for background
-  const coverScale = useMemo(() => {
-    if (!config?.keyframes || config.keyframes.length === 0) return 1.1;
-
-    const perspective = config.perspective || 1000;
-
-    // We calculate the required scale for EVERY keyframe and take the maximum
-    // This is much safer than combining global maximums.
-    const requiredScales = config.keyframes.map(k => {
-      const zoom = k.zoom ?? 1;
-      const z = k.z ?? 0;
-
-      // Effective scale due to zoom and Z-depth
-      const zScale = perspective / (perspective + z);
-      const effectiveScale = zoom * zScale;
-
-      // 1. Base scale to counter zooming OUT
-      const zoomFactor = 1 / Math.max(0.1, effectiveScale);
-
-      // 2. Panning factor (requires overscan)
-      const panFactorX = 1 + (Math.abs(k.x ?? 0) * 2) / width;
-      const panFactorY = 1 + (Math.abs(k.y ?? 0) * 2) / height;
-      const panFactor = Math.max(panFactorX, panFactorY);
-
-      // 3. Rotation factor (sin(45) ~ 1.41)
-      const rot = Math.max(Math.abs(k.rotationX ?? 0), Math.abs(k.rotationY ?? 0), Math.abs(k.rotationZ ?? 0));
-      const rotationFactor = 1 + (rot / 45) * 0.42;
-
-      return zoomFactor * panFactor * rotationFactor;
-    });
-
-    const maxScale = Math.max(...requiredScales);
-
-    // Optimization: Cap at 5x to avoid massive texture memory usage, plus 10% safety margin
-    return Math.min(5, maxScale * 1.1);
-  }, [config?.keyframes, config?.perspective, width, height]);
-
-  const computeCameraState = useMemo(() => (f: number) => {
-    if (sortedKeyframes.length === 0) {
-      return { x: 0, y: 0, z: 0, zoom: 1, rotationX: 0, rotationY: 0, rotationZ: 0 };
+const parseEasing = (easing: string | any) => {
+  if (!easing) return Easing.linear;
+  if (typeof easing === 'string') {
+    switch (easing) {
+      case 'ease': return Easing.ease;
+      case 'in': return Easing.in(Easing.ease);
+      case 'out': return Easing.out(Easing.ease);
+      case 'in-out': return Easing.inOut(Easing.ease);
+      case 'bezier': return Easing.bezier(0.25, 0.1, 0.25, 1);
+      case 'step': return (t: number) => (t < 0.5 ? 0 : 1);
+      default: return Easing.linear;
     }
+  }
+  if (easing.type === 'bezier' && easing.bezier) {
+    return Easing.bezier(easing.bezier[0], easing.bezier[1], easing.bezier[2], easing.bezier[3]);
+  }
+  return Easing.linear;
+};
 
-    if (sortedKeyframes.length === 1) {
-      const k = sortedKeyframes[0];
-      return {
-        x: k.x ?? 0,
-        y: k.y ?? 0,
-        z: k.z ?? 0,
-        zoom: k.zoom ?? 1,
-        rotationX: k.rotationX ?? 0,
-        rotationY: k.rotationY ?? 0,
-        rotationZ: k.rotationZ ?? 0,
-      };
-    }
-
-    // Find the current segment
-    let startIdx = 0;
-    for (let i = 0; i < sortedKeyframes.length - 1; i++) {
-      if (f >= sortedKeyframes[i].frame && f <= sortedKeyframes[i + 1].frame) {
-        startIdx = i;
-        break;
-      }
-      if (f > sortedKeyframes[i + 1].frame) {
-        startIdx = i;
-      }
-    }
-
-    const startK = sortedKeyframes[startIdx];
-    const endK = sortedKeyframes[startIdx + 1] || startK;
-
-    const getEasingFunc = (easingInput?: string | CameraEasing) => {
-      if (typeof easingInput === 'object') {
-        if (easingInput.type === 'bezier' && easingInput.bezier) {
-          return Easing.bezier(easingInput.bezier[0], easingInput.bezier[1], easingInput.bezier[2], easingInput.bezier[3]);
-        }
-        if (easingInput.type === 'step') {
-          return (t: number) => (t < 0.5 ? 0 : 1);
-        }
-        return getEasingFunc(easingInput.type);
-      }
-
-      switch (easingInput) {
-        case 'bezier':
-          return Easing.bezier(0.33, 1, 0.68, 1); // easeOutCubic
-        case 'ease':
-          return Easing.inOut(Easing.ease);
-        case 'step':
-          return (t: number) => (t < 0.5 ? 0 : 1);
-        case 'linear':
-        default:
-          return Easing.linear;
-      }
-    };
-
-    const easing = getEasingFunc(startK.easing);
-
-    const getCatmullRom = (t: number, p0: number, p1: number, p2: number, p3: number) => {
-      const v0 = (p2 - p0) * 0.5;
-      const v1 = (p3 - p1) * 0.5;
-      const t2 = t * t;
-      const t3 = t * t2;
-      return (2 * p1 - 2 * p2 + v0 + v1) * t3 + (-3 * p1 + 3 * p2 - 2 * v0 - v1) * t2 + v0 * t + p1;
-    };
-
-    const interpolateProp = (prop: keyof CameraKeyframe, defaultValue: number) => {
-      if (startK.frame === endK.frame) return (startK[prop] as number) ?? defaultValue;
-
-      const t = (f - startK.frame) / (endK.frame - startK.frame);
-      const easedT = easing(t);
-
-      if (config?.pathSmoothing && ['x', 'y', 'z'].includes(prop as string)) {
-        const p0K = sortedKeyframes[Math.max(0, startIdx - 1)];
-        const p1K = startK;
-        const p2K = endK;
-        const p3K = sortedKeyframes[Math.min(sortedKeyframes.length - 1, startIdx + 2)];
-
-        const p0 = (p0K[prop] as number) ?? defaultValue;
-        const p1 = (p1K[prop] as number) ?? defaultValue;
-        const p2 = (p2K[prop] as number) ?? defaultValue;
-        const p3 = (p3K[prop] as number) ?? defaultValue;
-
-        return getCatmullRom(easedT, p0, p1, p2, p3);
-      }
-
-      return interpolate(
-        f,
-        [startK.frame, endK.frame],
-        [(startK[prop] as number) ?? defaultValue, (endK[prop] as number) ?? defaultValue],
-        {
-          extrapolateLeft: 'clamp',
-          extrapolateRight: 'clamp',
-          easing,
-        }
-      );
-    };
-
-    const x = interpolateProp('x', 0);
-    const y = interpolateProp('y', 0);
-    const z = interpolateProp('z', 0);
-
-    let lookAtRotation = { x: 0, y: 0 };
-    if (startK.lookAt && endK.lookAt) {
-      // Proper lookAt interpolation
-      const targetX = interpolate(f, [startK.frame, endK.frame], [startK.lookAt.x, endK.lookAt.x], { easing, extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-      const targetY = interpolate(f, [startK.frame, endK.frame], [startK.lookAt.y, endK.lookAt.y], { easing, extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-      const targetZ = interpolate(f, [startK.frame, endK.frame], [startK.lookAt.z, endK.lookAt.z], { easing, extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-
-      // Calculate vector from camera to target
-      const dx = targetX - x;
-      const dy = targetY - y;
-      const dz = targetZ - z;
-
-      // Calculate rotations
-      const yaw = -Math.atan2(dx, -dz) * (180 / Math.PI);
-      const pitch = Math.atan2(dy, Math.sqrt(dx * dx + dz * dz)) * (180 / Math.PI);
-
-      lookAtRotation = { x: pitch, y: yaw };
-    }
-
-    return {
-      x,
-      y,
-      z,
-      zoom: interpolateProp('zoom', 1),
-      rotationX: startK.lookAt ? lookAtRotation.x : interpolateProp('rotationX', 0),
-      rotationY: startK.lookAt ? lookAtRotation.y : interpolateProp('rotationY', 0),
-      rotationZ: interpolateProp('rotationZ', 0),
-    };
-  }, [sortedKeyframes, config?.pathSmoothing]);
-
-  const cameraState = useMemo(() => computeCameraState(frame), [computeCameraState, frame]);
-
-  // Calculate velocity for motion blur (High precision frame-to-frame delta)
-  const motionBlurStyle = useMemo(() => {
-    if (!config?.motionBlur?.enabled) return {};
-
-    const intensity = config.motionBlur.intensity ?? 0.5;
-
-    // We sample at frame and frame + 0.5 to get the "shutter" velocity
-    const curr = cameraState;
-    const next = computeCameraState(frame + 0.5);
-
-    // Position delta
-    const dx = next.x - curr.x;
-    const dy = next.y - curr.y;
-    const dz = next.z - curr.z;
-
-    // Zoom delta (weighted heavily as it creates high visual flux)
-    const dZoom = next.zoom - curr.zoom;
-
-    // Rotation delta
-    const drX = next.rotationX - curr.rotationX;
-    const drY = next.rotationY - curr.rotationY;
-    const drZ = next.rotationZ - curr.rotationZ;
-
-    // Combined visual velocity
-    const posVelocity = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    const rotVelocity = Math.sqrt(drX * drX + drY * drY + drZ * drZ) * 5; // Scale rotations
-    const zoomVelocity = Math.abs(dZoom) * 1000;
-
-    const totalVelocity = posVelocity + rotVelocity + zoomVelocity;
-
-    // blurAmount is pixels of blur.
-    // On CPU, we cap it strictly to prevent expensive large kernels.
-    const blurAmount = Math.min(6, totalVelocity * 0.05 * intensity);
-
-    if (blurAmount < 0.2) return {};
-
-    return {
-      filter: `blur(${blurAmount.toFixed(1)}px)`,
-    };
-  }, [frame, computeCameraState, cameraState, config?.motionBlur]);
-
-  // Handle subtle camera shake if enabled
-  const shakeOffset = useMemo(() => {
-    if (!config?.shake?.enabled) return { x: 0, y: 0, rz: 0 };
-
-    const intensity = config.shake.intensity ?? 2;
-    const speed = config.shake.speed ?? 1;
-    const rIntensity = config.shake.rotationIntensity ?? 0.2;
-
-    const x = Math.sin(frame * 0.15 * speed) * intensity + Math.sin(frame * 0.07 * speed) * (intensity * 0.4);
-    const y = Math.cos(frame * 0.12 * speed) * intensity + Math.cos(frame * 0.05 * speed) * (intensity * 0.4);
-    const rz = Math.sin(frame * 0.1 * speed) * rIntensity;
-
-    return { x, y, rz };
-  }, [frame, config?.shake]);
-
-  if (!config || !config.enabled) {
-    return <>{children}</>;
+const getCameraState = (frame: number, keyframes: CameraKeyframe[], width: number, height: number) => {
+  if (!keyframes || keyframes.length === 0) {
+    return { x: 0, y: 0, z: 0, zoom: 1, rotationX: 0, rotationY: 0, rotationZ: 0 };
   }
 
-  const perspective = config.perspective || 1000;
+  const sorted = [...keyframes].sort((a, b) => a.frame - b.frame);
+
+  // Find segment
+  let i = 0;
+  while (i < sorted.length - 1 && sorted[i + 1].frame <= frame) {
+    i++;
+  }
+
+  const k1 = sorted[i];
+  const k2 = sorted[Math.min(i + 1, sorted.length - 1)];
+
+  if (k1 === k2) {
+      const state = { ...k1 };
+      if ((k1 as any).lookAt) {
+          state.x = (k1 as any).lookAt.x;
+          state.y = (k1 as any).lookAt.y;
+          state.z = (k1 as any).lookAt.z || state.z;
+      }
+      return state;
+  }
+
+  const tRaw = (frame - k1.frame) / (k2.frame - k1.frame);
+  const easingFn = parseEasing(k1.easing);
+  const t = easingFn(tRaw);
+
+  // For x, y, z we use Catmull-Rom if possible
+  const getVal = (prop: keyof CameraKeyframe) => {
+    const getP = (k: CameraKeyframe) => {
+        if (prop === 'x' || prop === 'y' || prop === 'z') {
+            if ((k as any).lookAt) {
+                return (k as any).lookAt[prop] ?? (k[prop] || 0);
+            }
+        }
+        return (k[prop] as number) || 0;
+    };
+
+    const p1 = getP(k1);
+    const p2 = getP(k2);
+    const p0 = getP(sorted[Math.max(0, i - 1)]);
+    const p3 = getP(sorted[Math.min(sorted.length - 1, i + 2)]);
+    return catmullRom(p0, p1, p2, p3, t);
+  };
+
+  const interp = (prop: keyof CameraKeyframe) => interpolate(t, [0, 1], [(k1[prop] as number) || 0, (k2[prop] as number) || 0]);
+
+  const state: any = {
+    x: getVal('x'),
+    y: getVal('y'),
+    z: getVal('z'),
+    zoom: interpolate(t, [0, 1], [k1.zoom || 1, k2.zoom || 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
+    rotationX: interp('rotationX'),
+    rotationY: interp('rotationY'),
+    rotationZ: interp('rotationZ') || (k1 as any).rotation || 0,
+  };
+
+  return state;
+};
+
+export const CameraEngine: React.FC<{
+  config: CameraConfig;
+  children: React.ReactNode;
+  backgroundLayer?: React.ReactNode;
+}> = ({ config, children, backgroundLayer }) => {
+  const frame = useCurrentFrame();
+  const { width, height, durationInFrames } = useVideoConfig();
+
+  const mergedKeyframes = useMemo(() => {
+    if (!config) return [{ frame: 0, x: 0, y: 0, z: 0, zoom: 1, rotationX: 0, rotationY: 0, rotationZ: 0 }];
+
+    let keys = [...(config.keyframes || [])];
+    if (config.preset) {
+      const presetKeys = getPresetKeyframes(config.preset as CameraPreset, durationInFrames);
+      const manualFrames = new Set(keys.map(k => k.frame));
+      presetKeys.forEach(pk => {
+        if (!manualFrames.has(pk.frame)) {
+          keys.push(pk);
+        }
+      });
+      keys.sort((a, b) => a.frame - b.frame);
+    }
+
+    if (keys.length === 0) {
+      keys.push({ frame: 0, x: 0, y: 0, z: 0, zoom: 1, rotationX: 0, rotationY: 0, rotationZ: 0 });
+    }
+
+    return keys;
+  }, [config, durationInFrames]);
+
+  const cameraState = useMemo(() => getCameraState(frame, mergedKeyframes, width, height), [frame, mergedKeyframes, width, height]);
+  const prevCameraState = useMemo(() => getCameraState(frame - 0.5, mergedKeyframes, width, height), [frame, mergedKeyframes, width, height]);
+
+  if (!config?.enabled) {
+    return (
+      <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+        {backgroundLayer}
+        {children}
+      </div>
+    );
+  }
+
+  // Camera Shake logic
+  let shakeX = 0;
+  let shakeY = 0;
+  let shakeRotZ = 0;
+  if (config.shake?.enabled) {
+    const intensity = config.shake.intensity || 2;
+    const speed = config.shake.speed || 1.0;
+    const rotIntensity = config.shake.rotationIntensity || 0.2;
+    shakeX = (Math.sin(frame * 0.15 * speed) + Math.sin(frame * 0.4 * speed) * 0.5) * intensity;
+    shakeY = (Math.sin(frame * 0.2 * speed + 1) + Math.sin(frame * 0.35 * speed + 2) * 0.5) * intensity;
+    shakeRotZ = Math.sin(frame * 0.1 * speed) * rotIntensity;
+  }
+
   const cx = width / 2;
   const cy = height / 2;
 
-  const containerStyle: React.CSSProperties = {
-    width: '100%',
-    height: '100%',
-    perspective: `${perspective}px`,
-    perspectiveOrigin: '50% 50%',
-    overflow: 'hidden',
-  };
+  const tx = (cameraState.x || 0) + shakeX;
+  const ty = (cameraState.y || 0) + shakeY;
+  const zoom = cameraState.zoom || 1;
+  const rotZ = (cameraState.rotationZ || 0) + shakeRotZ;
 
-  // Overlays use the full 3D cinematic stack (including perspective, lookAt rotations, and Z translation)
-  const overlayStyle: React.CSSProperties = {
-    transformStyle: 'preserve-3d',
-    willChange: 'transform',
-    backfaceVisibility: 'hidden',
-    transformOrigin: 'center center',
-    ...motionBlurStyle,
-    transform: `
-      translate3d(${cx}px, ${cy}px, 0)
-      scale3d(${cameraState.zoom.toFixed(4)}, ${cameraState.zoom.toFixed(4)}, 1)
-      rotateX(${cameraState.rotationX.toFixed(2)}deg)
-      rotateY(${cameraState.rotationY.toFixed(2)}deg)
-      rotateZ(${(cameraState.rotationZ + (shakeOffset.rz || 0)).toFixed(2)}deg)
-      translate3d(${(-cameraState.x + shakeOffset.x).toFixed(1)}px, ${(-cameraState.y + shakeOffset.y).toFixed(1)}px, ${-cameraState.z.toFixed(1)}px)
-      translate3d(${-cx}px, ${-cy}px, 0)
-    `,
-  };
+  // Motion Blur
+  const dx = (cameraState.x || 0) - (prevCameraState.x || 0);
+  const dy = (cameraState.y || 0) - (prevCameraState.y || 0);
+  const blurAmount = config.motionBlur?.enabled
+    ? Math.min(Math.sqrt(dx * dx + dy * dy) * (config.motionBlur.intensity || 0.5) * 0.3, 4)
+    : 0;
 
-  // Background uses only 2D functionalities: Panning (X, Y) and Scaling (Zoom)
-  // VITAL: To maintain sync during pans, the translation offset MUST be divided by the coverScale
-  // so that the background pixels move at exactly the same screen rate as the overlays.
-  const backgroundStyle: React.CSSProperties = {
-    willChange: 'transform',
-    transformOrigin: 'center center',
-    ...motionBlurStyle,
-    transform: `
-      translate3d(${cx}px, ${cy}px, 0)
-      scale3d(${(cameraState.zoom * coverScale).toFixed(4)}, ${(cameraState.zoom * coverScale).toFixed(4)}, 1)
-      translate3d(${((-cameraState.x + shakeOffset.x) / coverScale).toFixed(1)}px, ${((-cameraState.y + shakeOffset.y) / coverScale).toFixed(1)}px, 0)
-      translate3d(${-cx}px, ${-cy}px, 0)
-    `,
-  };
-
-  const childrenArray = React.Children.toArray(children);
-  const background = childrenArray[0];
-  const overlays = childrenArray.slice(1);
+  // Background Parallax & Coverage
+  const angleRad = (Math.abs(rotZ) % 90) * (Math.PI / 180);
+  const rotScale = Math.cos(angleRad) + Math.sin(angleRad);
+  const zoomScale = 1 / Math.min(zoom, 1);
+  const coverScale = Math.max(rotScale * zoomScale, 1) * 1.1;
 
   return (
-    <div style={containerStyle}>
-      {/* Background layer: 2D ONLY */}
-      <AbsoluteFill style={backgroundStyle}>
-        {background}
-      </AbsoluteFill>
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+        overflow: 'hidden',
+        perspective: `${config.perspective || 1000}px`,
+        backgroundColor: 'black'
+      }}
+    >
+      {backgroundLayer && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 0,
+            transform: `scale(${coverScale}) translate3d(${-(cameraState.x || 0) * 0.05}px, ${-(cameraState.y || 0) * 0.05}px, -100px)`,
+            filter: blurAmount > 1 ? `blur(${Math.round(blurAmount * 0.5 * 10) / 10}px)` : 'none',
+            willChange: 'transform',
+          }}
+        >
+          {backgroundLayer}
+        </div>
+      )}
 
-      {/* Overlay layer: FULL 3D */}
-      <AbsoluteFill style={overlayStyle}>
-        {overlays}
-      </AbsoluteFill>
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 1,
+          transformStyle: 'preserve-3d',
+          transform: `
+            translate3d(${cx}px, ${cy}px, 0)
+            scale3d(${zoom}, ${zoom}, 1)
+            rotateX(${cameraState.rotationX || 0}deg)
+            rotateY(${cameraState.rotationY || 0}deg)
+            rotateZ(${rotZ}deg)
+            translate3d(${-tx}px, ${-ty}px, ${-(cameraState.z || 0)}px)
+          `,
+          filter: blurAmount > 1 ? `blur(${Math.round(blurAmount * 10) / 10}px)` : 'none',
+          willChange: 'transform',
+          backfaceVisibility: 'hidden',
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 };
