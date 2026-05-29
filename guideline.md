@@ -110,6 +110,7 @@ This document defines the comprehensive JSON schema for `remotion_template.json`
   - `x`, `y`, `z`: `number` (Translation).
   - `zoom`: `number` (Default: 1).
   - `rotationX`, `rotationY`, `rotationZ`: `number` (Degrees).
+  - `easing`: `string` (`"linear"`, `"ease"`, `"bezier"`).
 
 ---
 

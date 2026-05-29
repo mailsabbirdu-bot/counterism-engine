@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { useCurrentFrame, interpolate, Easing } from 'remotion';
 
 export interface CameraKeyframe {
   frame: number;
@@ -10,6 +10,7 @@ export interface CameraKeyframe {
   rotationX?: number;
   rotationY?: number;
   rotationZ?: number;
+  easing?: 'ease' | 'linear' | 'bezier';
 }
 
 export interface CameraConfig {
@@ -23,7 +24,6 @@ export const CameraEngine: React.FC<{
   children: React.ReactNode;
 }> = ({ config, children }) => {
   const frame = useCurrentFrame();
-  const { width, height } = useVideoConfig();
 
   if (!config || !config.enabled || !config.keyframes || config.keyframes.length === 0) {
     return <>{children}</>;
@@ -37,28 +37,37 @@ export const CameraEngine: React.FC<{
     };
   }, [config.keyframes]);
 
-  const getInterpolated = (prop: keyof CameraKeyframe, defaultValue: number) => {
-    const values = sortedKeyframes.map((k) => (k[prop] as number) ?? defaultValue);
-    if (frames.length === 1) return values[0];
+  const cameraState = useMemo(() => {
+    const getVal = (prop: keyof CameraKeyframe, defaultValue: number) => {
+      const values = sortedKeyframes.map((k) => (k[prop] as number) ?? defaultValue);
+      if (frames.length === 1) return values[0];
 
-    return interpolate(frame, frames, values, {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    });
-  };
+      // Map easing names to Easing functions
+      const easing = sortedKeyframes[0].easing === 'bezier'
+        ? Easing.bezier(0.33, 1, 0.68, 1) // easeOutCubic
+        : sortedKeyframes[0].easing === 'ease'
+          ? Easing.inOut(Easing.ease)
+          : Easing.linear;
 
-  const x = getInterpolated('x', 0);
-  const y = getInterpolated('y', 0);
-  const z = getInterpolated('z', 0);
-  const zoom = getInterpolated('zoom', 1);
-  const rotationX = getInterpolated('rotationX', 0);
-  const rotationY = getInterpolated('rotationY', 0);
-  const rotationZ = getInterpolated('rotationZ', 0);
+      return interpolate(frame, frames, values, {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+        easing: easing
+      });
+    };
+
+    return {
+      x: getVal('x', 0),
+      y: getVal('y', 0),
+      z: getVal('z', 0),
+      zoom: getVal('zoom', 1),
+      rotationX: getVal('rotationX', 0),
+      rotationY: getVal('rotationY', 0),
+      rotationZ: getVal('rotationZ', 0),
+    };
+  }, [frame, frames, sortedKeyframes]);
 
   const perspective = config.perspective || 1000;
-
-  // To simulate a camera moving, we move the scene in the opposite direction.
-  // However, zoom is better handled as a positive scale on the container.
 
   const containerStyle: React.CSSProperties = {
     width: '100%',
@@ -68,18 +77,19 @@ export const CameraEngine: React.FC<{
     overflow: 'hidden',
   };
 
+  // Improved scene style with hardware acceleration hints
   const sceneStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
     transformStyle: 'preserve-3d',
+    willChange: 'transform',
+    backfaceVisibility: 'hidden',
     transform: `
-      translateZ(${-perspective * (1 - zoom)}px)
-      translateX(${-x}px)
-      translateY(${-y}px)
-      translateZ(${-z}px)
-      rotateX(${rotationX}deg)
-      rotateY(${rotationY}deg)
-      rotateZ(${rotationZ}deg)
+      translate3d(${-cameraState.x}px, ${-cameraState.y}px, ${-cameraState.z}px)
+      scale3d(${cameraState.zoom}, ${cameraState.zoom}, 1)
+      rotateX(${cameraState.rotationX}deg)
+      rotateY(${cameraState.rotationY}deg)
+      rotateZ(${cameraState.rotationZ}deg)
     `,
   };
 

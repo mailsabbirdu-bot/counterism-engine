@@ -54,13 +54,13 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
 
   return (
     <AbsoluteFill className="bg-black">
-      <CameraEngine config={sceneData.camera}>
-        {/* STEP 1 — Load Background */}
-        <AbsoluteFill>
-          {renderBackground()}
-        </AbsoluteFill>
+      {/* STEP 1 — Background is static relative to the cinematic camera */}
+      <AbsoluteFill>
+        {renderBackground()}
+      </AbsoluteFill>
 
-        {/* STEP 2-4 — Composite Layers */}
+      {/* STEP 2-4 — Composite Layers inside the Camera */}
+      <CameraEngine config={sceneData.camera}>
         <OverlayManager overlays={sceneData.overlays || []} />
       </CameraEngine>
     </AbsoluteFill>
