@@ -62,6 +62,7 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
       {/* STEP 2 — Cinematic Camera Rig (Overlay World) */}
       <CameraRig
         config={sceneData.camera}
+        debug={sceneData.debug_camera}
         durationInFrames={durationInFrames}
       >
         {(cameraState) => (
@@ -69,6 +70,7 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
             overlays={sceneData.overlays || []}
             cameraX={cameraState.x}
             cameraY={cameraState.y}
+            debug={sceneData.debug_camera}
           />
         )}
       </CameraRig>

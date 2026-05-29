@@ -3,14 +3,16 @@ import { AbsoluteFill, useCurrentFrame, useVideoConfig } from 'remotion';
 import { CameraConfig, CameraState } from '../lib/cameraTypes';
 import { buildPresetCamera } from '../lib/cameraPresets';
 import { getInterpolatedCamera } from '../lib/cameraInterpolation';
+import { CameraDebugOverlay } from './CameraDebugOverlay';
 
 interface CameraRigProps {
   config?: CameraConfig;
+  debug?: boolean;
   durationInFrames: number;
   children: (cameraState: CameraState) => React.ReactNode;
 }
 
-export const CameraRig: React.FC<CameraRigProps> = ({ config, durationInFrames, children }) => {
+export const CameraRig: React.FC<CameraRigProps> = ({ config, debug, durationInFrames, children }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
@@ -45,14 +47,17 @@ export const CameraRig: React.FC<CameraRigProps> = ({ config, durationInFrames, 
   `;
 
   return (
-    <AbsoluteFill
-      style={{
-        transform,
-        // Optional: transformOrigin can be center or customizable
-        transformOrigin: 'center center'
-      }}
-    >
-      {children(cameraState)}
-    </AbsoluteFill>
+    <>
+      <AbsoluteFill
+        style={{
+          transform,
+          // Optional: transformOrigin can be center or customizable
+          transformOrigin: 'center center'
+        }}
+      >
+        {children(cameraState)}
+      </AbsoluteFill>
+      <CameraDebugOverlay cameraState={cameraState} enabled={debug} />
+    </>
   );
 };
