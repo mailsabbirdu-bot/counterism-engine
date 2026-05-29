@@ -1,0 +1,86 @@
+{
+  "project_name": "Cinematic Camera Pro Test",
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "scenes": [
+    {
+      "scene_id": "CINEMATIC-PRO",
+      "background_type": "procedural",
+      "procedural_config": {
+        "speed": 1,
+        "type": "nebula"
+      },
+      "duration_in_frames": 150,
+      "camera": {
+        "enabled": true,
+        "perspective": 1000,
+        "pathSmoothing": true,
+        "motionBlur": {
+          "enabled": true,
+          "intensity": 1.0
+        },
+        "shake": {
+          "enabled": true,
+          "intensity": 3,
+          "speed": 1.5,
+          "rotationIntensity": 0.5
+        },
+        "keyframes": [
+          {
+            "frame": 0,
+            "x": -500,
+            "y": 0,
+            "z": 1000,
+            "zoom": 1,
+            "lookAt": { "x": 0, "y": 0, "z": 0 },
+            "easing": { "type": "bezier", "bezier": [0.25, 0.1, 0.25, 1] }
+          },
+          {
+            "frame": 75,
+            "x": 500,
+            "y": 300,
+            "z": 500,
+            "zoom": 1.5,
+            "lookAt": { "x": 0, "y": 0, "z": 0 },
+            "easing": "ease"
+          },
+          {
+            "frame": 149,
+            "x": 0,
+            "y": 0,
+            "z": 2000,
+            "zoom": 0.5,
+            "lookAt": { "x": 0, "y": 0, "z": 0 }
+          }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "T1",
+          "type": "text",
+          "content": "CINEMATIC PRO",
+          "font": "Montserrat",
+          "fontSize": "150px",
+          "style": "font-black text-white drop-shadow-2xl",
+          "start": 0,
+          "duration": 150,
+          "depth": 0
+        },
+        {
+          "id": "S1",
+          "type": "shape",
+          "shape_type": "circle",
+          "size": 200,
+          "color": "#ff0000",
+          "position": { "x": 960, "y": 540 },
+          "start": 0,
+          "duration": 150,
+          "depth": -500
+        }
+      ]
+    }
+  ]
+}

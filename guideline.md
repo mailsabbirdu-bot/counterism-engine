@@ -105,6 +105,10 @@ This document defines the comprehensive JSON schema for `remotion_template.json`
 ### `camera` object
 - `enabled`: `boolean`
 - `perspective`: `number` (Default: 1000. Higher = flatter perspective).
+- `pathSmoothing`: `boolean` (Uses Catmull-Rom spline interpolation for smoother paths).
+- `motionBlur`: `object` (Lightweight velocity-based blur).
+  - `enabled`: `boolean`
+  - `intensity`: `number` (Default: 0.5).
 - `shake`: `object` (Optional subtle handheld motion).
   - `enabled`: `boolean`
   - `intensity`: `number` (Default: 2. Pixel displacement).
@@ -115,7 +119,9 @@ This document defines the comprehensive JSON schema for `remotion_template.json`
   - `x`, `y`, `z`: `number` (Translation).
   - `zoom`: `number` (Default: 1).
   - `rotationX`, `rotationY`, `rotationZ`: `number` (Degrees).
-  - `easing`: `string` (`"linear"`, `"ease"`, `"bezier"`).
+  - `easing`: `string` | `object` (`"linear"`, `"ease"`, `"bezier"`, `"step"`, or `{ "type": "bezier", "bezier": [x1, y1, x2, y2] }`).
+  - `lookAt`: `object` (Automatically points camera at these coordinates).
+    - `x`, `y`, `z`: `number`
 
 ---
 
