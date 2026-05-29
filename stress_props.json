@@ -1,0 +1,43 @@
+{
+  "templateData": {
+    "project_name": "Camera Stability Stress Test",
+    "global_settings": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 30
+    },
+    "scenes": [
+      {
+        "scene_id": "STRESS-TEST",
+        "duration_in_frames": 150,
+        "background_type": "procedural",
+        "procedural_config": {
+          "color": "#ff0000"
+        },
+        "camera": {
+          "enabled": true,
+          "perspective": 1000,
+          "keyframes": [
+            { "frame": 0, "x": 960, "y": 540, "zoom": 1 },
+            { "frame": 30, "x": 0, "y": 0, "zoom": 1.5, "rotationZ": 45 },
+            { "frame": 60, "x": 1920, "y": 0, "zoom": 0.5, "rotationY": 30 },
+            { "frame": 90, "x": 1920, "y": 1080, "zoom": 2.5, "rotationX": -20 },
+            { "frame": 120, "x": 0, "y": 1080, "zoom": 1, "rotationZ": -45 },
+            { "frame": 149, "x": 960, "y": 540, "zoom": 1 }
+          ]
+        },
+        "overlays": [
+          {
+            "id": "CENTER-MARKER",
+            "type": "text",
+            "content": "STABILIZED CENTER",
+            "fontSize": "150px",
+            "start": 0,
+            "duration": 150,
+            "zIndex": 100
+          }
+        ]
+      }
+    ]
+  }
+}
