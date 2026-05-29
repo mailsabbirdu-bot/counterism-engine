@@ -57,48 +57,36 @@ export const CameraEngine: React.FC<{
     if (!config?.keyframes || config.keyframes.length === 0) return 1.1;
 
     const perspective = config.perspective || 1000;
-    let minEffectiveScale = 1;
-    let maxAbsX = 0;
-    let maxAbsY = 0;
-    let maxRot = 0;
 
-    config.keyframes.forEach(k => {
+    // We calculate the required scale for EVERY keyframe and take the maximum
+    // This is much safer than combining global maximums.
+    const requiredScales = config.keyframes.map(k => {
       const zoom = k.zoom ?? 1;
       const z = k.z ?? 0;
-      // CSS Perspective scale formula: scale = d / (d + z_translated)
-      // Our translation is -k.z
+
+      // Effective scale due to zoom and Z-depth
       const zScale = perspective / (perspective + z);
       const effectiveScale = zoom * zScale;
 
-      if (effectiveScale < minEffectiveScale) {
-        minEffectiveScale = effectiveScale;
-      }
+      // 1. Base scale to counter zooming OUT
+      const zoomFactor = 1 / Math.max(0.1, effectiveScale);
 
-      maxAbsX = Math.max(maxAbsX, Math.abs(k.x ?? 0));
-      maxAbsY = Math.max(maxAbsY, Math.abs(k.y ?? 0));
+      // 2. Panning factor (requires overscan)
+      const panFactorX = 1 + (Math.abs(k.x ?? 0) * 2) / width;
+      const panFactorY = 1 + (Math.abs(k.y ?? 0) * 2) / height;
+      const panFactor = Math.max(panFactorX, panFactorY);
 
+      // 3. Rotation factor (sin(45) ~ 1.41)
       const rot = Math.max(Math.abs(k.rotationX ?? 0), Math.abs(k.rotationY ?? 0), Math.abs(k.rotationZ ?? 0));
-      maxRot = Math.max(maxRot, rot);
+      const rotationFactor = 1 + (rot / 45) * 0.42;
+
+      return zoomFactor * panFactor * rotationFactor;
     });
 
-    // 1. Account for zooming out (effectiveScale < 1)
-    const zoomOverscan = 1 / Math.max(0.1, minEffectiveScale);
+    const maxScale = Math.max(...requiredScales);
 
-    // 2. Account for panning
-    // To cover a pan of maxAbsX, we need to scale by (1 + 2 * maxAbsX / width)
-    const panOverscanX = 1 + (maxAbsX * 2) / width;
-    const panOverscanY = 1 + (maxAbsY * 2) / height;
-    const panOverscan = Math.max(panOverscanX, panOverscanY);
-
-    // 3. Account for rotation - Since background is now 2D ONLY, we don't need rotation overscan
-    // However, if the camera itself rotates the scene, the 2D background still needs to cover the corners
-    const rotationOverscan = 1 + (maxRot / 45) * 0.42;
-
-    // Total required scale to ensure no black edges
-    const totalScale = zoomOverscan * panOverscan * rotationOverscan;
-
-    // Optimization: Cap the scale to 4x.
-    return Math.min(4, totalScale * 1.05);
+    // Optimization: Cap at 5x to avoid massive texture memory usage, plus 10% safety margin
+    return Math.min(5, maxScale * 1.1);
   }, [config?.keyframes, config?.perspective, width, height]);
 
   const cameraState = useMemo(() => {
@@ -140,7 +128,7 @@ export const CameraEngine: React.FC<{
           return Easing.bezier(easingInput.bezier[0], easingInput.bezier[1], easingInput.bezier[2], easingInput.bezier[3]);
         }
         if (easingInput.type === 'step') {
-          return Easing.step(0.5);
+          return (t: number) => (t < 0.5 ? 0 : 1);
         }
         return getEasingFunc(easingInput.type);
       }
@@ -151,7 +139,7 @@ export const CameraEngine: React.FC<{
         case 'ease':
           return Easing.inOut(Easing.ease);
         case 'step':
-          return Easing.step(0.5);
+          return (t: number) => (t < 0.5 ? 0 : 1);
         case 'linear':
         default:
           return Easing.linear;
@@ -315,20 +303,17 @@ export const CameraEngine: React.FC<{
   };
 
   // Background uses only 2D functionalities: Panning (X, Y) and Scaling (Zoom)
-  // It is explicitly isolated from 3D rotations, perspective distortion, and Z depth
+  // VITAL: To maintain sync during pans, the translation offset MUST be divided by the scale
+  // if we scale BEFORE translating, or adjusted if we translate then scale.
+  // Using a clean matrix-like stack:
   const backgroundStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
     willChange: 'transform',
-    // Background 2D transform:
-    // 1. Move to center
-    // 2. Scale by background coverScale * camera zoom
-    // 3. Translate by camera pan offset
-    // 4. Move back from center
     transform: `
       translate3d(${cx}px, ${cy}px, 0)
       scale3d(${cameraState.zoom * coverScale}, ${cameraState.zoom * coverScale}, 1)
-      translate3d(${-cameraState.x + shakeOffset.x}px, ${-cameraState.y + shakeOffset.y}px, 0)
+      translate3d(${( -cameraState.x + shakeOffset.x ) / coverScale}px, ${( -cameraState.y + shakeOffset.y ) / coverScale}px, 0)
       translate3d(${-cx}px, ${-cy}px, 0)
     `,
   };
