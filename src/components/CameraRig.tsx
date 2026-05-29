@@ -23,8 +23,6 @@ export const CameraRig: React.FC<CameraRigProps> = ({ config, debug, durationInF
 
     if (config.preset) {
       const presetKeyframes = buildPresetCamera(config.preset, durationInFrames, width, height);
-      // Merge strategy: if user provided keyframes, they override/augment preset?
-      // For simplicity, if preset exists, use it as base.
       if (baseKeyframes.length === 0) {
         baseKeyframes = presetKeyframes;
       }
@@ -40,23 +38,27 @@ export const CameraRig: React.FC<CameraRigProps> = ({ config, debug, durationInF
     return getInterpolatedCamera(frame, keyframes);
   }, [frame, keyframes, config?.enabled]);
 
-  const transform = `
-    translate3d(${cameraState.x}px, ${cameraState.y}px, 0)
-    scale(${cameraState.zoom})
-    rotate(${cameraState.rotation}deg)
-  `;
+  // VITAL: Force a single-line string with explicit units
+  const transform = `translate3d(${cameraState.x}px, ${cameraState.y}px, 0) scale(${cameraState.zoom}) rotate(${cameraState.rotation}deg)`;
+
+  if (frame % 30 === 0) {
+    console.log(`[CameraRig] Frame: ${frame} Transform: ${transform}`);
+  }
 
   return (
     <>
-      <AbsoluteFill
+      <div
         style={{
+          position: 'absolute',
+          inset: 0,
           transform,
-          // Optional: transformOrigin can be center or customizable
-          transformOrigin: 'center center'
+          transformOrigin: 'center center',
+          willChange: 'transform',
+          backfaceVisibility: 'hidden'
         }}
       >
         {children(cameraState)}
-      </AbsoluteFill>
+      </div>
       <CameraDebugOverlay cameraState={cameraState} enabled={debug} />
     </>
   );

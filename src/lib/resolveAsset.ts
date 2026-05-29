@@ -10,17 +10,19 @@ export const resolveAsset = (path: string): string => {
   // If it's already an absolute URL, return as is
   if (path.startsWith('http')) return path;
 
-  // Ensure we don't have leading slashes that might cause double-prefixing
+  // Ensure we don't have leading slashes for staticFile
   const cleanPath = path.startsWith('/') ? path.slice(1) : path;
   let url = staticFile(cleanPath);
 
-  // In some environments (like Colab), staticFile might prepend /public/
-  // but the server expects it relative to the public root.
+  // HEADLESS/COLAB FIX:
+  // Remotion's staticFile often returns "/public/..." in certain environments.
+  // The asset server usually serves from the root.
   if (url.startsWith('/public/')) {
     url = url.replace('/public/', '/');
+  } else if (url.includes('/public/')) {
+    // Handle cases like "http://localhost:3000/public/..."
+    url = url.replace('/public/', '/');
   }
-
-  console.log(`[resolveAsset] Original: ${path} -> Clean: ${cleanPath} -> Final URL: ${url}`);
 
   return url;
 };

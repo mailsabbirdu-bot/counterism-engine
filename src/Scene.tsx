@@ -24,7 +24,6 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
               src={bgUrl}
               className="w-full h-full object-cover"
               muted={sceneData.audio_enabled !== true}
-              loop
             />
             {/* Dark overlay for readability */}
             <AbsoluteFill className="bg-black/40" />
@@ -44,7 +43,6 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
                 src={fallbackUrl}
                 className="w-full h-full object-cover"
                 muted={sceneData.audio_enabled !== true}
-                loop
               />
               <AbsoluteFill className="bg-black/40" />
             </>

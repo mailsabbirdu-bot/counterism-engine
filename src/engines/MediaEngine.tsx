@@ -39,7 +39,6 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
     position: 'absolute',
     left: `${overlay.position?.x ?? 0}px`,
     top: `${overlay.position?.y ?? 0}px`,
-    zIndex: overlay.zIndex,
     width: overlay.width ? `${overlay.width}px` : 'auto',
     height: overlay.height ? `${overlay.height}px` : 'auto',
     opacity,
@@ -57,10 +56,9 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
   };
 
   const mediaUrl = resolveAsset(overlay.src);
-  console.log(`[MediaEngine] ${overlay.type.toUpperCase()} Path: ${overlay.src} -> Resolved URL: ${mediaUrl}`);
 
   return (
-    <AbsoluteFill className="pointer-events-none" style={{ zIndex: overlay.zIndex ?? 100 }}>
+    <AbsoluteFill className="pointer-events-none">
       <div style={containerStyle}>
         {overlay.type === 'video' ? (
           <OffthreadVideo

@@ -29,8 +29,9 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       style={{
         fontFamily: overlay.font || 'Inter',
         fontSize: baseFontSize,
-        left: overlay.position?.x,
-        top: overlay.position?.y,
+        // VITAL: Always use explicit pixel units
+        left: overlay.position ? `${overlay.position.x}px` : undefined,
+        top: overlay.position ? `${overlay.position.y}px` : undefined,
         // Add a subtle text shadow for better readability on light backgrounds
         textShadow: '0 4px 30px rgba(0,0,0,0.5), 0 0 100px rgba(0,0,0,0.2)'
       }}

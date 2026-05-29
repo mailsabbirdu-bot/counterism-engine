@@ -68,6 +68,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({
               // Viewport Top-Left (0, 0) starts at World (1040, 1460)
               left: '1040px',
               top: '1460px',
+              overflow: 'visible',
               zIndex: overlay.zIndex,
               ...parallaxStyle
             }}
