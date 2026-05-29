@@ -3,14 +3,16 @@ import { AbsoluteFill, useCurrentFrame, useVideoConfig } from 'remotion';
 import { CameraConfig, CameraState } from '../lib/cameraTypes';
 import { buildPresetCamera } from '../lib/cameraPresets';
 import { getInterpolatedCamera } from '../lib/cameraInterpolation';
+import { CameraDebugOverlay } from './CameraDebugOverlay';
 
 interface CameraRigProps {
   config?: CameraConfig;
+  debug?: boolean;
   durationInFrames: number;
   children: (cameraState: CameraState) => React.ReactNode;
 }
 
-export const CameraRig: React.FC<CameraRigProps> = ({ config, durationInFrames, children }) => {
+export const CameraRig: React.FC<CameraRigProps> = ({ config, debug, durationInFrames, children }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
@@ -21,8 +23,6 @@ export const CameraRig: React.FC<CameraRigProps> = ({ config, durationInFrames, 
 
     if (config.preset) {
       const presetKeyframes = buildPresetCamera(config.preset, durationInFrames, width, height);
-      // Merge strategy: if user provided keyframes, they override/augment preset?
-      // For simplicity, if preset exists, use it as base.
       if (baseKeyframes.length === 0) {
         baseKeyframes = presetKeyframes;
       }
@@ -38,21 +38,28 @@ export const CameraRig: React.FC<CameraRigProps> = ({ config, durationInFrames, 
     return getInterpolatedCamera(frame, keyframes);
   }, [frame, keyframes, config?.enabled]);
 
-  const transform = `
-    translate3d(${cameraState.x}px, ${cameraState.y}px, 0)
-    scale(${cameraState.zoom})
-    rotate(${cameraState.rotation}deg)
-  `;
+  // VITAL: Force a single-line string with explicit units
+  const transform = `translate3d(${cameraState.x}px, ${cameraState.y}px, 0) scale(${cameraState.zoom}) rotate(${cameraState.rotation}deg)`;
+
+  if (frame % 30 === 0) {
+    console.log(`[CameraRig] Frame: ${frame} Transform: ${transform}`);
+  }
 
   return (
-    <AbsoluteFill
-      style={{
-        transform,
-        // Optional: transformOrigin can be center or customizable
-        transformOrigin: 'center center'
-      }}
-    >
-      {children(cameraState)}
-    </AbsoluteFill>
+    <>
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          transform,
+          transformOrigin: 'center center',
+          willChange: 'transform',
+          backfaceVisibility: 'hidden'
+        }}
+      >
+        {children(cameraState)}
+      </div>
+      <CameraDebugOverlay cameraState={cameraState} enabled={debug} />
+    </>
   );
 };

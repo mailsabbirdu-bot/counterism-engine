@@ -11,12 +11,14 @@ interface OverlayManagerProps {
   overlays: any[];
   cameraX?: number;
   cameraY?: number;
+  debug?: boolean;
 }
 
 export const OverlayManager: React.FC<OverlayManagerProps> = ({
   overlays,
   cameraX = 0,
-  cameraY = 0
+  cameraY = 0,
+  debug = false
 }) => {
   return (
     <div
@@ -66,11 +68,17 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({
               // Viewport Top-Left (0, 0) starts at World (1040, 1460)
               left: '1040px',
               top: '1460px',
+              overflow: 'visible',
               zIndex: overlay.zIndex,
               ...parallaxStyle
             }}
           >
             {renderEngine()}
+            {debug && (
+              <div className="absolute top-0 left-0 bg-red-600/80 text-white text-[10px] px-1 font-mono pointer-events-none whitespace-nowrap">
+                {overlay.id} (z:{overlay.zIndex} d:{overlay.depth || 1.0})
+              </div>
+            )}
           </div>
         );
       })}

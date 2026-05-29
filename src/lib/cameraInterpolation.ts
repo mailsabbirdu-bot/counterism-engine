@@ -2,11 +2,21 @@ import { interpolate, Easing } from 'remotion';
 import { CameraKeyframe, CameraState } from './cameraTypes';
 
 export const normalizeCameraKeyframes = (keyframes: CameraKeyframe[]): CameraKeyframe[] => {
-  if (keyframes.length === 0) {
+  if (!keyframes || keyframes.length === 0) {
     return [{ frame: 0, x: 0, y: 0, zoom: 1, rotation: 0 }];
   }
 
-  return keyframes.sort((a, b) => a.frame - b.frame);
+  // Sort and remove duplicates at the same frame
+  const sorted = [...keyframes].sort((a, b) => a.frame - b.frame);
+  const unique: CameraKeyframe[] = [];
+
+  sorted.forEach(kf => {
+    if (unique.length === 0 || unique[unique.length - 1].frame !== kf.frame) {
+      unique.push(kf);
+    }
+  });
+
+  return unique;
 };
 
 export const getInterpolatedCamera = (
@@ -24,27 +34,16 @@ export const getInterpolatedCamera = (
     };
   }
 
-  const frames = sortedKeyframes.map(k => k.frame);
+  const inputFrames = sortedKeyframes.map(k => k.frame);
+  const options = {
+    extrapolateLeft: 'clamp' as const,
+    extrapolateRight: 'clamp' as const,
+  };
 
-  const x = interpolate(frame, frames, sortedKeyframes.map(k => k.x), {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
-  const y = interpolate(frame, frames, sortedKeyframes.map(k => k.y), {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
-  const zoom = interpolate(frame, frames, sortedKeyframes.map(k => k.zoom), {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
-  const rotation = interpolate(frame, frames, sortedKeyframes.map(k => k.rotation || 0), {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
+  const x = interpolate(frame, inputFrames, sortedKeyframes.map(k => k.x), options);
+  const y = interpolate(frame, inputFrames, sortedKeyframes.map(k => k.y), options);
+  const zoom = interpolate(frame, inputFrames, sortedKeyframes.map(k => k.zoom), options);
+  const rotation = interpolate(frame, inputFrames, sortedKeyframes.map(k => k.rotation || 0), options);
 
   return { x, y, zoom, rotation };
 };

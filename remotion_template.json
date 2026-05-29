@@ -1,5 +1,5 @@
 {
-  "project_name": "Counterism_Studio_V4_Pro_Cinematic",
+  "project_name": "Camera_Stress_Test_V4",
   "global_settings": {
     "width": 1920,
     "height": 1080,
@@ -7,127 +7,30 @@
   },
   "scenes": [
     {
-      "scene_id": "SC-01-INTRO",
+      "scene_id": "STRESS-TEST",
       "background_type": "video",
       "video_path": "renders/scene_SC_01.mp4",
-      "audio_enabled": true,
-      "duration_in_frames": 150,
+      "duration_in_frames": 600,
+      "debug_camera": true,
       "camera": {
         "enabled": true,
-        "preset": "slowPushIn"
-      },
-      "overlays": [
-        {
-          "id": "title-main",
-          "type": "text",
-          "content": "COUNTERISM V4",
-          "start": 0,
-          "duration": 150,
-          "font": "Montserrat",
-          "fontSize": "180px",
-          "style": "text-white font-black tracking-tighter",
-          "zIndex": 100,
-          "depth": 1.2
-        },
-        {
-          "id": "sub-title",
-          "type": "text",
-          "content": "THE FUTURE OF CINEMATIC AUTOMATION",
-          "start": 30,
-          "duration": 120,
-          "font": "Montserrat",
-          "fontSize": "40px",
-          "position": { "x": 0, "y": 200 },
-          "style": "text-blue-400 font-bold tracking-[0.5em]",
-          "zIndex": 90,
-          "depth": 0.8
-        }
-      ]
-    },
-    {
-      "scene_id": "SC-02-DYNAMICS",
-      "background_type": "video",
-      "video_path": "renders/scene_SC_02.mp4",
-      "audio_enabled": true,
-      "duration_in_frames": 300,
-      "camera": {
-        "enabled": true,
-        "preset": "panRight",
         "keyframes": [
-          { "frame": 0, "x": 400, "y": 0, "zoom": 1 },
-          { "frame": 150, "x": 0, "y": 0, "zoom": 1.1 },
-          { "frame": 300, "x": -400, "y": 0, "zoom": 1.05 }
+          { "frame": 0, "x": 1200, "y": 900, "zoom": 1, "rotation": 0 },
+          { "frame": 150, "x": -1200, "y": -900, "zoom": 1.8, "rotation": 15 },
+          { "frame": 300, "x": 0, "y": 0, "zoom": 0.4, "rotation": -15 },
+          { "frame": 450, "x": 1000, "y": -1000, "zoom": 2.5, "rotation": 30 },
+          { "frame": 600, "x": 0, "y": 0, "zoom": 1, "rotation": 0 }
         ]
       },
       "overlays": [
-        {
-          "id": "pip-video",
-          "type": "video",
-          "src": "renders/scene_SC_01.mp4",
-          "start": 0,
-          "duration": 300,
-          "position": { "x": 1000, "y": 200 },
-          "width": 800,
-          "height": 450,
-          "borderRadius": 40,
-          "shadow": true,
-          "border": { "width": 10, "color": "#3b82f6" },
-          "zIndex": 20,
-          "depth": 1.5,
-          "audio_enabled": false
-        },
-        {
-          "id": "stats-panel",
-          "type": "ui_panel",
-          "title": "ENGINE STATUS",
-          "description": "Dynamic camera and parallax depth active.",
-          "iconType": "activity",
-          "start": 60,
-          "duration": 240,
-          "position": { "x": 100, "y": 100 },
-          "variant": "glass",
-          "initialProgress": 0,
-          "targetProgress": 100,
-          "zIndex": 40,
-          "depth": 0.5
-        }
-      ]
-    },
-    {
-      "scene_id": "SC-03-FLOAT",
-      "background_type": "video",
-      "video_path": "renders/scene_SC_03.mp4",
-      "audio_enabled": true,
-      "duration_in_frames": 240,
-      "camera": {
-        "enabled": true,
-        "preset": "cinematicFloat"
-      },
-      "overlays": [
-        {
-          "id": "data-viz",
-          "type": "chart",
-          "chart_type": "line",
-          "title": "NETWORK STABILITY",
-          "start": 0,
-          "duration": 240,
-          "width": 1200,
-          "height": 700,
-          "position": { "x": 360, "y": 190 },
-          "zIndex": 30,
-          "depth": 1.0,
-          "data": [
-            {
-              "id": "latency",
-              "data": [
-                { "x": "0ms", "y": 10 },
-                { "x": "10ms", "y": 40 },
-                { "x": "20ms", "y": 25 },
-                { "x": "30ms", "y": 80 }
-              ]
-            }
-          ]
-        }
+        { "id": "t1", "type": "text", "content": "CENTER ANCHOR", "start": 0, "duration": 600, "fontSize": "180px", "style": "text-white font-black", "zIndex": 100, "depth": 1.0 },
+        { "id": "t2", "type": "text", "content": "NORTH CLUSTER", "start": 0, "duration": 600, "fontSize": "96px", "position": { "x": 0, "y": -1200 }, "style": "text-blue-400", "zIndex": 90, "depth": 0.5 },
+        { "id": "t3", "type": "text", "content": "SOUTH CLUSTER", "start": 0, "duration": 600, "fontSize": "96px", "position": { "x": 0, "y": 1200 }, "style": "text-red-400", "zIndex": 90, "depth": 1.5 },
+        { "id": "t4", "type": "text", "content": "EAST DATA", "start": 0, "duration": 600, "fontSize": "96px", "position": { "x": 1500, "y": 0 }, "style": "text-emerald-400", "zIndex": 90, "depth": 1.2 },
+        { "id": "t5", "type": "text", "content": "WEST DATA", "start": 0, "duration": 600, "fontSize": "96px", "position": { "x": -1500, "y": 0 }, "style": "text-amber-400", "zIndex": 90, "depth": 0.8 },
+        { "id": "ui1", "type": "ui_panel", "title": "PARALLAX_X", "description": "DEPTH 1.5 ACTIVE", "iconType": "cpu", "start": 0, "duration": 600, "position": { "x": 1000, "y": 600 }, "zIndex": 80, "depth": 1.5 },
+        { "id": "ui2", "type": "ui_panel", "title": "PARALLAX_Y", "description": "DEPTH 0.3 ACTIVE", "iconType": "activity", "start": 0, "duration": 600, "position": { "x": -1000, "y": -600 }, "zIndex": 80, "depth": 0.3 },
+        { "id": "s1", "type": "shape", "shape_type": "circle", "start": 0, "duration": 600, "size": 1500, "color": "#ffffff05", "position": { "x": 960, "y": 540 }, "decorated": true, "zIndex": 5, "depth": 0.1 }
       ]
     }
   ]
