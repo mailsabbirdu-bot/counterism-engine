@@ -90,16 +90,15 @@ export const CameraEngine: React.FC<{
     const panOverscanY = 1 + (maxAbsY * 2) / height;
     const panOverscan = Math.max(panOverscanX, panOverscanY);
 
-    // 3. Account for rotation
-    // Rotating a rectangle reveals corners. Max reveal at 45deg is ~1.41x (sqrt 2)
+    // 3. Account for rotation - Since background is now 2D ONLY, we don't need rotation overscan
+    // However, if the camera itself rotates the scene, the 2D background still needs to cover the corners
     const rotationOverscan = 1 + (maxRot / 45) * 0.42;
 
     // Total required scale to ensure no black edges
     const totalScale = zoomOverscan * panOverscan * rotationOverscan;
 
-    // Optimization: Cap the scale to 5x. Extremely large textures slow down rendering.
-    // Also add a 5% safety margin.
-    return Math.min(5, totalScale * 1.05);
+    // Optimization: Cap the scale to 4x.
+    return Math.min(4, totalScale * 1.05);
   }, [config?.keyframes, config?.perspective, width, height]);
 
   const cameraState = useMemo(() => {
@@ -304,7 +303,8 @@ export const CameraEngine: React.FC<{
     overflow: 'hidden',
   };
 
-  const sceneStyle: React.CSSProperties = {
+  // Overlays use the full 3D cinematic stack (including perspective, lookAt rotations, and Z translation)
+  const overlayStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
     transformStyle: 'preserve-3d',
@@ -314,13 +314,23 @@ export const CameraEngine: React.FC<{
     transform: `translate3d(${cx}px, ${cy}px, 0) scale3d(${cameraState.zoom}, ${cameraState.zoom}, 1) rotateX(${cameraState.rotationX}deg) rotateY(${cameraState.rotationY}deg) rotateZ(${cameraState.rotationZ + (shakeOffset.rz || 0)}deg) translate3d(${-cameraState.x + shakeOffset.x}px, ${-cameraState.y + shakeOffset.y}px, ${-cameraState.z}px) translate3d(${-cx}px, ${-cy}px, 0)`,
   };
 
-  // The background needs to be scaled up independently to ensure it covers the viewport
-  // during pans. We apply the inverse of the camera's zoom if we want it to feel like
-  // a static surface, but the user wants it to be panned/zoomed too, just without
-  // revealing black bars.
+  // Background uses only 2D functionalities: Panning (X, Y) and Scaling (Zoom)
+  // It is explicitly isolated from 3D rotations, perspective distortion, and Z depth
   const backgroundStyle: React.CSSProperties = {
-    transform: `scale(${coverScale})`,
-    transformOrigin: 'center center',
+    width: '100%',
+    height: '100%',
+    willChange: 'transform',
+    // Background 2D transform:
+    // 1. Move to center
+    // 2. Scale by background coverScale * camera zoom
+    // 3. Translate by camera pan offset
+    // 4. Move back from center
+    transform: `
+      translate3d(${cx}px, ${cy}px, 0)
+      scale3d(${cameraState.zoom * coverScale}, ${cameraState.zoom * coverScale}, 1)
+      translate3d(${-cameraState.x + shakeOffset.x}px, ${-cameraState.y + shakeOffset.y}px, 0)
+      translate3d(${-cx}px, ${-cy}px, 0)
+    `,
   };
 
   const childrenArray = React.Children.toArray(children);
@@ -329,10 +339,13 @@ export const CameraEngine: React.FC<{
 
   return (
     <div style={containerStyle}>
-      <div style={sceneStyle}>
-        <AbsoluteFill style={backgroundStyle}>
-          {background}
-        </AbsoluteFill>
+      {/* Background layer: 2D ONLY */}
+      <AbsoluteFill style={backgroundStyle}>
+        {background}
+      </AbsoluteFill>
+
+      {/* Overlay layer: FULL 3D */}
+      <div style={overlayStyle}>
         {overlays}
       </div>
     </div>
