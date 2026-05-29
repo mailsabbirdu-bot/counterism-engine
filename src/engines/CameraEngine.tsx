@@ -10,7 +10,7 @@ export interface CameraKeyframe {
   rotationX?: number;
   rotationY?: number;
   rotationZ?: number;
-  easing?: 'ease' | 'linear' | 'bezier';
+  easing?: 'linear' | 'ease' | 'bezier' | 'in' | 'out';
 }
 
 export interface CameraConfig {
@@ -29,43 +29,55 @@ export const CameraEngine: React.FC<{
     return <>{children}</>;
   }
 
-  const { sortedKeyframes, frames } = useMemo(() => {
+  const { sortedKeyframes } = useMemo(() => {
     const sorted = [...config.keyframes].sort((a, b) => a.frame - b.frame);
-    return {
-      sortedKeyframes: sorted,
-      frames: sorted.map((k) => k.frame),
-    };
+    return { sortedKeyframes: sorted };
   }, [config.keyframes]);
 
   const cameraState = useMemo(() => {
-    const getVal = (prop: keyof CameraKeyframe, defaultValue: number) => {
-      const values = sortedKeyframes.map((k) => (k[prop] as number) ?? defaultValue);
-      if (frames.length === 1) return values[0];
+    // Find the current segment
+    let startIdx = 0;
+    for (let i = 0; i < sortedKeyframes.length - 1; i++) {
+      if (frame >= sortedKeyframes[i].frame) {
+        startIdx = i;
+      }
+    }
 
-      // Map easing names to Easing functions
-      const easing = sortedKeyframes[0].easing === 'bezier'
-        ? Easing.bezier(0.33, 1, 0.68, 1) // easeOutCubic
-        : sortedKeyframes[0].easing === 'ease'
-          ? Easing.inOut(Easing.ease)
-          : Easing.linear;
+    const endIdx = Math.min(startIdx + 1, sortedKeyframes.length - 1);
+    const startKey = sortedKeyframes[startIdx];
+    const endKey = sortedKeyframes[endIdx];
 
-      return interpolate(frame, frames, values, {
+    const getInterpolated = (prop: keyof CameraKeyframe, defaultValue: number) => {
+      const startVal = (startKey[prop] as number) ?? defaultValue;
+      const endVal = (endKey[prop] as number) ?? defaultValue;
+
+      if (startIdx === endIdx) return startVal;
+
+      const easingType = startKey.easing || 'ease';
+      let easingFn = Easing.linear;
+
+      if (easingType === 'ease') easingFn = Easing.inOut(Easing.ease);
+      else if (easingType === 'in') easingFn = Easing.in(Easing.ease);
+      else if (easingType === 'out') easingFn = Easing.out(Easing.ease);
+      else if (easingType === 'bezier') easingFn = Easing.bezier(0.33, 1, 0.68, 1);
+
+      return interpolate(frame, [startKey.frame, endKey.frame], [startVal, endVal], {
         extrapolateLeft: 'clamp',
         extrapolateRight: 'clamp',
-        easing: easing
+        easing: easingFn,
       });
     };
 
     return {
-      x: getVal('x', 0),
-      y: getVal('y', 0),
-      z: getVal('z', 0),
-      zoom: getVal('zoom', 1),
-      rotationX: getVal('rotationX', 0),
-      rotationY: getVal('rotationY', 0),
-      rotationZ: getVal('rotationZ', 0),
+      x: getInterpolated('x', 0),
+      y: getInterpolated('y', 0),
+      z: getInterpolated('z', 0),
+      zoom: getInterpolated('zoom', 1),
+      rotationX: getInterpolated('rotationX', 0),
+      rotationY: getInterpolated('rotationY', 0),
+      rotationZ: getInterpolated('rotationZ', 0),
     };
-  }, [frame, frames, sortedKeyframes]);
+  }, [frame, sortedKeyframes]);
 
   const perspective = config.perspective || 1000;
 
@@ -77,7 +89,8 @@ export const CameraEngine: React.FC<{
     overflow: 'hidden',
   };
 
-  // Improved scene style with hardware acceleration hints
+  // Professional transform order: Translation first, then rotation
+  // We use scale3d for zoom and translate3d for camera position (including Z depth)
   const sceneStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
@@ -85,6 +98,7 @@ export const CameraEngine: React.FC<{
     willChange: 'transform',
     backfaceVisibility: 'hidden',
     transform: `
+      perspective(${perspective}px)
       translate3d(${-cameraState.x}px, ${-cameraState.y}px, ${-cameraState.z}px)
       scale3d(${cameraState.zoom}, ${cameraState.zoom}, 1)
       rotateX(${cameraState.rotationX}deg)

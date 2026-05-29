@@ -15,7 +15,7 @@
         "enabled": true,
         "perspective": 1000,
         "keyframes": [
-          { "frame": 0, "x": 0, "y": 0, "zoom": 1, "rotationY": 0 },
+          { "frame": 0, "x": 0, "y": 0, "zoom": 1, "rotationY": 0, "easing": "bezier" },
           { "frame": 150, "x": 200, "y": 0, "zoom": 1.5, "rotationY": 15 }
         ]
       },

@@ -34,7 +34,8 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         left: overlay.position ? `${overlay.position.x}px` : undefined,
         top: overlay.position ? `${overlay.position.y}px` : undefined,
         // Add a subtle text shadow for better readability on light backgrounds
-        textShadow: '0 4px 30px rgba(0,0,0,0.5), 0 0 100px rgba(0,0,0,0.2)'
+        textShadow: '0 4px 30px rgba(0,0,0,0.5), 0 0 100px rgba(0,0,0,0.2)',
+        transformStyle: 'preserve-3d'
       }}
     >
       <div className="flex flex-wrap justify-center gap-x-6 gap-y-6 max-w-[80%] text-center">
