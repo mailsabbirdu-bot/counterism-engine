@@ -105,6 +105,11 @@ This document defines the comprehensive JSON schema for `remotion_template.json`
 ### `camera` object
 - `enabled`: `boolean`
 - `perspective`: `number` (Default: 1000. Higher = flatter perspective).
+- `shake`: `object` (Optional subtle handheld motion).
+  - `enabled`: `boolean`
+  - `intensity`: `number` (Default: 2. Pixel displacement).
+  - `speed`: `number` (Default: 1. Motion frequency).
+  - `rotationIntensity`: `number` (Default: 0.2. Subtle roll in degrees).
 - `keyframes`: `array` of camera states.
   - `frame`: `number`
   - `x`, `y`, `z`: `number` (Translation).
