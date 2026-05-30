@@ -25,7 +25,7 @@
         },
         "shake": {
           "enabled": true,
-          "intensity": 2,
+          "intensity": 2.5,
           "speed": 1
         },
         "shots": [
@@ -33,7 +33,7 @@
             "targetId": "OPENING_TITLE",
             "startFrame": 0,
             "duration": 90,
-            "zoom": 1.15,
+            "zoom": 1.1,
             "style": "push_in",
             "inDuration": 30
           },
@@ -65,7 +65,7 @@
             "targetId": "CONCLUSION",
             "startFrame": 420,
             "duration": 180,
-            "zoom": 1.2,
+            "zoom": 1.1,
             "style": "pull_out",
             "inDuration": 40
           }
@@ -78,7 +78,7 @@
           "content": "Every Story Begins With A Signal",
           "animation": "cinematicGlow",
           "font": "Montserrat",
-          "fontSize": "110px",
+          "fontSize": "120px",
           "style": "text-white font-black uppercase tracking-tighter",
           "position": {
             "x": 960,
@@ -86,10 +86,10 @@
           },
           "start": 0,
           "duration": 120,
-          "depth": 100,
+          "depth": 200,
           "zIndex": 50,
           "cameraFocus": {
-            "zoom": 1.15,
+            "zoom": 1.1,
             "fitMode": "contain",
             "preferredDuration": 90,
             "moveStyle": "smooth"
@@ -110,7 +110,7 @@
           },
           "start": 60,
           "duration": 180,
-          "depth": 250,
+          "depth": 350,
           "zIndex": 50,
           "cameraFocus": {
             "zoom": 1.4,
@@ -125,7 +125,7 @@
           "content": "Millions of events happen every second.",
           "animation": "slideUp",
           "font": "Montserrat",
-          "fontSize": "42px",
+          "fontSize": "40px",
           "style": "text-slate-300",
           "position": {
             "x": 350,
@@ -133,8 +133,8 @@
           },
           "start": 90,
           "duration": 150,
-          "depth": 150,
-          "zIndex": 45
+          "depth": 250,
+          "zIndex": 50
         },
         {
           "id": "DATA_PANEL",
@@ -177,7 +177,7 @@
           },
           "start": 180,
           "duration": 180,
-          "depth": 300,
+          "depth": 400,
           "zIndex": 50
         },
         {
@@ -208,7 +208,7 @@
           },
           "start": 240,
           "duration": 250,
-          "depth": 400,
+          "depth": 450,
           "zIndex": 30,
           "cameraFocus": {
             "zoom": 1.7,
@@ -232,7 +232,7 @@
           },
           "start": 330,
           "duration": 180,
-          "depth": 200,
+          "depth": 300,
           "zIndex": 50
         },
         {
@@ -241,7 +241,7 @@
           "content": "The Camera Guided The Journey.\nThe Data Told The Story.",
           "animation": "cinematicGlow",
           "font": "Montserrat",
-          "fontSize": "100px",
+          "fontSize": "120px",
           "style": "text-white font-black text-center",
           "position": {
             "x": 960,
@@ -249,10 +249,10 @@
           },
           "start": 420,
           "duration": 180,
-          "depth": 100,
+          "depth": 200,
           "zIndex": 60,
           "cameraFocus": {
-            "zoom": 1.2,
+            "zoom": 1.1,
             "fitMode": "contain",
             "preferredDuration": 180,
             "moveStyle": "dramatic"
