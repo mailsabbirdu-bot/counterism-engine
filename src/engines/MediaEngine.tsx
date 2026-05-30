@@ -43,7 +43,7 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
     width: overlay.width ? `${overlay.width}px` : 'auto',
     height: overlay.height ? `${overlay.height}px` : 'auto',
     opacity,
-    transform: `scale(${scale})`,
+    transform: `translate(-50%, -50%) scale(${scale})`,
     borderRadius: `${overlay.borderRadius ?? 0}px`,
     overflow: 'hidden',
     boxShadow: overlay.shadow ? '0 20px 50px rgba(0,0,0,0.5)' : 'none',

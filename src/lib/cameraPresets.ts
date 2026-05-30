@@ -1,16 +1,4 @@
-export interface CameraKeyframe {
-  frame: number;
-  x?: number;
-  y?: number;
-  z?: number;
-  zoom?: number;
-  rotationX?: number;
-  rotationY?: number;
-  rotationZ?: number;
-  easing?: string;
-}
-
-export type CameraPreset = 'slow_push' | 'slow_pull' | 'ken_burns' | 'dramatic_reveal' | 'handheld_static' | 'whip_pan_right' | 'whip_pan_left';
+import { CameraKeyframe, CameraPreset } from '../types/camera';
 
 export const getPresetKeyframes = (preset: CameraPreset, duration: number): CameraKeyframe[] => {
   switch (preset) {

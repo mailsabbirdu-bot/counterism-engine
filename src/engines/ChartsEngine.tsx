@@ -123,11 +123,11 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       style={{
         width: overlay.width || 1000,
         height: overlay.height || 650,
-        left: overlay.position?.x || 1000,
-        top: overlay.position?.y || 500,
+        left: `${overlay.position?.x ?? 960}px`,
+        top: `${overlay.position?.y ?? 540}px`,
         opacity: entrance,
         zIndex: overlay.zIndex ?? 30,
-        transform: `scale(${0.9 + entrance * 0.1}) translateY(${(1 - entrance) * 100}px)`
+        transform: `translate(-50%, -50%) scale(${0.9 + entrance * 0.1}) translateY(${(1 - entrance) * 100}px)`
       }}
     >
       <div className="flex justify-between items-center mb-10">

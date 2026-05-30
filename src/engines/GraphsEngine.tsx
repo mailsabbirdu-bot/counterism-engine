@@ -18,6 +18,9 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const nodeCount = overlay.nodes || 30;
   const linkCount = overlay.links || 40;
 
+  const centerX = overlay.position?.x ?? width / 2;
+  const centerY = overlay.position?.y ?? height / 2;
+
   // Heavy calculation happens only once per scene instantiation
   const { processedNodes, processedLinks } = useMemo(() => {
     const nodes: Node[] = Array.from({ length: nodeCount }, (_, i) => ({ id: i }));
@@ -29,7 +32,7 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     const simulation = d3.forceSimulation<Node>(nodes)
       .force("link", d3.forceLink<Node, Link>(links).id(d => d.id).distance(200))
       .force("charge", d3.forceManyBody().strength(-150))
-      .force("center", d3.forceCenter(width / 2, height / 2))
+      .force("center", d3.forceCenter(centerX, centerY))
       .stop();
 
     // Pre-calculate final positions for high performance
@@ -64,7 +67,7 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       style={{ opacity: entrance, zIndex: overlay.zIndex ?? 25 }}
     >
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`}>
-        <g transform={`translate(${width/2 + driftX}, ${height/2 + driftY}) scale(${scale}) rotate(${rotation}) translate(${-width/2}, ${-height/2})`}>
+        <g transform={`translate(${centerX + driftX}, ${centerY + driftY}) scale(${scale}) rotate(${rotation}) translate(${-centerX}, ${-centerY})`}>
           {/* Render links first (under nodes) */}
           {processedLinks.map((link, i) => (
             <line

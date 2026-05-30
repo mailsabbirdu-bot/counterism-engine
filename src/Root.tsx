@@ -4,7 +4,10 @@ import { Scene } from './Scene';
 import defaultTemplate from '../remotion_template.json';
 
 const inputProps = getInputProps();
-const template = (inputProps as any)?.templateData || defaultTemplate;
+// Support both { templateData: ... } and direct template JSON
+const template = (inputProps as any)?.scenes
+  ? inputProps
+  : ((inputProps as any)?.templateData || defaultTemplate);
 
 export const RemotionRoot: React.FC = () => {
   // Pre-load fonts from template

@@ -10,8 +10,8 @@ export const ShapesEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     return null;
   }
 
-  const x = overlay.position?.x || width / 2;
-  const y = overlay.position?.y || height / 2;
+  const x = overlay.position?.x ?? width / 2;
+  const y = overlay.position?.y ?? height / 2;
   const size = overlay.size || 100;
   const color = overlay.color || "#3b82f6";
 

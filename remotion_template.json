@@ -19,63 +19,68 @@
       "camera": {
         "enabled": true,
         "perspective": 1000,
-        "pathSmoothing": true,
         "motionBlur": { "enabled": true, "intensity": 1.0 },
         "shake": { "enabled": true, "intensity": 3, "speed": 1.0 },
         "keyframes": [
           {
             "frame": 0,
-            "x": 0, "y": 0, "z": 0, "zoom": 1,
+            "x": 0, "y": 0, "zoom": 1,
             "easing": "ease"
           },
           {
             "frame": 60,
-            "x": -660, "y": 260, "z": 0, "zoom": 2.5,
+            "x": -660, "y": 260, "zoom": 2.5,
             "easing": "ease"
           },
           {
             "frame": 120,
-            "x": -660, "y": 260, "z": 0, "zoom": 2.5,
+            "x": -660, "y": 260, "zoom": 2.5,
             "easing": "linear"
           },
           {
             "frame": 180,
-            "x": 420, "y": -280, "z": 0, "zoom": 2.5,
+            "x": 420, "y": -280, "zoom": 2.5,
             "easing": "ease"
           },
           {
             "frame": 240,
-            "x": 420, "y": -280, "z": 0, "zoom": 2.5,
+            "x": 420, "y": -280, "zoom": 2.5,
             "easing": "linear"
           },
           {
             "frame": 299,
-            "x": 0, "y": 0, "z": 0, "zoom": 1,
+            "x": 0, "y": 0, "zoom": 1,
             "easing": "ease"
           }
         ]
       },
       "overlays": [
         {
-          "id": "BOTTOM-LEFT-TEXT",
+          "id": "CENTER-TARGET",
           "type": "text",
-          "content": "STABILIZED TARGET",
+          "content": "CENTER",
           "font": "Montserrat",
           "fontSize": "80px",
-          "style": "text-white font-black",
-          "position": { "x": 300, "y": 800 },
-          "start": 0, "duration": 300, "depth": 0
+          "position": { "x": 960, "y": 540 },
+          "start": 0, "duration": 300
         },
         {
-          "id": "SCI-FI-PANEL",
-          "type": "ui_panel",
-          "title": "SYSTEM OVERRIDE",
-          "description": "DEEP SEARCH IN PROGRESS...",
-          "iconType": "cpu",
-          "variant": "glass",
-          "nodeId": "CORE-01",
-          "position": { "x": 1100, "y": 100 },
-          "start": 0, "duration": 300, "depth": 0
+          "id": "TOP-LEFT-TARGET",
+          "type": "text",
+          "content": "TOP LEFT",
+          "font": "Montserrat",
+          "fontSize": "80px",
+          "position": { "x": 300, "y": 800 },
+          "start": 0, "duration": 300
+        },
+        {
+          "id": "BOTTOM-RIGHT-TARGET",
+          "type": "text",
+          "content": "BOTTOM RIGHT",
+          "font": "Montserrat",
+          "fontSize": "80px",
+          "position": { "x": 1380, "y": 260 },
+          "start": 0, "duration": 300
         }
       ]
     }
