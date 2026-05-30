@@ -16,9 +16,8 @@ export const MediaEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
 
 const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { width: videoWidth, height: videoHeight } = useVideoConfig();
 
-  // Defensive check for duration to prevent non-monotonic interpolation
   const fadeDuration = Math.min(15, Math.floor(overlay.duration / 2));
 
   const opacity = interpolate(
@@ -35,10 +34,13 @@ const MediaContent: React.FC<{ overlay: any }> = ({ overlay }) => {
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
 
+  const x = overlay.position?.x ?? videoWidth / 2;
+  const y = overlay.position?.y ?? videoHeight / 2;
+
   const containerStyle: React.CSSProperties = {
     position: 'absolute',
-    left: `${overlay.position?.x ?? 0}px`,
-    top: `${overlay.position?.y ?? 0}px`,
+    left: `${x}px`,
+    top: `${y}px`,
     zIndex: overlay.zIndex,
     width: overlay.width ? `${overlay.width}px` : 'auto',
     height: overlay.height ? `${overlay.height}px` : 'auto',

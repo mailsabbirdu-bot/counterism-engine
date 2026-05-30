@@ -1,12 +1,10 @@
 import React from 'react';
-import { useCurrentFrame, interpolate, spring, useVideoConfig } from 'remotion';
+import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { motion } from 'framer-motion';
-import { cn } from '../lib/utils';
 
 export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const relativeFrame = frame - overlay.start;
+  const { width, height } = useVideoConfig();
 
   if (frame < overlay.start || frame > overlay.start + overlay.duration) {
     return null;
@@ -16,35 +14,36 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     ? overlay.content.split('')
     : overlay.content.split(' ');
 
-  // Base font size - if not provided, use a large default
   const baseFontSize = overlay.fontSize || "120px";
+  const x = overlay.position?.x ?? width / 2;
+  const y = overlay.position?.y ?? height / 2;
 
   return (
     <div
       className="absolute pointer-events-none"
       style={{
         display: 'flex',
-        alignItems: overlay.position ? 'flex-start' : 'center',
-        justifyContent: overlay.position ? 'flex-start' : 'center',
-        padding: overlay.position ? '0' : '80px',
+        alignItems: 'center',
+        justifyContent: 'center',
         fontFamily: overlay.font || 'Inter',
         fontSize: baseFontSize,
         zIndex: overlay.zIndex,
-        left: overlay.position ? `${overlay.position.x}px` : '0',
-        top: overlay.position ? `${overlay.position.y}px` : '0',
-        width: overlay.position ? 'auto' : '100%',
-        height: overlay.position ? 'auto' : '100%',
+        left: `${x}px`,
+        top: `${y}px`,
+        transform: 'translate(-50%, -50%)',
+        width: 'auto',
+        height: 'auto',
         textShadow: '0 4px 30px rgba(0,0,0,0.5), 0 0 100px rgba(0,0,0,0.2)',
-        color: 'white'
+        color: 'white',
+        whiteSpace: 'nowrap'
       }}
     >
       <div style={{
         display: 'flex',
         flexWrap: 'wrap',
         gap: '24px',
-        justifyContent: overlay.position ? 'flex-start' : 'center',
-        textAlign: overlay.position ? 'left' : 'center',
-        maxWidth: overlay.position ? '100%' : '80%'
+        justifyContent: 'center',
+        textAlign: 'center'
       }}>
         {items.map((item: string, i: number) => {
           const delay = i * (overlay.stagger || 0.1);
@@ -53,7 +52,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
           let animate = {};
           let transition = {
             duration: 1.2,
-            ease: [0.16, 1, 0.3, 1], // easeOutExpo
+            ease: [0.16, 1, 0.3, 1],
             delay: delay,
           };
 
@@ -67,7 +66,6 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
             initial = { opacity: 0, scale: 0.5 };
             animate = { opacity: 1, scale: 1 };
           } else {
-             // Default fade in
              initial = { opacity: 0 };
              animate = { opacity: 1 };
           }
@@ -81,7 +79,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
               style={{
                 display: 'inline-block',
                 whiteSpace: item === ' ' ? 'pre' : 'normal',
-                fontWeight: 900, // Force extra bold for cinematic impact
+                fontWeight: 900,
               }}
             >
               {item}
