@@ -15,72 +15,185 @@
         "secondaryColor": "#000066"
       },
       "audio_enabled": false,
-      "duration_in_frames": 300,
+      "duration_in_frames": 600,
       "camera": {
         "enabled": true,
         "perspective": 1000,
+        "pathSmoothing": true,
         "motionBlur": { "enabled": true, "intensity": 1.0 },
         "shake": { "enabled": true, "intensity": 3, "speed": 1.0 },
         "keyframes": [
           {
             "frame": 0,
-            "x": 0, "y": 0, "zoom": 1,
+            "x": 0, "y": 0, "z": 0, "zoom": 1,
+            "easing": "ease"
+          },
+
+          {
+            "frame": 45,
+            "x": -700, "y": 350, "z": 0, "zoom": 2.4,
             "easing": "ease"
           },
           {
-            "frame": 60,
-            "x": -660, "y": 260, "zoom": 2.5,
-            "easing": "ease"
-          },
-          {
-            "frame": 120,
-            "x": -660, "y": 260, "zoom": 2.5,
+            "frame": 90,
+            "x": -700, "y": 350, "z": 0, "zoom": 2.4,
             "easing": "linear"
+          },
+
+          {
+            "frame": 135,
+            "x": 700, "y": -350, "z": 0, "zoom": 2.4,
+            "easing": "ease"
           },
           {
             "frame": 180,
-            "x": 420, "y": -280, "zoom": 2.5,
+            "x": 700, "y": -350, "z": 0, "zoom": 2.4,
+            "easing": "linear"
+          },
+
+          {
+            "frame": 225,
+            "x": 0, "y": 450, "z": 0, "zoom": 2.6,
             "easing": "ease"
           },
           {
-            "frame": 240,
-            "x": 420, "y": -280, "zoom": 2.5,
+            "frame": 270,
+            "x": 0, "y": 450, "z": 0, "zoom": 2.6,
             "easing": "linear"
           },
+
           {
-            "frame": 299,
-            "x": 0, "y": 0, "zoom": 1,
+            "frame": 315,
+            "x": 0, "y": -450, "z": 0, "zoom": 2.6,
+            "easing": "ease"
+          },
+          {
+            "frame": 360,
+            "x": 0, "y": -450, "z": 0, "zoom": 2.6,
+            "easing": "linear"
+          },
+
+          {
+            "frame": 405,
+            "x": -850, "y": -400, "z": 0, "zoom": 2.8,
+            "easing": "ease"
+          },
+          {
+            "frame": 450,
+            "x": -850, "y": -400, "z": 0, "zoom": 2.8,
+            "easing": "linear"
+          },
+
+          {
+            "frame": 495,
+            "x": 850, "y": 400, "z": 0, "zoom": 2.8,
+            "easing": "ease"
+          },
+          {
+            "frame": 540,
+            "x": 850, "y": 400, "z": 0, "zoom": 2.8,
+            "easing": "linear"
+          },
+
+          {
+            "frame": 599,
+            "x": 0, "y": 0, "z": 0, "zoom": 1,
             "easing": "ease"
           }
         ]
       },
       "overlays": [
         {
-          "id": "CENTER-TARGET",
+          "id": "CENTER-TITLE",
           "type": "text",
-          "content": "CENTER",
+          "content": "MISSION CONTROL",
           "font": "Montserrat",
-          "fontSize": "80px",
+          "fontSize": "90px",
+          "style": "text-white font-black",
           "position": { "x": 960, "y": 540 },
-          "start": 0, "duration": 300
+          "start": 0,
+          "duration": 600,
+          "depth": 0
         },
+
         {
-          "id": "TOP-LEFT-TARGET",
+          "id": "BOTTOM-LEFT-TEXT",
           "type": "text",
-          "content": "TOP LEFT",
+          "content": "TARGET LOCKED",
           "font": "Montserrat",
           "fontSize": "80px",
-          "position": { "x": 300, "y": 800 },
-          "start": 0, "duration": 300
+          "style": "text-green-400 font-black",
+          "position": { "x": 250, "y": 850 },
+          "start": 0,
+          "duration": 600,
+          "depth": 0
         },
+
         {
-          "id": "BOTTOM-RIGHT-TARGET",
+          "id": "TOP-RIGHT-TEXT",
           "type": "text",
-          "content": "BOTTOM RIGHT",
+          "content": "ORBITAL FEED",
           "font": "Montserrat",
           "fontSize": "80px",
-          "position": { "x": 1380, "y": 260 },
-          "start": 0, "duration": 300
+          "style": "text-cyan-300 font-black",
+          "position": { "x": 1650, "y": 150 },
+          "start": 0,
+          "duration": 600,
+          "depth": 0
+        },
+
+        {
+          "id": "BOTTOM-CENTER-TEXT",
+          "type": "text",
+          "content": "DATA STREAM",
+          "font": "Montserrat",
+          "fontSize": "80px",
+          "style": "text-yellow-300 font-black",
+          "position": { "x": 960, "y": 950 },
+          "start": 0,
+          "duration": 600,
+          "depth": 0
+        },
+
+        {
+          "id": "TOP-CENTER-TEXT",
+          "type": "text",
+          "content": "SATELLITE ARRAY",
+          "font": "Montserrat",
+          "fontSize": "80px",
+          "style": "text-purple-300 font-black",
+          "position": { "x": 960, "y": 120 },
+          "start": 0,
+          "duration": 600,
+          "depth": 0
+        },
+
+        {
+          "id": "TOP-LEFT-PANEL",
+          "type": "ui_panel",
+          "title": "SECTOR ALPHA",
+          "description": "SIGNAL VERIFIED",
+          "iconType": "shield",
+          "variant": "glass",
+          "nodeId": "ALPHA-01",
+          "position": { "x": 120, "y": 120 },
+          "start": 0,
+          "duration": 600,
+          "depth": 0
+        },
+
+        {
+          "id": "BOTTOM-RIGHT-PANEL",
+          "type": "ui_panel",
+          "title": "SECTOR BETA",
+          "description": "TRACKING ACTIVE",
+          "iconType": "cpu",
+          "variant": "glass",
+          "nodeId": "BETA-01",
+          "position": { "x": 1450, "y": 820 },
+          "start": 0,
+          "duration": 600,
+          "depth": 0
         }
       ]
     }

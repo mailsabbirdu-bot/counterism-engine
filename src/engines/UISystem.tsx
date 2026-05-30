@@ -47,7 +47,7 @@ export const UISystem: React.FC<{ overlay: any }> = ({ overlay }) => {
         top: overlay.position ? `${overlay.position.y}px` : '100px',
         opacity,
         zIndex: overlay.zIndex ?? 40,
-        transform: `translate(-50%, -50%) perspective(2000px) rotateY(${(1 - entrance) * 30}deg) scale(${0.85 + entrance * 0.15})`,
+        transform: `perspective(2000px) rotateY(${(1 - entrance) * 30}deg) scale(${0.85 + entrance * 0.15})`,
         filter: `blur(${(1 - opacity) * 10}px)`,
         color: 'white'
       }}
