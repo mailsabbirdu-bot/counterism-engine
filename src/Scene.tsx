@@ -56,6 +56,7 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
     <AbsoluteFill className="bg-black">
       <CameraEngine
         config={sceneData.camera}
+        overlays={sceneData.overlays || []}
         backgroundLayer={renderBackground()}
       >
         <OverlayManager overlays={sceneData.overlays || []} />

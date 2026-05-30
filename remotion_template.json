@@ -1,5 +1,5 @@
 {
-  "project_name": "Cinematic Navigation Stress Test",
+  "project_name": "Professional Cinematic Sequence",
   "global_settings": {
     "width": 1920,
     "height": 1080,
@@ -7,193 +7,112 @@
   },
   "scenes": [
     {
-      "scene_id": "NAV-TEST",
+      "scene_id": "MAIN-SEQUENCE",
       "background_type": "procedural",
       "procedural_config": {
         "variant": "cyber",
-        "primaryColor": "#000033",
-        "secondaryColor": "#000066"
+        "primaryColor": "#000022",
+        "secondaryColor": "#000044"
       },
       "audio_enabled": false,
-      "duration_in_frames": 600,
+      "duration_in_frames": 630,
       "camera": {
         "enabled": true,
-        "perspective": 1000,
-        "pathSmoothing": true,
-        "motionBlur": { "enabled": true, "intensity": 1.0 },
-        "shake": { "enabled": true, "intensity": 3, "speed": 1.0 },
-        "keyframes": [
+        "perspective": 1200,
+        "motionBlur": { "enabled": true, "intensity": 0.8 },
+        "shake": { "enabled": true, "intensity": 1.2, "speed": 1.0 },
+        "shots": [
           {
-            "frame": 0,
-            "x": 0, "y": 0, "z": 0, "zoom": 1,
-            "easing": "ease"
-          },
-
-          {
-            "frame": 45,
-            "x": -700, "y": 350, "z": 0, "zoom": 2.4,
-            "easing": "ease"
+            "targetId": "MISSION-CONTROL",
+            "startFrame": 0,
+            "duration": 90,
+            "zoom": 1.1,
+            "inDuration": 0
           },
           {
-            "frame": 90,
-            "x": -700, "y": 350, "z": 0, "zoom": 2.4,
-            "easing": "linear"
-          },
-
-          {
-            "frame": 135,
-            "x": 700, "y": -350, "z": 0, "zoom": 2.4,
-            "easing": "ease"
+            "targetId": "ALPHA-PANEL",
+            "startFrame": 90,
+            "duration": 120,
+            "zoom": 2.2,
+            "inDuration": 30
           },
           {
-            "frame": 180,
-            "x": 700, "y": -350, "z": 0, "zoom": 2.4,
-            "easing": "linear"
-          },
-
-          {
-            "frame": 225,
-            "x": 0, "y": 450, "z": 0, "zoom": 2.6,
-            "easing": "ease"
+            "targetId": "SATELLITE-TEXT",
+            "startFrame": 210,
+            "duration": 120,
+            "zoom": 2.2,
+            "inDuration": 30
           },
           {
-            "frame": 270,
-            "x": 0, "y": 450, "z": 0, "zoom": 2.6,
-            "easing": "linear"
-          },
-
-          {
-            "frame": 315,
-            "x": 0, "y": -450, "z": 0, "zoom": 2.6,
-            "easing": "ease"
+            "targetId": "TARGET-TEXT",
+            "startFrame": 330,
+            "duration": 120,
+            "zoom": 2.2,
+            "inDuration": 30
           },
           {
-            "frame": 360,
-            "x": 0, "y": -450, "z": 0, "zoom": 2.6,
-            "easing": "linear"
-          },
-
-          {
-            "frame": 405,
-            "x": -850, "y": -400, "z": 0, "zoom": 2.8,
-            "easing": "ease"
-          },
-          {
-            "frame": 450,
-            "x": -850, "y": -400, "z": 0, "zoom": 2.8,
-            "easing": "linear"
-          },
-
-          {
-            "frame": 495,
-            "x": 850, "y": 400, "z": 0, "zoom": 2.8,
-            "easing": "ease"
-          },
-          {
-            "frame": 540,
-            "x": 850, "y": 400, "z": 0, "zoom": 2.8,
-            "easing": "linear"
-          },
-
-          {
-            "frame": 599,
-            "x": 0, "y": 0, "z": 0, "zoom": 1,
-            "easing": "ease"
+            "targetId": "BETA-PANEL",
+            "startFrame": 450,
+            "duration": 120,
+            "zoom": 2.2,
+            "inDuration": 30
           }
         ]
       },
       "overlays": [
         {
-          "id": "CENTER-TITLE",
+          "id": "MISSION-CONTROL",
           "type": "text",
           "content": "MISSION CONTROL",
           "font": "Montserrat",
-          "fontSize": "90px",
-          "style": "text-white font-black",
+          "fontSize": "110px",
           "position": { "x": 960, "y": 540 },
-          "start": 0,
-          "duration": 600,
-          "depth": 0
+          "start": 0, "duration": 630,
+          "zIndex": 50
         },
-
         {
-          "id": "BOTTOM-LEFT-TEXT",
-          "type": "text",
-          "content": "TARGET LOCKED",
-          "font": "Montserrat",
-          "fontSize": "80px",
-          "style": "text-green-400 font-black",
-          "position": { "x": 250, "y": 850 },
-          "start": 0,
-          "duration": 600,
-          "depth": 0
-        },
-
-        {
-          "id": "TOP-RIGHT-TEXT",
-          "type": "text",
-          "content": "ORBITAL FEED",
-          "font": "Montserrat",
-          "fontSize": "80px",
-          "style": "text-cyan-300 font-black",
-          "position": { "x": 1650, "y": 150 },
-          "start": 0,
-          "duration": 600,
-          "depth": 0
-        },
-
-        {
-          "id": "BOTTOM-CENTER-TEXT",
-          "type": "text",
-          "content": "DATA STREAM",
-          "font": "Montserrat",
-          "fontSize": "80px",
-          "style": "text-yellow-300 font-black",
-          "position": { "x": 960, "y": 950 },
-          "start": 0,
-          "duration": 600,
-          "depth": 0
-        },
-
-        {
-          "id": "TOP-CENTER-TEXT",
-          "type": "text",
-          "content": "SATELLITE ARRAY",
-          "font": "Montserrat",
-          "fontSize": "80px",
-          "style": "text-purple-300 font-black",
-          "position": { "x": 960, "y": 120 },
-          "start": 0,
-          "duration": 600,
-          "depth": 0
-        },
-
-        {
-          "id": "TOP-LEFT-PANEL",
+          "id": "ALPHA-PANEL",
           "type": "ui_panel",
           "title": "SECTOR ALPHA",
           "description": "SIGNAL VERIFIED",
           "iconType": "shield",
           "variant": "glass",
           "nodeId": "ALPHA-01",
-          "position": { "x": 120, "y": 120 },
-          "start": 0,
-          "duration": 600,
-          "depth": 0
+          "position": { "x": 400, "y": 250 },
+          "start": 0, "duration": 630,
+          "zIndex": 40
         },
-
         {
-          "id": "BOTTOM-RIGHT-PANEL",
+          "id": "SATELLITE-TEXT",
+          "type": "text",
+          "content": "SATELLITE ARRAY",
+          "font": "Montserrat",
+          "fontSize": "80px",
+          "position": { "x": 1500, "y": 250 },
+          "start": 0, "duration": 630,
+          "zIndex": 50
+        },
+        {
+          "id": "TARGET-TEXT",
+          "type": "text",
+          "content": "TARGET LOCKED",
+          "font": "Montserrat",
+          "fontSize": "80px",
+          "position": { "x": 400, "y": 830 },
+          "start": 0, "duration": 630,
+          "zIndex": 50
+        },
+        {
+          "id": "BETA-PANEL",
           "type": "ui_panel",
           "title": "SECTOR BETA",
           "description": "TRACKING ACTIVE",
           "iconType": "cpu",
           "variant": "glass",
           "nodeId": "BETA-01",
-          "position": { "x": 1450, "y": 820 },
-          "start": 0,
-          "duration": 600,
-          "depth": 0
+          "position": { "x": 1520, "y": 830 },
+          "start": 0, "duration": 630,
+          "zIndex": 40
         }
       ]
     }

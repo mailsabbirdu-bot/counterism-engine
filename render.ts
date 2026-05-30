@@ -72,18 +72,6 @@ const start = async () => {
       }
     }
 
-    console.log('\n🔍 Extracting compositions...');
-    const compositions = await getCompositions(bundleLocation, {
-      inputProps: { templateData: template }
-    });
-
-    const outputDir = path.join(process.cwd(), 'renders/overlays/remotion');
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-
-    const concurrency = concurrencyArg ? parseInt(concurrencyArg, 10) : 1;
-
     console.log('\n🔍 Pre-render Asset Verification & Duration Adjustment:');
     let assetsMissing = false;
     const fps = template.global_settings?.fps || 30;
@@ -140,6 +128,19 @@ const start = async () => {
     } else {
       console.log('\n✨ All assets verified successfully!');
     }
+
+    console.log('\n🔍 Extracting compositions...');
+    // We pass the potentially modified 'template' object here so compositions get the updated durations
+    const compositions = await getCompositions(bundleLocation, {
+      inputProps: { templateData: template }
+    });
+
+    const outputDir = path.join(process.cwd(), 'renders/overlays/remotion');
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const concurrency = concurrencyArg ? parseInt(concurrencyArg, 10) : 1;
 
     for (const scene of template.scenes) {
       console.log(`\n🎬 Processing Scene: ${scene.scene_id}`);

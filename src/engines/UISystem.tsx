@@ -1,12 +1,10 @@
 import React from 'react';
 import { interpolate, useCurrentFrame, spring, useVideoConfig } from 'remotion';
 import { Terminal, ShieldCheck, Activity, Cpu, Box } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
-import { Progress } from '../components/ui/progress';
 
 export const UISystem: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width, height } = useVideoConfig();
   const relativeFrame = frame - overlay.start;
 
   if (frame < overlay.start || frame > overlay.start + overlay.duration) {
@@ -21,7 +19,6 @@ export const UISystem: React.FC<{ overlay: any }> = ({ overlay }) => {
 
   const opacity = interpolate(relativeFrame, [0, 20], [0, 1], { extrapolateRight: 'clamp' });
 
-  // Dynamic progress value simulation
   const progressValue = interpolate(
     relativeFrame,
     [30, 120],
@@ -39,15 +36,18 @@ export const UISystem: React.FC<{ overlay: any }> = ({ overlay }) => {
     }
   };
 
+  const x = overlay.position?.x ?? width / 2;
+  const y = overlay.position?.y ?? height / 2;
+
   return (
     <div
       className="absolute"
       style={{
-        left: overlay.position ? `${overlay.position.x}px` : '100px',
-        top: overlay.position ? `${overlay.position.y}px` : '100px',
+        left: `${x}px`,
+        top: `${y}px`,
         opacity,
         zIndex: overlay.zIndex ?? 40,
-        transform: `perspective(2000px) rotateY(${(1 - entrance) * 30}deg) scale(${0.85 + entrance * 0.15})`,
+        transform: `translate(-50%, -50%) perspective(2000px) rotateY(${(1 - entrance) * 30}deg) scale(${0.85 + entrance * 0.15})`,
         filter: `blur(${(1 - opacity) * 10}px)`,
         color: 'white'
       }}
@@ -59,7 +59,8 @@ export const UISystem: React.FC<{ overlay: any }> = ({ overlay }) => {
         border: '1px solid rgba(255, 255, 255, 0.2)',
         padding: '32px',
         boxShadow: '0 50px 100px rgba(0,0,0,0.6)',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        position: 'relative'
       }}>
         {/* Glow effect */}
         <div className="absolute -top-32 -left-32 w-64 h-64 bg-blue-500/30 blur-[120px] pointer-events-none" />
