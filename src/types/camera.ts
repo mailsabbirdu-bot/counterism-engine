@@ -16,11 +16,24 @@ export interface CameraKeyframe {
 	};
 }
 
+export type ShotStyle =
+	| "push_in"
+	| "pull_out"
+	| "pan_left"
+	| "pan_right"
+	| "tilt_up"
+	| "tilt_down"
+	| "orbit"
+	| "whip_pan"
+	| "dramatic_reveal"
+	| "static";
+
 export interface CinematicShot {
 	targetId: string;
 	startFrame: number;
 	duration: number;
 	zoom?: number;
+	style?: ShotStyle;
 	inDuration?: number;
 	outDuration?: number;
 	easing?: string | { type: 'bezier'; bezier: [number, number, number, number] };

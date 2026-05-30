@@ -7,9 +7,9 @@ The V4 engine supports a sophisticated 3D camera. To create professional results
 1. **Targeting**: Use `lookAt` in camera keyframes or shots. You can target an overlay by its `id`.
 2. **Centering**: ALL overlays are center-anchored. A position of `{x: 960, y: 540}` places the element's center exactly in the middle of a 1080p canvas.
 3. **Pacing**: Use the `shots` array for automated cinematography. A shot moves the camera to a target, holds, and then moves to the next.
-4. **Atmosphere**: Always enable `motionBlur` and `shake` (subtle intensity 2-3) for a handheld, high-end feel.
+4. **Atmosphere**: Always enable `motionBlur`. Use `shake` (subtle intensity 1.5-3) for cinematic and documentary scenes, but **disable it** for technical, dashboard, or UI-heavy explainers where stability is required for readability.
 5. **Depth**: Assign a `depth` value (e.g., 200 to 500) to overlays to create natural parallax during camera pans.
-7. **Framing Intelligence**: Use `cameraFocus` on specific overlays (like charts or small UI cards) to define their ideal `zoom` and `offsetY`. This allows the `shots` system to remain simple while the engine handles the framing logic.
+7. **Framing Intelligence**: Use `cameraFocus` on overlays to define ideal `zoom`, `offsetY`, and `fitMode` ("contain"/"cover"). This allows the `shots` system to focus on "what" to see, while the overlay defines "how" to frame it.
 
 ## 🛠️ JSON Schema Structure
 
@@ -32,6 +32,7 @@ The V4 engine supports a sophisticated 3D camera. To create professional results
       "startFrame": 0,
       "duration": 90,
       "zoom": 1.2,
+      "style": "push_in",
       "inDuration": 30
     }
   ],

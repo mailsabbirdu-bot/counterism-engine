@@ -64,6 +64,8 @@ The `shots` system handles smooth transitions between focal points automatically
 - `startFrame`: `number`. When the shot starts.
 - `duration`: `number`. How long to stay on target.
 - `zoom`: `number`. Magnification for this specific shot.
+- `style`: `string`. Cinematic move style.
+  - `"push_in"`, `"pull_out"`, `"pan_left"`, `"pan_right"`, `"tilt_up"`, `"tilt_down"`, `"orbit"`, `"whip_pan"`, `"dramatic_reveal"`, `"static"`.
 - `inDuration`: `number`. Transition time into the shot.
 
 ---
@@ -113,6 +115,8 @@ The `shots` system handles smooth transitions between focal points automatically
 - `cameraFocus`: `object` (** Framing Intelligence **).
   - `zoom`: `number`. Preferred zoom level when this element is targeted.
   - `offsetX`, `offsetY`: `number`. Pixel offsets from the element's center.
+  - `fitMode`: `"contain"` \| `"cover"`. How the element should fit the framing.
+  - `focusBounds`: `boolean`. If true, framing is calculated from element dimensions.
   - `preferredDuration`: `number`. Suggested hold time for AI generators.
   - `moveStyle`: `"smooth"` \| `"whip"` \| `"dramatic"`. Preferred transition feel.
 

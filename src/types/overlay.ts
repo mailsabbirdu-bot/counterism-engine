@@ -5,6 +5,8 @@ export interface CameraFocus {
     padding?: number;
     preferredDuration?: number;
     moveStyle?: 'smooth' | 'whip' | 'dramatic';
+    fitMode?: 'contain' | 'cover';
+    focusBounds?: boolean;
 }
 
 export interface Overlay {

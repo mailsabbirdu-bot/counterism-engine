@@ -24,6 +24,11 @@ const parseEasing = (easing: string | any) => {
       default: return cinematicEase;
     }
   }
+  // Handle complex easing object (e.g. from Shot Styles)
+  if (typeof easing === 'object' && easing.type === 'bezier' && easing.bezier) {
+    const [x1, y1, x2, y2] = easing.bezier;
+    return Easing.bezier(x1, y1, x2, y2);
+  }
   return cinematicEase;
 };
 
@@ -149,20 +154,35 @@ export const CameraEngine: React.FC<{
                 easing: 'in-out'
             });
 
+            // Shot Style Logic
+            let startZoom = 1.0;
+            let endZoom = zoom;
+            let currentEasing = shot.easing || 'in-out';
+
+            if (shot.style === 'push_in') {
+                startZoom = zoom * 0.85;
+                endZoom = zoom;
+            } else if (shot.style === 'pull_out') {
+                startZoom = zoom * 1.15;
+                endZoom = zoom;
+            } else if (shot.style === 'whip_pan') {
+                currentEasing = { type: 'bezier', bezier: [1, 0, 0, 1] } as any;
+            }
+
             // Reach target
             keys.push({
                 frame: shot.startFrame + inDur,
                 lookAt: shot.targetId,
-                zoom: zoom,
+                zoom: startZoom,
                 easing: 'linear'
             });
 
-            // End hold
+            // End hold (animate within shot for cinematic feel)
             keys.push({
                 frame: shot.startFrame + shot.duration,
                 lookAt: shot.targetId,
-                zoom: zoom,
-                easing: 'in-out'
+                zoom: endZoom,
+                easing: currentEasing
             });
         });
     }
