@@ -1,10 +1,11 @@
 import React from 'react';
-import { useCurrentFrame, useVideoConfig } from 'remotion';
-import { motion } from 'framer-motion';
+import { useCurrentFrame, useVideoConfig, interpolate, spring, Easing } from 'remotion';
 
 export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
-  const { width, height } = useVideoConfig();
+  const { width, height, fps } = useVideoConfig();
+
+  const relativeFrame = frame - overlay.start;
 
   if (frame < overlay.start || frame > overlay.start + overlay.duration) {
     return null;
@@ -46,44 +47,51 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         textAlign: 'center'
       }}>
         {items.map((item: string, i: number) => {
-          const delay = i * (overlay.stagger || 0.1);
+          const itemDelay = i * (overlay.stagger || 3); // stagger in frames
+          const itemFrame = relativeFrame - itemDelay;
 
-          let initial = {};
-          let animate = {};
-          let transition = {
-            duration: 1.2,
-            ease: [0.16, 1, 0.3, 1],
-            delay: delay,
+          const entrance = spring({
+            frame: itemFrame,
+            fps,
+            config: { damping: 15, stiffness: 100 },
+          });
+
+          const exitFrame = overlay.duration - 15 - (items.length - i) * (overlay.stagger || 1);
+          const exit = interpolate(
+            relativeFrame,
+            [exitFrame, exitFrame + 15],
+            [1, 0],
+            { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+          );
+
+          const progress = entrance * exit;
+
+          let style: React.CSSProperties = {
+            display: 'inline-block',
+            whiteSpace: item === ' ' ? 'pre' : 'normal',
+            fontWeight: 900,
+            opacity: progress,
           };
 
           if (overlay.animation === 'cinematicGlow') {
-            initial = { opacity: 0, filter: 'blur(20px) brightness(3)', y: 20, scale: 0.9 };
-            animate = { opacity: 1, filter: 'blur(0px) brightness(1)', y: 0, scale: 1 };
+            const blur = interpolate(progress, [0, 1], [20, 0]);
+            const brightness = interpolate(progress, [0, 1], [3, 1]);
+            const scale = interpolate(progress, [0, 1], [0.9, 1]);
+            const yOffset = interpolate(progress, [0, 1], [20, 0]);
+            style.filter = `blur(${blur}px) brightness(${brightness})`;
+            style.transform = `translateY(${yOffset}px) scale(${scale})`;
           } else if (overlay.animation === 'slideUp') {
-            initial = { opacity: 0, y: 150 };
-            animate = { opacity: 1, y: 0 };
+            const yOffset = interpolate(progress, [0, 1], [150, 0]);
+            style.transform = `translateY(${yOffset}px)`;
           } else if (overlay.animation === 'wordByWord') {
-            initial = { opacity: 0, scale: 0.5 };
-            animate = { opacity: 1, scale: 1 };
-          } else {
-             initial = { opacity: 0 };
-             animate = { opacity: 1 };
+            const scale = interpolate(progress, [0, 1], [0.5, 1]);
+            style.transform = `scale(${scale})`;
           }
 
           return (
-            <motion.span
-              key={i}
-              initial={initial}
-              animate={animate}
-              transition={transition}
-              style={{
-                display: 'inline-block',
-                whiteSpace: item === ' ' ? 'pre' : 'normal',
-                fontWeight: 900,
-              }}
-            >
+            <span key={i} style={style}>
               {item}
-            </motion.span>
+            </span>
           );
         })}
       </div>
