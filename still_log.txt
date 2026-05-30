@@ -1,0 +1,3 @@
+You passed --props but it was neither valid JSON nor a file path to a valid JSON file. Provided value: $(cat Camera_Focus_Test.json)
+Got the following value: $(cat Camera_Focus_Test.json)
+Check that your input is parseable using `JSON.parse` and try again.
