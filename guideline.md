@@ -32,40 +32,39 @@ This document defines the comprehensive JSON schema for `remotion_template.json`
 
 ---
 
-## 🎥 Professional Cinematic Camera
-The V4 Camera Engine uses a **Hybrid 3D Transform Stack**. It treats the background and overlays as layers in 3D space, allowing for frame-perfect centering and targeting.
+## 🎥 Professional Cinematic Camera (V4)
+The V4 Camera Engine utilizes a **Mathematical Pivot-Centering Architecture**. Unlike standard transforms that cause "drift" during zoom-pans, V4 dynamically calculates the `transform-origin` based on the focal target and applies a compensating translation to the viewport center.
 
-### 1. `camera` root configuration
+### 1. 🚀 Performance Optimization (CPU/Colab)
+- **Hardware Acceleration:** Uses `translate3d` and `scale3d` to bypass main-thread layout recalculations.
+- **Hinting:** Applies `will-change: transform` and `backface-visibility: hidden` to the overlay container to prevent jitter/flicker on low-power environments.
+- **Native Remotion Primitives:** Animations are driven by `interpolate` and `spring` for deterministic, frame-accurate rendering.
+
+### 2. `camera` Configuration
 - `enabled`: `boolean`
-- `perspective`: `number` (Default: 1000. Depth of field simulation).
-- `smoothing`: `number` (0 to 1). Strength of the internal path smoother.
-- `presets`: `string` (Optional). Use a pre-defined move:
-  - `"slow_push"`, `"slow_pull"`, `"ken_burns"`, `"dramatic_reveal"`, `"whip_pan_left"`, `"whip_pan_right"`.
+- `perspective`: `number` (Default: 1000). Controls 3D depth perception.
 - `motionBlur`: `object`
   - `enabled`: `boolean`
-  - `intensity`: `number` (0.1 to 2.0). Velocity-aware sampling.
+  - `intensity`: `number` (Default: 0.8). Uses sub-frame velocity deltas to calculate realistic blur.
 - `shake`: `object`
   - `enabled`: `boolean`
-  - `intensity`: `number` (1-10). Multi-frequency handheld motion.
+  - `intensity`: `number` (Default: 1.0). Seeded Simplex-noise handheld motion.
+  - `speed`: `number` (Default: 1.0). Frequency of the shake.
 
-### 2. `camera.keyframes` (Manual Precision)
-Each keyframe interpolates to the next using the specified `easing`.
-- `frame`: `number` (Absolute frame index).
-- `lookAt`: `string` \| `object`.
-  - If a **string**: Matches an overlay's `id`. The camera will automatically center that element.
-  - If an **object**: `{ x: number, y: number }`.
-- `zoom`: `number` (Default: 1.0. 2.0 = 200% magnification).
-- `rotationX`, `rotationY`, `rotationZ`: `number` (Degrees).
+### 3. 🎯 Focal Precision (`keyframes` & `shots`)
+- `lookAt`: `string` | `object`.
+  - **ID Targeting:** Provide the `id` of any overlay (e.g., `"TEXT-01"`). The camera will lock onto its mathematical center.
+  - **Coordinate Targeting:** `{ "x": 960, "y": 540 }`.
+- `zoom`: `number` (1.0 = Default, 4.0 = Extreme detail).
 - `easing`: `"linear"`, `"ease"`, `"bezier"`, `"step"`, `"quintic"`.
 
-### 3. `camera.shots` (High-Level Choreography)
-The `shots` system allows for automated cinematic "cuts" or smooth pans between targets.
-- `targetId`: `string`. The ID of the overlay to focus on.
-- `startFrame`: `number`. When to begin moving to this target.
-- `duration`: `number`. How long to hold on this target.
-- `zoom`: `number`. Zoom level for this specific shot.
-- `inDuration`: `number`. Frames spent transitioning into this shot.
-- `outDuration`: `number`. Frames spent transitioning out.
+### 4. `camera.shots` (Cinematic Choreography)
+The `shots` system handles smooth transitions between focal points automatically:
+- `targetId`: `string`. Overlay ID to focus on.
+- `startFrame`: `number`. When the shot starts.
+- `duration`: `number`. How long to stay on target.
+- `zoom`: `number`. Magnification for this specific shot.
+- `inDuration`: `number`. Transition time into the shot.
 
 ---
 
@@ -111,3 +110,10 @@ The `shots` system allows for automated cinematic "cuts" or smooth pans between 
 - `depth`: `number` (Optional. Z-axis displacement for parallax effects. Positive moves closer to camera).
 - `zIndex`: `number` (Stacking order).
   - Recommended: Background (0), Shapes (10), Graphs (25), Charts (30), UI (40), Text (50), Media (100).
+- `cameraFocus`: `object` (** Framing Intelligence **).
+  - `zoom`: `number`. Preferred zoom level when this element is targeted.
+  - `offsetX`, `offsetY`: `number`. Pixel offsets from the element's center.
+  - `preferredDuration`: `number`. Suggested hold time for AI generators.
+  - `moveStyle`: `"smooth"` \| `"whip"` \| `"dramatic"`. Preferred transition feel.
+
+> **Note:** The `cameraFocus` property allows you to move framing knowledge into the overlay itself. When a `shot` or `lookAt` targets an ID, the engine automatically reads these values to provide perfect, context-aware framing.

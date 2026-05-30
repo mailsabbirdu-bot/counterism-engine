@@ -9,6 +9,7 @@ The V4 engine supports a sophisticated 3D camera. To create professional results
 3. **Pacing**: Use the `shots` array for automated cinematography. A shot moves the camera to a target, holds, and then moves to the next.
 4. **Atmosphere**: Always enable `motionBlur` and `shake` (subtle intensity 2-3) for a handheld, high-end feel.
 5. **Depth**: Assign a `depth` value (e.g., 200 to 500) to overlays to create natural parallax during camera pans.
+7. **Framing Intelligence**: Use `cameraFocus` on specific overlays (like charts or small UI cards) to define their ideal `zoom` and `offsetY`. This allows the `shots` system to remain simple while the engine handles the framing logic.
 
 ## 🛠️ JSON Schema Structure
 
@@ -42,6 +43,9 @@ The V4 engine supports a sophisticated 3D camera. To create professional results
 
 ### Overlay Standards
 - **ID**: Every overlay MUST have a unique string ID (e.g., "DATA_CHART_01") for camera targeting.
+- **cameraFocus**: Use this to define how the camera should frame this specific object.
+  - `zoom`: 1.8 for charts, 1.1 for titles, 1.3 for maps.
+  - `offsetY`: Negative values move the camera up (useful for lower-third panels).
 - **Z-Index**: Control stacking. Text (50) should be above UI (40), and Media (100) should be on top.
 - **Animations**:
   - `text`: "cinematicGlow" (best for dark), "slideUp", "wordByWord".

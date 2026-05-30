@@ -23,6 +23,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     <div
       className="absolute pointer-events-none"
       style={{
+        position: 'absolute',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

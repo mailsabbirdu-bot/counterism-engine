@@ -31,17 +31,23 @@ const resolveTarget = (lookAt: string | { x: number, y: number } | undefined, ov
   const cx = width / 2;
   const cy = height / 2;
 
-  if (!lookAt) return { x: cx, y: cy };
+  if (!lookAt) return { x: cx, y: cy, zoom: null, offset: { x: 0, y: 0 } };
 
   if (typeof lookAt === 'string') {
     const target = (overlays || []).find(o => o.id === lookAt);
     if (target && target.position) {
-      return { x: target.position.x, y: target.position.y };
+      const focus = target.cameraFocus || {};
+      return {
+        x: target.position.x + (focus.offsetX || 0),
+        y: target.position.y + (focus.offsetY || 0),
+        zoom: focus.zoom || null,
+        offset: { x: focus.offsetX || 0, y: focus.offsetY || 0 }
+      };
     }
-    return { x: cx, y: cy };
+    return { x: cx, y: cy, zoom: null, offset: { x: 0, y: 0 } };
   }
 
-  return { x: lookAt.x, y: lookAt.y };
+  return { x: lookAt.x, y: lookAt.y, zoom: null, offset: { x: 0, y: 0 } };
 };
 
 const getCameraState = (frame: number, keyframes: CameraKeyframe[], overlays: any[], width: number, height: number) => {
@@ -65,13 +71,18 @@ const getCameraState = (frame: number, keyframes: CameraKeyframe[], overlays: an
   const getTarget = (k: CameraKeyframe) => {
     if (k.lookAt) return resolveTarget(k.lookAt, overlays, width, height);
     return {
-      x: k.x !== undefined ? cx + k.x : (k.lookAt ? cx : cx), // fallback to center if no x and no lookAt
-      y: k.y !== undefined ? cy + k.y : (k.lookAt ? cy : cy)
+      x: k.x !== undefined ? cx + k.x : cx,
+      y: k.y !== undefined ? cy + k.y : cy,
+      zoom: null,
+      offset: { x: 0, y: 0 }
     };
   };
 
   const t1 = getTarget(k1);
   const t2 = getTarget(k2);
+
+  const z1 = k1.zoom ?? t1.zoom ?? 1;
+  const z2 = k2.zoom ?? t2.zoom ?? 1;
 
   if (k1 === k2 || frame <= k1.frame) {
       return {
@@ -79,7 +90,7 @@ const getCameraState = (frame: number, keyframes: CameraKeyframe[], overlays: an
         tx: t1.x,
         ty: t1.y,
         z: k1.z || 0,
-        zoom: k1.zoom || 1,
+        zoom: z1,
         rotationX: k1.rotationX || 0,
         rotationY: k1.rotationY || 0,
         rotationZ: k1.rotationZ || 0,
@@ -96,7 +107,7 @@ const getCameraState = (frame: number, keyframes: CameraKeyframe[], overlays: an
     tx: interp(t1.x, t2.x),
     ty: interp(t1.y, t2.y),
     z: interp(k1.z || 0, k2.z || 0),
-    zoom: interp(k1.zoom || 1, k2.zoom || 1),
+    zoom: interp(z1, z2),
     rotationX: interp(k1.rotationX || 0, k2.rotationX || 0),
     rotationY: interp(k1.rotationY || 0, k2.rotationY || 0),
     rotationZ: interp(k1.rotationZ || 0, k2.rotationZ || 0),
@@ -126,13 +137,15 @@ export const CameraEngine: React.FC<{
     if (config?.shots && config.shots.length > 0) {
         config.shots.forEach(shot => {
             const inDur = shot.inDuration ?? 30;
-            const zoom = shot.zoom || 1.5;
 
-            // Movement start (previous state is preserved until shot.startFrame)
+            // Resolve target's cameraFocus zoom if available
+            const target = overlays.find(o => o.id === shot.targetId);
+            const defaultZoom = target?.cameraFocus?.zoom || 1.5;
+            const zoom = shot.zoom || defaultZoom;
+
+            // Movement start
             keys.push({
                 frame: shot.startFrame,
-                // We implicitly inherit the previous target/zoom here by not defining them,
-                // but we need to ensure the easing for the NEXT segment starts here.
                 easing: 'in-out'
             });
 
@@ -141,7 +154,7 @@ export const CameraEngine: React.FC<{
                 frame: shot.startFrame + inDur,
                 lookAt: shot.targetId,
                 zoom: zoom,
-                easing: 'linear' // Next segment is the hold
+                easing: 'linear'
             });
 
             // End hold
@@ -149,7 +162,7 @@ export const CameraEngine: React.FC<{
                 frame: shot.startFrame + shot.duration,
                 lookAt: shot.targetId,
                 zoom: zoom,
-                easing: 'in-out' // Next segment is movement away
+                easing: 'in-out'
             });
         });
     }
@@ -189,6 +202,10 @@ export const CameraEngine: React.FC<{
   const zoom = cameraState.zoom;
   const rotZ = cameraState.rotationZ + shakeRotZ;
 
+  if (frame % 30 === 0) {
+    console.log(`[CameraEngine] Frame ${frame}: tx=${tx.toFixed(1)}, ty=${ty.toFixed(1)}, zoom=${zoom.toFixed(2)}`);
+  }
+
   // Motion Blur (Sub-frame delta)
   const dx = (nextFrameState.tx - cameraState.tx) * zoom;
   const dy = (nextFrameState.ty - cameraState.ty) * zoom;
@@ -201,36 +218,46 @@ export const CameraEngine: React.FC<{
         width, height,
         position: 'relative',
         overflow: 'hidden',
-        perspective: `${config.perspective || 1000}px`,
+        perspective: `${config.perspective || 2000}px`,
         backgroundColor: '#000'
       }}
     >
+      {/* Fixed Background Layer with Parallax */}
       {backgroundLayer && (
         <div style={{
           position: 'absolute',
-          inset: -100, // Overscan for shake/zoom
+          top: 0,
+          left: 0,
+          width,
+          height,
           zIndex: 0,
-          transform: `translate3d(${(cx - tx) * 0.02}px, ${(cy - ty) * 0.02}px, -50px) scale(1.1)`,
+          // Subtle reactive parallax based on camera target
+          transform: `scale(1.1) translate3d(${(cx - tx) * 0.05}px, ${(cy - ty) * 0.05}px, -100px)`,
           willChange: 'transform'
         }}>
           {backgroundLayer}
         </div>
       )}
 
+      {/* Cinematic Camera Pivot System */}
       <div
         style={{
           position: 'absolute',
+          top: 0,
+          left: 0,
           width, height,
           zIndex: 1,
           transformStyle: 'preserve-3d',
-          transformOrigin: '0 0',
+          // 1. Move the pivot point (target) to the screen center
+          // 2. Scale and Rotate around that pivot
+          transformOrigin: `${tx}px ${ty}px`,
           transform: `
-            translate3d(${cx}px, ${cy}px, 0)
+            translate3d(${cx - tx}px, ${cy - ty}px, 0)
             scale3d(${zoom}, ${zoom}, 1)
             rotateZ(${rotZ}deg)
             rotateX(${cameraState.rotationX || 0}deg)
             rotateY(${cameraState.rotationY || 0}deg)
-            translate3d(${-tx}px, ${-ty}px, ${-(cameraState.z || 0)}px)
+            translate3d(0, 0, ${-(cameraState.z || 0)}px)
           `,
           filter: blur > 1 ? `blur(${blur}px)` : 'none',
           willChange: 'transform',
