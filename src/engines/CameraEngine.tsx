@@ -1,23 +1,7 @@
 import React, { useMemo } from 'react';
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from 'remotion';
-import { getPresetKeyframes, CameraPreset, CameraKeyframe } from '../lib/cameraPresets';
-
-export interface CameraConfig {
-  enabled: boolean;
-  perspective?: number;
-  preset?: CameraPreset;
-  keyframes?: CameraKeyframe[];
-  shake?: {
-    enabled: boolean;
-    intensity?: number;
-    speed?: number;
-    rotationIntensity?: number;
-  };
-  motionBlur?: {
-    enabled: boolean;
-    intensity?: number;
-  };
-}
+import { getPresetKeyframes } from '../lib/cameraPresets';
+import { CameraConfig, CameraKeyframe, CameraPreset, CinematicShot } from '../types/camera';
 
 // Catmull-Rom Spline Interpolation for smooth spatial paths
 const catmullRom = (p0: number, p1: number, p2: number, p3: number, t: number) => {
@@ -47,9 +31,29 @@ const parseEasing = (easing: string | any) => {
   return Easing.linear;
 };
 
-const getCameraState = (frame: number, keyframes: CameraKeyframe[], width: number, height: number) => {
+const resolveTarget = (lookAt: string | { x: number, y: number } | undefined, overlays: any[], width: number, height: number) => {
+  const cx = width / 2;
+  const cy = height / 2;
+
+  if (!lookAt) return { x: cx, y: cy };
+
+  if (typeof lookAt === 'string') {
+    const target = overlays.find(o => o.id === lookAt);
+    if (target && target.position) {
+      return { x: target.position.x, y: target.position.y };
+    }
+    return { x: cx, y: cy };
+  }
+
+  return { x: lookAt.x, y: lookAt.y };
+};
+
+const getCameraState = (frame: number, keyframes: CameraKeyframe[], overlays: any[], width: number, height: number) => {
+  const cx = width / 2;
+  const cy = height / 2;
+
   if (!keyframes || keyframes.length === 0) {
-    return { x: 0, y: 0, z: 0, zoom: 1, rotationX: 0, rotationY: 0, rotationZ: 0 };
+    return { x: 0, y: 0, z: 0, zoom: 1, rotationX: 0, rotationY: 0, rotationZ: 0, tx: cx, ty: cy };
   }
 
   const sorted = [...keyframes].sort((a, b) => a.frame - b.frame);
@@ -63,29 +67,40 @@ const getCameraState = (frame: number, keyframes: CameraKeyframe[], width: numbe
   const k1 = sorted[i];
   const k2 = sorted[Math.min(i + 1, sorted.length - 1)];
 
-  if (k1 === k2) {
-      const state = { ...k1 };
-      if ((k1 as any).lookAt) {
-          state.x = (k1 as any).lookAt.x;
-          state.y = (k1 as any).lookAt.y;
-          state.z = (k1 as any).lookAt.z || state.z;
-      }
-      return state;
+  const getTarget = (k: CameraKeyframe) => {
+    if (k.lookAt) return resolveTarget(k.lookAt, overlays, width, height);
+    return {
+      x: cx + (k.x || 0),
+      y: cy + (k.y || 0)
+    };
+  };
+
+  if (k1 === k2 || frame <= k1.frame) {
+      const target = getTarget(k1);
+      return {
+        ...k1,
+        tx: target.x,
+        ty: target.y,
+        z: k1.z || 0,
+        zoom: k1.zoom || 1,
+        rotationX: k1.rotationX || 0,
+        rotationY: k1.rotationY || 0,
+        rotationZ: k1.rotationZ || 0,
+      };
   }
 
   const tRaw = (frame - k1.frame) / (k2.frame - k1.frame);
   const easingFn = parseEasing(k1.easing);
   const t = easingFn(tRaw);
 
-  // For x, y, z we use Catmull-Rom if possible
-  const getVal = (prop: keyof CameraKeyframe) => {
+  // For spatial paths we use Catmull-Rom if possible
+  const getSpatial = (prop: 'tx' | 'ty' | 'z') => {
     const getP = (k: CameraKeyframe) => {
-        if (prop === 'x' || prop === 'y' || prop === 'z') {
-            if ((k as any).lookAt) {
-                return (k as any).lookAt[prop] ?? (k[prop] || 0);
-            }
+        if (prop === 'tx' || prop === 'ty') {
+            const target = getTarget(k);
+            return prop === 'tx' ? target.x : target.y;
         }
-        return (k[prop] as number) || 0;
+        return (k.z as number) || 0;
     };
 
     const p1 = getP(k1);
@@ -95,16 +110,20 @@ const getCameraState = (frame: number, keyframes: CameraKeyframe[], width: numbe
     return catmullRom(p0, p1, p2, p3, t);
   };
 
-  const interp = (prop: keyof CameraKeyframe) => interpolate(t, [0, 1], [(k1[prop] as number) || 0, (k2[prop] as number) || 0]);
+  const interp = (prop: keyof CameraKeyframe) => {
+    const v1 = (k1[prop] as number) || 0;
+    const v2 = (k2[prop] as number) || 0;
+    return interpolate(t, [0, 1], [v1, v2]);
+  };
 
   const state: any = {
-    x: getVal('x'),
-    y: getVal('y'),
-    z: getVal('z'),
+    tx: getSpatial('tx'),
+    ty: getSpatial('ty'),
+    z: getSpatial('z'),
     zoom: interpolate(t, [0, 1], [k1.zoom || 1, k2.zoom || 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
     rotationX: interp('rotationX'),
     rotationY: interp('rotationY'),
-    rotationZ: interp('rotationZ') || (k1 as any).rotation || 0,
+    rotationZ: interp('rotationZ'),
   };
 
   return state;
@@ -112,9 +131,10 @@ const getCameraState = (frame: number, keyframes: CameraKeyframe[], width: numbe
 
 export const CameraEngine: React.FC<{
   config: CameraConfig;
+  overlays: any[];
   children: React.ReactNode;
   backgroundLayer?: React.ReactNode;
-}> = ({ config, children, backgroundLayer }) => {
+}> = ({ config, overlays, children, backgroundLayer }) => {
   const frame = useCurrentFrame();
   const { width, height, durationInFrames } = useVideoConfig();
 
@@ -122,6 +142,8 @@ export const CameraEngine: React.FC<{
     if (!config) return [{ frame: 0, x: 0, y: 0, z: 0, zoom: 1, rotationX: 0, rotationY: 0, rotationZ: 0 }];
 
     let keys = [...(config.keyframes || [])];
+
+    // Add Preset keyframes
     if (config.preset) {
       const presetKeys = getPresetKeyframes(config.preset as CameraPreset, durationInFrames);
       const manualFrames = new Set(keys.map(k => k.frame));
@@ -130,18 +152,60 @@ export const CameraEngine: React.FC<{
           keys.push(pk);
         }
       });
-      keys.sort((a, b) => a.frame - b.frame);
     }
 
-    if (keys.length === 0) {
-      keys.push({ frame: 0, x: 0, y: 0, z: 0, zoom: 1, rotationX: 0, rotationY: 0, rotationZ: 0 });
+    // Synthesize Shots into keyframes
+    if (config.shots && config.shots.length > 0) {
+        config.shots.forEach(shot => {
+            const inDur = shot.inDuration ?? 30;
+            const outDur = shot.outDuration ?? 30;
+            const zoom = shot.zoom || 1.5;
+
+            // Shot Entry point
+            keys.push({
+                frame: shot.startFrame,
+                easing: 'ease'
+            });
+
+            // REACH TARGET
+            keys.push({
+                frame: shot.startFrame + inDur,
+                lookAt: shot.targetId,
+                zoom: zoom,
+                easing: shot.easing || 'ease'
+            });
+
+            // END HOLD
+            keys.push({
+                frame: Math.max(shot.startFrame + inDur, shot.startFrame + shot.duration - outDur),
+                lookAt: shot.targetId,
+                zoom: zoom,
+                easing: 'linear'
+            });
+
+            // RESET after shot
+            if (shot.startFrame + shot.duration < durationInFrames) {
+                keys.push({
+                    frame: shot.startFrame + shot.duration,
+                    x: 0, y: 0, zoom: 1,
+                    easing: 'ease'
+                });
+            }
+        });
     }
 
-    return keys;
+    const uniqueKeys = Array.from(new Map(keys.map(k => [k.frame, k])).values());
+    uniqueKeys.sort((a, b) => a.frame - b.frame);
+
+    if (uniqueKeys.length === 0) {
+      uniqueKeys.push({ frame: 0, x: 0, y: 0, z: 0, zoom: 1, rotationX: 0, rotationY: 0, rotationZ: 0 });
+    }
+
+    return uniqueKeys;
   }, [config, durationInFrames]);
 
-  const cameraState = useMemo(() => getCameraState(frame, mergedKeyframes, width, height), [frame, mergedKeyframes, width, height]);
-  const prevCameraState = useMemo(() => getCameraState(frame - 0.5, mergedKeyframes, width, height), [frame, mergedKeyframes, width, height]);
+  const cameraState = useMemo(() => getCameraState(frame, mergedKeyframes, overlays, width, height), [frame, mergedKeyframes, overlays, width, height]);
+  const prevCameraState = useMemo(() => getCameraState(frame - 0.5, mergedKeyframes, overlays, width, height), [frame, mergedKeyframes, overlays, width, height]);
 
   if (!config?.enabled) {
     return (
@@ -168,14 +232,14 @@ export const CameraEngine: React.FC<{
   const cx = width / 2;
   const cy = height / 2;
 
-  const tx = (cameraState.x || 0) + shakeX;
-  const ty = (cameraState.y || 0) + shakeY;
+  const tx = (cameraState.tx || cx) + shakeX;
+  const ty = (cameraState.ty || cy) + shakeY;
   const zoom = cameraState.zoom || 1;
   const rotZ = (cameraState.rotationZ || 0) + shakeRotZ;
 
   // Motion Blur
-  const dx = (cameraState.x || 0) - (prevCameraState.x || 0);
-  const dy = (cameraState.y || 0) - (prevCameraState.y || 0);
+  const dx = (cameraState.tx || cx) - (prevCameraState.tx || cx);
+  const dy = (cameraState.ty || cy) - (prevCameraState.ty || cy);
   const blurAmount = config.motionBlur?.enabled
     ? Math.min(Math.sqrt(dx * dx + dy * dy) * (config.motionBlur.intensity || 0.5) * 0.3, 4)
     : 0;
@@ -203,7 +267,7 @@ export const CameraEngine: React.FC<{
             position: 'absolute',
             inset: 0,
             zIndex: 0,
-            transform: `scale(${coverScale}) translate3d(${-(cameraState.x || 0) * 0.05}px, ${-(cameraState.y || 0) * 0.05}px, -100px)`,
+            transform: `scale(${coverScale}) translate3d(${-(tx - cx) * 0.05}px, ${-(ty - cy) * 0.05}px, -100px)`,
             filter: blurAmount > 1 ? `blur(${Math.round(blurAmount * 0.5 * 10) / 10}px)` : 'none',
             willChange: 'transform',
           }}
@@ -215,7 +279,10 @@ export const CameraEngine: React.FC<{
       <div
         style={{
           position: 'absolute',
-          inset: 0,
+          left: 0,
+          top: 0,
+          width,
+          height,
           zIndex: 1,
           transformStyle: 'preserve-3d',
           transform: `
@@ -229,6 +296,7 @@ export const CameraEngine: React.FC<{
           filter: blurAmount > 1 ? `blur(${Math.round(blurAmount * 10) / 10}px)` : 'none',
           willChange: 'transform',
           backfaceVisibility: 'hidden',
+          transformOrigin: '0 0',
         }}
       >
         {children}
