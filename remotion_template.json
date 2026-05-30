@@ -20,7 +20,7 @@
         "enabled": true,
         "perspective": 1200,
         "motionBlur": { "enabled": true, "intensity": 0.8 },
-        "shake": { "enabled": true, "intensity": 1.2, "speed": 1.0 },
+        "shake": { "enabled": false, "intensity": 1.0, "speed": 1.0 },
         "shots": [
           {
             "targetId": "MISSION-CONTROL",
