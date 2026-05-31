@@ -145,7 +145,8 @@ const start = async () => {
     for (const scene of template.scenes) {
       console.log(`\n🎬 Processing Scene: ${scene.scene_id}`);
 
-      const composition = compositions.find((c) => c.id === scene.scene_id);
+      const compositionId = scene.scene_id.replace(/_/g, '-');
+      const composition = compositions.find((c) => c.id === compositionId);
       if (!composition) {
         console.error(`❌ Composition ${scene.scene_id} not found`);
         continue;

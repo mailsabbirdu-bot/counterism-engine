@@ -1,5 +1,5 @@
 {
-  "project_name": "Counterism_V4_Camera_Storytelling_Test",
+  "project_name": "Counterism Studio V4 - Ultimate Feature Showcase",
   "global_settings": {
     "width": 1920,
     "height": 1080,
@@ -7,255 +7,162 @@
   },
   "scenes": [
     {
-      "scene_id": "SC-CAMERA-STORY",
+      "scene_id": "SC_01_CINEMATIC_CAMERA",
       "background_type": "procedural",
       "procedural_config": {
-        "speed": 0.25,
-        "variant": "gradient",
-        "primaryColor": "#0F172A",
-        "secondaryColor": "#1E293B"
+        "variant": "mesh",
+        "primaryColor": "#0f172a",
+        "secondaryColor": "#1e293b",
+        "speed": 0.5
       },
-      "duration_in_frames": 600,
+      "duration_in_frames": 300,
       "camera": {
         "enabled": true,
         "perspective": 1200,
-        "motionBlur": {
-          "enabled": true,
-          "intensity": 0.8
-        },
-        "shake": {
-          "enabled": true,
-          "intensity": 2,
-          "speed": 1
-        },
+        "motionBlur": { "enabled": true, "intensity": 0.8 },
+        "shake": { "enabled": true, "intensity": 1.5, "speed": 1 },
         "shots": [
           {
-            "targetId": "OPENING_TITLE",
+            "targetId": "MAIN_TITLE",
+            "style": "push_in",
             "startFrame": 0,
-            "duration": 90,
-            "zoom": 1.15,
-            "style": "push_in",
-            "inDuration": 30
-          },
-          {
-            "targetId": "QUESTION_BLOCK",
-            "startFrame": 90,
-            "duration": 90,
+            "duration": 120,
             "zoom": 1.4,
-            "style": "whip_pan",
-            "inDuration": 25
+            "inDuration": 60
           },
           {
-            "targetId": "DATA_PANEL",
-            "startFrame": 180,
-            "duration": 120,
+            "targetId": "SYSTEM_UI",
+            "style": "whip_pan",
+            "startFrame": 150,
+            "duration": 150,
             "zoom": 1.8,
-            "style": "push_in",
             "inDuration": 30
-          },
-          {
-            "targetId": "TREND_CHART",
-            "startFrame": 300,
-            "duration": 120,
-            "zoom": 1.7,
-            "style": "whip_pan",
-            "inDuration": 30
-          },
-          {
-            "targetId": "CONCLUSION",
-            "startFrame": 420,
-            "duration": 180,
-            "zoom": 1.2,
-            "style": "pull_out",
-            "inDuration": 40
           }
         ]
       },
       "overlays": [
         {
-          "id": "OPENING_TITLE",
+          "id": "MAIN_TITLE",
           "type": "text",
-          "content": "Every Story Begins With A Signal",
+          "content": "STUDIO V4 ENGINE",
           "animation": "cinematicGlow",
           "font": "Montserrat",
-          "fontSize": "110px",
-          "style": "text-white font-black uppercase tracking-tighter",
-          "position": {
-            "x": 960,
-            "y": 540
-          },
+          "fontSize": "150px",
+          "position": { "x": 960, "y": 540 },
           "start": 0,
-          "duration": 120,
-          "depth": 100,
-          "zIndex": 50,
-          "cameraFocus": {
-            "zoom": 1.15,
-            "fitMode": "contain",
-            "preferredDuration": 90,
-            "moveStyle": "smooth"
-          }
-        },
-        {
-          "id": "QUESTION_BLOCK",
-          "type": "text",
-          "content": "But where does the signal come from?",
-          "animation": "wordByWord",
-          "font": "Montserrat",
-          "fontSize": "80px",
-          "style": "text-cyan-300 font-bold",
-          "position": {
-            "x": 350,
-            "y": 300
-          },
-          "start": 60,
-          "duration": 180,
-          "depth": 250,
-          "zIndex": 50,
-          "cameraFocus": {
-            "zoom": 1.4,
-            "fitMode": "contain",
-            "preferredDuration": 90,
-            "moveStyle": "smooth"
-          }
-        },
-        {
-          "id": "QUESTION_DETAIL",
-          "type": "text",
-          "content": "Millions of events happen every second.",
-          "animation": "slideUp",
-          "font": "Montserrat",
-          "fontSize": "42px",
-          "style": "text-slate-300",
-          "position": {
-            "x": 350,
-            "y": 420
-          },
-          "start": 90,
           "duration": 150,
-          "depth": 150,
-          "zIndex": 45
+          "zIndex": 100
         },
         {
-          "id": "DATA_PANEL",
+          "id": "SYSTEM_UI",
           "type": "ui_panel",
-          "title": "Network Activity",
-          "description": "Analyzing incoming signals across monitored systems",
-          "iconType": "activity",
-          "nodeId": "NODE-42",
           "variant": "glass",
+          "title": "CORE PROCESSOR",
+          "description": "V4 Engine is optimized for CPU rendering in Google Colab environments.",
+          "iconType": "cpu",
+          "nodeId": "COLAB-OPTIMIZED",
           "initialProgress": 0,
           "targetProgress": 100,
-          "position": {
-            "x": 1450,
-            "y": 350
-          },
+          "position": { "x": 960, "y": 540 },
           "start": 150,
-          "duration": 240,
-          "depth": 500,
-          "zIndex": 40,
-          "cameraFocus": {
-            "zoom": 1.8,
-            "offsetY": -40,
-            "fitMode": "contain",
-            "focusBounds": true,
-            "preferredDuration": 120,
-            "moveStyle": "dramatic"
-          }
-        },
+          "duration": 150,
+          "zIndex": 90
+        }
+      ]
+    },
+    {
+      "scene_id": "SC_02_DATA_VISUALIZATION",
+      "background_type": "procedural",
+      "procedural_config": {
+        "variant": "gradient",
+        "primaryColor": "#020617",
+        "secondaryColor": "#1e1b4b"
+      },
+      "duration_in_frames": 300,
+      "camera": {
+        "enabled": true,
+        "preset": "ken_burns"
+      },
+      "overlays": [
         {
-          "id": "METRIC_1",
-          "type": "text",
-          "content": "24.6M Requests",
-          "animation": "slideUp",
-          "font": "Montserrat",
-          "fontSize": "56px",
-          "style": "text-green-400 font-black",
-          "position": {
-            "x": 1450,
-            "y": 600
-          },
-          "start": 180,
-          "duration": 180,
-          "depth": 300,
-          "zIndex": 50
-        },
-        {
-          "id": "TREND_CHART",
+          "id": "DATA_CHART",
           "type": "chart",
           "chart_type": "line",
-          "title": "Signal Volume",
-          "subtitle": "Last 24 Hours",
+          "title": "Engine Performance",
+          "subtitle": "FPS Stability across 100 frames",
           "data": [
             {
-              "id": "signals",
+              "id": "fps",
               "data": [
-                { "x": "00", "y": 15 },
-                { "x": "04", "y": 22 },
-                { "x": "08", "y": 31 },
-                { "x": "12", "y": 48 },
-                { "x": "16", "y": 75 },
-                { "x": "20", "y": 110 },
-                { "x": "24", "y": 170 }
+                { "x": "0", "y": 60 },
+                { "x": "20", "y": 58 },
+                { "x": "40", "y": 60 },
+                { "x": "60", "y": 59 },
+                { "x": "80", "y": 60 },
+                { "x": "100", "y": 60 }
               ]
             }
           ],
-          "width": 900,
-          "height": 500,
-          "position": {
-            "x": 1450,
-            "y": 760
-          },
-          "start": 240,
-          "duration": 250,
-          "depth": 400,
-          "zIndex": 30,
-          "cameraFocus": {
-            "zoom": 1.7,
-            "fitMode": "contain",
-            "focusBounds": true,
-            "preferredDuration": 120,
-            "moveStyle": "smooth"
-          }
+          "position": { "x": 960, "y": 540 },
+          "start": 0,
+          "duration": 300,
+          "zIndex": 30
         },
         {
-          "id": "INSIGHT_TEXT",
+          "id": "SUBTITLE",
           "type": "text",
-          "content": "Patterns become visible when we focus.",
+          "content": "Professional Data Visualization",
           "animation": "slideUp",
           "font": "Montserrat",
-          "fontSize": "70px",
-          "style": "text-yellow-300 font-bold",
-          "position": {
-            "x": 960,
-            "y": 900
-          },
-          "start": 330,
-          "duration": 180,
-          "depth": 200,
+          "fontSize": "40px",
+          "position": { "x": 960, "y": 900 },
+          "start": 30,
+          "duration": 270,
           "zIndex": 50
+        }
+      ]
+    },
+    {
+      "scene_id": "SC_03_MEDIA_HYBRID",
+      "background_type": "video",
+      "video_path": "renders/scene_SC_01.mp4",
+      "audio_enabled": false,
+      "duration_in_frames": 300,
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "VIDEO_OVERLAY",
+            "style": "push_in",
+            "startFrame": 0,
+            "duration": 300,
+            "zoom": 1.5,
+            "inDuration": 150
+          }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "VIDEO_OVERLAY",
+          "type": "video",
+          "src": "renders/scene_SC_02.mp4",
+          "audio_enabled": false,
+          "position": { "x": 960, "y": 540 },
+          "start": 0,
+          "duration": 300,
+          "zIndex": 10,
+          "cameraFocus": { "zoom": 1.5 }
         },
         {
-          "id": "CONCLUSION",
+          "id": "TAG",
           "type": "text",
-          "content": "The Camera Guided The Journey.\\nThe Data Told The Story.",
-          "animation": "cinematicGlow",
-          "font": "Montserrat",
-          "fontSize": "100px",
-          "style": "text-white font-black text-center",
-          "position": {
-            "x": 960,
-            "y": 540
-          },
-          "start": 420,
-          "duration": 180,
-          "depth": 100,
-          "zIndex": 60,
-          "cameraFocus": {
-            "zoom": 1.2,
-            "fitMode": "contain",
-            "preferredDuration": 180,
-            "moveStyle": "dramatic"
-          }
+          "content": "PICTURE-IN-PICTURE",
+          "animation": "wordByWord",
+          "fontSize": "60px",
+          "position": { "x": 960, "y": 200 },
+          "start": 30,
+          "duration": 270,
+          "zIndex": 100
         }
       ]
     }
