@@ -36,14 +36,20 @@ print_banner("🛠️ INSTALLING LOCAL LLM STACK")
 # We use a lightweight stack optimized for CPU inference
 !pip install -r requirements.txt
 
-# 3. Get User Input
-print_banner("📝 CONTENT GENERATION")
-story_prompt = input("\n🎬 Describe the story or topic for your video: \n> ")
+# 3. Story Source Verification
+print_banner("📝 STORY SOURCE VERIFICATION")
+STORY_FILE = f"{DRIVE_BASE_PATH}/manifests/guideline_prompt.txt"
+
+if os.path.exists(STORY_FILE):
+    print(f"✅ Found story file at: {STORY_FILE}")
+else:
+    print(f"❌ FATAL: Story file NOT FOUND: {STORY_FILE}")
+    print("Please ensure your story is written in 'guideline_prompt.txt' inside the manifests folder.")
 
 # 4. Generate Master JSON
 print_banner("🧠 LOCAL AI INFERENCE (CPU)")
 # Loading and inference will happen locally on the Colab instance
-!python generator.py --story="{story_prompt}" --model="{MODEL_ID}" --output="{OUTPUT_JSON}"
+!python generator.py --story-file="{STORY_FILE}" --model="{MODEL_ID}" --output="{OUTPUT_JSON}"
 
 print_banner("🏁 MASTER JSON READY")
 print(f"Your master manifest has been saved to: {OUTPUT_JSON}")

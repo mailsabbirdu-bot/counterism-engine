@@ -71,11 +71,22 @@ class RemotionJsonMaker:
 
 def main():
     parser = argparse.ArgumentParser(description="Counterism Studio V4 JSON Maker (Local LLM)")
-    parser.add_argument("--story", required=True, help="The story or topic for the video")
+    parser.add_argument("--story", help="The story or topic for the video")
+    parser.add_argument("--story-file", help="Path to a text file containing the story/topic")
     parser.add_argument("--output", required=True, help="Path to save remotion_render.json")
     parser.add_argument("--model", default="Qwen/Qwen2.5-1.5B-Instruct", help="HuggingFace Model ID")
 
     args = parser.parse_args()
+
+    # Determine the story source
+    story = args.story
+    if args.story_file and os.path.exists(args.story_file):
+        with open(args.story_file, 'r') as f:
+            story = f.read()
+
+    if not story:
+        print("❌ Error: No story provided. Use --story or --story-file.")
+        exit(1)
 
     maker = RemotionJsonMaker(args.model)
 
@@ -87,9 +98,9 @@ def main():
     print("📋 Loading guidelines...")
     guidelines = maker.load_guidelines(local_guideline, local_prompt, drive_prompt)
 
-    print(f"✨ Generating JSON for: {args.story[:50]}...")
+    print(f"✨ Generating JSON for story of length {len(story)}...")
     try:
-        render_json = maker.generate(args.story, guidelines)
+        render_json = maker.generate(story, guidelines)
 
         os.makedirs(os.path.dirname(args.output), exist_ok=True)
         with open(args.output, 'w') as f:
