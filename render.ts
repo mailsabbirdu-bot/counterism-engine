@@ -11,6 +11,7 @@ const args = process.argv.slice(2);
 const templateArg = args.find(arg => arg.startsWith('--template='))?.split('=')[1];
 const outputArg = args.find(arg => arg.startsWith('--output='))?.split('=')[1];
 const concurrencyArg = args.find(arg => arg.startsWith('--concurrency='))?.split('=')[1];
+const sceneIdArg = args.find(arg => arg.startsWith('--scene='))?.split('=')[1];
 
 const templatePath = templateArg && path.isAbsolute(templateArg)
   ? templateArg
@@ -58,18 +59,6 @@ const start = async () => {
       console.log('✅ Manual asset synchronization complete.');
     } catch (e) {
       console.warn('⚠️  Manual asset copy encountered an issue, continuing with bundler defaults.');
-    }
-
-    console.log('\n📦 Inspecting Bundle for Public Assets:');
-    if (fs.existsSync(bundleLocation)) {
-      const bundleFiles = fs.readdirSync(bundleLocation);
-      console.log(`- Bundle Files: ${bundleFiles.join(', ')}`);
-
-      // Check for assets directory or files
-      const assetsPath = path.join(bundleLocation, 'assets');
-      if (fs.existsSync(assetsPath)) {
-        console.log(`- Assets folder found: ${fs.readdirSync(assetsPath).slice(0, 5).join(', ')}...`);
-      }
     }
 
     console.log('\n🔍 Pre-render Asset Verification & Duration Adjustment:');
@@ -130,7 +119,6 @@ const start = async () => {
     }
 
     console.log('\n🔍 Extracting compositions...');
-    // We pass the potentially modified 'template' object here so compositions get the updated durations
     const compositions = await getCompositions(bundleLocation, {
       inputProps: { templateData: template }
     });
@@ -143,6 +131,9 @@ const start = async () => {
     const concurrency = concurrencyArg ? parseInt(concurrencyArg, 10) : 1;
 
     for (const scene of template.scenes) {
+      if (sceneIdArg && scene.scene_id !== sceneIdArg) {
+          continue;
+      }
       console.log(`\n🎬 Processing Scene: ${scene.scene_id}`);
 
       const composition = compositions.find((c) => c.id === scene.scene_id);
@@ -164,7 +155,7 @@ const start = async () => {
 
       console.log(`⏳ Rendering ${scene.scene_id} (Concurrency: ${concurrency})...`);
 
-      const renderOptions: any = {
+      const renderMediaOptions: any = {
         composition,
         serveUrl: bundleLocation,
         codec: 'h264',
@@ -175,12 +166,9 @@ const start = async () => {
         onProgress: ({ progress }: { progress: number }) => {
           process.stdout.write(`\rProgress: ${(progress * 100).toFixed(1)}%`);
         },
-        onLog: (log: any) => {
-          console.log(`[Browser Log] ${log.level}: ${log.text}`);
-        },
       };
 
-      await renderMedia(renderOptions);
+      await renderMedia(renderMediaOptions);
 
       console.log(`\n✅ Finished: ${outputLocation}`);
     }
