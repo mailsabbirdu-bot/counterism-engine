@@ -1,264 +1,67 @@
 {
-  "project_name": "Counterism_V4_Camera_Storytelling_Test",
-  "global_settings": {
-    "width": 1920,
-    "height": 1080,
-    "fps": 30
-  },
-  "scenes": [
-    {
-      "scene_id": "SC_CAMERA_STORY",
-      "background_type": "procedural",
-      "procedural_config": {
-        "speed": 0.25,
-        "variant": "gradient",
-        "primaryColor": "#0F172A",
-        "secondaryColor": "#1E293B"
-      },
-      "duration_in_frames": 600,
-      "camera": {
-        "enabled": true,
-        "perspective": 1200,
-        "motionBlur": {
-          "enabled": true,
-          "intensity": 0.8
-        },
-        "shake": {
-          "enabled": true,
-          "intensity": 2,
-          "speed": 1
-        },
-        "shots": [
-          {
-            "targetId": "OPENING_TITLE",
-            "startFrame": 0,
-            "duration": 90,
-            "zoom": 1.15,
-            "style": "push_in",
-            "inDuration": 30
-          },
-          {
-            "targetId": "QUESTION_BLOCK",
-            "startFrame": 90,
-            "duration": 90,
-            "zoom": 1.4,
-            "style": "pan_left",
-            "inDuration": 25
-          },
-          {
-            "targetId": "DATA_PANEL",
-            "startFrame": 180,
-            "duration": 120,
-            "zoom": 1.8,
-            "style": "dramatic_reveal",
-            "inDuration": 30
-          },
-          {
-            "targetId": "TREND_CHART",
-            "startFrame": 300,
-            "duration": 120,
-            "zoom": 1.7,
-            "style": "orbit",
-            "inDuration": 30
-          },
-          {
-            "targetId": "CONCLUSION",
-            "startFrame": 420,
-            "duration": 180,
-            "zoom": 1.2,
-            "style": "pull_out",
-            "inDuration": 40
-          }
-        ]
-      },
-      "overlays": [
-        {
-          "id": "OPENING_TITLE",
-          "type": "text",
-          "content": "Every Story Begins With A Signal",
-          "animation": "cinematicGlow",
-          "font": "Montserrat",
-          "fontSize": "110px",
-          "style": "text-white font-black uppercase tracking-tighter",
-          "position": {
-            "x": 960,
-            "y": 540
-          },
-          "start": 0,
-          "duration": 120,
-          "depth": 100,
-          "zIndex": 50,
-          "cameraFocus": {
-            "zoom": 1.15,
-            "fitMode": "contain",
-            "preferredDuration": 90,
-            "moveStyle": "smooth"
-          }
-        },
-        {
-          "id": "QUESTION_BLOCK",
-          "type": "text",
-          "content": "But where does the signal come from?",
-          "animation": "wordByWord",
-          "splitMode": "word",
-          "font": "Montserrat",
-          "fontSize": "80px",
-          "style": "text-cyan-300 font-bold",
-          "position": {
-            "x": 350,
-            "y": 300
-          },
-          "start": 60,
-          "duration": 180,
-          "depth": 250,
-          "zIndex": 50,
-          "cameraFocus": {
-            "zoom": 1.4,
-            "fitMode": "contain",
-            "preferredDuration": 90,
-            "moveStyle": "smooth"
-          }
-        },
-        {
-          "id": "QUESTION_DETAIL",
-          "type": "text",
-          "content": "Millions of events happen every second.",
-          "animation": "slideUp",
-          "font": "Montserrat",
-          "fontSize": "42px",
-          "style": "text-slate-300",
-          "position": {
-            "x": 350,
-            "y": 420
-          },
-          "start": 90,
-          "duration": 150,
-          "depth": 150,
-          "zIndex": 45
-        },
-        {
-          "id": "DATA_PANEL",
-          "type": "ui_panel",
-          "title": "Network Activity",
-          "description": "Analyzing incoming signals across monitored systems",
-          "iconType": "activity",
-          "nodeId": "NODE-42",
-          "variant": "glass",
-          "initialProgress": 0,
-          "targetProgress": 100,
-          "position": {
-            "x": 1450,
-            "y": 350
-          },
-          "start": 150,
-          "duration": 240,
-          "depth": 500,
-          "zIndex": 40,
-          "cameraFocus": {
-            "zoom": 1.8,
-            "offsetY": -40,
-            "fitMode": "contain",
-            "focusBounds": true,
-            "preferredDuration": 120,
-            "moveStyle": "dramatic"
-          }
-        },
-        {
-          "id": "METRIC_1",
-          "type": "text",
-          "content": "24.6M Requests",
-          "animation": "slideUp",
-          "font": "Montserrat",
-          "fontSize": "56px",
-          "style": "text-green-400 font-black",
-          "position": {
-            "x": 1450,
-            "y": 600
-          },
-          "start": 180,
-          "duration": 180,
-          "depth": 300,
-          "zIndex": 50
-        },
-        {
-          "id": "TREND_CHART",
-          "type": "chart",
-          "chart_type": "line",
-          "title": "Signal Volume",
-          "subtitle": "Last 24 Hours",
-          "data": [
-            {
-              "id": "signals",
-              "data": [
-                { "x": "00", "y": 15 },
-                { "x": "04", "y": 22 },
-                { "x": "08", "y": 31 },
-                { "x": "12", "y": 48 },
-                { "x": "16", "y": 75 },
-                { "x": "20", "y": 110 },
-                { "x": "24", "y": 170 }
-              ]
-            }
-          ],
-          "width": 900,
-          "height": 500,
-          "position": {
-            "x": 1450,
-            "y": 760
-          },
-          "start": 240,
-          "duration": 250,
-          "depth": 400,
-          "zIndex": 30,
-          "cameraFocus": {
-            "zoom": 1.7,
-            "fitMode": "contain",
-            "focusBounds": true,
-            "preferredDuration": 120,
-            "moveStyle": "smooth"
-          }
-        },
-        {
-          "id": "INSIGHT_TEXT",
-          "type": "text",
-          "content": "Patterns become visible when we focus.",
-          "animation": "slideUp",
-          "font": "Montserrat",
-          "fontSize": "70px",
-          "style": "text-yellow-300 font-bold",
-          "position": {
-            "x": 960,
-            "y": 900
-          },
-          "start": 330,
-          "duration": 180,
-          "depth": 200,
-          "zIndex": 50
-        },
-        {
-          "id": "CONCLUSION",
-          "type": "text",
-          "content": "The Camera Guided The Journey.\nThe Data Told The Story.",
-          "animation": "cinematicGlow",
-          "font": "Montserrat",
-          "fontSize": "100px",
-          "style": "text-white font-black text-center",
-          "position": {
-            "x": 960,
-            "y": 540
-          },
-          "start": 420,
-          "duration": 180,
-          "depth": 100,
-          "zIndex": 60,
-          "cameraFocus": {
-            "zoom": 1.2,
-            "fitMode": "contain",
-            "preferredDuration": 180,
-            "moveStyle": "dramatic"
-          }
-        }
-      ]
-    }
-  ]
+"global_settings": {
+"width": 1920,
+"height": 1080,
+"fps": 30
+},
+"scenes": [
+{
+"scene_id": "SC_01",
+"duration_in_frames": 300,
+"background_type": "procedural",
+"procedural_config": {
+"variant": "mesh",
+"color": "#0a0a0a"
+},
+"camera": {
+"enabled": true,
+"perspective": 2000,
+"motionBlur": { "enabled": true, "intensity": 0.8 },
+"shake": { "enabled": true, "intensity": 1.5, "speed": 1.2 },
+"shots": [
+{
+"targetId": "headline_01",
+"style": "push_in",
+"startFrame": 0,
+"duration": 90,
+"zoom": 1.4,
+"inDuration": 45
+},
+{
+"targetId": "stat_card",
+"style": "whip_pan",
+"startFrame": 120,
+"duration": 90,
+"zoom": 1.8,
+"inDuration": 30
+}
+]
+},
+"overlays": [
+{
+"id": "headline_01",
+"type": "text",
+"content": "CINEMATIC V4",
+"fontSize": "150px",
+"font": "Montserrat",
+"position": { "x": 960, "y": 440 },
+"start": 0,
+duration": 300,
+"animation": "cinematicGlow",
+"zIndex": 50
+},
+{
+"id": "stat_card",
+"type": "ui_panel",
+"variant": "glass",
+"title": "System Performance",
+"position": { "x": 960, "y": 640 },
+"start": 60,
+"duration": 240,
+"zIndex": 40,
+"cameraFocus": { "zoom": 1.8, "offsetY": 20 }
+}
+]
+}
+]
 }
