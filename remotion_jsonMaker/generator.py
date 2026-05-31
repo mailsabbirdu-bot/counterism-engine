@@ -1,22 +1,16 @@
 import os
 import json
 import argparse
-import torch
 import re
-from transformers import pipeline
+import time
 from typing import Dict, Any
+from playwright.sync_api import sync_playwright
+from playwright_stealth import stealth
 
 class RemotionJsonMaker:
-    def __init__(self, model_id: str = "Qwen/Qwen2.5-0.5B-Instruct"):
-        print(f"Loading local model: {model_id} (CPU optimized)...")
-        # Use CPU, fp32 or bfloat16 depending on availability. On Colab CPU, float32 is safest.
-        self.pipe = pipeline(
-            "text-generation",
-            model=model_id,
-            torch_dtype=torch.float32,
-            device_map="cpu",
-            clean_up_tokenization_spaces=True
-        )
+    def __init__(self, user_data_dir: str = None, headless: bool = True):
+        self.user_data_dir = user_data_dir
+        self.headless = headless
 
     def load_guidelines(self, local_guideline_path: str, local_prompt_path: str, drive_prompt_path: str) -> str:
         guidelines = ""
@@ -42,55 +36,104 @@ class RemotionJsonMaker:
         # Clean guidelines: Remove the example JSON to prevent hallucination
         guidelines = re.sub(r'## 📝 Comprehensive Reference Example.*', '', guidelines, flags=re.DOTALL)
 
-        # Truncate to ensure speed on CPU (0.5B is fast, but context still costs)
-        max_chars = 5000
-        truncated_guidelines = guidelines[-max_chars:]
-        truncated_story = story[:max_chars]
-
-        messages = [
-            {"role": "system", "content": "You are a Remotion V4 JSON master. Return ONLY raw JSON. No markdown. No comments."},
-            {"role": "user", "content": f"GUIDELINES:\n{truncated_guidelines}\n\nSTORY AND SCENE REQUIREMENTS:\n{truncated_story}\n\nTASK:\nGenerate the complete JSON manifest. Return ONLY the JSON object."}
-        ]
-
-        # Use the pipeline to generate text
-        print("🧠 Running local inference (Fast 0.5B model)...")
-        outputs = self.pipe(
-            messages,
-            max_new_tokens=2048,
-            do_sample=True,
-            temperature=0.01, # Near deterministic
+        full_prompt = (
+            "You are a Remotion V4 JSON master. Return ONLY raw JSON. No markdown. No comments. "
+            "Ensure the output is a single valid JSON object following the TECHNICAL SCHEMA provided.\n\n"
+            f"GUIDELINES:\n{guidelines}\n\n"
+            f"STORY AND SCENE REQUIREMENTS:\n{story}\n\n"
+            "TASK:\nGenerate the complete JSON manifest. Return ONLY the JSON object."
         )
 
-        raw_output = outputs[0]["generated_text"][-1]["content"]
+        with sync_playwright() as p:
+            print("🚀 Launching browser...")
+            if self.user_data_dir:
+                context = p.chromium.launch_persistent_context(
+                    self.user_data_dir,
+                    headless=self.headless,
+                    args=["--disable-blink-features=AutomationControlled"]
+                )
+            else:
+                browser = p.chromium.launch(headless=self.headless, args=["--disable-blink-features=AutomationControlled"])
+                context = browser.new_context()
 
-        # Extract JSON from potential markdown blocks
-        json_match = re.search(r'(\{.*\})', raw_output, re.DOTALL)
-        if json_match:
+            page = context.new_page()
+            stealth(page)
+
+            print("🌐 Navigating to Gemini...")
+            page.goto("https://gemini.google.com/app", wait_until="networkidle")
+
             try:
-                return json.loads(json_match.group(1))
-            except json.JSONDecodeError:
-                # Try cleaning it up if it's slightly messy
-                cleaned = raw_output.strip()
-                if cleaned.startswith("```json"):
-                    cleaned = cleaned[7:]
-                if cleaned.endswith("```"):
-                    cleaned = cleaned[:-3]
-                return json.loads(cleaned)
-        else:
-            return json.loads(raw_output)
+                # Wait for the text area - Gemini uses a contenteditable div
+                print("📝 Waiting for input area...")
+                input_selector = "div[contenteditable='true']"
+                page.wait_for_selector(input_selector, timeout=30000)
+
+                print("⌨️ Injecting prompt...")
+                page.fill(input_selector, full_prompt)
+
+                # Press Enter to send
+                page.keyboard.press("Enter")
+
+                print("⏳ Waiting for Gemini to generate response...")
+                # Gemini responses are contained in elements with class 'message-content' or similar.
+                # We wait for the 'stop' button (interrupt) to disappear or the response to stabilize.
+                # A more reliable way: wait for the next model-response element and wait for it to stop changing.
+
+                response_selector = ".model-response-text"
+                page.wait_for_selector(response_selector, timeout=120000)
+
+                # Give it some time to finish streaming
+                last_len = 0
+                for _ in range(20): # Max 20 seconds wait for stabilization
+                    time.sleep(2)
+                    responses = page.query_selector_all(response_selector)
+                    if not responses: continue
+                    current_len = len(responses[-1].inner_text())
+                    if current_len == last_len and current_len > 0:
+                        break
+                    last_len = current_len
+
+                responses = page.query_selector_all(response_selector)
+                if not responses:
+                    raise Exception("Failed to find Gemini response.")
+
+                raw_output = responses[-1].inner_text()
+                print("✅ Response received.")
+
+                # Extract JSON from potential markdown blocks
+                json_match = re.search(r'(\{.*\})', raw_output, re.DOTALL)
+                if json_match:
+                    try:
+                        return json.loads(json_match.group(1))
+                    except json.JSONDecodeError:
+                        # Try cleaning up markdown if re failed to be precise
+                        cleaned = raw_output.strip()
+                        if cleaned.startswith("```json"):
+                            cleaned = cleaned[7:]
+                        if cleaned.startswith("```"):
+                            cleaned = cleaned[3:]
+                        if cleaned.endswith("```"):
+                            cleaned = cleaned[:-3]
+                        return json.loads(cleaned.strip())
+                else:
+                    return json.loads(raw_output.strip())
+
+            finally:
+                if self.user_data_dir:
+                    context.close()
+                else:
+                    browser.close()
 
 def main():
-    parser = argparse.ArgumentParser(description="Counterism Studio V4 JSON Maker (Local LLM)")
+    parser = argparse.ArgumentParser(description="Counterism Studio V4 JSON Maker (Playwright Gemini Edition)")
     parser.add_argument("--story", help="The story or topic for the video")
     parser.add_argument("--story-file", help="Path to a text file containing the story/topic")
     parser.add_argument("--output", required=True, help="Path to save remotion_render.json")
-    parser.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct", help="HuggingFace Model ID")
-    parser.add_argument("--hf-token", help="HuggingFace API Token (optional)")
+    parser.add_argument("--user-data-dir", help="Path to Chromium user data directory for persistent session")
+    parser.add_argument("--no-headless", action="store_false", dest="headless", help="Run browser in non-headless mode")
+    parser.set_defaults(headless=True)
 
     args = parser.parse_args()
-
-    if args.hf_token:
-        os.environ["HF_TOKEN"] = args.hf_token
 
     # Determine the story source
     story = args.story
@@ -102,21 +145,21 @@ def main():
         print("❌ Error: No story provided. Use --story or --story-file.")
         exit(1)
 
-    maker = RemotionJsonMaker(args.model)
+    maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, headless=args.headless)
 
-    # Paths are hardcoded for the specific Colab environment
+    # Paths
     local_guideline = "../guideline.md"
     local_prompt = "../guideline_prompt.txt"
-    # Drive prompt is excluded from guidelines if it's the story source to avoid redundancy
-    drive_prompt = "/content/drive/MyDrive/Counterism_Studio_V4/manifests/guideline_prompt.txt"
+    # Updated to 'google audio' as requested by user
+    drive_prompt = "/content/drive/MyDrive/google audio/manifests/guideline_prompt.txt"
 
     if args.story_file == drive_prompt:
-        drive_prompt = "" # Prevent loading same 11k file twice
+        drive_prompt = ""
 
     print("📋 Loading guidelines...")
     guidelines = maker.load_guidelines(local_guideline, local_prompt, drive_prompt)
 
-    print(f"✨ Generating JSON for story of length {len(story)}...")
+    print(f"✨ Generating JSON for story via Gemini...")
     try:
         render_json = maker.generate(story, guidelines)
 
@@ -127,7 +170,6 @@ def main():
         print(f"✅ Master JSON created successfully at: {args.output}")
     except Exception as e:
         print(f"❌ Error during generation: {e}")
-        # Log the raw output if failed to help debug
         exit(1)
 
 if __name__ == "__main__":
