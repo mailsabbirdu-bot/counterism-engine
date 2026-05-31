@@ -18,7 +18,7 @@ class RemotionJsonMaker:
         try:
             cmd = [
                 "ffprobe", "-v", "0", "-of", "csv=p=0", "-select_streams", "v:0",
-                "-show_entries", "stream=r_frame_rate", video_path
+                "-show_entries", "stream=avg_frame_rate", video_path
             ]
             output = subprocess.check_output(cmd).decode("utf-8").strip()
             if "/" in output:
@@ -32,47 +32,44 @@ class RemotionJsonMaker:
     def adjust_durations_in_text(self, text: str, public_dir: str = "../public") -> str:
         """
         Scans text for video_path and duration_in_frames and adjusts them if
-        the source video FPS is not 30.
+        the source video FPS is not 30. Uses strict boundary checks to avoid scene mismatch.
         """
-        # Find all scene blocks or at least pairs of video_path and duration_in_frames
-        # We'll use a regex that looks for video_path then duration_in_frames or vice-versa
 
         def replacement_logic(match):
-            full_match = match.group(0)
-            vpath_match = re.search(r'"video_path":\s*"([^"]+)"', full_match)
-            duration_match = re.search(r'"duration_in_frames"\s*:\s*(\d+)', full_match)
+            block = match.group(0)
+            vpath_match = re.search(r'"video_path":\s*"([^"]+)"', block)
+            duration_match = re.search(r'"duration_in_frames"\s*:\s*(\d+)', block)
 
             if vpath_match and duration_match:
                 rel_vpath = vpath_match.group(1)
-                orig_duration_str = duration_match.group(1)
-                orig_duration = int(orig_duration_str)
+                orig_duration = int(duration_match.group(1))
 
                 abs_vpath = os.path.join(public_dir, rel_vpath)
                 if os.path.exists(abs_vpath):
                     fps = self.probe_video_fps(abs_vpath)
-                    if abs(fps - 30.0) > 0.1:
-                        # Recalculate duration for 30fps target
+                    if abs(fps - 30.0) > 0.01: # Use a tighter tolerance
                         new_duration = int(round((orig_duration / fps) * 30))
                         print(f"⚖️ Adjusting {rel_vpath}: {fps}fps, {orig_duration}f -> {new_duration}f (30fps target)")
 
-                        # Replace the duration value safely within the duration_in_frames field
-                        new_val = f'"duration_in_frames": {new_duration}'
-                        # This regex replaces the entire duration field to be safe
-                        return re.sub(r'"duration_in_frames"\s*:\s*\d+', new_val, full_match)
+                        # Only replace the duration_in_frames value within THIS specific block
+                        return re.sub(r'"duration_in_frames"\s*:\s*\d+', f'"duration_in_frames": {new_duration}', block)
 
-            return full_match
+            return block
 
-        # Match blocks that contain both video_path and duration_in_frames
-        # We look for these pairs without allowing another video_path or duration_in_frames in between
-        # to avoid crossing scene boundaries.
+        # Find blocks that are likely individual scene definitions or adjacent properties.
+        # We look for pairs that don't have another instance of either key between them.
+        # This is more robust against scene crossing.
 
-        # Pattern 1: video_path followed by duration_in_frames
-        pattern = r'("video_path":\s*"[^"]+"(?:(?!"video_path"|"duration_in_frames").){0,150}?"duration_in_frames"\s*:\s*\d+)'
-        text = re.sub(pattern, replacement_logic, text, flags=re.DOTALL)
+        # Strategy: Match any block that contains both keys within a reasonable range,
+        # ensuring we don't skip over another scene.
 
-        # Pattern 2: duration_in_frames followed by video_path
-        pattern_rev = r'("duration_in_frames"\s*:\s*\d+(?:(?!"video_path"|"duration_in_frames").){0,150}?"video_path":\s*"[^"]+")'
-        text = re.sub(pattern_rev, replacement_logic, text, flags=re.DOTALL)
+        # Pattern 1: video_path ... duration_in_frames
+        pattern1 = r'("video_path":\s*"[^"]+"(?:(?!"video_path"|"duration_in_frames").){0,300}?"duration_in_frames"\s*:\s*\d+)'
+        text = re.sub(pattern1, replacement_logic, text, flags=re.DOTALL)
+
+        # Pattern 2: duration_in_frames ... video_path
+        pattern2 = r'("duration_in_frames"\s*:\s*\d+(?:(?!"video_path"|"duration_in_frames").){0,300}?"video_path":\s*"[^"]+")'
+        text = re.sub(pattern2, replacement_logic, text, flags=re.DOTALL)
 
         return text
 
@@ -276,8 +273,8 @@ def main():
         render_json = maker.generate(story, guidelines, prompt_output_path=args.prompt_output)
 
         os.makedirs(os.path.dirname(args.output), exist_ok=True)
-        with open(args.output, 'w') as f:
-            json.dump(render_json, f, indent=2)
+        with open(args.output, 'w', encoding='utf-8') as f:
+            json.dump(render_json, f, indent=2, ensure_ascii=False)
 
         print(f"✅ Master JSON created successfully at: {args.output}")
     except Exception as e:
