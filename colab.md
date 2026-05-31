@@ -72,55 +72,27 @@ if os.path.exists(drive_audio):
     !cp -r {drive_audio}/* public/audio/
     print(f"✅ Copied {len(os.listdir('public/audio'))} audio files.")
 
-# 4. Manifest Synchronization & Dynamic Duration
-print_banner("📜 MANIFEST SYNCHRONIZATION & DYNAMIC DURATION")
+# 4. Manifest Verification
+print_banner("📜 MANIFEST VERIFICATION")
 
 MANIFEST_DIR = f"{DRIVE_BASE_PATH}/manifests"
-os.makedirs(MANIFEST_DIR, exist_ok=True)
+DRIVE_JSON = f"{MANIFEST_DIR}/remotion_render.json"
 
-# Copy template from GitHub to Drive
-LOCAL_JSON = "remotion_template.json"
-DRIVE_JSON = f"{MANIFEST_DIR}/remotion_template_gdrive.json"
-
-print(f"📄 Syncing manifest to Drive: {DRIVE_JSON}")
-shutil.copy(LOCAL_JSON, DRIVE_JSON)
-
-# Load and Update Duration
-with open(DRIVE_JSON, 'r') as f:
-    template = json.load(f)
-
-fps = template.get('global_settings', {}).get('fps', 30)
-updated = False
-
-for scene in template.get('scenes', []):
-    if scene.get('background_type') == 'video' and scene.get('video_path'):
-        bg_path = os.path.join("public", scene['video_path'])
-        if os.path.exists(bg_path):
-            duration = get_video_duration(bg_path)
-            if duration:
-                frames = math.floor(duration * fps)
-                print(f"🎬 Scene {scene['scene_id']}: Calculated {frames} frames from {scene['video_path']}")
-                scene['duration_in_frames'] = frames
-                updated = True
-        else:
-            print(f"⚠️  Background video not found: {bg_path}")
-
-if updated:
-    with open(DRIVE_JSON, 'w') as f:
-        json.dump(template, f, indent=2)
-    print("✅ Drive manifest updated with dynamic durations.")
+if os.path.exists(DRIVE_JSON):
+    print(f"✅ Found Drive manifest: {DRIVE_JSON}")
 else:
-    print("ℹ️  No duration updates needed or possible.")
+    print(f"❌ FATAL: Manifest NOT FOUND in Drive: {DRIVE_JSON}")
+    print("Please place your 'remotion_render.json' in the manifests folder on Google Drive.")
 
 # 5. Install Dependencies
 print_banner("🛠️ INSTALLING DEPENDENCIES")
 !apt-get update -y && apt-get install -y ffmpeg build-essential
 !npm install
 
-# 6. Render Pipeline using Drive Manifest
+# 6. Render Pipeline
 print_banner("🎬 STARTING RENDERING PIPELINE")
-# Pass the Drive manifest to the render command
-!npm run render -- --template={DRIVE_JSON} --concurrency=1
+# The pipeline will automatically use remotion_render.json from Google Drive by default
+!npm run render -- --concurrency=1
 
 # 7. Automatic Drive Upload
 print_banner("💾 SAVING RESULTS TO GOOGLE DRIVE")
