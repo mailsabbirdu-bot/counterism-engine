@@ -7,7 +7,7 @@ from transformers import pipeline
 from typing import Dict, Any
 
 class RemotionJsonMaker:
-    def __init__(self, model_id: str = "meta-llama/Llama-3.2-1B-Instruct"):
+    def __init__(self, model_id: str = "Qwen/Qwen2.5-1.5B-Instruct"):
         print(f"Loading local model: {model_id} (CPU optimized)...")
         # Use CPU, fp32 or bfloat16 depending on availability. On Colab CPU, float32 is safest.
         self.pipe = pipeline(
@@ -83,7 +83,7 @@ def main():
     parser.add_argument("--story", help="The story or topic for the video")
     parser.add_argument("--story-file", help="Path to a text file containing the story/topic")
     parser.add_argument("--output", required=True, help="Path to save remotion_render.json")
-    parser.add_argument("--model", default="meta-llama/Llama-3.2-1B-Instruct", help="HuggingFace Model ID")
+    parser.add_argument("--model", default="Qwen/Qwen2.5-1.5B-Instruct", help="HuggingFace Model ID")
     parser.add_argument("--hf-token", help="HuggingFace API Token (optional)")
 
     args = parser.parse_args()
