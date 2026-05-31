@@ -13,9 +13,13 @@ const outputArg = args.find(arg => arg.startsWith('--output='))?.split('=')[1];
 const concurrencyArg = args.find(arg => arg.startsWith('--concurrency='))?.split('=')[1];
 const sceneIdArg = args.find(arg => arg.startsWith('--scene='))?.split('=')[1];
 
+const GOOGLE_DRIVE_MANIFEST = '/content/drive/MyDrive/Counterism_Studio_V4/manifests/remotion_render.json';
+
 const templatePath = templateArg && path.isAbsolute(templateArg)
   ? templateArg
-  : path.join(process.cwd(), templateArg || 'remotion_template.json');
+  : templateArg
+    ? path.join(process.cwd(), templateArg)
+    : GOOGLE_DRIVE_MANIFEST;
 
 if (!fs.existsSync(templatePath)) {
   console.error(`❌ Template file not found: ${templatePath}`);
@@ -23,17 +27,6 @@ if (!fs.existsSync(templatePath)) {
 }
 
 const template = JSON.parse(fs.readFileSync(templatePath, 'utf8'));
-
-const getVideoDuration = (path: string): number => {
-  try {
-    const stdout = execSync(
-      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${path}"`
-    );
-    return parseFloat(stdout.toString().trim());
-  } catch (e) {
-    return 0;
-  }
-};
 
 const start = async () => {
   try {
@@ -61,34 +54,18 @@ const start = async () => {
       console.warn('⚠️  Manual asset copy encountered an issue, continuing with bundler defaults.');
     }
 
-    console.log('\n🔍 Pre-render Asset Verification & Duration Adjustment:');
+    console.log('\n🔍 Pre-render Asset Verification:');
     let assetsMissing = false;
-    const fps = template.global_settings?.fps || 30;
 
     for (const scene of template.scenes) {
       console.log(`\n--- Scene: ${scene.scene_id} ---`);
 
-      // Verify background video and update duration
+      // Verify background video
       if (scene.background_type === 'video' && scene.video_path) {
         const bgPath = path.join(process.cwd(), 'public', scene.video_path);
         if (fs.existsSync(bgPath)) {
           const stats = fs.statSync(bgPath);
           console.log(`✅ Background Video FOUND: ${scene.video_path} (${(stats.size / (1024 * 1024)).toFixed(2)} MB)`);
-
-          // Primary Rule: duration_in_frames = background video duration
-          try {
-            const stdout = execSync(
-              `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${bgPath}"`
-            );
-            const durationInSeconds = parseFloat(stdout.toString().trim());
-            if (!isNaN(durationInSeconds)) {
-              const frames = Math.floor(durationInSeconds * fps);
-              console.log(`📏 Adjusting duration: ${scene.duration_in_frames} -> ${frames} frames (Based on video)`);
-              scene.duration_in_frames = frames;
-            }
-          } catch (e) {
-            console.warn(`⚠️ Could not probe duration for ${bgPath}, using default.`);
-          }
         } else {
           console.error(`❌ Background Video MISSING: ${bgPath}`);
           assetsMissing = true;
