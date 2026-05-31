@@ -20,8 +20,8 @@ PROJECT_NAME = "counterism-engine"
 DRIVE_BASE_PATH = "/content/drive/MyDrive/Counterism_Studio_V4"
 MANIFEST_DIR = f"{DRIVE_BASE_PATH}/manifests"
 OUTPUT_JSON = f"{MANIFEST_DIR}/remotion_render.json"
-# Qwen 2.5 1.5B is non-gated and highly efficient on CPU
-MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
+# Qwen 2.5 0.5B is the fastest model for CPU inference while maintaining high JSON accuracy
+MODEL_ID = "Qwen/Qwen2.5-0.5B-Instruct"
 
 # 2. Setup
 print_banner("📂 MOUNTING GOOGLE DRIVE")
@@ -55,8 +55,8 @@ except:
 
 # 5. Generate Master JSON
 print_banner("🧠 LOCAL AI INFERENCE (CPU)")
-print("🚀 This process typically takes 2-5 minutes on a standard Colab CPU.")
-print("⏳ Truncating context to 6000 chars to ensure stability...")
+print("🚀 Using ultra-fast 0.5B model. Estimated time: 1-2 minutes.")
+print("⏳ Stripping example JSON from guidelines to prevent model hallucination...")
 # Loading and inference will happen locally on the Colab instance
 !python generator.py --story-file="{STORY_FILE}" --model="{MODEL_ID}" --output="{OUTPUT_JSON}" --hf-token="{hf_token}"
 

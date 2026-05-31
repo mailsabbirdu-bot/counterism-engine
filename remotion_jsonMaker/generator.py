@@ -7,7 +7,7 @@ from transformers import pipeline
 from typing import Dict, Any
 
 class RemotionJsonMaker:
-    def __init__(self, model_id: str = "Qwen/Qwen2.5-1.5B-Instruct"):
+    def __init__(self, model_id: str = "Qwen/Qwen2.5-0.5B-Instruct"):
         print(f"Loading local model: {model_id} (CPU optimized)...")
         # Use CPU, fp32 or bfloat16 depending on availability. On Colab CPU, float32 is safest.
         self.pipe = pipeline(
@@ -39,25 +39,26 @@ class RemotionJsonMaker:
         return guidelines
 
     def generate(self, story: str, guidelines: str) -> Dict[str, Any]:
-        # Truncate story and guidelines to prevent context bloat on CPU
-        # 1.5B/1B models have limited context attention on CPU.
-        # We cap at ~3000 tokens (approx 12000 chars) total.
-        max_chars = 6000
-        truncated_guidelines = guidelines[-max_chars:] # Keep the end (most specific parts)
-        truncated_story = story[:max_chars] # Keep the beginning (main story)
+        # Clean guidelines: Remove the example JSON to prevent hallucination
+        guidelines = re.sub(r'## 📝 Comprehensive Reference Example.*', '', guidelines, flags=re.DOTALL)
+
+        # Truncate to ensure speed on CPU (0.5B is fast, but context still costs)
+        max_chars = 5000
+        truncated_guidelines = guidelines[-max_chars:]
+        truncated_story = story[:max_chars]
 
         messages = [
-            {"role": "system", "content": "You are a specialized JSON generator. Return ONLY raw JSON."},
-            {"role": "user", "content": f"{truncated_guidelines}\n\nSTORY:\n{truncated_story}\n\nTASK:\nGenerate 'remotion_render.json' for the story. Use the engine rules. Return ONLY JSON."}
+            {"role": "system", "content": "You are a Remotion V4 JSON master. Return ONLY raw JSON. No markdown. No comments."},
+            {"role": "user", "content": f"GUIDELINES:\n{truncated_guidelines}\n\nSTORY AND SCENE REQUIREMENTS:\n{truncated_story}\n\nTASK:\nGenerate the complete JSON manifest. Return ONLY the JSON object."}
         ]
 
         # Use the pipeline to generate text
-        print("🧠 Running local inference (this usually takes 2-5 minutes on CPU)...")
+        print("🧠 Running local inference (Fast 0.5B model)...")
         outputs = self.pipe(
             messages,
-            max_new_tokens=1500,
+            max_new_tokens=2048,
             do_sample=True,
-            temperature=0.1, # Low temperature for consistency
+            temperature=0.01, # Near deterministic
         )
 
         raw_output = outputs[0]["generated_text"][-1]["content"]
@@ -83,7 +84,7 @@ def main():
     parser.add_argument("--story", help="The story or topic for the video")
     parser.add_argument("--story-file", help="Path to a text file containing the story/topic")
     parser.add_argument("--output", required=True, help="Path to save remotion_render.json")
-    parser.add_argument("--model", default="Qwen/Qwen2.5-1.5B-Instruct", help="HuggingFace Model ID")
+    parser.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct", help="HuggingFace Model ID")
     parser.add_argument("--hf-token", help="HuggingFace API Token (optional)")
 
     args = parser.parse_args()
