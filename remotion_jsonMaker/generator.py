@@ -3,6 +3,7 @@ import json
 import argparse
 import re
 import time
+import subprocess
 from typing import Dict, Any
 from playwright.sync_api import sync_playwright
 from playwright_stealth import stealth
@@ -11,6 +12,69 @@ class RemotionJsonMaker:
     def __init__(self, user_data_dir: str = None, headless: bool = True):
         self.user_data_dir = user_data_dir
         self.headless = headless
+
+    def probe_video_fps(self, video_path: str) -> float:
+        """Probes a video file for its FPS using ffprobe."""
+        try:
+            cmd = [
+                "ffprobe", "-v", "0", "-of", "csv=p=0", "-select_streams", "v:0",
+                "-show_entries", "stream=r_frame_rate", video_path
+            ]
+            output = subprocess.check_output(cmd).decode("utf-8").strip()
+            if "/" in output:
+                num, den = map(float, output.split("/"))
+                return num / den
+            return float(output)
+        except Exception as e:
+            print(f"⚠️ Warning: Could not probe FPS for {video_path}: {e}")
+            return 30.0
+
+    def adjust_durations_in_text(self, text: str, public_dir: str = "../public") -> str:
+        """
+        Scans text for video_path and duration_in_frames and adjusts them if
+        the source video FPS is not 30.
+        """
+        # Find all scene blocks or at least pairs of video_path and duration_in_frames
+        # We'll use a regex that looks for video_path then duration_in_frames or vice-versa
+
+        def replacement_logic(match):
+            full_match = match.group(0)
+            vpath_match = re.search(r'"video_path":\s*"([^"]+)"', full_match)
+            duration_match = re.search(r'"duration_in_frames"\s*:\s*(\d+)', full_match)
+
+            if vpath_match and duration_match:
+                rel_vpath = vpath_match.group(1)
+                orig_duration_str = duration_match.group(1)
+                orig_duration = int(orig_duration_str)
+
+                abs_vpath = os.path.join(public_dir, rel_vpath)
+                if os.path.exists(abs_vpath):
+                    fps = self.probe_video_fps(abs_vpath)
+                    if abs(fps - 30.0) > 0.1:
+                        # Recalculate duration for 30fps target
+                        new_duration = int(round((orig_duration / fps) * 30))
+                        print(f"⚖️ Adjusting {rel_vpath}: {fps}fps, {orig_duration}f -> {new_duration}f (30fps target)")
+
+                        # Replace the duration value safely within the duration_in_frames field
+                        new_val = f'"duration_in_frames": {new_duration}'
+                        # This regex replaces the entire duration field to be safe
+                        return re.sub(r'"duration_in_frames"\s*:\s*\d+', new_val, full_match)
+
+            return full_match
+
+        # Match blocks that contain both video_path and duration_in_frames
+        # We look for these pairs within a short distance of each other (e.g. 200 chars)
+        # This handles both JSON-like blocks and raw text lists.
+
+        # Pattern 1: video_path followed by duration_in_frames
+        pattern = r'("video_path":\s*"[^"]+".{0,200}?"duration_in_frames"\s*:\s*\d+)'
+        text = re.sub(pattern, replacement_logic, text, flags=re.DOTALL)
+
+        # Pattern 2: duration_in_frames followed by video_path
+        pattern_rev = r'("duration_in_frames"\s*:\s*\d+.{0,200}?"video_path":\s*"[^"]+")'
+        text = re.sub(pattern_rev, replacement_logic, text, flags=re.DOTALL)
+
+        return text
 
     def load_guidelines(self, local_guideline_path: str, local_prompt_path: str, drive_prompt_path: str) -> str:
         guidelines = ""
@@ -202,6 +266,11 @@ def main():
 
     print("📋 Loading guidelines and context...")
     guidelines = maker.load_guidelines(local_guideline, local_prompt, drive_prompt)
+
+    print("⚖️ Checking and adjusting video durations for 30fps target...")
+    # Adjust in guidelines (which might contain the story) and the story itself
+    story = maker.adjust_durations_in_text(story)
+    guidelines = maker.adjust_durations_in_text(guidelines)
 
     print(f"✨ Generating JSON for story via Gemini...")
     try:
