@@ -1,2 +1,4 @@
-google-generativeai
-argparse
+transformers
+torch
+accelerate
+sentencepiece

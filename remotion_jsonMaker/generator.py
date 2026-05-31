@@ -1,14 +1,21 @@
 import os
 import json
 import argparse
-import google.generativeai as genai
+import torch
+import re
+from transformers import pipeline
 from typing import Dict, Any
 
 class RemotionJsonMaker:
-    def __init__(self, api_key: str):
-        genai.configure(api_key=api_key)
-        # Using gemini-1.5-flash for speed and high context window (perfect for JSON generation)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+    def __init__(self, model_id: str = "Qwen/Qwen2.5-1.5B-Instruct"):
+        print(f"Loading local model: {model_id} (CPU optimized)...")
+        # Use CPU, fp32 or bfloat16 depending on availability. On Colab CPU, float32 is safest.
+        self.pipe = pipeline(
+            "text-generation",
+            model=model_id,
+            torch_dtype=torch.float32,
+            device_map="cpu",
+        )
 
     def load_guidelines(self, local_guideline_path: str, local_prompt_path: str, drive_prompt_path: str) -> str:
         guidelines = ""
@@ -31,43 +38,48 @@ class RemotionJsonMaker:
         return guidelines
 
     def generate(self, story: str, guidelines: str) -> Dict[str, Any]:
-        prompt = f"""
-{guidelines}
+        messages = [
+            {"role": "system", "content": "You are a specialized JSON generator for the Counterism Studio V4 Remotion engine. Return ONLY valid JSON."},
+            {"role": "user", "content": f"{guidelines}\n\n--- USER STORY/TOPIC ---\n{story}\n\n--- TASK ---\nGenerate a 'remotion_render.json' based on the story. Follow all engine rules. Return ONLY the raw JSON object, no markdown, no explanation."}
+        ]
 
---- USER STORY/TOPIC ---
-{story}
-
---- TASK ---
-Generate a 'remotion_render.json' based on the story above.
-Follow all engine rules:
-- ALL overlays centered at (960, 540).
-- Use 'shots' for camera movement.
-- Depth values for parallax (-500 to 500).
-- Valid overlay types: text, ui_panel, chart, graph, shape, video, image.
-- Ensure 'scene_id' is unique.
-
-Return ONLY valid JSON.
-"""
-        response = self.model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                response_mime_type="application/json",
-            )
+        # Use the pipeline to generate text
+        print("🧠 Running local inference (this may take a few minutes on CPU)...")
+        outputs = self.pipe(
+            messages,
+            max_new_tokens=2048,
+            do_sample=False, # Deterministic for better JSON structure
         )
 
-        return json.loads(response.text)
+        raw_output = outputs[0]["generated_text"][-1]["content"]
+
+        # Extract JSON from potential markdown blocks
+        json_match = re.search(r'(\{.*\})', raw_output, re.DOTALL)
+        if json_match:
+            try:
+                return json.loads(json_match.group(1))
+            except json.JSONDecodeError:
+                # Try cleaning it up if it's slightly messy
+                cleaned = raw_output.strip()
+                if cleaned.startswith("```json"):
+                    cleaned = cleaned[7:]
+                if cleaned.endswith("```"):
+                    cleaned = cleaned[:-3]
+                return json.loads(cleaned)
+        else:
+            return json.loads(raw_output)
 
 def main():
-    parser = argparse.ArgumentParser(description="Counterism Studio V4 JSON Maker")
+    parser = argparse.ArgumentParser(description="Counterism Studio V4 JSON Maker (Local LLM)")
     parser.add_argument("--story", required=True, help="The story or topic for the video")
-    parser.add_argument("--api-key", required=True, help="Gemini API Key")
     parser.add_argument("--output", required=True, help="Path to save remotion_render.json")
+    parser.add_argument("--model", default="Qwen/Qwen2.5-1.5B-Instruct", help="HuggingFace Model ID")
 
     args = parser.parse_args()
 
-    maker = RemotionJsonMaker(args.api_key)
+    maker = RemotionJsonMaker(args.model)
 
-    # Paths are hardcoded for the specific Colab environment requested
+    # Paths are hardcoded for the specific Colab environment
     local_guideline = "../guideline.md"
     local_prompt = "../guideline_prompt.txt"
     drive_prompt = "/content/drive/MyDrive/Counterism_Studio_V4/manifests/guideline_prompt.txt"
@@ -75,7 +87,7 @@ def main():
     print("📋 Loading guidelines...")
     guidelines = maker.load_guidelines(local_guideline, local_prompt, drive_prompt)
 
-    print(f"🧠 Generating JSON for story: {args.story[:50]}...")
+    print(f"✨ Generating JSON for: {args.story[:50]}...")
     try:
         render_json = maker.generate(args.story, guidelines)
 
@@ -86,6 +98,7 @@ def main():
         print(f"✅ Master JSON created successfully at: {args.output}")
     except Exception as e:
         print(f"❌ Error during generation: {e}")
+        # Log the raw output if failed to help debug
         exit(1)
 
 if __name__ == "__main__":
