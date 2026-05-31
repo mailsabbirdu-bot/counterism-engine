@@ -2,7 +2,7 @@
 
 Run this cell in Google Colab to generate your `remotion_render.json` using **Gemini** via browser automation.
 
-**Note:** Since Gemini requires authentication, you may need to provide a `user_data_dir` that contains an authenticated session, or run in non-headless mode locally to log in first. On Colab, you might need to handle login or use an API-based approach if session persistence is difficult.
+**Note:** Gemini requires authentication. On Colab, you should first log in to your Google account in the browser. Since Colab instances are ephemeral, you might need to use a persistent `user_data_dir` on Google Drive to store your session.
 
 ```python
 # ==============================================================================
@@ -10,6 +10,7 @@ Run this cell in Google Colab to generate your `remotion_render.json` using **Ge
 # ==============================================================================
 
 import os
+import sys
 from google.colab import drive
 
 def print_banner(text):
@@ -20,18 +21,28 @@ def print_banner(text):
 # 1. Configuration
 PROJECT_NAME = "counterism-engine"
 DRIVE_BASE_PATH = "/content/drive/MyDrive/google audio"
+# Fallback for different drive naming
+if not os.path.exists(DRIVE_BASE_PATH):
+    DRIVE_BASE_PATH = "/content/drive/MyDrive/google-audio"
+
 MANIFEST_DIR = f"{DRIVE_BASE_PATH}/manifests"
 OUTPUT_JSON = f"{MANIFEST_DIR}/remotion_render.json"
-# Path for persistent browser session (optional)
+STORY_FILE = f"{MANIFEST_DIR}/guideline_prompt.txt"
 USER_DATA_DIR = f"{DRIVE_BASE_PATH}/browser_session"
 
 # 2. Setup
 print_banner("📂 MOUNTING GOOGLE DRIVE")
 drive.mount('/content/drive')
 
+# Ensure we are in the right base directory
+%cd /content
+
 if not os.path.exists(PROJECT_NAME):
     print("🚀 Cloning engine...")
     !git clone https://github.com/mailsabbirdu-bot/counterism-engine
+else:
+    print("✅ Engine already cloned.")
+
 %cd {PROJECT_NAME}/remotion_jsonMaker
 
 print_banner("🛠️ INSTALLING PLAYWRIGHT STACK")
@@ -41,23 +52,26 @@ print_banner("🛠️ INSTALLING PLAYWRIGHT STACK")
 
 # 3. Story Source Verification
 print_banner("📝 STORY SOURCE VERIFICATION")
-STORY_FILE = f"{DRIVE_BASE_PATH}/manifests/guideline_prompt.txt"
 
 if os.path.exists(STORY_FILE):
     print(f"✅ Found story file at: {STORY_FILE}")
 else:
     print(f"❌ FATAL: Story file NOT FOUND: {STORY_FILE}")
-    print(f"Please ensure your story is written in 'guideline_prompt.txt' inside the manifests folder: {STORY_FILE}")
+    print(f"Please ensure your story is written in 'guideline_prompt.txt' inside the manifests folder: {MANIFEST_DIR}")
+    # Stop execution if story is missing
+    sys.exit("Story file missing.")
 
 # 4. Generate Master JSON
 print_banner("🧠 GEMINI BROWSER AUTOMATION")
 print("🚀 Using Playwright to interact with Gemini. This may take a few minutes.")
-print("⏳ Stripping example JSON from guidelines to prevent model hallucination...")
 
-# If you have an authenticated session, add: --user-data-dir="{USER_DATA_DIR}"
-!python generator.py --story-file="{STORY_FILE}" --output="{OUTPUT_JSON}"
+# We use xvfb-run to provide a virtual display for Playwright even in headless mode
+# Add --user-data-dir="{USER_DATA_DIR}" to the command below if you have a saved session
+!xvfb-run python generator.py --story-file="{STORY_FILE}" --output="{OUTPUT_JSON}" --drive-prompt="{STORY_FILE}"
 
-print_banner("🏁 MASTER JSON READY")
-print(f"Your master manifest has been saved to: {OUTPUT_JSON}")
-print("You can now run the rendering pipeline to generate the video.")
+print_banner("🏁 PROCESS FINISHED")
+if os.path.exists(OUTPUT_JSON):
+    print(f"✅ Master manifest saved to: {OUTPUT_JSON}")
+else:
+    print(f"❌ ERROR: Output JSON was not created. Check the logs above.")
 ```
