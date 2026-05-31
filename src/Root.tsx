@@ -54,7 +54,7 @@ export const RemotionRoot: React.FC = () => {
       {template.scenes.map((scene: any) => (
         <Composition
           key={scene.scene_id}
-          id={scene.scene_id.replace(/_/g, '-')}
+          id={scene.scene_id}
           component={Scene}
           durationInFrames={scene.duration_in_frames}
           fps={template.global_settings.fps}
