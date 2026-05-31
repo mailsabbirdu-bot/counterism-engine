@@ -1,14 +1,14 @@
-# 🤖 Counterism Studio V4 JSON Maker (One-Cell Solution)
+# 🤖 Counterism Studio V4 JSON Maker (Local LLM Edition)
 
-Run this cell in Google Colab to generate your `remotion_render.json` automatically based on any story or topic.
+Run this cell in Google Colab to generate your `remotion_render.json` using a **local 1.5B model**. This is completely free, runs on CPU, and has no usage limits.
 
 ```python
 # ==============================================================================
-# COUNTERISM STUDIO V4 — AI JSON MASTER GENERATOR
+# COUNTERISM STUDIO V4 — LOCAL AI JSON MASTER GENERATOR
 # ==============================================================================
 
 import os
-from google.colab import drive, userdata
+from google.colab import drive
 
 def print_banner(text):
     print("\n" + "="*80)
@@ -20,6 +20,8 @@ PROJECT_NAME = "counterism-engine"
 DRIVE_BASE_PATH = "/content/drive/MyDrive/Counterism_Studio_V4"
 MANIFEST_DIR = f"{DRIVE_BASE_PATH}/manifests"
 OUTPUT_JSON = f"{MANIFEST_DIR}/remotion_render.json"
+# Qwen 2.5 1.5B is highly capable and fast on CPU
+MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
 
 # 2. Setup
 print_banner("📂 MOUNTING GOOGLE DRIVE")
@@ -30,22 +32,18 @@ if not os.path.exists(PROJECT_NAME):
     !git clone https://github.com/mailsabbirdu-bot/counterism-engine
 %cd {PROJECT_NAME}/remotion_jsonMaker
 
-print_banner("🛠️ INSTALLING AI DEPENDENCIES")
+print_banner("🛠️ INSTALLING LOCAL LLM STACK")
+# We use a lightweight stack optimized for CPU inference
 !pip install -r requirements.txt
 
-# 3. Get User Inputs
+# 3. Get User Input
 print_banner("📝 CONTENT GENERATION")
-# Note: You should have a GEMINI_API_KEY stored in Colab Secrets
-try:
-    api_key = userdata.get('GEMINI_API_KEY')
-except:
-    api_key = input("🔑 Enter your Gemini API Key: ")
-
 story_prompt = input("\n🎬 Describe the story or topic for your video: \n> ")
 
 # 4. Generate Master JSON
-print_banner("🧠 AI GENERATION IN PROGRESS")
-!python generator.py --story="{story_prompt}" --api-key="{api_key}" --output="{OUTPUT_JSON}"
+print_banner("🧠 LOCAL AI INFERENCE (CPU)")
+# Loading and inference will happen locally on the Colab instance
+!python generator.py --story="{story_prompt}" --model="{MODEL_ID}" --output="{OUTPUT_JSON}"
 
 print_banner("🏁 MASTER JSON READY")
 print(f"Your master manifest has been saved to: {OUTPUT_JSON}")
