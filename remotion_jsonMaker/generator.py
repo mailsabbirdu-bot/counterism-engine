@@ -6,7 +6,7 @@ import time
 import subprocess
 from typing import Dict, Any
 from playwright.sync_api import sync_playwright
-from playwright_stealth import stealth
+import playwright_stealth
 
 class RemotionJsonMaker:
     def __init__(self, user_data_dir: str = None, headless: bool = True):
@@ -63,15 +63,15 @@ class RemotionJsonMaker:
             return full_match
 
         # Match blocks that contain both video_path and duration_in_frames
-        # We look for these pairs within a short distance of each other (e.g. 200 chars)
-        # This handles both JSON-like blocks and raw text lists.
+        # We look for these pairs without allowing another video_path or duration_in_frames in between
+        # to avoid crossing scene boundaries.
 
         # Pattern 1: video_path followed by duration_in_frames
-        pattern = r'("video_path":\s*"[^"]+".{0,200}?"duration_in_frames"\s*:\s*\d+)'
+        pattern = r'("video_path":\s*"[^"]+"(?:(?!"video_path"|"duration_in_frames").){0,150}?"duration_in_frames"\s*:\s*\d+)'
         text = re.sub(pattern, replacement_logic, text, flags=re.DOTALL)
 
         # Pattern 2: duration_in_frames followed by video_path
-        pattern_rev = r'("duration_in_frames"\s*:\s*\d+.{0,200}?"video_path":\s*"[^"]+")'
+        pattern_rev = r'("duration_in_frames"\s*:\s*\d+(?:(?!"video_path"|"duration_in_frames").){0,150}?"video_path":\s*"[^"]+")'
         text = re.sub(pattern_rev, replacement_logic, text, flags=re.DOTALL)
 
         return text
@@ -81,17 +81,17 @@ class RemotionJsonMaker:
 
         # Load local guideline.md from the repository root
         if os.path.exists(local_guideline_path):
-            with open(local_guideline_path, 'r') as f:
+            with open(local_guideline_path, 'r', encoding='utf-8') as f:
                 guidelines += f"\n--- ENGINE SYSTEM GUIDELINES ---\n{f.read()}\n"
 
         # Load local guideline_prompt.txt from the repository root
         if os.path.exists(local_prompt_path):
-            with open(local_prompt_path, 'r') as f:
+            with open(local_prompt_path, 'r', encoding='utf-8') as f:
                 guidelines += f"\n--- TECHNICAL SCHEMA & COMPONENTS ---\n{f.read()}\n"
 
         # Load drive guideline_prompt.txt (this contains story and specific instructions)
         if drive_prompt_path and os.path.exists(drive_prompt_path):
-            with open(drive_prompt_path, 'r') as f:
+            with open(drive_prompt_path, 'r', encoding='utf-8') as f:
                 guidelines += f"\n--- STORY AND DURATION SPECIFICATIONS (DRIVE) ---\n{f.read()}\n"
 
         return guidelines
@@ -99,6 +99,10 @@ class RemotionJsonMaker:
     def generate(self, story: str, guidelines: str, prompt_output_path: str = None) -> Dict[str, Any]:
         # Clean guidelines: Remove the example JSON to prevent hallucination
         guidelines = re.sub(r'## 📝 Comprehensive Reference Example.*', '', guidelines, flags=re.DOTALL)
+
+        print("⚖️ Checking and adjusting video durations in prompt for 30fps target...")
+        story = self.adjust_durations_in_text(story)
+        guidelines = self.adjust_durations_in_text(guidelines)
 
         full_prompt = (
             "You are a Remotion V4 JSON master. Return ONLY raw JSON. No markdown. No comments. "
@@ -111,7 +115,7 @@ class RemotionJsonMaker:
         # Save the prompt to a file if requested
         if prompt_output_path:
             os.makedirs(os.path.dirname(prompt_output_path), exist_ok=True)
-            with open(prompt_output_path, 'w') as f:
+            with open(prompt_output_path, 'w', encoding='utf-8') as f:
                 f.write(full_prompt)
             print(f"📝 Prompt saved to: {prompt_output_path}")
 
@@ -135,7 +139,7 @@ class RemotionJsonMaker:
                 context = browser.new_context()
 
             page = context.new_page()
-            stealth(page)
+            playwright_stealth.Stealth().apply_stealth_sync(page)
 
             print("🌐 Navigating to Gemini...")
             page.goto("https://gemini.google.com/app", wait_until="networkidle", timeout=60000)
@@ -250,7 +254,7 @@ def main():
     # Determine the story source
     story = args.story
     if args.story_file and os.path.exists(args.story_file):
-        with open(args.story_file, 'r') as f:
+        with open(args.story_file, 'r', encoding='utf-8') as f:
             story = f.read()
 
     if not story:
@@ -266,11 +270,6 @@ def main():
 
     print("📋 Loading guidelines and context...")
     guidelines = maker.load_guidelines(local_guideline, local_prompt, drive_prompt)
-
-    print("⚖️ Checking and adjusting video durations for 30fps target...")
-    # Adjust in guidelines (which might contain the story) and the story itself
-    story = maker.adjust_durations_in_text(story)
-    guidelines = maker.adjust_durations_in_text(guidelines)
 
     print(f"✨ Generating JSON for story via Gemini...")
     try:
