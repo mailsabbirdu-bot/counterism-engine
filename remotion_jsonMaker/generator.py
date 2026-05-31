@@ -7,7 +7,7 @@ from transformers import pipeline
 from typing import Dict, Any
 
 class RemotionJsonMaker:
-    def __init__(self, model_id: str = "Qwen/Qwen2.5-1.5B-Instruct"):
+    def __init__(self, model_id: str = "meta-llama/Llama-3.2-1B-Instruct"):
         print(f"Loading local model: {model_id} (CPU optimized)...")
         # Use CPU, fp32 or bfloat16 depending on availability. On Colab CPU, float32 is safest.
         self.pipe = pipeline(
@@ -15,6 +15,7 @@ class RemotionJsonMaker:
             model=model_id,
             torch_dtype=torch.float32,
             device_map="cpu",
+            clean_up_tokenization_spaces=True
         )
 
     def load_guidelines(self, local_guideline_path: str, local_prompt_path: str, drive_prompt_path: str) -> str:
@@ -38,17 +39,25 @@ class RemotionJsonMaker:
         return guidelines
 
     def generate(self, story: str, guidelines: str) -> Dict[str, Any]:
+        # Truncate story and guidelines to prevent context bloat on CPU
+        # 1.5B/1B models have limited context attention on CPU.
+        # We cap at ~3000 tokens (approx 12000 chars) total.
+        max_chars = 6000
+        truncated_guidelines = guidelines[-max_chars:] # Keep the end (most specific parts)
+        truncated_story = story[:max_chars] # Keep the beginning (main story)
+
         messages = [
-            {"role": "system", "content": "You are a specialized JSON generator for the Counterism Studio V4 Remotion engine. Return ONLY valid JSON."},
-            {"role": "user", "content": f"{guidelines}\n\n--- USER STORY/TOPIC ---\n{story}\n\n--- TASK ---\nGenerate a 'remotion_render.json' based on the story. Follow all engine rules. Return ONLY the raw JSON object, no markdown, no explanation."}
+            {"role": "system", "content": "You are a specialized JSON generator. Return ONLY raw JSON."},
+            {"role": "user", "content": f"{truncated_guidelines}\n\nSTORY:\n{truncated_story}\n\nTASK:\nGenerate 'remotion_render.json' for the story. Use the engine rules. Return ONLY JSON."}
         ]
 
         # Use the pipeline to generate text
-        print("🧠 Running local inference (this may take a few minutes on CPU)...")
+        print("🧠 Running local inference (this usually takes 2-5 minutes on CPU)...")
         outputs = self.pipe(
             messages,
-            max_new_tokens=2048,
-            do_sample=False, # Deterministic for better JSON structure
+            max_new_tokens=1500,
+            do_sample=True,
+            temperature=0.1, # Low temperature for consistency
         )
 
         raw_output = outputs[0]["generated_text"][-1]["content"]
@@ -74,9 +83,13 @@ def main():
     parser.add_argument("--story", help="The story or topic for the video")
     parser.add_argument("--story-file", help="Path to a text file containing the story/topic")
     parser.add_argument("--output", required=True, help="Path to save remotion_render.json")
-    parser.add_argument("--model", default="Qwen/Qwen2.5-1.5B-Instruct", help="HuggingFace Model ID")
+    parser.add_argument("--model", default="meta-llama/Llama-3.2-1B-Instruct", help="HuggingFace Model ID")
+    parser.add_argument("--hf-token", help="HuggingFace API Token (optional)")
 
     args = parser.parse_args()
+
+    if args.hf_token:
+        os.environ["HF_TOKEN"] = args.hf_token
 
     # Determine the story source
     story = args.story
@@ -93,7 +106,11 @@ def main():
     # Paths are hardcoded for the specific Colab environment
     local_guideline = "../guideline.md"
     local_prompt = "../guideline_prompt.txt"
+    # Drive prompt is excluded from guidelines if it's the story source to avoid redundancy
     drive_prompt = "/content/drive/MyDrive/Counterism_Studio_V4/manifests/guideline_prompt.txt"
+
+    if args.story_file == drive_prompt:
+        drive_prompt = "" # Prevent loading same 11k file twice
 
     print("📋 Loading guidelines...")
     guidelines = maker.load_guidelines(local_guideline, local_prompt, drive_prompt)
