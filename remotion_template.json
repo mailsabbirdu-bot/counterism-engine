@@ -46,7 +46,7 @@
 "font": "Montserrat",
 "position": { "x": 960, "y": 440 },
 "start": 0,
-duration": 300,
+"duration": 300,
 "animation": "cinematicGlow",
 "zIndex": 50
 },
