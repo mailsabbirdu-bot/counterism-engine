@@ -20,8 +20,8 @@ PROJECT_NAME = "counterism-engine"
 DRIVE_BASE_PATH = "/content/drive/MyDrive/Counterism_Studio_V4"
 MANIFEST_DIR = f"{DRIVE_BASE_PATH}/manifests"
 OUTPUT_JSON = f"{MANIFEST_DIR}/remotion_render.json"
-# Llama 3.2 1B is highly capable and ultra-fast on CPU
-MODEL_ID = "meta-llama/Llama-3.2-1B-Instruct"
+# Qwen 2.5 1.5B is non-gated and highly efficient on CPU
+MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
 
 # 2. Setup
 print_banner("📂 MOUNTING GOOGLE DRIVE")
