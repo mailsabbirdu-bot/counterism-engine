@@ -75,10 +75,10 @@
           "id": "chart_22", "type": "chart", "chart_type": "donut", "title": "System Storage", "data": [ { "id": "Used", "value": 80 }, { "id": "Free", "value": 20 } ], "start": 1890, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "chart_23", "type": "chart", "chart_type": "treemap", "title": "File Structure", "data": { "name": "root", "children": [ { "name": "A", "value": 100 } ] }, "start": 1980, "duration": 90, "position": { "x": 960, "y": 540 }
+          "id": "chart_23", "type": "chart", "chart_type": "treemap", "title": "File Structure", "data": { "name": "root", "children": [ { "name": "A", "value": 100 }, { "name": "B", "value": 150 }, { "name": "C", "value": 80 } ] }, "start": 1980, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "chart_24", "type": "chart", "chart_type": "sunburst", "title": "Hierarchy", "data": { "name": "root", "children": [ { "name": "A", "value": 50 } ] }, "start": 2070, "duration": 90, "position": { "x": 960, "y": 540 }
+          "id": "chart_24", "type": "chart", "chart_type": "sunburst", "title": "Hierarchy", "data": { "name": "root", "children": [ { "name": "A", "children": [{ "name": "A1", "value": 20 }, { "name": "A2", "value": 30 }] }, { "name": "B", "value": 50 } ] }, "start": 2070, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
           "id": "chart_25", "type": "chart", "chart_type": "histogram", "title": "Age Distribution", "data": [ { "bin": "10-20", "count": 50 } ], "start": 2160, "duration": 90, "position": { "x": 960, "y": 540 }
@@ -102,7 +102,7 @@
           "id": "chart_31", "type": "chart", "chart_type": "chord", "title": "Relationships", "keys": ["A", "B"], "data": [ [0, 10], [10, 0] ], "start": 2700, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "chart_32", "type": "chart", "chart_type": "network", "title": "Social Graph", "data": { "nodes": [{ "id": "A" }], "links": [] }, "start": 2790, "duration": 90, "position": { "x": 960, "y": 540 }
+          "id": "chart_32", "type": "chart", "chart_type": "network", "title": "Social Graph", "data": { "nodes": [{ "id": "A", "color": "red" }, { "id": "B", "color": "blue" }, { "id": "C", "color": "green" }], "links": [{ "source": "A", "target": "B", "distance": 100 }, { "source": "B", "target": "C", "distance": 100 }] }, "start": 2790, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
           "id": "chart_33", "type": "chart", "chart_type": "choropleth", "title": "Heat Map", "features": { "features": [ { "id": "BGD", "properties": { "name": "Bangladesh" }, "geometry": { "type": "Polygon", "coordinates": [[[88.0, 24.0], [92.0, 24.0], [92.0, 21.0], [88.0, 21.0], [88.0, 24.0]]] } } ] }, "data": [ { "id": "BGD", "value": 500000 } ], "start": 2880, "duration": 90, "position": { "x": 960, "y": 540 }
