@@ -89,10 +89,29 @@ The `shots` system handles smooth transitions between focal points automatically
 - `position`: `{ x: number, y: number }`.
 
 ### 3. `chart` (Nivo Data Viz)
-- `chart_type`: `"line"` \| `"bar"`.
+Comprehensive data visualization system for documentaries and infographics.
+- `chart_type`:
+  - **Comparison:** `"horizontalBar"` (rankings), `"verticalBar"` (categories), `"groupedBar"` (multi-series), `"stackedBar"` (composition), `"barRace"` (dynamic rankings).
+  - **Time Series:** `"line"` (trends), `"multiLine"` (multi-trends), `"area"` (magnitude), `"stackedArea"` (changing composition), `"forecast"` (predictions).
+  - **Composition:** `"pie"` (few categories), `"donut"` (composition + center), `"treemap"` (large hierarchies), `"sunburst"` (nested hierarchies).
+  - **Distribution:** `"histogram"` (density), `"boxPlot"` (outliers), `"violinPlot"` (density spread).
+  - **Relational/Flow:** `"scatter"` (correlation), `"bubble"` (3D data), `"sankey"` (flow), `"chord"` (connections).
+  - **Advanced:** `"network"` (relationships), `"choropleth"` (geographic density), `"bubbleMap"` (point-based geography).
 - `title`, `subtitle`: Header strings.
-- `data`: Standard Nivo data array.
+- `data`: Standard Nivo data array/object.
+- `keys`: `string[]` (Required for bar/chord/barRace).
+- `indexBy`: `string` (Required for bar/barRace).
 - `width`, `height`: Canvas size.
+- `position`: `{ x: number, y: number }`.
+
+### 4. `data_indicator` (Modern Metrics)
+Fluid, Framer-motion driven indicators for single metrics.
+- `indicator_type`:
+  - **Numeric:** `"kpiNumber"` (single big stat), `"percentageCounter"` (0-100 progress), `"comparisonKPI"` (two values side-by-side), `"deltaIndicator"` (+/- % change), `"countdown"` (approaching event).
+  - **Progress:** `"progressBar"` (horizontal growth), `"circularProgress"` (conic-fill circle), `"semiGauge"` (speedometer-style), `"milestoneTracker"` (step-by-step phases).
+  - **Cards & Timelines:** `"dashboardCard"` (summary tile), `"timeline"` (chronological event list), `"milestoneTimeline"` (major historical stages).
+- `value`, `label`, `prefix`, `suffix`: Data fields.
+- `milestones`, `events`: Arrays for trackers and timelines.
 - `position`: `{ x: number, y: number }`.
 
 ### 4. `video` & `image` (Media Overlays)

@@ -6,6 +6,7 @@ import { ShapesEngine } from './engines/ShapesEngine';
 import { ChartsEngine } from './engines/ChartsEngine';
 import { GraphsEngine } from './engines/GraphsEngine';
 import { MediaEngine } from './engines/MediaEngine';
+import { DataIndicatorEngine } from './engines/DataIndicatorEngine';
 
 interface OverlayManagerProps {
   overlays: any[];
@@ -25,6 +26,8 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays }) => {
               return <ShapesEngine overlay={overlay} />;
             case 'chart':
               return <ChartsEngine overlay={overlay} />;
+            case 'data_indicator':
+              return <DataIndicatorEngine overlay={overlay} />;
             case 'graph':
               return <GraphsEngine overlay={overlay} />;
             case 'video':

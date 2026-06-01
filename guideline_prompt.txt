@@ -31,17 +31,29 @@ The V4 engine supports a sophisticated 3D camera. To create professional results
     - `iconType`: "terminal", "security", "activity", "cpu", "box".
     - `initialProgress` / `targetProgress`: 0-100. Animates a progress bar.
 3.  **`chart`**: High-end data visualization.
-    - `chart_type`: "line" or "bar".
-    - `data`: Standard Nivo array format.
-4.  **`graph`**: Animated node-link network.
+    - `chart_type`:
+      - Comparison: "horizontalBar", "verticalBar", "groupedBar", "stackedBar", "barRace" (racing ranks).
+      - Time Series: "line", "multiLine", "area", "stackedArea", "forecast".
+      - Composition: "pie", "donut", "treemap", "sunburst".
+      - Distribution/Relationship: "histogram", "boxPlot", "violinPlot", "scatter", "bubble".
+      - Complex: "sankey", "chord", "network", "choropleth" (maps), "bubbleMap".
+    - `data`: Standard Nivo format.
+    - `keys`, `indexBy`: Required for bar/chord charts.
+4.  **`data_indicator`**: Single metric visualizations.
+    - `indicator_type`:
+      - Numeric: "kpiNumber", "percentageCounter", "comparisonKPI", "deltaIndicator", "countdown".
+      - Progress: "progressBar", "circularProgress", "semiGauge", "milestoneTracker".
+      - Layout: "dashboardCard", "timeline", "milestoneTimeline".
+    - `value`, `label`, `prefix`, `suffix`, `milestones`, `events`: Data fields.
+5.  **`graph`**: Animated node-link network.
     - `nodes`: number (20-100).
     - `links`: number.
     - `nodeColor`, `linkColor`: Hex or rgba.
-5.  **`shape`**: Geometric background elements.
+6.  **`shape`**: Geometric background elements.
     - `shape_type`: "circle", "rect", "line".
     - `animation`: "pulse", "float", "morph".
     - `decorated`: true/false (adds orbit rings).
-6.  **`video` / `image`**: External media.
+7.  **`video` / `image`**: External media.
     - `src`: Path relative to `public/`.
     - `borderRadius`, `shadow`, `border`: Styling options.
 
