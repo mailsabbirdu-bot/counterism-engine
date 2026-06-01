@@ -13,21 +13,43 @@ class RemotionJsonMaker:
         self.user_data_dir = user_data_dir
         self.headless = headless
 
-    def probe_video_fps(self, video_path: str) -> float:
-        """Probes a video file for its FPS using ffprobe."""
+    def probe_video_duration_and_fps(self, video_path: str):
+        """Probes a video file for its duration and FPS using ffprobe."""
         try:
             cmd = [
-                "ffprobe", "-v", "0", "-of", "csv=p=0", "-select_streams", "v:0",
-                "-show_entries", "stream=avg_frame_rate", video_path
+                "ffprobe", "-v", "error", "-select_streams", "v:0",
+                "-show_entries", "stream=duration,nb_frames,r_frame_rate",
+                "-of", "json", video_path
             ]
-            output = subprocess.check_output(cmd).decode("utf-8").strip()
-            if "/" in output:
-                num, den = map(float, output.split("/"))
-                return num / den
-            return float(output)
+            output = subprocess.check_output(cmd).decode("utf-8")
+            data = json.loads(output)
+            if not data.get('streams'):
+                # Fallback for some formats
+                cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", video_path]
+                output = subprocess.check_output(cmd).decode("utf-8")
+                data = json.loads(output)
+                return float(data['format'].get('duration', 0)), 30.0
+
+            stream = data['streams'][0]
+            duration = float(stream.get('duration', 0))
+            if duration == 0:
+                # Try format duration
+                cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", video_path]
+                output = subprocess.check_output(cmd).decode("utf-8")
+                data = json.loads(output)
+                duration = float(data['format'].get('duration', 0))
+
+            fps_str = stream.get('r_frame_rate', '30/1')
+            if '/' in fps_str:
+                num, den = map(float, fps_str.split('/'))
+                fps = num / den if den != 0 else 30.0
+            else:
+                fps = float(fps_str)
+
+            return duration, fps
         except Exception as e:
-            print(f"⚠️ Warning: Could not probe FPS for {video_path}: {e}")
-            return 30.0
+            print(f"⚠️ Warning: Could not probe video stats for {video_path}: {e}")
+            return 0.0, 30.0
 
     def adjust_durations_in_text(self, text: str, public_dir: str = "../public") -> str:
         """
@@ -40,19 +62,26 @@ class RemotionJsonMaker:
             vpath_match = re.search(r'"video_path":\s*"([^"]+)"', block)
             duration_match = re.search(r'"duration_in_frames"\s*:\s*(\d+)', block)
 
-            if vpath_match and duration_match:
+            if vpath_match:
                 rel_vpath = vpath_match.group(1)
-                orig_duration = int(duration_match.group(1))
-
                 abs_vpath = os.path.join(public_dir, rel_vpath)
-                if os.path.exists(abs_vpath):
-                    fps = self.probe_video_fps(abs_vpath)
-                    if abs(fps - 30.0) > 0.01: # Use a tighter tolerance
-                        new_duration = int(round((orig_duration / fps) * 30))
-                        print(f"⚖️ Adjusting {rel_vpath}: {fps}fps, {orig_duration}f -> {new_duration}f (30fps target)")
 
-                        # Only replace the duration_in_frames value within THIS specific block
-                        return re.sub(r'"duration_in_frames"\s*:\s*\d+', f'"duration_in_frames": {new_duration}', block)
+                if os.path.exists(abs_vpath):
+                    duration_sec, fps = self.probe_video_duration_and_fps(abs_vpath)
+
+                    if duration_sec > 0:
+                        # Most accurate way to target 30fps: use real-world duration in seconds
+                        new_duration = int(round(duration_sec * 30))
+
+                        if duration_match:
+                            orig_duration = int(duration_match.group(1))
+                            if new_duration != orig_duration:
+                                print(f"⚖️ Adjusting {rel_vpath}: {duration_sec}s ({fps}fps source) -> {new_duration}f (30fps target)")
+                                return re.sub(r'"duration_in_frames"\s*:\s*\d+', f'"duration_in_frames": {new_duration}', block)
+                        else:
+                            # If duration wasn't in this specific match block but video_path was,
+                            # we might need to be careful, but the regex patterns below pair them.
+                            pass
 
             return block
 
@@ -94,19 +123,38 @@ class RemotionJsonMaker:
         return guidelines
 
     def generate(self, story: str, guidelines: str, prompt_output_path: str = None) -> Dict[str, Any]:
-        # Clean guidelines: Remove the example JSON to prevent hallucination
-        guidelines = re.sub(r'## 📝 Comprehensive Reference Example.*', '', guidelines, flags=re.DOTALL)
+        # Note: We keep the example JSON in guidelines as it provides critical structure for Nivo charts and Camera shots
 
         print("⚖️ Checking and adjusting video durations in prompt for 30fps target...")
         story = self.adjust_durations_in_text(story)
         guidelines = self.adjust_durations_in_text(guidelines)
 
         full_prompt = (
-            "You are a Remotion V4 JSON master. Return ONLY raw JSON. No markdown. No comments. "
-            "Ensure the output is a single valid JSON object following the TECHNICAL SCHEMA provided.\n\n"
+            "You are a world-class Motion Graphics Director and Remotion V4 JSON Engineer. "
+            "Your task is to generate a high-precision, cinematic JSON manifest.\n\n"
+            "CRITICAL TECHNICAL RULES:\n"
+            "1. DATA ACCURACY (Nivo Charts):\n"
+            "   - 'chart' overlays MUST have a valid 'data' array.\n"
+            "   - Line Chart: [ { 'id': 'Metric Name', 'data': [ { 'x': 'Label', 'y': 123 }, ... ] } ]\n"
+            "   - Bar Chart: [ { 'id': 'Metric Name', 'data': [ { 'x': 'Label', 'y': 123 }, ... ] } ]\n"
+            "   - Ensure all numbers match the story (e.g. 2 crore = 20000000). Use realistic variations for historical data.\n"
+            "2. PROFESSIONAL CINEMATOGRAPHY:\n"
+            "   - USE PRESETS: For the best results, use 'preset': 'slow_push' or 'ken_burns' in the camera object.\n"
+            "   - NO JUMPS: Every 'shot' in the camera array MUST target an overlay that has 'cameraFocus' defined.\n"
+            "   - ZOOM CONSISTENCY: The 'zoom' value in a camera 'shot' MUST EXACTLY MATCH the 'zoom' value in the target overlay's 'cameraFocus' object to prevent visual jumps.\n"
+            "   - ZOOM LIMITS: Keep 'zoom' between 1.1 and 1.8 for text, up to 2.2 for data details. NEVER exceed 3.0.\n"
+            "   - TRANSITIONS: 'inDuration' for shots should be 30-45 frames for smooth movement.\n"
+            "3. DEPTH & LAYERING:\n"
+            "   - Every scene MUST have 3 layers: Background (Shape at -300), Middle (Video at 0), Foreground (Text/UI at 300).\n"
+            "4. CENTER ANCHORING:\n"
+            "   - ALL overlays are center-anchored. Position {x: 960, y: 540} is dead center.\n"
+            "   - If you place text at y: 540, it will be in the middle. For headlines, use y: 400-500.\n\n"
             f"SYSTEM GUIDELINES AND SCHEMA:\n{guidelines}\n\n"
             f"STORY AND SCENE REQUIREMENTS:\n{story}\n\n"
-            "TASK:\nGenerate the complete JSON manifest. Return ONLY the JSON object."
+            "3. CONTENT ACCURACY:\n"
+            "   - Use the EXACT text provided in the story for 'text' overlay 'content' fields. Do not summarize or truncate.\n\n"
+            "TASK:\nGenerate the complete JSON manifest. Ensure Bengali text is used where appropriate. "
+            "Return ONLY the raw JSON object. No markdown, no preamble, no commentary."
         )
 
         # Save the prompt to a file if requested
@@ -208,7 +256,26 @@ class RemotionJsonMaker:
                 raw_output = responses[-1].inner_text()
                 print(f"✅ Response received (Length: {len(raw_output)}).")
 
-                # Extract JSON from potential markdown blocks
+                # Robust JSON extraction
+                # 1. Try to find content between the first { and the last }
+                start_idx = raw_output.find('{')
+                end_idx = raw_output.rfind('}')
+
+                if start_idx != -1 and end_idx != -1:
+                    json_str = raw_output[start_idx:end_idx+1]
+                    try:
+                        return json.loads(json_str)
+                    except json.JSONDecodeError:
+                        # 2. Try deep cleaning markdown and comments if simple extraction fails
+                        cleaned = json_str
+                        cleaned = re.sub(r'//.*$', '', cleaned, flags=re.MULTILINE) # Remove single line comments
+                        cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL) # Remove block comments
+                        try:
+                            return json.loads(cleaned)
+                        except:
+                            pass
+
+                # 3. Fallback to regex if indices failed or were messy
                 json_match = re.search(r'(\{.*\})', raw_output, re.DOTALL)
                 if json_match:
                     try:
@@ -219,15 +286,9 @@ class RemotionJsonMaker:
                         cleaned = re.sub(r'^```\s*', '', cleaned)
                         cleaned = re.sub(r'\s*```$', '', cleaned)
                         return json.loads(cleaned)
-                else:
-                    cleaned = raw_output.strip()
-                    if cleaned.startswith("```json"):
-                        cleaned = cleaned[7:]
-                    if cleaned.startswith("```"):
-                        cleaned = cleaned[3:]
-                    if cleaned.endswith("```"):
-                        cleaned = cleaned[:-3]
-                    return json.loads(cleaned.strip())
+
+                # 4. Final attempt: the raw output stripped
+                return json.loads(raw_output.strip())
 
             finally:
                 if self.user_data_dir:
