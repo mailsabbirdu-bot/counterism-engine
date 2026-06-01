@@ -335,7 +335,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
            data={animatedData}
            xScale={{ type: 'linear', min: 0, max: 'auto' }}
            yScale={{ type: 'linear', min: 0, max: 'auto' }}
-           nodeSize={overlay.chart_type === 'bubble' ? { key: 'z' } : 8}
+           nodeSize={overlay.chart_type === 'bubble' ? (d: any) => d.z : 8}
            blendMode="multiply"
            axisTop={null}
            axisRight={null}
