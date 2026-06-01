@@ -19,18 +19,17 @@ def print_banner(text):
 # 1. Configuration
 PROJECT_NAME = "counterism-engine"
 
-# Input Story Path: /content/drive/MyDrive/Counterism_Studio_V4/manifests/guideline_prompt.txt
-INPUT_DRIVE_PATH = "/content/drive/MyDrive/Counterism_Studio_V4"
-STORY_FILE = f"{INPUT_DRIVE_PATH}/manifests/guideline_prompt.txt"
+# Input/Output Drive Path: /content/drive/MyDrive/Counterism_Studio_V4/
+DRIVE_BASE_PATH = "/content/drive/MyDrive/Counterism_Studio_V4"
+STORY_FILE = f"{DRIVE_BASE_PATH}/manifests/guideline_prompt.txt"
 
-# Output Paths: /content/drive/MyDrive/google audio/Counterism_Studio_V4/manifests/
-OUTPUT_DRIVE_PATH = "/content/drive/MyDrive/google audio/Counterism_Studio_V4"
-OUTPUT_JSON = f"{OUTPUT_DRIVE_PATH}/manifests/remotion_render.json"
-# Prompt Output Path: /content/drive/MyDrive/Counterism_Studio_V4/manifests/
-PROMPT_FILE = f"{INPUT_DRIVE_PATH}/manifests/remotion_prompt.txt"
+# Manifest and Prompt Output Path: /content/drive/MyDrive/Counterism_Studio_V4/manifests/
+OUTPUT_JSON = f"{DRIVE_BASE_PATH}/manifests/remotion_render.json"
+PROMPT_FILE = f"{DRIVE_BASE_PATH}/manifests/remotion_prompt.txt"
 
 # Path for persistent browser session (optional)
-USER_DATA_DIR = f"{OUTPUT_DRIVE_PATH}/browser_session"
+# This can still be kept in a separate folder or same base
+USER_DATA_DIR = f"{DRIVE_BASE_PATH}/browser_session"
 
 # 2. Setup
 print_banner("📂 MOUNTING GOOGLE DRIVE")
@@ -59,7 +58,7 @@ if os.path.exists(STORY_FILE):
     print(f"✅ Found story file at: {STORY_FILE}")
 else:
     print(f"❌ FATAL: Story file NOT FOUND: {STORY_FILE}")
-    print(f"Please ensure your story and durations are in 'guideline_prompt.txt' inside: {INPUT_DRIVE_PATH}/manifests/")
+    print(f"Please ensure your story and durations are in 'guideline_prompt.txt' inside: {DRIVE_BASE_PATH}/manifests/")
     sys.exit("Input story file missing.")
 
 # 4. Generate Master JSON
