@@ -7,10 +7,10 @@
   },
   "scenes": [
     {
-      "scene_id": "scene_SC_01.mp4",
+      "scene_id": "scene-SC-01",
       "duration_in_frames": 128,
       "background_type": "video",
-      "video_path": "renders/scene_SC_01.mp4",
+      "video_path": "renders/scene-SC-01",
       "camera": {
         "enabled": true,
         "perspective": 1800,
@@ -89,10 +89,10 @@
       ]
     },
     {
-      "scene_id": "scene_SC_02.mp4",
+      "scene_id": "scene-SC-02",
       "duration_in_frames": 183,
       "background_type": "video",
-      "video_path": "renders/scene_SC_02.mp4",
+      "video_path": "renders/scene-SC-02",
       "camera": {
         "enabled": true,
         "perspective": 1700,
@@ -168,10 +168,10 @@
       ]
     },
     {
-      "scene_id": "scene_SC_03.mp4",
+      "scene_id": "scene-SC-03",
       "duration_in_frames": 153,
       "background_type": "video",
-      "video_path": "renders/scene_SC_03.mp4",
+      "video_path": "renders/scene-SC-03",
       "camera": {
         "enabled": true,
         "perspective": 1600,
@@ -229,10 +229,10 @@
       ]
     },
     {
-      "scene_id": "scene_SC_04.mp4",
+      "scene_id": "scene-SC-04",
       "duration_in_frames": 169,
       "background_type": "video",
-      "video_path": "renders/scene_SC_04.mp4",
+      "video_path": "renders/scene-SC-04",
       "camera": {
         "enabled": true,
         "perspective": 1800,
@@ -302,10 +302,10 @@
       ]
     },
     {
-      "scene_id": "scene_SC_05.mp4",
+      "scene_id": "scene-SC-05",
       "duration_in_frames": 225,
       "background_type": "video",
-      "video_path": "renders/scene_SC_05.mp4",
+      "video_path": "renders/scene-SC-05",
       "camera": {
         "enabled": true,
         "perspective": 1500,
@@ -365,10 +365,10 @@
       ]
     },
     {
-      "scene_id": "scene_SC_06.mp4",
+      "scene_id": "scene-SC-06",
       "duration_in_frames": 181,
       "background_type": "video",
-      "video_path": "renders/scene_SC_06.mp4",
+      "video_path": "renders/scene-SC-06",
       "camera": {
         "enabled": true,
         "perspective": 1400,
@@ -434,10 +434,10 @@
       ]
     },
     {
-      "scene_id": "scene_SC_07.mp4",
+      "scene_id": "scene-SC-07",
       "duration_in_frames": 126,
       "background_type": "video",
-      "video_path": "renders/scene_SC_07.mp4",
+      "video_path": "renders/scene-SC-07",
       "camera": {
         "enabled": true,
         "perspective": 1600,
