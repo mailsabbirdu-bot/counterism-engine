@@ -1,496 +1,120 @@
 {
-  "project_name": "Dhaka_Earthquake_Timebomb_Documentary",
-  "global_settings": {
-    "width": 1920,
-    "height": 1080,
-    "fps": 30
-  },
+  "project_name": "Data Visualization Preset Showcase",
+  "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
   "scenes": [
     {
-      "scene_id": "scene-SC-01",
-      "duration_in_frames": 128,
-      "background_type": "video",
-      "video_path": "renders/scene-SC-01",
-      "camera": {
-        "enabled": true,
-        "perspective": 1800,
-        "motionBlur": {
-          "enabled": true,
-          "intensity": 0.9
-        },
-        "shake": {
-          "enabled": true,
-          "intensity": 1.2,
-          "speed": 0.7
-        },
-        "shots": [
-          {
-            "targetId": "DHAKA_TITLE",
-            "startFrame": 0,
-            "duration": 64,
-            "zoom": 1.15,
-            "style": "dramatic_reveal",
-            "inDuration": 30
-          },
-          {
-            "targetId": "CITY_LABEL",
-            "startFrame": 64,
-            "duration": 64,
-            "zoom": 1.4,
-            "style": "push_in",
-            "inDuration": 25
-          }
-        ]
-      },
+      "scene_id": "all-presets",
+      "duration_in_frames": 3600,
+      "background_type": "procedural",
+      "procedural_config": { "variant": "neon_grid", "primaryColor": "#050505", "secondaryColor": "#111827" },
       "overlays": [
         {
-          "id": "BG_RING_01",
-          "type": "shape",
-          "shape_type": "circle",
-          "start": 0,
-          "duration": 128,
-          "position": { "x": 960, "y": 540 },
-          "size": 900,
-          "color": "#1e293b",
-          "animation": "pulse",
-          "decorated": true,
-          "zIndex": 10,
-          "depth": -600
+          "id": "stat_1", "type": "data_indicator", "indicator_type": "kpiNumber", "label": "Global Population", "value": 8000000000, "suffix": "+", "start": 0, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "DHAKA_TITLE",
-          "type": "text",
-          "content": "ঢাকা",
-          "start": 0,
-          "duration": 128,
-          "position": { "x": 960, "y": 430 },
-          "fontSize": "170px",
-          "animation": "cinematicGlow",
-          "zIndex": 50,
-          "depth": 250,
-          "cameraFocus": {
-            "zoom": 1.6,
-            "offsetY": -40
-          }
+          "id": "stat_2", "type": "data_indicator", "indicator_type": "percentageCounter", "label": "Internet Access", "value": 67, "start": 90, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "CITY_LABEL",
-          "type": "text",
-          "content": "এই প্ল্যানেটের অন্যতম ক্রাউডেড একটা মেগাসিটি",
-          "start": 18,
-          "duration": 110,
-          "position": { "x": 960, "y": 700 },
-          "fontSize": "58px",
-          "animation": "wordByWord",
-          "splitMode": "word",
-          "zIndex": 50,
-          "depth": 120
-        }
-      ]
-    },
-    {
-      "scene_id": "scene-SC-02",
-      "duration_in_frames": 183,
-      "background_type": "video",
-      "video_path": "renders/scene-SC-02",
-      "camera": {
-        "enabled": true,
-        "perspective": 1700,
-        "motionBlur": {
-          "enabled": true,
-          "intensity": 1
-        },
-        "shake": {
-          "enabled": true,
-          "intensity": 1.5,
-          "speed": 0.8
-        },
-        "shots": [
-          {
-            "targetId": "POPULATION_PANEL",
-            "startFrame": 0,
-            "duration": 90,
-            "zoom": 1.5,
-            "style": "push_in",
-            "inDuration": 40
-          },
-          {
-            "targetId": "PEOPLE_TEXT",
-            "startFrame": 95,
-            "duration": 88,
-            "zoom": 1.25,
-            "style": "pan_right",
-            "inDuration": 30
-          }
-        ]
-      },
-      "overlays": [
-        {
-          "id": "CITY_GRID",
-          "type": "graph",
-          "start": 0,
-          "duration": 183,
-          "position": { "x": 960, "y": 540 },
-          "nodes": 50,
-          "links": 80,
-          "nodeColor": "#60a5fa",
-          "linkColor": "rgba(96,165,250,0.2)",
-          "zIndex": 25,
-          "depth": -350
+          "id": "stat_3", "type": "data_indicator", "indicator_type": "progressBar", "label": "Project Alpha", "value": 85, "start": 180, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "POPULATION_PANEL",
-          "type": "ui_panel",
-          "start": 10,
-          "duration": 173,
-          "position": { "x": 960, "y": 420 },
-          "title": "জনসংখ্যা",
-          "description": "২ কোটিরও বেশি মানুষ",
-          "iconType": "activity",
-          "initialProgress": 0,
-          "targetProgress": 100,
-          "zIndex": 40,
-          "depth": 300
+          "id": "stat_4", "type": "data_indicator", "indicator_type": "circularProgress", "label": "Server Health", "value": 92, "start": 270, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "PEOPLE_TEXT",
-          "type": "text",
-          "content": "এখানে বাঁচছে, লড়ছে আর প্রতিনিয়ত কংক্রিটের পাহাড় বানাচ্ছে",
-          "start": 45,
-          "duration": 138,
-          "position": { "x": 960, "y": 780 },
-          "fontSize": "56px",
-          "animation": "wordByWord",
-          "splitMode": "word",
-          "zIndex": 50,
-          "depth": 150
-        }
-      ]
-    },
-    {
-      "scene_id": "scene-SC-03",
-      "duration_in_frames": 153,
-      "background_type": "video",
-      "video_path": "renders/scene-SC-03",
-      "camera": {
-        "enabled": true,
-        "perspective": 1600,
-        "motionBlur": {
-          "enabled": true,
-          "intensity": 1.1
-        },
-        "shake": {
-          "enabled": true,
-          "intensity": 1.8,
-          "speed": 1
-        },
-        "shots": [
-          {
-            "targetId": "TIMEBOMB_TEXT",
-            "startFrame": 0,
-            "duration": 153,
-            "zoom": 1.8,
-            "style": "dramatic_reveal",
-            "inDuration": 50
-          }
-        ]
-      },
-      "overlays": [
-        {
-          "id": "WARNING_SHAPE",
-          "type": "shape",
-          "shape_type": "circle",
-          "start": 0,
-          "duration": 153,
-          "position": { "x": 960, "y": 540 },
-          "size": 700,
-          "color": "#dc2626",
-          "animation": "pulse",
-          "decorated": true,
-          "zIndex": 10,
-          "depth": -500
+          "id": "stat_5", "type": "data_indicator", "indicator_type": "semiGauge", "label": "Risk Factor", "value": 4.5, "suffix": "/10", "start": 360, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "TIMEBOMB_TEXT",
-          "type": "text",
-          "content": "কিন্তু এই সাম্রাজ্যের নিচেই লুকিয়ে আছে একটা টাইমবোম্ব",
-          "start": 0,
-          "duration": 153,
-          "position": { "x": 960, "y": 540 },
-          "fontSize": "82px",
-          "animation": "cinematicGlow",
-          "zIndex": 50,
-          "depth": 300,
-          "cameraFocus": {
-            "zoom": 1.9,
-            "offsetY": 0
-          }
-        }
-      ]
-    },
-    {
-      "scene_id": "scene-SC-04",
-      "duration_in_frames": 169,
-      "background_type": "video",
-      "video_path": "renders/scene-SC-04",
-      "camera": {
-        "enabled": true,
-        "perspective": 1800,
-        "motionBlur": {
-          "enabled": true,
-          "intensity": 0.9
-        },
-        "shake": {
-          "enabled": true,
-          "intensity": 1.4,
-          "speed": 0.9
-        },
-        "shots": [
-          {
-            "targetId": "CLOCK_TEXT",
-            "startFrame": 0,
-            "duration": 80,
-            "zoom": 1.4,
-            "style": "push_in"
-          },
-          {
-            "targetId": "SEISMIC_CHART",
-            "startFrame": 85,
-            "duration": 84,
-            "zoom": 1.7,
-            "style": "pan_right"
-          }
-        ]
-      },
-      "overlays": [
-        {
-          "id": "CLOCK_TEXT",
-          "type": "text",
-          "content": "একটা জিওলজিক্যাল ক্লক",
-          "start": 0,
-          "duration": 169,
-          "position": { "x": 960, "y": 250 },
-          "fontSize": "110px",
-          "animation": "slideUp",
-          "zIndex": 50,
-          "depth": 220
+          "id": "stat_6", "type": "data_indicator", "indicator_type": "milestoneTracker", "milestones": [ { "label": "Phase 1" }, { "label": "Phase 2" }, { "label": "Phase 3" } ], "start": 450, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "SEISMIC_CHART",
-          "type": "chart",
-          "chart_type": "line",
-          "start": 40,
-          "duration": 129,
-          "position": { "x": 960, "y": 620 },
-          "width": 900,
-          "height": 450,
-          "zIndex": 30,
-          "depth": 320,
-          "data": [
-            {
-              "id": "risk",
-              "data": [
-                { "x": "T1", "y": 10 },
-                { "x": "T2", "y": 25 },
-                { "x": "T3", "y": 45 },
-                { "x": "T4", "y": 70 },
-                { "x": "T5", "y": 95 }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "scene_id": "scene-SC-05",
-      "duration_in_frames": 225,
-      "background_type": "video",
-      "video_path": "renders/scene-SC-05",
-      "camera": {
-        "enabled": true,
-        "perspective": 1500,
-        "motionBlur": {
-          "enabled": true,
-          "intensity": 1.2
-        },
-        "shake": {
-          "enabled": true,
-          "intensity": 2.3,
-          "speed": 1.3
-        },
-        "shots": [
-          {
-            "targetId": "QUAKE_TITLE",
-            "startFrame": 0,
-            "duration": 110,
-            "zoom": 1.7,
-            "style": "dramatic_reveal"
-          },
-          {
-            "targetId": "MAGNITUDE_PANEL",
-            "startFrame": 115,
-            "duration": 110,
-            "zoom": 2,
-            "style": "push_in"
-          }
-        ]
-      },
-      "overlays": [
-        {
-          "id": "QUAKE_TITLE",
-          "type": "text",
-          "content": "নরসিংদীর মাধবদী",
-          "start": 0,
-          "duration": 225,
-          "position": { "x": 960, "y": 300 },
-          "fontSize": "120px",
-          "animation": "cinematicGlow",
-          "zIndex": 50,
-          "depth": 250
+          "id": "stat_7", "type": "data_indicator", "indicator_type": "comparisonKPI", "label1": "Revenue 2023", "value1": 50000, "label2": "Revenue 2024", "value2": 75000, "start": 540, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "MAGNITUDE_PANEL",
-          "type": "ui_panel",
-          "start": 60,
-          "duration": 165,
-          "position": { "x": 960, "y": 650 },
-          "title": "ভূমিকম্প",
-          "description": "রিখটার স্কেল ৫.৭",
-          "iconType": "activity",
-          "initialProgress": 0,
-          "targetProgress": 57,
-          "zIndex": 40,
-          "depth": 350
-        }
-      ]
-    },
-    {
-      "scene_id": "scene-SC-06",
-      "duration_in_frames": 181,
-      "background_type": "video",
-      "video_path": "renders/scene-SC-06",
-      "camera": {
-        "enabled": true,
-        "perspective": 1400,
-        "motionBlur": {
-          "enabled": true,
-          "intensity": 1.3
-        },
-        "shake": {
-          "enabled": true,
-          "intensity": 3,
-          "speed": 1.8
-        },
-        "shots": [
-          {
-            "targetId": "AFTERSHOCK_TITLE",
-            "startFrame": 0,
-            "duration": 80,
-            "zoom": 1.4,
-            "style": "push_in"
-          },
-          {
-            "targetId": "AFTERSHOCK_CHART",
-            "startFrame": 85,
-            "duration": 96,
-            "zoom": 1.9,
-            "style": "whip_pan"
-          }
-        ]
-      },
-      "overlays": [
-        {
-          "id": "AFTERSHOCK_TITLE",
-          "type": "text",
-          "content": "পর পর তিনটা মারাত্মক আফটারশক",
-          "start": 0,
-          "duration": 181,
-          "position": { "x": 960, "y": 250 },
-          "fontSize": "90px",
-          "animation": "wordByWord",
-          "splitMode": "word",
-          "zIndex": 50,
-          "depth": 200
+          "id": "stat_8", "type": "data_indicator", "indicator_type": "deltaIndicator", "label": "Stock Price", "value": 12.5, "start": 630, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "AFTERSHOCK_CHART",
-          "type": "chart",
-          "chart_type": "bar",
-          "start": 40,
-          "duration": 141,
-          "position": { "x": 960, "y": 650 },
-          "width": 850,
-          "height": 420,
-          "keys": ["value"],
-          "indexBy": "label",
-          "data": [
-            { "label": "১", "value": 82 },
-            { "label": "২", "value": 91 },
-            { "label": "৩", "value": 88 }
-          ],
-          "zIndex": 30,
-          "depth": 350
-        }
-      ]
-    },
-    {
-      "scene_id": "scene-SC-07",
-      "duration_in_frames": 126,
-      "background_type": "video",
-      "video_path": "renders/scene-SC-07",
-      "camera": {
-        "enabled": true,
-        "perspective": 1600,
-        "motionBlur": {
-          "enabled": true,
-          "intensity": 1
-        },
-        "shake": {
-          "enabled": true,
-          "intensity": 2.5,
-          "speed": 1.2
-        },
-        "shots": [
-          {
-            "targetId": "WAKEUP_CALL",
-            "startFrame": 0,
-            "duration": 126,
-            "zoom": 2,
-            "style": "dramatic_reveal",
-            "inDuration": 35
-          }
-        ]
-      },
-      "overlays": [
-        {
-          "id": "FINAL_RING",
-          "type": "shape",
-          "shape_type": "circle",
-          "start": 0,
-          "duration": 126,
-          "position": { "x": 960, "y": 540 },
-          "size": 800,
-          "color": "#ef4444",
-          "animation": "pulse",
-          "decorated": true,
-          "zIndex": 10,
-          "depth": -500
+          "id": "stat_9", "type": "data_indicator", "indicator_type": "countdown", "seconds": 3, "start": 720, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "WAKEUP_CALL",
-          "type": "text",
-          "content": "এটা ছিল একটা ওয়েক-আপ কল",
-          "start": 0,
-          "duration": 126,
-          "position": { "x": 960, "y": 540 },
-          "fontSize": "120px",
-          "animation": "cinematicGlow",
-          "zIndex": 50,
-          "depth": 350,
-          "cameraFocus": {
-            "zoom": 2.2,
-            "offsetY": 0
-          }
+          "id": "stat_10", "type": "data_indicator", "indicator_type": "dashboardCard", "label": "Active Users", "value": 15420, "prefix": "", "trend": "+18%", "start": 810, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_11", "type": "chart", "chart_type": "horizontalBar", "title": "GDP Comparison", "indexBy": "country", "keys": ["gdp"], "data": [ { "country": "USA", "gdp": 25 }, { "country": "China", "gdp": 18 }, { "country": "Japan", "gdp": 5 } ], "start": 900, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_12", "type": "chart", "chart_type": "verticalBar", "title": "Quarterly Sales", "indexBy": "q", "keys": ["sales"], "data": [ { "q": "Q1", "sales": 100 }, { "q": "Q2", "sales": 150 } ], "start": 990, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_13", "type": "chart", "chart_type": "groupedBar", "title": "Gender Distribution", "indexBy": "year", "keys": ["male", "female"], "data": [ { "year": "2020", "male": 45, "female": 55 } ], "start": 1080, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_14", "type": "chart", "chart_type": "stackedBar", "title": "Energy Mix", "indexBy": "type", "keys": ["solar", "wind"], "data": [ { "type": "renewables", "solar": 30, "wind": 70 } ], "start": 1170, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_15", "type": "chart", "chart_type": "barRace", "title": "Population Race", "indexBy": "country", "keys": ["val"], "data": [ { "country": "India", "val": 1400 }, { "country": "China", "val": 1410 } ], "start": 1260, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_16", "type": "chart", "chart_type": "line", "title": "Growth Trend", "data": [ { "id": "g", "data": [ { "x": 0, "y": 0 }, { "x": 10, "y": 100 } ] } ], "start": 1350, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_17", "type": "chart", "chart_type": "multiLine", "title": "Stock Trends", "data": [ { "id": "A", "data": [{ "x": "Jan", "y": 10 }, { "x": "Feb", "y": 25 }, { "x": "Mar", "y": 15 }] }, { "id": "B", "data": [{ "x": "Jan", "y": 20 }, { "x": "Feb", "y": 15 }, { "x": "Mar", "y": 30 }] } ], "start": 1440, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_18", "type": "chart", "chart_type": "area", "title": "Network Traffic", "data": [ { "id": "t", "data": [{ "x": 0, "y": 50 }, { "x": 10, "y": 80 }] } ], "start": 1530, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_19", "type": "chart", "chart_type": "stackedArea", "title": "Cloud Usage", "data": [ { "id": "A", "data": [{ "x": "W1", "y": 50 }, { "x": "W2", "y": 80 }, { "x": "W3", "y": 60 }] } ], "start": 1620, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_20", "type": "chart", "chart_type": "forecast", "title": "Sales Projection", "data": [ { "id": "f", "data": [{ "x": "W1", "y": 50 }, { "x": "W2", "y": 55 }, { "x": "W3", "y": 70 }] } ], "start": 1710, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_21", "type": "chart", "chart_type": "pie", "title": "Market Share", "data": [ { "id": "A", "value": 50 }, { "id": "B", "value": 50 } ], "start": 1800, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_22", "type": "chart", "chart_type": "donut", "title": "System Storage", "data": [ { "id": "Used", "value": 80 }, { "id": "Free", "value": 20 } ], "start": 1890, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_23", "type": "chart", "chart_type": "treemap", "title": "File Structure", "data": { "name": "root", "children": [ { "name": "A", "value": 100 }, { "name": "B", "value": 150 }, { "name": "C", "value": 80 } ] }, "start": 1980, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_24", "type": "chart", "chart_type": "sunburst", "title": "Hierarchy", "data": { "name": "root", "children": [ { "name": "A", "children": [{ "name": "A1", "value": 20 }, { "name": "A2", "value": 30 }] }, { "name": "B", "value": 50 } ] }, "start": 2070, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_25", "type": "chart", "chart_type": "histogram", "title": "Age Distribution", "data": [ { "bin": "10-20", "count": 50 } ], "start": 2160, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_26", "type": "chart", "chart_type": "boxPlot", "title": "Salary Spread", "data": [ { "group": "A", "mu": 50, "sd": 10 } ], "start": 2250, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_27", "type": "chart", "chart_type": "violinPlot", "title": "Data Density", "data": [ { "label": "Group A", "value": 100 } ], "start": 2340, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_28", "type": "chart", "chart_type": "scatter", "title": "Price vs Quality", "data": [ { "id": "A", "data": [{ "x": 10, "y": 20 }] } ], "start": 2430, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_29", "type": "chart", "chart_type": "bubble", "title": "Size Matters", "data": [ { "id": "A", "data": [{ "x": 10, "y": 20, "z": 50 }, { "x": 20, "y": 40, "z": 80 }, { "x": 30, "y": 30, "z": 40 }] } ], "start": 2520, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_30", "type": "chart", "chart_type": "sankey", "title": "Cash Flow", "data": { "nodes": [{ "id": "A" }, { "id": "B" }], "links": [{ "source": "A", "target": "B", "value": 10 }] }, "start": 2610, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_31", "type": "chart", "chart_type": "chord", "title": "Relationships", "keys": ["A", "B"], "data": [ [0, 10], [10, 0] ], "start": 2700, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_32", "type": "chart", "chart_type": "network", "title": "Social Graph", "data": { "nodes": [{ "id": "A", "color": "red" }, { "id": "B", "color": "blue" }, { "id": "C", "color": "green" }], "links": [{ "source": "A", "target": "B", "distance": 100 }, { "source": "B", "target": "C", "distance": 100 }] }, "start": 2790, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_33", "type": "chart", "chart_type": "choropleth", "title": "Heat Map", "features": { "features": [ { "id": "BGD", "properties": { "name": "Bangladesh" }, "geometry": { "type": "Polygon", "coordinates": [[[88.0, 24.0], [92.0, 24.0], [92.0, 21.0], [88.0, 21.0], [88.0, 24.0]]] } } ] }, "data": [ { "id": "BGD", "value": 500000 } ], "start": 2880, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "chart_34", "type": "chart", "chart_type": "bubbleMap", "title": "City Points", "features": { "features": [ { "id": "BGD", "properties": { "name": "Bangladesh" }, "geometry": { "type": "Polygon", "coordinates": [[[88.0, 24.0], [92.0, 24.0], [92.0, 21.0], [88.0, 21.0], [88.0, 24.0]]] } } ] }, "bubbles": [{ "x": 50, "y": 50, "size": 30 }], "data": [], "start": 2970, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "stat_35", "type": "data_indicator", "indicator_type": "timeline", "events": [ { "date": "2020", "title": "Start", "description": "Launch" } ], "start": 3060, "duration": 90, "position": { "x": 960, "y": 540 }
+        },
+        {
+          "id": "stat_36", "type": "data_indicator", "indicator_type": "milestoneTimeline", "milestones": [ { "date": "Jan", "title": "Alpha" } ], "start": 3150, "duration": 90, "position": { "x": 960, "y": 540 }
         }
       ]
     }

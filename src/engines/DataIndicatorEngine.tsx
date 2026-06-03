@@ -1,6 +1,5 @@
 import React from 'react';
 import { useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
-import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUp, ArrowDown, Timer, Calendar, Flag, Activity } from 'lucide-react';
 
 export const DataIndicatorEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
