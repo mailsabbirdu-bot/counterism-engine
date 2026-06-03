@@ -57,16 +57,16 @@
           "id": "chart_16", "type": "chart", "chart_type": "line", "title": "Growth Trend", "data": [ { "id": "g", "data": [ { "x": 0, "y": 0 }, { "x": 10, "y": 100 } ] } ], "start": 1350, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "chart_17", "type": "chart", "chart_type": "multiLine", "title": "Stock Trends", "data": [ { "id": "A", "data": [{ "x": 0, "y": 10 }] }, { "id": "B", "data": [{ "x": 0, "y": 20 }] } ], "start": 1440, "duration": 90, "position": { "x": 960, "y": 540 }
+          "id": "chart_17", "type": "chart", "chart_type": "multiLine", "title": "Stock Trends", "data": [ { "id": "A", "data": [{ "x": "Jan", "y": 10 }, { "x": "Feb", "y": 25 }, { "x": "Mar", "y": 15 }] }, { "id": "B", "data": [{ "x": "Jan", "y": 20 }, { "x": "Feb", "y": 15 }, { "x": "Mar", "y": 30 }] } ], "start": 1440, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
           "id": "chart_18", "type": "chart", "chart_type": "area", "title": "Network Traffic", "data": [ { "id": "t", "data": [{ "x": 0, "y": 50 }, { "x": 10, "y": 80 }] } ], "start": 1530, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "chart_19", "type": "chart", "chart_type": "stackedArea", "title": "Cloud Usage", "data": [ { "id": "A", "data": [{ "x": 0, "y": 50 }] } ], "start": 1620, "duration": 90, "position": { "x": 960, "y": 540 }
+          "id": "chart_19", "type": "chart", "chart_type": "stackedArea", "title": "Cloud Usage", "data": [ { "id": "A", "data": [{ "x": "W1", "y": 50 }, { "x": "W2", "y": 80 }, { "x": "W3", "y": 60 }] } ], "start": 1620, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "chart_20", "type": "chart", "chart_type": "forecast", "title": "Sales Projection", "data": [ { "id": "f", "data": [{ "x": 0, "y": 50 }] } ], "start": 1710, "duration": 90, "position": { "x": 960, "y": 540 }
+          "id": "chart_20", "type": "chart", "chart_type": "forecast", "title": "Sales Projection", "data": [ { "id": "f", "data": [{ "x": "W1", "y": 50 }, { "x": "W2", "y": 55 }, { "x": "W3", "y": 70 }] } ], "start": 1710, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
           "id": "chart_21", "type": "chart", "chart_type": "pie", "title": "Market Share", "data": [ { "id": "A", "value": 50 }, { "id": "B", "value": 50 } ], "start": 1800, "duration": 90, "position": { "x": 960, "y": 540 }
@@ -93,7 +93,7 @@
           "id": "chart_28", "type": "chart", "chart_type": "scatter", "title": "Price vs Quality", "data": [ { "id": "A", "data": [{ "x": 10, "y": 20 }] } ], "start": 2430, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
-          "id": "chart_29", "type": "chart", "chart_type": "bubble", "title": "Size Matters", "data": [ { "id": "A", "data": [{ "x": 10, "y": 20, "z": 50 }] } ], "start": 2520, "duration": 90, "position": { "x": 960, "y": 540 }
+          "id": "chart_29", "type": "chart", "chart_type": "bubble", "title": "Size Matters", "data": [ { "id": "A", "data": [{ "x": 10, "y": 20, "z": 50 }, { "x": 20, "y": 40, "z": 80 }, { "x": 30, "y": 30, "z": 40 }] } ], "start": 2520, "duration": 90, "position": { "x": 960, "y": 540 }
         },
         {
           "id": "chart_30", "type": "chart", "chart_type": "sankey", "title": "Cash Flow", "data": { "nodes": [{ "id": "A" }, { "id": "B" }], "links": [{ "source": "A", "target": "B", "value": 10 }] }, "start": 2610, "duration": 90, "position": { "x": 960, "y": 540 }

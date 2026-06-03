@@ -57,20 +57,20 @@ const MapChart: React.FC<{ overlay: any; dataProgress: number; commonProps: any 
 
 const ViolinPlot: React.FC<{ overlay: any; dataProgress: number; commonProps: any }> = ({ overlay, dataProgress }) => {
   return (
-    <div className="flex justify-around items-end h-full w-full pb-10">
+    <div className="flex justify-around items-center h-full w-full px-10">
        {overlay.data.map((group: any, i: number) => (
-            <div key={i} className="relative flex flex-col items-center" style={{ width: '60px' }}>
+            <div key={i} className="relative flex flex-col items-center" style={{ width: '100px' }}>
                <div
-                  className="bg-blue-500/40 border-2 border-blue-400"
+                  className="bg-gradient-to-b from-blue-500/60 via-indigo-500/80 to-blue-500/60 border-2 border-white/30 shadow-[0_0_30px_rgba(59,130,246,0.3)]"
                   style={{
-                    width: '40px',
+                    width: '60px',
                     height: `${group.value * 4 * dataProgress}px`,
-                    borderRadius: '50% 50% 50% 50% / 60% 60% 40% 40%',
-                    transform: 'scaleX(1.5)',
+                    borderRadius: '50% 50% 50% 50% / 80% 80% 20% 20%',
+                    transform: 'scaleX(1.2)',
                   }}
                />
-               <div className="w-1 h-full absolute bg-white/20 -z-10" />
-               <span className="text-white/60 text-[10px] mt-4 font-bold uppercase">{group.label}</span>
+               <div className="w-[2px] h-[300px] absolute bg-white/10 -z-10" />
+               <span className="text-white/80 text-xs mt-6 font-black uppercase tracking-tighter">{group.label}</span>
             </div>
        ))}
     </div>
@@ -211,7 +211,6 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
            borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
            enableLabel={overlay.chart_type === 'barRace'}
            labelTextColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
-           motionConfig="gentle"
          />
        );
     }
@@ -335,7 +334,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
            data={animatedData}
            xScale={{ type: 'linear', min: 0, max: 'auto' }}
            yScale={{ type: 'linear', min: 0, max: 'auto' }}
-           nodeSize={overlay.chart_type === 'bubble' ? (d: any) => d.z : 8}
+           nodeSize={overlay.chart_type === 'bubble' ? (d: any) => d.data.z : 8}
            blendMode="multiply"
            axisTop={null}
            axisRight={null}
@@ -409,7 +408,6 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
             nodeBorderColor={{ from: 'color', modifiers: [['darker', 0.8]] }}
             linkThickness={n => 2 + 2 * (n as any).target.data.index}
             linkColor={{ from: 'source.color' }}
-            motionConfig="molasses"
          />
        );
     }
