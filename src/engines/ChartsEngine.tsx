@@ -394,6 +394,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     }
 
     if (overlay.chart_type === 'network') {
+       if (!overlay.data?.nodes || !overlay.data?.links) return null;
        return (
          <ResponsiveNetwork
             {...commonProps}
