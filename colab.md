@@ -100,21 +100,23 @@ print_banner("💾 SAVING RESULTS TO GOOGLE DRIVE")
 LOCAL_RENDER_DIR = "renders/overlays/remotion"
 DRIVE_RENDER_DIR = f"{DRIVE_BASE_PATH}/renders/overlays/remotion"
 
-if os.path.exists(LOCAL_RENDER_DIR):
+# Check both local and drive locations (since render.ts might output to Drive directly)
+if os.path.exists(LOCAL_RENDER_DIR) or os.path.exists(DRIVE_RENDER_DIR):
     # Ensure Drive destination exists
-    print(f"📡 Ensuring Drive directory exists: {DRIVE_RENDER_DIR}")
+    print(f"📡 Verifying Drive directory: {DRIVE_RENDER_DIR}")
     os.makedirs(DRIVE_RENDER_DIR, exist_ok=True)
 
-    # Use -rv for verbose recursive copy to ensure all nested renders are captured
-    # -u ensures we only update newer files
-    print("📦 Uploading rendered files...")
-    !cp -rvu {LOCAL_RENDER_DIR}/* {DRIVE_RENDER_DIR}/
+    if os.path.exists(LOCAL_RENDER_DIR):
+        print("📦 Syncing local renders to Drive...")
+        !cp -rvu {LOCAL_RENDER_DIR}/* {DRIVE_RENDER_DIR}/
+    else:
+        print("ℹ️  Renders already produced in Drive directory.")
 
     # Final verification of upload
     drive_count = len(os.listdir(DRIVE_RENDER_DIR))
-    print(f"✅ Upload complete. {drive_count} files currently in Drive render folder.")
+    print(f"✅ Process complete. {drive_count} files currently in Drive render folder.")
 else:
-    print("❌ FATAL: Local render directory NOT FOUND. Rendering may have failed.")
+    print("❌ FATAL: Render directory NOT FOUND in local or Drive. Rendering may have failed.")
 
 print_banner("🏁 PROCESS COMPLETE")
 ```

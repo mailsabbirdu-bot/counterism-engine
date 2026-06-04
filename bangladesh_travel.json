@@ -1,0 +1,59 @@
+{
+  "project_name": "Bangladesh District Travel Simulation",
+  "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
+  "scenes": [
+    {
+      "scene_id": "bangladesh-journey",
+      "duration_in_frames": 600,
+      "background_type": "procedural",
+      "procedural_config": { "variant": "mesh", "primaryColor": "#064e3b", "secondaryColor": "#022c22" },
+      "camera": {
+        "enabled": true,
+        "motionBlur": { "enabled": true },
+        "shots": [
+          { "targetId": "BD_MAP", "startFrame": 0, "duration": 600, "zoom": 1.2, "style": "slow_push" }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "BD_MAP",
+          "type": "map",
+          "start": 0,
+          "duration": 600,
+          "position": { "x": 960, "y": 540 },
+          "width": 1400,
+          "height": 900,
+          "scale": 4500,
+          "center": [90.35, 23.8],
+          "topojson_url": "https://raw.githubusercontent.com/sk-sabbir/bangladesh-topojson/master/districts.json",
+          "object_name": "districts",
+          "highlights": ["Dhaka", "Chittagong", "Sylhet", "Rajshahi"],
+          "cities": [
+            { "name": "Dhaka", "coords": [90.41, 23.81] },
+            { "name": "Chittagong", "coords": [91.78, 22.35] },
+            { "name": "Sylhet", "coords": [91.86, 24.89] },
+            { "name": "Rajshahi", "coords": [88.6, 24.37] }
+          ],
+          "routes": [
+            { "from": "Dhaka", "to": "Chittagong", "curve": 0.5, "label": "INTER-CITY" },
+            { "from": "Chittagong", "to": "Sylhet", "curve": 1.2, "label": "COASTAL-NORTH" },
+            { "from": "Sylhet", "to": "Rajshahi", "curve": 0.8, "label": "CROSS-REGIONAL" }
+          ],
+          "zIndex": 30
+        },
+        {
+          "id": "TEXT_OVERLAY",
+          "type": "text",
+          "content": "BANGLADESH\nEXPEDITION",
+          "start": 45,
+          "duration": 510,
+          "position": { "x": 300, "y": 200 },
+          "fontSize": "80px",
+          "animation": "cinematicGlow",
+          "style": "font-black text-emerald-400 uppercase tracking-tighter text-left",
+          "zIndex": 50
+        }
+      ]
+    }
+  ]
+}

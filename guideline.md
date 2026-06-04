@@ -147,7 +147,9 @@ Fluid, Framer-motion driven indicators for single metrics.
 ### 7. `map` (Advanced Vector Geospatial Engine)
 High-fidelity SVG mapping system using D3 and real-world TopoJSON data.
 - `center`: `[longitude, latitude]` (Default: `[0, 20]`).
-- `scale`: `number` (Default: `200`). Controls zoom level.
+- `scale`: `number` (Default: `200`). Controls zoom level (World: 200, Continent: 800, Country: 4000+).
+- `topojson_url`: `string` (Optional). URL to a custom TopoJSON file.
+- `object_name`: `string` (Optional). The key of the geometry object inside the TopoJSON (e.g., `"districts"`, `"countries"`).
 - `cities`: `array` of `{ name: string, coords: [lon, lat] }`.
 - `routes`: `array` of:
   - `from`, `to`: City names defined in `cities`.

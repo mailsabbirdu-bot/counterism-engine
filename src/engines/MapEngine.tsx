@@ -4,7 +4,7 @@ import * as d3 from 'd3-geo';
 import { feature } from 'topojson-client';
 
 // Standard high-quality world TopoJSON URL
-const TOPOJSON_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+const DEFAULT_TOPOJSON = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 interface City {
   name: string;
@@ -20,6 +20,8 @@ interface MapOverlayProps {
     cities?: City[];
     routes?: { from: string; to: string; curve?: number; label?: string }[];
     highlights?: string[]; // IDs or names of countries to highlight
+    topojson_url?: string;
+    object_name?: string; // e.g. 'countries' or 'districts'
     start: number;
     duration: number;
     position?: { x: number; y: number };
@@ -42,11 +44,18 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
   const [handle] = useState(() => delayRender('Loading Map Topology'));
 
   useEffect(() => {
-    fetch(TOPOJSON_URL)
+    const url = overlay.topojson_url || DEFAULT_TOPOJSON;
+    const objName = overlay.object_name || 'countries';
+
+    fetch(url)
       .then(res => res.json())
       .then(data => {
-        const countries = feature(data, data.objects.countries as any);
-        setMapData(countries);
+        // Handle different TopoJSON object keys
+        const obj = data.objects[objName] || Object.values(data.objects)[0];
+        if (!obj) throw new Error(`Object ${objName} not found in TopoJSON`);
+
+        const geojson = feature(data, obj as any);
+        setMapData(geojson);
         continueRender(handle);
       })
       .catch(err => {
@@ -54,7 +63,7 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
         setMapData({ features: [] }); // Fallback to empty map to prevent engine crash
         continueRender(handle);
       });
-  }, []);
+  }, [overlay.topojson_url, overlay.object_name]);
 
   // 1. Setup Projection (Smoothly animates center/scale if needed)
   const projection = useMemo(() => {
@@ -126,7 +135,11 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
         {/* World Map SVG Paths */}
         <g className="map-base">
           {mapData.features.map((feature: any, i: number) => {
-             const isHighlighted = overlay.highlights?.includes(feature.properties.name);
+             const name = feature.properties.name || feature.properties.NAME_1 || feature.properties.NAME || feature.id;
+             const isHighlighted = overlay.highlights?.some(h =>
+                h.toLowerCase() === name?.toString().toLowerCase()
+             );
+
              return (
                 <path
                   key={`country-${i}`}
