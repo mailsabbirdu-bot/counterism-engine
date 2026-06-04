@@ -68,7 +68,13 @@ The V4 engine supports a sophisticated 3D camera. To create professional results
 ## 📐 Design Philosophy
 - **Layering**: Always use at least 3 layers of depth to make camera moves feel 3D.
 - **Timing**: Stagger `start` frames so elements enter in sequence (0, 15, 30, etc.).
-- **Camera Presets**: If you don't need custom keyframes, use `preset`: "slow_push", "slow_pull", "ken_burns", "dramatic_reveal", "handheld_static".
+- **Camera Presets**: Use `camera.preset` for instant high-quality movement:
+  - `slow_push`: For building emphasis (best for main titles).
+  - `slow_pull`: For revealing context.
+  - `ken_burns`: For atmospheric, drifting backgrounds.
+  - `dramatic_reveal`: For high-impact introductions.
+  - `handheld_static`: For realistic, organic micro-drift.
+  - `whip_pan_right` / `whip_pan_left`: For high-velocity energy.
 
 ## 📝 Comprehensive Reference Example
 ```json

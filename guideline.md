@@ -33,6 +33,20 @@ This document defines the comprehensive JSON schema for `remotion_template.json`
 ---
 
 ## 🎥 Professional Cinematic Camera (V4)
+
+### 🎬 Camera Presets
+V4 includes a collection of professional camera move presets that can be applied to any scene using the `camera.preset` field. These presets are designed to provide high-quality movement without manual keyframing.
+
+| Preset | Description | Best Use Case |
+| :--- | :--- | :--- |
+| `slow_push` | A gentle zoom-in (1.0x to 1.2x) over the scene duration. | Use for **emphasis** and building tension. Ideal for headlines or single data points. |
+| `slow_pull` | A gentle zoom-out (1.2x to 1.0x). | Use for **revealing context** or transitioning away from a specific detail. |
+| `ken_burns` | A classic pan-and-zoom move from one corner to the opposite. | Use for **atmospheric backgrounds** or high-resolution images to create life and movement. |
+| `dramatic_reveal` | Starts with a tight, tilted zoom and pulls back to a centered wide shot. | Use for **introductions** or high-impact scene openings. |
+| `handheld_static` | A subtle, organic drift with micro-rotations. | Use for **realism** and "humanizing" the shot. Perfect for long-duration data displays. |
+| `whip_pan_right` | A high-velocity horizontal blur entering from the left. | Use for **high-energy transitions** between scenes. |
+| `whip_pan_left` | A high-velocity horizontal blur entering from the right. | Use for **high-energy transitions** between scenes. |
+
 The V4 Camera Engine utilizes a **Mathematical Pivot-Centering Architecture**. Unlike standard transforms that cause "drift" during zoom-pans, V4 dynamically calculates the `transform-origin` based on the focal target and applies a compensating translation to the viewport center.
 
 ### 1. 🚀 Performance Optimization (CPU/Colab)

@@ -13,11 +13,16 @@ import { ResponsiveNetwork } from '@nivo/network';
 import { ResponsiveChoropleth } from '@nivo/geo';
 
 const MapChart: React.FC<{ overlay: any; dataProgress: number; commonProps: any }> = ({ overlay, dataProgress, commonProps }) => {
+   const animatedData = overlay.data.map((item: any) => ({
+      ...item,
+      value: item.value * dataProgress
+   }));
+
    return (
       <div className="relative w-full h-full">
          <ResponsiveChoropleth
             {...commonProps}
-            data={overlay.data}
+            data={animatedData}
             features={overlay.features.features}
             margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
             colors="nivo"
@@ -127,10 +132,12 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       animate: false,
     };
 
-    // Smoother data reveal over 150 frames
+    // Smoother data reveal - adapts to overlay duration
+    const animationStart = 20;
+    const animationEnd = Math.min(overlay.duration - 15, 150);
     const dataProgress = interpolate(
       relativeFrame,
-      [20, 150],
+      [animationStart, animationEnd],
       [0, 1],
       { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.4, 0, 0.2, 1) }
     );
@@ -239,10 +246,17 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     }
 
     if (overlay.chart_type === 'treemap') {
+       const animateHierarchy = (node: any): any => ({
+          ...node,
+          value: node.value ? node.value * dataProgress : undefined,
+          children: node.children ? node.children.map(animateHierarchy) : undefined
+       });
+       const animatedData = animateHierarchy(overlay.data);
+
        return (
          <ResponsiveTreeMap
             {...commonProps}
-            data={overlay.data}
+            data={animatedData}
             identity="name"
             value="value"
             valueFormat=".02s"
@@ -257,10 +271,17 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     }
 
     if (overlay.chart_type === 'sunburst') {
+       const animateHierarchy = (node: any): any => ({
+          ...node,
+          value: node.value ? node.value * dataProgress : undefined,
+          children: node.children ? node.children.map(animateHierarchy) : undefined
+       });
+       const animatedData = animateHierarchy(overlay.data);
+
        return (
          <ResponsiveSunburst
             {...commonProps}
-            data={overlay.data}
+            data={animatedData}
             margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
             id="name"
             value="value"
@@ -295,10 +316,17 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     }
 
     if (overlay.chart_type === 'boxPlot') {
+        const animatedData = overlay.data.map((item: any) => ({
+           ...item,
+           mu: (item.mu ?? 0) * dataProgress,
+           sd: (item.sd ?? 0) * dataProgress,
+           value: (item.value ?? 0) * dataProgress
+        }));
+
         return (
           <ResponsiveBoxPlot
             {...(commonProps as any)}
-            data={overlay.data}
+            data={animatedData}
             layout="vertical"
             padding={0.12}
             valueScale={{ type: 'linear' }}
@@ -343,10 +371,14 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     }
 
     if (overlay.chart_type === 'sankey') {
+       const animatedData = {
+          nodes: overlay.data.nodes,
+          links: overlay.data.links.map((l: any) => ({ ...l, value: l.value * dataProgress }))
+       };
        return (
          <ResponsiveSankey
             {...commonProps}
-            data={overlay.data}
+            data={animatedData}
             margin={{ top: 40, right: 160, bottom: 40, left: 50 }}
             align="justify"
             colors={{ scheme: 'nivo' }}
@@ -369,10 +401,11 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     }
 
     if (overlay.chart_type === 'chord') {
+       const animatedData = overlay.data.map((row: any) => row.map((val: number) => val * dataProgress));
        return (
          <ResponsiveChord
             {...commonProps}
-            data={overlay.data}
+            data={animatedData}
             keys={overlay.keys}
             margin={{ top: 60, right: 60, bottom: 90, left: 60 }}
             padAngle={0.02}
@@ -395,10 +428,14 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
 
     if (overlay.chart_type === 'network') {
        if (!overlay.data?.nodes || !overlay.data?.links) return null;
+       const animatedData = {
+          nodes: overlay.data.nodes.map((n: any) => ({ ...n, size: (n.size || 12) * dataProgress })),
+          links: overlay.data.links
+       };
        return (
          <ResponsiveNetwork
             {...(commonProps as any)}
-            data={overlay.data}
+            data={animatedData}
             margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
             linkDistance={e => (e as any).distance || 50}
             centeringStrength={0.3}
@@ -406,7 +443,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
             nodeColor={e => (e as any).color || '#ffffff'}
             nodeBorderWidth={1}
             nodeBorderColor={{ from: 'color', modifiers: [['darker', 0.8]] }}
-            linkThickness={n => 2 + 2 * ((n as any).target?.data?.index ?? 0)}
+            linkThickness={n => (2 + 2 * ((n as any).target?.data?.index ?? 0)) * dataProgress}
             linkColor={{ from: 'source.color' }}
          />
        );

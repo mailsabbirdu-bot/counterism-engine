@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import { useCurrentFrame, useVideoConfig, spring, interpolate } from 'remotion';
 import * as d3 from 'd3';
 
 interface Node extends d3.SimulationNodeDatum {
@@ -55,6 +55,14 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     config: { damping: 20 },
   });
 
+  // Staggered reveal for nodes and links
+  const revealProgress = interpolate(
+    frame - overlay.start,
+    [10, 60],
+    [0, 1],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+  );
+
   // Smooth container animation
   const rotation = frame * (overlay.speed || 0.05);
   const scale = 1 + Math.sin(frame / 60) * 0.03;
@@ -69,28 +77,48 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`}>
         <g transform={`translate(${centerX + driftX}, ${centerY + driftY}) scale(${scale}) rotate(${rotation}) translate(${-centerX}, ${-centerY})`}>
           {/* Render links first (under nodes) */}
-          {processedLinks.map((link, i) => (
-            <line
-              key={`link-${i}`}
-              x1={(link.source as Node).x}
-              y1={(link.source as Node).y}
-              x2={(link.target as Node).x}
-              y2={(link.target as Node).y}
-              stroke={overlay.linkColor || "rgba(255,255,255,0.15)"}
-              strokeWidth="1.5"
-            />
-          ))}
+          {processedLinks.map((link, i) => {
+            const linkReveal = interpolate(
+              revealProgress * processedLinks.length,
+              [i, i + 1],
+              [0, 1],
+              { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+            );
+            return (
+              <line
+                key={`link-${i}`}
+                x1={(link.source as Node).x}
+                y1={(link.source as Node).y}
+                x2={(link.target as Node).x}
+                y2={(link.target as Node).y}
+                stroke={overlay.linkColor || "rgba(255,255,255,0.15)"}
+                strokeWidth="1.5"
+                opacity={linkReveal}
+              />
+            );
+          })}
           {/* Render nodes */}
-          {processedNodes.map((node, i) => (
-            <circle
-              key={`node-${i}`}
-              cx={node.x}
-              cy={node.y}
-              r="6"
-              fill={overlay.nodeColor || "#3b82f6"}
-              style={{ filter: "drop-shadow(0 0 10px rgba(59,130,246,0.6))" }}
-            />
-          ))}
+          {processedNodes.map((node, i) => {
+            const nodeReveal = interpolate(
+              revealProgress * processedNodes.length,
+              [i, i + 1],
+              [0, 1],
+              { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+            );
+            return (
+              <circle
+                key={`node-${i}`}
+                cx={node.x}
+                cy={node.y}
+                r={6 * nodeReveal}
+                fill={overlay.nodeColor || "#3b82f6"}
+                style={{
+                  filter: "drop-shadow(0 0 10px rgba(59,130,246,0.6))",
+                  opacity: nodeReveal
+                }}
+              />
+            );
+          })}
         </g>
       </svg>
     </div>
