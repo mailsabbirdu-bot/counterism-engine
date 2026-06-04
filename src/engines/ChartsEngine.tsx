@@ -297,7 +297,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     if (overlay.chart_type === 'boxPlot') {
         return (
           <ResponsiveBoxPlot
-            {...commonProps}
+            {...(commonProps as any)}
             data={overlay.data}
             layout="vertical"
             padding={0.12}
@@ -397,17 +397,17 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
        if (!overlay.data?.nodes || !overlay.data?.links) return null;
        return (
          <ResponsiveNetwork
-            {...commonProps}
+            {...(commonProps as any)}
             nodes={overlay.data.nodes}
             links={overlay.data.links}
             margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
-            linkDistance={e => (e as any).distance}
+            linkDistance={e => (e as any).distance || 50}
             centeringStrength={0.3}
             repulsionStrength={450}
-            nodeColor={e => (e as any).color}
+            nodeColor={e => (e as any).color || '#ffffff'}
             nodeBorderWidth={1}
             nodeBorderColor={{ from: 'color', modifiers: [['darker', 0.8]] }}
-            linkThickness={n => 2 + 2 * (n as any).target.data.index}
+            linkThickness={n => 2 + 2 * ((n as any).target?.data?.index ?? 0)}
             linkColor={{ from: 'source.color' }}
          />
        );
