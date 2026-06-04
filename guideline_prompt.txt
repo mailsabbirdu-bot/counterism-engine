@@ -76,49 +76,115 @@ The V4 engine supports a sophisticated 3D camera. To create professional results
   - `handheld_static`: For realistic, organic micro-drift.
   - `whip_pan_right` / `whip_pan_left`: For high-velocity energy.
 
-## 📝 Comprehensive Reference Example
+## 📝 Comprehensive Reference Example (The "Master Template")
+This example demonstrates nearly every feature of the engine. Use it as a blueprint for high-end cinematic generation.
+
 ```json
 {
-  "project_name": "Counterism Studio V4 Showcase",
+  "project_name": "Counterism Studio V4 Master Showcase",
   "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
   "scenes": [
     {
-      "scene_id": "SC_TECH",
-      "duration_in_frames": 300,
+      "scene_id": "SCENE_01_CINEMATIC",
+      "duration_in_frames": 450,
       "background_type": "procedural",
-      "procedural_config": { "variant": "mesh", "primaryColor": "#050505", "secondaryColor": "#1a1a2e" },
+      "procedural_config": {
+        "variant": "neon_grid",
+        "primaryColor": "#020617",
+        "secondaryColor": "#1e1b4b",
+        "speed": 1.5
+      },
       "camera": {
         "enabled": true,
+        "motionBlur": { "enabled": true, "intensity": 1.2 },
+        "shake": { "enabled": true, "intensity": 2.5, "speed": 1.0 },
         "shots": [
-          { "targetId": "TITLE", "startFrame": 0, "duration": 90, "zoom": 1.2, "style": "push_in" },
-          { "targetId": "DATA", "startFrame": 120, "duration": 150, "zoom": 1.8, "style": "pan_right" }
+          { "targetId": "OVERLAY_TEXT", "startFrame": 0, "duration": 90, "zoom": 1.1, "style": "push_in" },
+          { "targetId": "OVERLAY_CHART", "startFrame": 100, "duration": 120, "zoom": 1.6, "style": "pan_right" },
+          { "targetId": "OVERLAY_UI", "startFrame": 240, "duration": 90, "zoom": 1.4, "style": "tilt_up" },
+          { "targetId": "OVERLAY_INDICATOR", "startFrame": 340, "duration": 110, "zoom": 2.0, "style": "dramatic_reveal" }
         ]
       },
       "overlays": [
         {
-          "id": "TITLE",
+          "id": "OVERLAY_TEXT",
           "type": "text",
-          "content": "V4 ENGINE",
-          "start": 0,
-          "duration": 300,
-          "position": { "x": 960, "y": 200 },
-          "fontSize": "150px",
+          "content": "ARCHITECTURAL\nINTELLIGENCE",
+          "start": 0, "duration": 450,
+          "position": { "x": 960, "y": 250 },
+          "fontSize": "140px",
+          "font": "Inter",
           "animation": "cinematicGlow",
-          "zIndex": 50,
-          "depth": 100
+          "style": "font-black uppercase tracking-tighter text-white",
+          "zIndex": 50, "depth": 100
         },
         {
-          "id": "DATA",
+          "id": "OVERLAY_CHART",
           "type": "chart",
-          "chart_type": "line",
-          "start": 60,
-          "duration": 240,
-          "position": { "x": 1200, "y": 600 },
-          "width": 800,
-          "height": 500,
-          "data": [ { "id": "val", "data": [ { "x": "A", "y": 10 }, { "x": "B", "y": 50 } ] } ],
-          "zIndex": 30,
-          "depth": 300
+          "chart_type": "barRace",
+          "title": "Global Market Cap", "subtitle": "Top Technology Leaders",
+          "start": 45, "duration": 405,
+          "position": { "x": 500, "y": 650 },
+          "width": 800, "height": 550,
+          "indexBy": "id", "keys": ["value"],
+          "data": [
+            { "id": "Nvidia", "value": 3200 },
+            { "id": "Apple", "value": 3100 },
+            { "id": "Microsoft", "value": 3050 }
+          ],
+          "zIndex": 30, "depth": 300,
+          "cameraFocus": { "zoom": 1.8, "offsetY": -20, "fitMode": "contain" }
+        },
+        {
+          "id": "OVERLAY_UI",
+          "type": "ui_panel",
+          "title": "SYSTEM CORE", "description": "Processing Neural Arrays",
+          "iconType": "cpu",
+          "start": 90, "duration": 360,
+          "position": { "x": 1400, "y": 450 },
+          "initialProgress": 0, "targetProgress": 98,
+          "zIndex": 40, "depth": 200,
+          "cameraFocus": { "zoom": 1.5, "fitMode": "cover" }
+        },
+        {
+          "id": "OVERLAY_INDICATOR",
+          "type": "data_indicator",
+          "indicator_type": "semiGauge",
+          "label": "Efficiency", "value": 94.2, "suffix": "%",
+          "start": 150, "duration": 300,
+          "position": { "x": 1400, "y": 750 },
+          "zIndex": 45, "depth": 400,
+          "cameraFocus": { "zoom": 2.2, "offsetY": 50 }
+        },
+        {
+          "id": "OVERLAY_GRAPH",
+          "type": "graph",
+          "nodes": 45, "links": 60,
+          "nodeColor": "#3b82f6", "linkColor": "rgba(59,130,246,0.2)",
+          "start": 0, "duration": 450,
+          "position": { "x": 960, "y": 540 },
+          "zIndex": 25, "depth": -200
+        },
+        {
+          "id": "OVERLAY_SHAPE",
+          "type": "shape",
+          "shape_type": "circle",
+          "animation": "float",
+          "decorated": true,
+          "start": 0, "duration": 450,
+          "position": { "x": 200, "y": 200 },
+          "zIndex": 10, "depth": -400
+        },
+        {
+          "id": "OVERLAY_MEDIA",
+          "type": "video",
+          "src": "renders/scene_SC_01.mp4",
+          "start": 200, "duration": 250,
+          "position": { "x": 500, "y": 300 },
+          "width": 400, "height": 225,
+          "borderRadius": 24, "shadow": true,
+          "zIndex": 100, "depth": 500,
+          "cameraFocus": { "zoom": 1.2, "fitMode": "contain" }
         }
       ]
     }

@@ -97,9 +97,9 @@ The `shots` system handles smooth transitions between focal points automatically
 - `position`: `{ x: number, y: number }`.
 
 ### 2. `ui_panel` (Glassmorphism UI)
-- `title`, `description`, `iconType` (terminal, cpu, activity, security, box), `nodeId`.
+- `title`, `description`, `iconType` (`terminal`, `cpu`, `activity`, `security`, `box`), `nodeId`.
 - `variant`: `"glass"` \| `"dark"`.
-- `initialProgress`, `targetProgress`: `0-100`.
+- `initialProgress`, `targetProgress`: `0-100`. (Animates a progress bar inside the panel).
 - `position`: `{ x: number, y: number }`.
 
 ### 3. `chart` (Nivo Data Viz)
@@ -128,7 +128,23 @@ Fluid, Framer-motion driven indicators for single metrics.
 - `milestones`, `events`: Arrays for trackers and timelines.
 - `position`: `{ x: number, y: number }`.
 
-### 4. `video` & `image` (Media Overlays)
+### 5. `graph` (Force-Directed Graph)
+- `nodes`: `number` (Default: 30).
+- `links`: `number` (Default: 40).
+- `nodeColor`: `string` (Hex or rgba).
+- `linkColor`: `string` (Hex or rgba).
+- `speed`: `number` (Default: 0.05). Rotation speed.
+- `position`: `{ x: number, y: number }`.
+
+### 6. `shape` (Geometric Motion)
+- `shape_type`: `"circle"` \| `"rect"` \| `"line"`.
+- `animation`: `"pulse"` \| `"float"` \| `"morph"`.
+- `decorated`: `boolean`. Adds orbit rings and decorative elements.
+- `color`: `string`.
+- `size`: `number`.
+- `position`: `{ x: number, y: number }`.
+
+### 7. `video` & `image` (Media Overlays)
 - `src`: Path in `public/`.
 - `width`, `height`: Size in pixels.
 - `borderRadius`: `number`.
