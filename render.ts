@@ -120,14 +120,16 @@ const start = async () => {
     const concurrency = concurrencyArg ? parseInt(concurrencyArg, 10) : 1;
 
     for (const scene of template.scenes) {
-      if (sceneIdArg && scene.scene_id !== sceneIdArg) {
+      const normalizedId = scene.scene_id.replace(/_/g, '-');
+
+      if (sceneIdArg && scene.scene_id !== sceneIdArg && normalizedId !== sceneIdArg) {
           continue;
       }
       console.log(`\n🎬 Processing Scene: ${scene.scene_id}`);
 
-      const composition = compositions.find((c) => c.id === scene.scene_id);
+      const composition = compositions.find((c) => c.id === normalizedId);
       if (!composition) {
-        console.error(`❌ Composition ${scene.scene_id} not found`);
+        console.error(`❌ Composition ${normalizedId} not found (Scene ID: ${scene.scene_id})`);
         continue;
       }
 
