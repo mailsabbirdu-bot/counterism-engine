@@ -3,7 +3,7 @@
   "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
   "scenes": [
     {
-      "scene_id": "GLOBAL_STRATEGY",
+      "scene_id": "GLOBAL-STRATEGY",
       "duration_in_frames": 300,
       "background_type": "procedural",
       "procedural_config": { "variant": "neon_grid", "primaryColor": "#020617", "secondaryColor": "#0f172a" },
@@ -49,7 +49,7 @@
       ]
     },
     {
-      "scene_id": "REGIONAL_LOGISTICS_EU",
+      "scene_id": "REGIONAL-LOGISTICS-EU",
       "duration_in_frames": 300,
       "background_type": "procedural",
       "procedural_config": { "variant": "mesh", "primaryColor": "#083344", "secondaryColor": "#0c4a6e" },
@@ -97,7 +97,7 @@
       ]
     },
     {
-      "scene_id": "BANGLADESH_DISTRICT_TRACE",
+      "scene_id": "BANGLADESH-DISTRICT-TRACE",
       "duration_in_frames": 450,
       "background_type": "procedural",
       "procedural_config": { "variant": "mesh", "primaryColor": "#064e3b", "secondaryColor": "#022c22" },
