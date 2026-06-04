@@ -11,7 +11,7 @@ export interface CameraFocus {
 
 export interface Overlay {
     id: string;
-    type: 'text' | 'ui_panel' | 'shape' | 'chart' | 'graph' | 'video' | 'image';
+    type: 'text' | 'ui_panel' | 'shape' | 'chart' | 'graph' | 'video' | 'image' | 'data_indicator' | 'map';
     start: number;
     duration: number;
     zIndex?: number;

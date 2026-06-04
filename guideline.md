@@ -144,7 +144,16 @@ Fluid, Framer-motion driven indicators for single metrics.
 - `size`: `number`.
 - `position`: `{ x: number, y: number }`.
 
-### 7. `video` & `image` (Media Overlays)
+### 7. `map` (Geospatial Intelligence)
+- `map_type`: `"world"` \| `"region"`.
+- `center`: `[longitude, latitude]` (Default: `[0, 20]`).
+- `scale`: `number` (Default: `200`).
+- `cities`: `array` of `{ name: string, coords: [lon, lat] }`.
+- `routes`: `array` of `{ from: string, to: string, curve: number }`.
+- `width`, `height`: Canvas size.
+- `position`: `{ x: number, y: number }`.
+
+### 8. `video` & `image` (Media Overlays)
 - `src`: Path in `public/`.
 - `width`, `height`: Size in pixels.
 - `borderRadius`: `number`.

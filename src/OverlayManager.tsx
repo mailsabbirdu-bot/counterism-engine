@@ -7,6 +7,7 @@ import { ChartsEngine } from './engines/ChartsEngine';
 import { GraphsEngine } from './engines/GraphsEngine';
 import { MediaEngine } from './engines/MediaEngine';
 import { DataIndicatorEngine } from './engines/DataIndicatorEngine';
+import { MapEngine } from './engines/MapEngine';
 
 interface OverlayManagerProps {
   overlays: any[];
@@ -33,6 +34,8 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays }) => {
             case 'video':
             case 'image':
               return <MediaEngine overlay={overlay} />;
+            case 'map':
+              return <MapEngine overlay={overlay} />;
             default:
               return null;
           }

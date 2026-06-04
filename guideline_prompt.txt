@@ -36,7 +36,7 @@ The V4 engine supports a sophisticated 3D camera. To create professional results
       - Time Series: "line", "multiLine", "area", "stackedArea", "forecast".
       - Composition: "pie", "donut", "treemap", "sunburst".
       - Distribution/Relationship: "histogram", "boxPlot", "violinPlot", "scatter", "bubble".
-      - Complex: "sankey", "chord", "network", "choropleth" (maps), "bubbleMap".
+      - Complex: "sankey", "chord", "network", "choropleth" (Nivo maps), "bubbleMap".
     - `data`: Standard Nivo format.
     - `keys`, `indexBy`: Required for bar/chord charts.
 4.  **`data_indicator`**: Single metric visualizations.
@@ -53,7 +53,12 @@ The V4 engine supports a sophisticated 3D camera. To create professional results
     - `shape_type`: "circle", "rect", "line".
     - `animation`: "pulse", "float", "morph".
     - `decorated`: true/false (adds orbit rings).
-7.  **`video` / `image`**: External media.
+7.  **`map`**: Advanced geospatial engine for routes and cities.
+    - `map_type`: "world", "region".
+    - `center`: [lon, lat].
+    - `cities`: [{ "name": "London", "coords": [-0.12, 51.5] }].
+    - `routes`: [{ "from": "London", "to": "New York", "curve": 1.2 }].
+8.  **`video` / `image`**: External media.
     - `src`: Path relative to `public/`.
     - `borderRadius`, `shadow`, `border`: Styling options.
 
