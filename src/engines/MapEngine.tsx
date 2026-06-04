@@ -1,10 +1,13 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { useCurrentFrame, useVideoConfig, interpolate, spring, Easing, continueRender, delayRender } from 'remotion';
 import * as d3 from 'd3-geo';
 import { feature } from 'topojson-client';
 
-// Standard high-quality world TopoJSON URL
-const DEFAULT_TOPOJSON = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+// Professional TopoJSON Sources
+const WORLD_TOPO = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+
+// Global cache to prevent redundant fetches
+const mapCache: Record<string, any> = {};
 
 interface City {
   name: string;
@@ -14,21 +17,19 @@ interface City {
 interface MapOverlayProps {
   overlay: {
     id: string;
-    map_type?: 'world' | 'region';
     center?: [number, number];
     scale?: number;
     cities?: City[];
-    routes?: { from: string; to: string; curve?: number; label?: string }[];
-    highlights?: string[]; // IDs or names of countries to highlight
+    routes?: { from: string; to: string; curve?: number; label?: string; type?: 'air' | 'sea' | 'land' }[];
+    highlights?: string[];
     topojson_url?: string;
-    object_name?: string; // e.g. 'countries' or 'districts'
+    object_name?: string;
     start: number;
     duration: number;
     position?: { x: number; y: number };
     width?: number;
     height?: number;
     zIndex?: number;
-    theme?: 'dark' | 'light' | 'blueprint';
   };
 }
 
@@ -41,31 +42,37 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
   const height = overlay.height || 800;
 
   const [mapData, setMapData] = useState<any>(null);
-  const [handle] = useState(() => delayRender('Loading Map Topology'));
+  const [handle] = useState(() => delayRender('Loading SVG Map Data'));
 
   useEffect(() => {
-    const url = overlay.topojson_url || DEFAULT_TOPOJSON;
+    const url = overlay.topojson_url || WORLD_TOPO;
     const objName = overlay.object_name || 'countries';
+    const cacheKey = `${url}-${objName}`;
+
+    if (mapCache[cacheKey]) {
+      setMapData(mapCache[cacheKey]);
+      continueRender(handle);
+      return;
+    }
 
     fetch(url)
       .then(res => res.json())
       .then(data => {
-        // Handle different TopoJSON object keys
         const obj = data.objects[objName] || Object.values(data.objects)[0];
         if (!obj) throw new Error(`Object ${objName} not found in TopoJSON`);
-
         const geojson = feature(data, obj as any);
+        mapCache[cacheKey] = geojson;
         setMapData(geojson);
         continueRender(handle);
       })
       .catch(err => {
         console.error("Map Data Fetch Error:", err);
-        setMapData({ features: [] }); // Fallback to empty map to prevent engine crash
+        setMapData({ features: [] });
         continueRender(handle);
       });
   }, [overlay.topojson_url, overlay.object_name]);
 
-  // 1. Setup Projection (Smoothly animates center/scale if needed)
+  // 1. Precise Geodesic Projection
   const projection = useMemo(() => {
     return d3.geoMercator()
       .scale(overlay.scale || 200)
@@ -75,86 +82,69 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
 
   const pathGenerator = d3.geoPath().projection(projection);
 
-  // 2. Animations
-  const entrance = spring({
-    frame: relativeFrame,
-    fps,
-    config: { damping: 20 },
-  });
-
+  // 2. Cinematic Timings
+  const entrance = spring({ frame: relativeFrame, fps, config: { damping: 20 } });
   const exitFrame = overlay.duration - 15;
-  const exit = interpolate(relativeFrame, [exitFrame, exitFrame + 15], [1, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
+  const exit = interpolate(relativeFrame, [exitFrame, exitFrame + 15], [1, 0], { extrapolateRight: 'clamp' });
 
-  const progress = entrance * exit;
-
-  // Staggered reveal for cities and routes
-  const dataProgress = interpolate(
-    relativeFrame,
-    [30, overlay.duration - 30],
-    [0, 1],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.4, 0, 0.2, 1) }
-  );
+  const borderDrawProgress = interpolate(relativeFrame, [20, 100], [0, 1], { extrapolateRight: 'clamp', easing: Easing.bezier(0.4, 0, 0.2, 1) });
+  const travelProgress = interpolate(relativeFrame, [80, overlay.duration - 40], [0, 1], { extrapolateRight: 'clamp' });
 
   // 3. Helpers
-  const getCityCoords = (name: string) => {
-    return overlay.cities?.find(c => c.name === name)?.coords;
+  const getCityCoords = (name: string) => overlay.cities?.find(c => c.name === name)?.coords;
+
+  const calculateDistance = (c1: [number, number], c2: [number, number]) => {
+    const R = 6371;
+    const dLat = (c2[1] - c1[1]) * Math.PI / 180;
+    const dLon = (c2[0] - c1[0]) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(c1[1]*Math.PI/180) * Math.cos(c2[1]*Math.PI/180) * Math.sin(dLon/2)**2;
+    return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
   };
 
-  const calculateDistance = (coords1: [number, number], coords2: [number, number]) => {
-    const R = 6371; // km
-    const dLat = (coords2[1] - coords1[1]) * Math.PI / 180;
-    const dLon = (coords2[0] - coords1[0]) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(coords1[1] * Math.PI / 180) * Math.cos(coords2[1] * Math.PI / 180) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return Math.round(R * c);
-  };
-
-  if (frame < overlay.start || frame > overlay.start + overlay.duration || !mapData) {
-    return null;
-  }
+  if (frame < overlay.start || frame > overlay.start + overlay.duration || !mapData) return null;
 
   return (
     <div
-      className="absolute bg-zinc-950/40 backdrop-blur-2xl rounded-[3rem] border-2 border-white/10 shadow-[0_40px_80px_rgba(0,0,0,0.5)] overflow-hidden p-8"
+      className="absolute bg-zinc-950/80 backdrop-blur-3xl rounded-[3rem] border-2 border-white/20 shadow-[0_60px_100px_rgba(0,0,0,0.8)] overflow-hidden"
       style={{
-        width,
-        height,
+        width, height,
         left: `${overlay.position?.x ?? 960}px`,
         top: `${overlay.position?.y ?? 540}px`,
-        opacity: progress,
+        opacity: entrance * exit,
         zIndex: overlay.zIndex ?? 30,
-        transform: `translate(-50%, -50%) scale(${0.9 + progress * 0.1})`,
+        transform: `translate(-50%, -50%) scale(${0.95 + entrance * 0.05})`,
       }}
     >
-      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`}>
-        {/* World Map SVG Paths */}
-        <g className="map-base">
-          {mapData.features.map((feature: any, i: number) => {
-             const name = feature.properties.name || feature.properties.NAME_1 || feature.properties.NAME || feature.id;
-             const isHighlighted = overlay.highlights?.some(h =>
-                h.toLowerCase() === name?.toString().toLowerCase()
-             );
+      {/* Technical Grid Overlay */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none"
+           style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)', backgroundSize: '40px 40px' }} />
 
-             return (
-                <path
-                  key={`country-${i}`}
-                  d={pathGenerator(feature) || ''}
-                  fill={isHighlighted ? "rgba(59, 130, 246, 0.2)" : "rgba(255, 255, 255, 0.05)"}
-                  stroke={isHighlighted ? "rgba(59, 130, 246, 0.5)" : "rgba(255, 255, 255, 0.1)"}
-                  strokeWidth={isHighlighted ? "1.5" : "0.5"}
-                  className="transition-all duration-500"
-                />
-             );
-          })}
+      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} className="relative z-10">
+        {/* Animated Borders & Territories */}
+        <g>
+          {useMemo(() => mapData.features.map((feature: any, i: number) => {
+            const countryName = feature.properties.name || feature.properties.NAME_1 || feature.id;
+            const isHighlighted = overlay.highlights?.some(h => h.toLowerCase() === countryName?.toString().toLowerCase());
+            const path = pathGenerator(feature);
+
+            return (
+              <path
+                key={`border-${i}`}
+                d={path || ''}
+                fill={isHighlighted ? "rgba(59, 130, 246, 0.2)" : "rgba(255, 255, 255, 0.03)"}
+                stroke={isHighlighted ? "rgba(59, 130, 246, 0.8)" : "rgba(255, 255, 255, 0.1)"}
+                strokeWidth={isHighlighted ? "2" : "0.5"}
+                pathLength="1"
+                strokeDasharray="1"
+                strokeDashoffset={1 - borderDrawProgress}
+                style={{ transition: 'fill 0.5s ease' }}
+              />
+            );
+          }), [mapData, borderDrawProgress, overlay.highlights, pathGenerator])}
         </g>
 
-        {/* Travel Routes */}
-        <g className="routes">
+        {/* Dynamic Travel Routes */}
+        <g>
           {overlay.routes?.map((route, i) => {
             const startCoords = getCityCoords(route.from);
             const endCoords = getCityCoords(route.to);
@@ -163,63 +153,75 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
             const [x1, y1] = projection(startCoords) || [0, 0];
             const [x2, y2] = projection(endCoords) || [0, 0];
 
-            // Documentary Arc calculation
+            // Cinematic Arc
             const dx = x2 - x1;
             const dy = y2 - y1;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            const dr = dist * (route.curve || 1.2);
+            const dr = dist * (route.curve || 1.3);
             const pathData = `M${x1},${y1}A${dr},${dr} 0 0,1 ${x2},${y2}`;
 
             const routeReveal = interpolate(
-              dataProgress * (overlay.routes?.length || 1),
+              travelProgress * (overlay.routes?.length || 1),
               [i, i + 0.8],
               [0, 1],
               { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
             );
 
-            // Traveling point interpolation
-            const totalDistance = calculateDistance(startCoords, endCoords);
-            const currentDistance = Math.round(totalDistance * routeReveal);
-
-            // Simple Bezier-like midpoint for the pulse
+            // Interpolate point along the path
             const t = routeReveal;
             const mx = (1-t)*(1-t)*x1 + 2*(1-t)*t*((x1+x2)/2) + t*t*x2;
             const my = (1-t)*(1-t)*y1 + 2*(1-t)*t*((y1+y2)/2 - dr/4) + t*t*y2;
 
+            const km = calculateDistance(startCoords, endCoords);
+
             return (
-              <g key={`route-group-${i}`}>
+              <g key={`route-${i}`}>
+                {/* Background Shadow Path */}
+                <path d={pathData} fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth="4" />
+
+                {/* Animated Line */}
                 <path
-                  key={`route-${i}`}
                   d={pathData}
                   fill="none"
-                  stroke="rgba(59, 130, 246, 0.4)"
+                  stroke={route.type === 'sea' ? "#0ea5e9" : "#3b82f6"}
                   strokeWidth="2"
-                  strokeDasharray="1000"
-                  strokeDashoffset={1000 * (1 - routeReveal)}
-                  style={{ filter: 'drop-shadow(0 0 5px rgba(59,130,246,0.3))' }}
+                  strokeDasharray="8 4"
+                  strokeDashoffset={-frame * 2}
+                  opacity={routeReveal}
                 />
 
-                {/* Traveling Marker */}
+                {/* The "Drawn" Path */}
+                <path
+                  d={pathData}
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2"
+                  pathLength="1"
+                  strokeDasharray="1"
+                  strokeDashoffset={1 - routeReveal}
+                />
+
+                {/* Traveling Icon/Pulse */}
                 {routeReveal > 0 && routeReveal < 1 && (
                   <g transform={`translate(${mx}, ${my})`}>
-                    <circle r="12" fill="#3b82f6" className="animate-pulse" style={{ opacity: 0.3 }} />
-                    <circle r="4" fill="white" stroke="#3b82f6" strokeWidth="2" />
+                    <circle r="15" fill="#3b82f6" className="animate-ping" style={{ opacity: 0.4 }} />
+                    <circle r="5" fill="white" stroke="#3b82f6" strokeWidth="2" shadow-xl />
                   </g>
                 )}
 
-                {/* Distance Telemetry */}
-                {routeReveal > 0.1 && (
+                {/* Real-time Telemetry */}
+                {routeReveal > 0.05 && (
                   <text
                     x={(x1 + x2) / 2}
-                    y={(y1 + y2) / 2 - 40}
-                    fill="#3b82f6"
-                    fontSize="12"
-                    fontWeight="black"
+                    y={(y1 + y2) / 2 - 30}
+                    fill="white"
+                    fontSize="10"
+                    fontWeight="900"
                     textAnchor="middle"
-                    className="font-mono tabular-nums uppercase tracking-widest"
+                    className="font-mono tracking-tighter"
                     style={{ opacity: routeReveal }}
                   >
-                    {route.label || 'TRANSFER'}: {currentDistance} / {totalDistance} KM
+                    {route.label || 'TRANSIT'}: {Math.round(km * routeReveal)} / {km} KM
                   </text>
                 )}
               </g>
@@ -227,31 +229,31 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
           })}
         </g>
 
-        {/* City Nodes */}
-        <g className="cities">
+        {/* City Infrastructure */}
+        <g>
           {overlay.cities?.map((city, i) => {
             const coords = projection(city.coords);
             if (!coords) return null;
             const [cx, cy] = coords;
 
-            const cityReveal = interpolate(
-               dataProgress,
-               [0.1 * i, 0.1 * i + 0.3],
-               [0, 1],
-               { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
-            );
+            const cityReveal = spring({
+               frame: relativeFrame - (i * 10),
+               fps,
+               config: { stiffness: 200 }
+            });
 
             return (
-              <g key={`city-${i}`} style={{ opacity: cityReveal }}>
+              <g key={`city-${i}`} style={{ opacity: cityReveal, transform: `scale(${cityReveal})` }}>
                 <circle cx={cx} cy={cy} r="3" fill="white" />
+                <circle cx={cx} cy={cy} r="8" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
                 <text
-                  x={cx + 10}
+                  x={cx + 12}
                   y={cy + 4}
                   fill="white"
                   fontSize="12"
-                  fontWeight="bold"
-                  className="font-mono uppercase"
-                  style={{ textShadow: '0 0 10px rgba(0,0,0,0.8)' }}
+                  fontWeight="black"
+                  className="font-mono uppercase tracking-tighter"
+                  style={{ textShadow: '0 2px 10px rgba(0,0,0,1)' }}
                 >
                   {city.name}
                 </text>
@@ -261,20 +263,24 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
         </g>
       </svg>
 
-      {/* Documentary UI Layer */}
-      <div className="absolute top-10 right-10 flex flex-col items-end gap-2">
-         <div className="px-4 py-1 bg-blue-500/20 border border-blue-500/40 text-blue-400 font-mono text-[10px] font-black uppercase tracking-widest">
-            Geospatial Analysis V4.2
+      {/* Documentary UI Chrome */}
+      <div className="absolute top-12 left-12 flex items-center gap-6">
+         <div className="w-16 h-16 rounded-full border-4 border-blue-500/30 flex items-center justify-center">
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
          </div>
-         <div className="text-white/40 font-mono text-[8px] uppercase tracking-tighter">
-            COORD_SYS: WGS-84 / Mercator<br/>
-            SCAN_SYNC: {Math.round(dataProgress * 100)}% COMPLETE
+         <div>
+            <h2 className="text-white font-black text-5xl tracking-tighter uppercase leading-none">Global Sector</h2>
+            <p className="text-blue-400 font-mono text-xs mt-2 font-bold tracking-[0.5em] uppercase opacity-60 overflow-hidden whitespace-nowrap">
+               Vector-Mapping Protocol: {Math.random().toString(16).slice(2, 10).toUpperCase()}
+            </p>
          </div>
       </div>
 
-      <div className="absolute bottom-10 left-10">
-         <h2 className="text-white font-black text-3xl tracking-tighter uppercase leading-none">{overlay.id}</h2>
-         <p className="text-blue-500/60 font-mono text-[10px] mt-2 font-bold uppercase tracking-[0.5em]">Real-time Vector Simulation</p>
+      <div className="absolute bottom-12 right-12 text-right">
+         <div className="text-blue-500 font-mono text-4xl font-black tabular-nums">
+            {Math.round(travelProgress * 100)}%
+         </div>
+         <div className="text-white/30 font-mono text-[10px] uppercase tracking-widest font-bold">Simulation Progress</div>
       </div>
     </div>
   );

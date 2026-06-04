@@ -1,104 +1,131 @@
 {
-  "project_name": "Vector Map Engine Showcase",
+  "project_name": "Ultra-Cinematic Map Engine Showcase",
   "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
   "scenes": [
     {
-      "scene_id": "global-logistics",
-      "duration_in_frames": 450,
+      "scene_id": "GLOBAL_BORDERS",
+      "duration_in_frames": 300,
       "background_type": "procedural",
       "procedural_config": { "variant": "neon_grid", "primaryColor": "#020617", "secondaryColor": "#0f172a" },
       "camera": {
         "enabled": true,
-        "motionBlur": { "enabled": true },
         "shots": [
-          { "targetId": "MAP_GLOBAL", "startFrame": 0, "duration": 450, "zoom": 1.1, "style": "slow_push" }
+          { "targetId": "WORLD_MAP", "startFrame": 0, "duration": 300, "zoom": 1.1, "style": "slow_push" }
         ]
       },
       "overlays": [
         {
-          "id": "MAP_GLOBAL",
+          "id": "WORLD_MAP",
+          "type": "map",
+          "start": 0,
+          "duration": 300,
+          "position": { "x": 960, "y": 540 },
+          "width": 1600,
+          "height": 900,
+          "scale": 250,
+          "center": [0, 20],
+          "highlights": ["United States of America", "China", "Russia", "Brazil", "India"],
+          "zIndex": 30
+        },
+        {
+          "id": "TITLE",
+          "type": "text",
+          "content": "GLOBAL BORDER\nANALYSIS",
+          "start": 30,
+          "duration": 240,
+          "position": { "x": 960, "y": 150 },
+          "fontSize": "100px",
+          "animation": "cinematicGlow",
+          "style": "font-black text-blue-500 uppercase tracking-widest text-center",
+          "zIndex": 50
+        }
+      ]
+    },
+    {
+      "scene_id": "BANGLADESH_EXPEDITION",
+      "duration_in_frames": 450,
+      "background_type": "procedural",
+      "procedural_config": { "variant": "mesh", "primaryColor": "#064e3b", "secondaryColor": "#022c22" },
+      "camera": {
+        "enabled": true,
+        "shots": [
+          { "targetId": "BD_MAP", "startFrame": 0, "duration": 450, "zoom": 1.15, "style": "slow_pull" }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "BD_MAP",
+          "type": "map",
+          "start": 0,
+          "duration": 450,
+          "position": { "x": 960, "y": 540 },
+          "width": 1400,
+          "height": 900,
+          "scale": 5000,
+          "center": [90.35, 23.8],
+          "topojson_url": "https://raw.githubusercontent.com/sk-sabbir/bangladesh-topojson/master/districts.json",
+          "object_name": "districts",
+          "highlights": ["Dhaka", "Chittagong", "Sylhet", "Rajshahi", "Khulna"],
+          "cities": [
+            { "name": "Dhaka", "coords": [90.41, 23.81] },
+            { "name": "Chittagong", "coords": [91.78, 22.35] },
+            { "name": "Sylhet", "coords": [91.86, 24.89] },
+            { "name": "Khulna", "coords": [89.54, 22.84] }
+          ],
+          "routes": [
+            { "from": "Dhaka", "to": "Sylhet", "curve": 0.8, "label": "NORTH-LINK" },
+            { "from": "Dhaka", "to": "Chittagong", "curve": 0.5, "label": "PORT-TRANSIT" },
+            { "from": "Chittagong", "to": "Khulna", "curve": 1.2, "label": "COASTAL-ROUTE" }
+          ],
+          "zIndex": 30
+        }
+      ]
+    },
+    {
+      "scene_id": "MARITIME_LOGISTICS",
+      "duration_in_frames": 450,
+      "background_type": "procedural",
+      "procedural_config": { "variant": "mesh", "primaryColor": "#083344", "secondaryColor": "#0c4a6e" },
+      "camera": {
+        "enabled": true,
+        "shots": [
+          { "targetId": "EU_MAP", "startFrame": 0, "duration": 450, "zoom": 1.3, "style": "slow_push" }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "EU_MAP",
           "type": "map",
           "start": 0,
           "duration": 450,
           "position": { "x": 960, "y": 540 },
           "width": 1600,
           "height": 900,
-          "scale": 250,
-          "center": [0, 20],
-          "highlights": ["United States of America", "China", "Brazil", "Australia"],
+          "scale": 1000,
+          "center": [15, 45],
+          "highlights": ["Germany", "Netherlands", "United Kingdom", "Spain"],
           "cities": [
-            { "name": "San Francisco", "coords": [-122.4, 37.7] },
-            { "name": "Shanghai", "coords": [121.5, 31.2] },
-            { "name": "Sao Paulo", "coords": [-46.6, -23.5] },
-            { "name": "Sydney", "coords": [151.2, -33.8] }
+            { "name": "Singapore", "coords": [103.8, 1.3] },
+            { "name": "Suez", "coords": [32.5, 29.9] },
+            { "name": "Rotterdam", "coords": [4.4, 51.9] }
           ],
           "routes": [
-            { "from": "San Francisco", "to": "Shanghai", "curve": 1.1, "label": "PACIFIC-TRANSIT" },
-            { "from": "Shanghai", "to": "Sydney", "curve": 1.3, "label": "ASIA-LINK" },
-            { "from": "Sydney", "to": "Sao Paulo", "curve": 1.5, "label": "SOUTHERN-ROUTE" }
+            { "from": "Singapore", "to": "Suez", "curve": 1.5, "label": "SEA-LINE-01", "type": "sea" },
+            { "from": "Suez", "to": "Rotterdam", "curve": 1.2, "label": "EU-ENTRY", "type": "sea" }
           ],
           "zIndex": 30
         },
         {
-          "id": "TITLE",
-          "type": "text",
-          "content": "GLOBAL LOGISTICS\nNETWORK",
-          "start": 30,
-          "duration": 300,
-          "position": { "x": 960, "y": 150 },
-          "fontSize": "80px",
-          "animation": "cinematicGlow",
-          "style": "font-black text-blue-400 uppercase tracking-widest",
-          "zIndex": 50
-        }
-      ]
-    },
-    {
-      "scene_id": "europe-detail",
-      "duration_in_frames": 300,
-      "background_type": "procedural",
-      "procedural_config": { "variant": "mesh", "primaryColor": "#020617", "secondaryColor": "#1e1b4b" },
-      "camera": {
-        "enabled": true,
-        "shots": [
-          { "targetId": "MAP_EU", "startFrame": 0, "duration": 300, "zoom": 1.2, "style": "push_in" }
-        ]
-      },
-      "overlays": [
-        {
-          "id": "MAP_EU",
-          "type": "map",
-          "start": 0,
-          "duration": 300,
-          "position": { "x": 960, "y": 540 },
-          "width": 1200,
-          "height": 800,
-          "scale": 800,
-          "center": [10, 50],
-          "highlights": ["Germany", "France", "United Kingdom", "Italy"],
-          "cities": [
-            { "name": "London", "coords": [-0.1, 51.5] },
-            { "name": "Paris", "coords": [2.3, 48.8] },
-            { "name": "Berlin", "coords": [13.4, 52.5] },
-            { "name": "Rome", "coords": [12.5, 41.9] }
-          ],
-          "routes": [
-            { "from": "London", "to": "Paris", "curve": 0.8, "label": "CHNL-LINK" },
-            { "from": "Paris", "to": "Berlin", "curve": 0.5, "label": "EU-CORRIDOR" },
-            { "from": "Berlin", "to": "Rome", "curve": 1.2, "label": "ALPINE-TRANSIT" }
-          ],
-          "zIndex": 30
-        },
-        {
-          "id": "STATS",
+          "id": "TELEMETRY",
           "type": "data_indicator",
           "indicator_type": "dashboardCard",
-          "label": "Regional Traffic",
-          "value": 12450,
-          "trend": "+12%",
-          "start": 60,
-          "duration": 240,
-          "position": { "x": 300, "y": 700 },
+          "label": "Cargo Efficiency",
+          "value": 88.5,
+          "suffix": "%",
+          "trend": "+4.2%",
+          "start": 90,
+          "duration": 300,
+          "position": { "x": 350, "y": 800 },
           "zIndex": 45
         }
       ]
