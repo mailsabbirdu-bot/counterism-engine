@@ -398,12 +398,11 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
        return (
          <ResponsiveNetwork
             {...(commonProps as any)}
-            nodes={overlay.data.nodes}
-            links={overlay.data.links}
+            data={overlay.data}
             margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
             linkDistance={e => (e as any).distance || 50}
             centeringStrength={0.3}
-            repulsionStrength={450}
+            repulsivity={450}
             nodeColor={e => (e as any).color || '#ffffff'}
             nodeBorderWidth={1}
             nodeBorderColor={{ from: 'color', modifiers: [['darker', 0.8]] }}
