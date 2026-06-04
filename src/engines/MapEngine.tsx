@@ -87,8 +87,12 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
   const exitFrame = overlay.duration - 15;
   const exit = interpolate(relativeFrame, [exitFrame, exitFrame + 15], [1, 0], { extrapolateRight: 'clamp' });
 
-  const borderDrawProgress = interpolate(relativeFrame, [20, 100], [0, 1], { extrapolateRight: 'clamp', easing: Easing.bezier(0.4, 0, 0.2, 1) });
-  const travelProgress = interpolate(relativeFrame, [80, overlay.duration - 40], [0, 1], { extrapolateRight: 'clamp' });
+  const borderDrawProgress = interpolate(relativeFrame, [10, Math.min(120, overlay.duration - 30)], [0, 1], { extrapolateRight: 'clamp', easing: Easing.bezier(0.22, 1, 0.36, 1) });
+  const travelProgress = interpolate(relativeFrame, [60, overlay.duration - 30], [0, 1], { extrapolateRight: 'clamp' });
+
+  // Staggered opacity for "ping" effect using Remotion
+  const pingScale = interpolate((relativeFrame % 30), [0, 30], [1, 3], { extrapolateRight: 'clamp' });
+  const pingOpacity = interpolate((relativeFrame % 30), [0, 30], [0.6, 0], { extrapolateRight: 'clamp' });
 
   // 3. Helpers
   const getCityCoords = (name: string) => overlay.cities?.find(c => c.name === name)?.coords;
@@ -204,8 +208,8 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
                 {/* Traveling Icon/Pulse */}
                 {routeReveal > 0 && routeReveal < 1 && (
                   <g transform={`translate(${mx}, ${my})`}>
-                    <circle r="15" fill="#3b82f6" className="animate-ping" style={{ opacity: 0.4 }} />
-                    <circle r="5" fill="white" stroke="#3b82f6" strokeWidth="2" shadow-xl />
+                    <circle r={10 * pingScale} fill="#3b82f6" style={{ opacity: pingOpacity }} />
+                    <circle r="5" fill="white" stroke="#3b82f6" strokeWidth="2" />
                   </g>
                 )}
 
