@@ -3,19 +3,20 @@
   "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
   "scenes": [
     {
-      "scene_id": "global-routes",
+      "scene_id": "global-logistics",
       "duration_in_frames": 450,
       "background_type": "procedural",
-      "procedural_config": { "variant": "mesh", "primaryColor": "#020617", "secondaryColor": "#1e1b4b" },
+      "procedural_config": { "variant": "neon_grid", "primaryColor": "#020617", "secondaryColor": "#0f172a" },
       "camera": {
         "enabled": true,
+        "motionBlur": { "enabled": true },
         "shots": [
-          { "targetId": "MAP_01", "startFrame": 0, "duration": 450, "zoom": 1.1, "style": "slow_push" }
+          { "targetId": "MAP_GLOBAL", "startFrame": 0, "duration": 450, "zoom": 1.1, "style": "slow_push" }
         ]
       },
       "overlays": [
         {
-          "id": "MAP_01",
+          "id": "MAP_GLOBAL",
           "type": "map",
           "start": 0,
           "duration": 450,
@@ -23,21 +24,82 @@
           "width": 1600,
           "height": 900,
           "scale": 250,
-          "center": [10, 30],
-          "highlights": ["China", "Brazil", "India", "Germany"],
+          "center": [0, 20],
+          "highlights": ["United States of America", "China", "Brazil", "Australia"],
           "cities": [
             { "name": "San Francisco", "coords": [-122.4, 37.7] },
-            { "name": "Paris", "coords": [2.3, 48.8] },
-            { "name": "Singapore", "coords": [103.8, 1.3] },
+            { "name": "Shanghai", "coords": [121.5, 31.2] },
+            { "name": "Sao Paulo", "coords": [-46.6, -23.5] },
             { "name": "Sydney", "coords": [151.2, -33.8] }
           ],
           "routes": [
-            { "from": "San Francisco", "to": "Paris", "curve": 1.2, "label": "AIR-LOGISTICS" },
-            { "from": "Paris", "to": "Singapore", "curve": 1.5, "label": "TRADE-ROUTE" },
-            { "from": "Singapore", "to": "Sydney", "curve": 1.3, "label": "SEA-LINK" }
+            { "from": "San Francisco", "to": "Shanghai", "curve": 1.1, "label": "PACIFIC-TRANSIT" },
+            { "from": "Shanghai", "to": "Sydney", "curve": 1.3, "label": "ASIA-LINK" },
+            { "from": "Sydney", "to": "Sao Paulo", "curve": 1.5, "label": "SOUTHERN-ROUTE" }
           ],
-          "zIndex": 30,
-          "depth": 0
+          "zIndex": 30
+        },
+        {
+          "id": "TITLE",
+          "type": "text",
+          "content": "GLOBAL LOGISTICS\nNETWORK",
+          "start": 30,
+          "duration": 300,
+          "position": { "x": 960, "y": 150 },
+          "fontSize": "80px",
+          "animation": "cinematicGlow",
+          "style": "font-black text-blue-400 uppercase tracking-widest",
+          "zIndex": 50
+        }
+      ]
+    },
+    {
+      "scene_id": "europe-detail",
+      "duration_in_frames": 300,
+      "background_type": "procedural",
+      "procedural_config": { "variant": "mesh", "primaryColor": "#020617", "secondaryColor": "#1e1b4b" },
+      "camera": {
+        "enabled": true,
+        "shots": [
+          { "targetId": "MAP_EU", "startFrame": 0, "duration": 300, "zoom": 1.2, "style": "push_in" }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "MAP_EU",
+          "type": "map",
+          "start": 0,
+          "duration": 300,
+          "position": { "x": 960, "y": 540 },
+          "width": 1200,
+          "height": 800,
+          "scale": 800,
+          "center": [10, 50],
+          "highlights": ["Germany", "France", "United Kingdom", "Italy"],
+          "cities": [
+            { "name": "London", "coords": [-0.1, 51.5] },
+            { "name": "Paris", "coords": [2.3, 48.8] },
+            { "name": "Berlin", "coords": [13.4, 52.5] },
+            { "name": "Rome", "coords": [12.5, 41.9] }
+          ],
+          "routes": [
+            { "from": "London", "to": "Paris", "curve": 0.8, "label": "CHNL-LINK" },
+            { "from": "Paris", "to": "Berlin", "curve": 0.5, "label": "EU-CORRIDOR" },
+            { "from": "Berlin", "to": "Rome", "curve": 1.2, "label": "ALPINE-TRANSIT" }
+          ],
+          "zIndex": 30
+        },
+        {
+          "id": "STATS",
+          "type": "data_indicator",
+          "indicator_type": "dashboardCard",
+          "label": "Regional Traffic",
+          "value": 12450,
+          "trend": "+12%",
+          "start": 60,
+          "duration": 240,
+          "position": { "x": 300, "y": 700 },
+          "zIndex": 45
         }
       ]
     }
