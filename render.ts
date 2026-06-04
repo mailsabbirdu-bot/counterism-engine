@@ -14,6 +14,7 @@ const concurrencyArg = args.find(arg => arg.startsWith('--concurrency='))?.split
 const sceneIdArg = args.find(arg => arg.startsWith('--scene='))?.split('=')[1];
 
 const GOOGLE_DRIVE_MANIFEST = '/content/drive/MyDrive/Counterism_Studio_V4/manifests/remotion_render.json';
+const GOOGLE_DRIVE_RENDER_DIR = '/content/drive/MyDrive/Counterism_Studio_V4/renders/overlays/remotion';
 
 const templatePath = templateArg && path.isAbsolute(templateArg)
   ? templateArg
@@ -100,7 +101,18 @@ const start = async () => {
       inputProps: { templateData: template }
     });
 
-    const outputDir = path.join(process.cwd(), 'renders/overlays/remotion');
+    const resumeEnabled = !args.includes('--no-resume');
+    const customChunkSize = args.find(arg => arg.startsWith('--chunk-size='))?.split('=')[1];
+    const CHUNK_SIZE = customChunkSize ? parseInt(customChunkSize, 10) : 300;
+
+    let outputDir = path.join(process.cwd(), 'renders/overlays/remotion');
+
+    // Auto-detect Google Drive for persistence
+    if (fs.existsSync('/content/drive/MyDrive')) {
+      outputDir = GOOGLE_DRIVE_RENDER_DIR;
+      console.log(`📡 Persistent Output Enabled: ${outputDir}`);
+    }
+
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
@@ -119,7 +131,7 @@ const start = async () => {
         continue;
       }
 
-      // Determine output location
+      // Determine final output location
       let outputLocation: string;
       if (outputArg && template.scenes.length === 1) {
         outputLocation = path.join(outputDir, outputArg);
@@ -130,24 +142,67 @@ const start = async () => {
         );
       }
 
-      console.log(`⏳ Rendering ${scene.scene_id} (Concurrency: ${concurrency})...`);
+      // 🛑 SCENE RESUME CHECK
+      if (resumeEnabled && fs.existsSync(outputLocation)) {
+        console.log(`⏭️  Skipping Scene [${scene.scene_id}]: Final output already exists.`);
+        continue;
+      }
 
-      const renderMediaOptions: any = {
-        composition,
-        serveUrl: bundleLocation,
-        codec: 'h264',
-        outputLocation,
-        inputProps: { sceneData: scene, templateData: template },
-        concurrency: concurrency,
-        publicDir: path.join(process.cwd(), 'public'),
-        onProgress: ({ progress }: { progress: number }) => {
-          process.stdout.write(`\rProgress: ${(progress * 100).toFixed(1)}%`);
-        },
-      };
+      console.log(`⏳ Rendering ${scene.scene_id} (Duration: ${composition.durationInFrames} frames)...`);
 
-      await renderMedia(renderMediaOptions);
+      // 🧩 CHUNKED RENDERING LOGIC
+      const chunksDir = path.join(outputDir, '.chunks', scene.scene_id);
+      if (!fs.existsSync(chunksDir)) fs.mkdirSync(chunksDir, { recursive: true });
 
-      console.log(`\n✅ Finished: ${outputLocation}`);
+      const totalFrames = composition.durationInFrames;
+      const chunkPaths: string[] = [];
+      const numChunks = Math.ceil(totalFrames / CHUNK_SIZE);
+
+      for (let i = 0; i < numChunks; i++) {
+        const startFrame = i * CHUNK_SIZE;
+        const endFrame = Math.min((i + 1) * CHUNK_SIZE - 1, totalFrames - 1);
+        const chunkPath = path.join(chunksDir, `chunk_${i}_${startFrame}_${endFrame}.mp4`);
+        chunkPaths.push(chunkPath);
+
+        if (resumeEnabled && fs.existsSync(chunkPath)) {
+          console.log(`  ✅ Chunk ${i+1}/${numChunks} already exists, skipping.`);
+          continue;
+        }
+
+        console.log(`  🎬 Rendering Chunk ${i+1}/${numChunks} (Frames: ${startFrame}-${endFrame})...`);
+
+        await renderMedia({
+          composition,
+          serveUrl: bundleLocation,
+          codec: 'h264',
+          outputLocation: chunkPath,
+          inputProps: { sceneData: scene, templateData: template },
+          concurrency: concurrency,
+          frameRange: [startFrame, endFrame],
+          publicDir: path.join(process.cwd(), 'public'),
+          onProgress: ({ progress }: { progress: number }) => {
+            process.stdout.write(`    \rProgress: ${(progress * 100).toFixed(1)}%`);
+          },
+        } as any);
+        console.log(''); // New line after progress
+      }
+
+      // 🧵 MERGING CHUNKS
+      console.log(`🧵 Merging ${chunkPaths.length} chunks into final video...`);
+      const listFilePath = path.join(chunksDir, 'chunks.txt');
+      const listContent = chunkPaths.map(p => `file '${p}'`).join('\n');
+      fs.writeFileSync(listFilePath, listContent);
+
+      try {
+        // Use remotion's bundled ffmpeg concat demuxer for lossless merging
+        execSync(`npx remotion ffmpeg -y -f concat -safe 0 -i "${listFilePath}" -c copy "${outputLocation}" -hide_banner -loglevel error`);
+        console.log(`✅ Scene Complete: ${outputLocation}`);
+
+        // Clean up chunks if successful
+        // execSync(`rm -rf "${chunksDir}"`);
+      } catch (mergeError) {
+        console.error(`❌ Merge failed for ${scene.scene_id}:`, mergeError);
+      }
     }
 
     console.log('\n🏁 All scenes rendered successfully!');
