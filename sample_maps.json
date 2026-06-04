@@ -1,9 +1,9 @@
 {
-  "project_name": "Ultra-Cinematic Map Engine Showcase",
+  "project_name": "Ultra-Cinematic Map Engine Master Showcase",
   "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
   "scenes": [
     {
-      "scene_id": "GLOBAL_BORDERS",
+      "scene_id": "GLOBAL_GEOPOLITICS",
       "duration_in_frames": 300,
       "background_type": "procedural",
       "procedural_config": { "variant": "neon_grid", "primaryColor": "#020617", "secondaryColor": "#0f172a" },
@@ -25,12 +25,19 @@
           "scale": 250,
           "center": [0, 20],
           "highlights": ["United States of America", "China", "Russia", "Brazil", "India"],
+          "cities": [
+            { "name": "Washington DC", "coords": [-77.0, 38.9] },
+            { "name": "Beijing", "coords": [116.4, 39.9] }
+          ],
+          "routes": [
+            { "from": "Washington DC", "to": "Beijing", "curve": 1.5, "label": "STRATEGIC-AXIS" }
+          ],
           "zIndex": 30
         },
         {
           "id": "TITLE",
           "type": "text",
-          "content": "GLOBAL BORDER\nANALYSIS",
+          "content": "GLOBAL BORDER\nINTELLIGENCE",
           "start": 30,
           "duration": 240,
           "position": { "x": 960, "y": 150 },
@@ -42,7 +49,7 @@
       ]
     },
     {
-      "scene_id": "BANGLADESH_EXPEDITION",
+      "scene_id": "BANGLADESH_DISTRICT_EXPEDITION",
       "duration_in_frames": 450,
       "background_type": "procedural",
       "procedural_config": { "variant": "mesh", "primaryColor": "#064e3b", "secondaryColor": "#022c22" },
@@ -78,11 +85,23 @@
             { "from": "Chittagong", "to": "Khulna", "curve": 1.2, "label": "COASTAL-ROUTE" }
           ],
           "zIndex": 30
+        },
+        {
+          "id": "BD_TEXT",
+          "type": "text",
+          "content": "BANGLADESH\nEXPEDITION",
+          "start": 45,
+          "duration": 360,
+          "position": { "x": 300, "y": 200 },
+          "fontSize": "80px",
+          "animation": "cinematicGlow",
+          "style": "font-black text-emerald-400 uppercase tracking-tighter text-left",
+          "zIndex": 50
         }
       ]
     },
     {
-      "scene_id": "MARITIME_LOGISTICS",
+      "scene_id": "MARITIME_LOGISTICS_EU",
       "duration_in_frames": 450,
       "background_type": "procedural",
       "procedural_config": { "variant": "mesh", "primaryColor": "#083344", "secondaryColor": "#0c4a6e" },
@@ -116,16 +135,15 @@
           "zIndex": 30
         },
         {
-          "id": "TELEMETRY",
-          "type": "data_indicator",
-          "indicator_type": "dashboardCard",
-          "label": "Cargo Efficiency",
-          "value": 88.5,
-          "suffix": "%",
-          "trend": "+4.2%",
-          "start": 90,
+          "id": "DATA_CARD",
+          "type": "ui_panel",
+          "title": "EUROPEAN SECTOR",
+          "description": "Logistics Efficiency: 94.2%",
+          "iconType": "activity",
+          "start": 60,
           "duration": 300,
           "position": { "x": 350, "y": 800 },
+          "targetProgress": 94,
           "zIndex": 45
         }
       ]
