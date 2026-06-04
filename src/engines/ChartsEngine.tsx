@@ -248,7 +248,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     if (overlay.chart_type === 'treemap') {
        const animateHierarchy = (node: any): any => ({
           ...node,
-          value: node.value ? node.value * dataProgress : undefined,
+          value: typeof node.value === 'number' ? node.value * dataProgress : undefined,
           children: node.children ? node.children.map(animateHierarchy) : undefined
        });
        const animatedData = animateHierarchy(overlay.data);
@@ -273,7 +273,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     if (overlay.chart_type === 'sunburst') {
        const animateHierarchy = (node: any): any => ({
           ...node,
-          value: node.value ? node.value * dataProgress : undefined,
+          value: typeof node.value === 'number' ? node.value * dataProgress : undefined,
           children: node.children ? node.children.map(animateHierarchy) : undefined
        });
        const animatedData = animateHierarchy(overlay.data);
