@@ -53,11 +53,12 @@ The V4 engine supports a sophisticated 3D camera. To create professional results
     - `shape_type`: "circle", "rect", "line".
     - `animation`: "pulse", "float", "morph".
     - `decorated`: true/false (adds orbit rings).
-7.  **`map`**: Advanced geospatial engine for routes and cities.
-    - `map_type`: "world", "region".
-    - `center`: [lon, lat].
+7.  **`map`**: High-fidelity vector mapping for routes and global analysis.
+    - `center`: [lon, lat]. Default [0, 20].
+    - `scale`: number. zoom level (e.g., 200 for world, 800 for continent).
     - `cities`: [{ "name": "London", "coords": [-0.12, 51.5] }].
-    - `routes`: [{ "from": "London", "to": "New York", "curve": 1.2 }].
+    - `routes`: [{ "from": "London", "to": "NYC", "curve": 1.2, "label": "FLIGHT-102" }].
+    - `highlights`: ["Germany", "France"]. Color specific countries.
 8.  **`video` / `image`**: External media.
     - `src`: Path relative to `public/`.
     - `borderRadius`, `shadow`, `border`: Styling options.

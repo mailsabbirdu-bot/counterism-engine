@@ -1,7 +1,10 @@
-import React, { useMemo } from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate, spring, Easing } from 'remotion';
+import React, { useMemo, useEffect, useState } from 'react';
+import { useCurrentFrame, useVideoConfig, interpolate, spring, Easing, continueRender, delayRender } from 'remotion';
 import * as d3 from 'd3-geo';
-import worldData from '../../public/world.json';
+import { feature } from 'topojson-client';
+
+// Standard high-quality world TopoJSON URL
+const TOPOJSON_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 interface City {
   name: string;
@@ -15,13 +18,15 @@ interface MapOverlayProps {
     center?: [number, number];
     scale?: number;
     cities?: City[];
-    routes?: { from: string; to: string; curve?: number }[];
+    routes?: { from: string; to: string; curve?: number; label?: string }[];
+    highlights?: string[]; // IDs or names of countries to highlight
     start: number;
     duration: number;
     position?: { x: number; y: number };
     width?: number;
     height?: number;
     zIndex?: number;
+    theme?: 'dark' | 'light' | 'blueprint';
   };
 }
 
@@ -33,7 +38,25 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
   const width = overlay.width || 1200;
   const height = overlay.height || 800;
 
-  // 1. Setup Projection
+  const [mapData, setMapData] = useState<any>(null);
+  const [handle] = useState(() => delayRender('Loading Map Topology'));
+
+  useEffect(() => {
+    fetch(TOPOJSON_URL)
+      .then(res => res.json())
+      .then(data => {
+        const countries = feature(data, data.objects.countries as any);
+        setMapData(countries);
+        continueRender(handle);
+      })
+      .catch(err => {
+        console.error("Map Data Fetch Error:", err);
+        setMapData({ features: [] }); // Fallback to empty map to prevent engine crash
+        continueRender(handle);
+      });
+  }, []);
+
+  // 1. Setup Projection (Smoothly animates center/scale if needed)
   const projection = useMemo(() => {
     return d3.geoMercator()
       .scale(overlay.scale || 200)
@@ -61,7 +84,7 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
   // Staggered reveal for cities and routes
   const dataProgress = interpolate(
     relativeFrame,
-    [30, 120],
+    [30, overlay.duration - 30],
     [0, 1],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.4, 0, 0.2, 1) }
   );
@@ -82,7 +105,7 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
     return Math.round(R * c);
   };
 
-  if (frame < overlay.start || frame > overlay.start + overlay.duration) {
+  if (frame < overlay.start || frame > overlay.start + overlay.duration || !mapData) {
     return null;
   }
 
@@ -100,20 +123,24 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
       }}
     >
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`}>
-        {/* World Map Background */}
+        {/* World Map SVG Paths */}
         <g className="map-base">
-          {(worldData as any).features.map((feature: any, i: number) => (
-            <path
-              key={`country-${i}`}
-              d={pathGenerator(feature) || ''}
-              fill="rgba(255, 255, 255, 0.05)"
-              stroke="rgba(255, 255, 255, 0.1)"
-              strokeWidth="0.5"
-            />
-          ))}
+          {mapData.features.map((feature: any, i: number) => {
+             const isHighlighted = overlay.highlights?.includes(feature.properties.name);
+             return (
+                <path
+                  key={`country-${i}`}
+                  d={pathGenerator(feature) || ''}
+                  fill={isHighlighted ? "rgba(59, 130, 246, 0.2)" : "rgba(255, 255, 255, 0.05)"}
+                  stroke={isHighlighted ? "rgba(59, 130, 246, 0.5)" : "rgba(255, 255, 255, 0.1)"}
+                  strokeWidth={isHighlighted ? "1.5" : "0.5"}
+                  className="transition-all duration-500"
+                />
+             );
+          })}
         </g>
 
-        {/* Sea Routes / Connections */}
+        {/* Travel Routes */}
         <g className="routes">
           {overlay.routes?.map((route, i) => {
             const startCoords = getCityCoords(route.from);
@@ -123,25 +150,28 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
             const [x1, y1] = projection(startCoords) || [0, 0];
             const [x2, y2] = projection(endCoords) || [0, 0];
 
-            // Create a curved path
+            // Documentary Arc calculation
             const dx = x2 - x1;
             const dy = y2 - y1;
-            const dr = Math.sqrt(dx * dx + dy * dy) * (route.curve || 1.5);
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const dr = dist * (route.curve || 1.2);
             const pathData = `M${x1},${y1}A${dr},${dr} 0 0,1 ${x2},${y2}`;
 
             const routeReveal = interpolate(
               dataProgress * (overlay.routes?.length || 1),
-              [i, i + 1],
+              [i, i + 0.8],
               [0, 1],
               { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
             );
 
-            // Calculate distance for the label
-            const distance = calculateDistance(startCoords, endCoords);
+            // Traveling point interpolation
+            const totalDistance = calculateDistance(startCoords, endCoords);
+            const currentDistance = Math.round(totalDistance * routeReveal);
 
-            // Simple mid-point for marker/label (not perfect for arcs but good for viz)
-            const mx = x1 + (x2 - x1) * routeReveal;
-            const my = y1 + (y2 - y1) * routeReveal - (Math.sin(routeReveal * Math.PI) * dr * 0.2);
+            // Simple Bezier-like midpoint for the pulse
+            const t = routeReveal;
+            const mx = (1-t)*(1-t)*x1 + 2*(1-t)*t*((x1+x2)/2) + t*t*x2;
+            const my = (1-t)*(1-t)*y1 + 2*(1-t)*t*((y1+y2)/2 - dr/4) + t*t*y2;
 
             return (
               <g key={`route-group-${i}`}>
@@ -149,38 +179,34 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
                   key={`route-${i}`}
                   d={pathData}
                   fill="none"
-                  stroke="rgba(59, 130, 246, 0.6)"
-                  strokeWidth="3"
+                  stroke="rgba(59, 130, 246, 0.4)"
+                  strokeWidth="2"
                   strokeDasharray="1000"
                   strokeDashoffset={1000 * (1 - routeReveal)}
-                  style={{
-                    filter: 'drop-shadow(0 0 8px rgba(59,130,246,0.4))',
-                    opacity: routeReveal
-                  }}
+                  style={{ filter: 'drop-shadow(0 0 5px rgba(59,130,246,0.3))' }}
                 />
+
+                {/* Traveling Marker */}
                 {routeReveal > 0 && routeReveal < 1 && (
-                  <circle
-                    cx={mx}
-                    cy={my}
-                    r="6"
-                    fill="#white"
-                    stroke="#3b82f6"
-                    strokeWidth="2"
-                    style={{ filter: 'drop-shadow(0 0 10px #3b82f6)' }}
-                  />
+                  <g transform={`translate(${mx}, ${my})`}>
+                    <circle r="12" fill="#3b82f6" className="animate-pulse" style={{ opacity: 0.3 }} />
+                    <circle r="4" fill="white" stroke="#3b82f6" strokeWidth="2" />
+                  </g>
                 )}
-                {routeReveal > 0.5 && (
+
+                {/* Distance Telemetry */}
+                {routeReveal > 0.1 && (
                   <text
                     x={(x1 + x2) / 2}
-                    y={(y1 + y2) / 2 - 20}
-                    fill="rgba(59, 130, 246, 0.9)"
+                    y={(y1 + y2) / 2 - 40}
+                    fill="#3b82f6"
                     fontSize="12"
-                    fontWeight="bold"
+                    fontWeight="black"
                     textAnchor="middle"
-                    className="font-mono"
-                    style={{ opacity: (routeReveal - 0.5) * 2 }}
+                    className="font-mono tabular-nums uppercase tracking-widest"
+                    style={{ opacity: routeReveal }}
                   >
-                    {distance} KM
+                    {route.label || 'TRANSFER'}: {currentDistance} / {totalDistance} KM
                   </text>
                 )}
               </g>
@@ -188,7 +214,7 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
           })}
         </g>
 
-        {/* Cities / Points of Interest */}
+        {/* City Nodes */}
         <g className="cities">
           {overlay.cities?.map((city, i) => {
             const coords = projection(city.coords);
@@ -204,32 +230,14 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
 
             return (
               <g key={`city-${i}`} style={{ opacity: cityReveal }}>
-                {/* Glow Effect */}
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={8 * cityReveal}
-                  fill="#3b82f6"
-                  className="animate-pulse"
-                  style={{ opacity: 0.4 }}
-                />
-                {/* Core Point */}
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={4 * cityReveal}
-                  fill="white"
-                  stroke="#3b82f6"
-                  strokeWidth="2"
-                />
-                {/* Label */}
+                <circle cx={cx} cy={cy} r="3" fill="white" />
                 <text
-                  x={cx + 12}
+                  x={cx + 10}
                   y={cy + 4}
                   fill="white"
-                  fontSize="14"
+                  fontSize="12"
                   fontWeight="bold"
-                  className="font-mono uppercase tracking-tighter"
+                  className="font-mono uppercase"
                   style={{ textShadow: '0 0 10px rgba(0,0,0,0.8)' }}
                 >
                   {city.name}
@@ -240,10 +248,20 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
         </g>
       </svg>
 
-      {/* Map Header */}
-      <div className="absolute top-10 left-10">
-         <h2 className="text-white font-black text-4xl tracking-tighter uppercase">Geospatial Intelligence</h2>
-         <p className="text-blue-400 font-mono text-xs mt-2 tracking-[0.3em] font-bold">Network & Route Analysis Active</p>
+      {/* Documentary UI Layer */}
+      <div className="absolute top-10 right-10 flex flex-col items-end gap-2">
+         <div className="px-4 py-1 bg-blue-500/20 border border-blue-500/40 text-blue-400 font-mono text-[10px] font-black uppercase tracking-widest">
+            Geospatial Analysis V4.2
+         </div>
+         <div className="text-white/40 font-mono text-[8px] uppercase tracking-tighter">
+            COORD_SYS: WGS-84 / Mercator<br/>
+            SCAN_SYNC: {Math.round(dataProgress * 100)}% COMPLETE
+         </div>
+      </div>
+
+      <div className="absolute bottom-10 left-10">
+         <h2 className="text-white font-black text-3xl tracking-tighter uppercase leading-none">{overlay.id}</h2>
+         <p className="text-blue-500/60 font-mono text-[10px] mt-2 font-bold uppercase tracking-[0.5em]">Real-time Vector Simulation</p>
       </div>
     </div>
   );

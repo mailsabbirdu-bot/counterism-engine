@@ -144,13 +144,17 @@ Fluid, Framer-motion driven indicators for single metrics.
 - `size`: `number`.
 - `position`: `{ x: number, y: number }`.
 
-### 7. `map` (Geospatial Intelligence)
-- `map_type`: `"world"` \| `"region"`.
+### 7. `map` (Advanced Vector Geospatial Engine)
+High-fidelity SVG mapping system using D3 and real-world TopoJSON data.
 - `center`: `[longitude, latitude]` (Default: `[0, 20]`).
-- `scale`: `number` (Default: `200`).
+- `scale`: `number` (Default: `200`). Controls zoom level.
 - `cities`: `array` of `{ name: string, coords: [lon, lat] }`.
-- `routes`: `array` of `{ from: string, to: string, curve: number }`.
-- `width`, `height`: Canvas size.
+- `routes`: `array` of:
+  - `from`, `to`: City names defined in `cities`.
+  - `curve`: `number` (Default: `1.2`). Control arc intensity.
+  - `label`: `string`. Displayed with real-time distance telemetry.
+- `highlights`: `string[]`. List of country names to highlight (e.g., `["Brazil", "China"]`).
+- `width`, `height`: Canvas dimensions.
 - `position`: `{ x: number, y: number }`.
 
 ### 8. `video` & `image` (Media Overlays)
