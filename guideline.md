@@ -145,17 +145,21 @@ Fluid, Framer-motion driven indicators for single metrics.
 - `position`: `{ x: number, y: number }`.
 
 ### 7. `map` (Advanced Vector Geospatial Engine)
-High-fidelity SVG mapping system using D3 and real-world TopoJSON data.
+High-fidelity SVG mapping system using D3, real-world GeoJSON/TopoJSON data, and OpenStreetMap tiles.
 - `center`: `[longitude, latitude]` (Default: `[0, 20]`).
-- `scale`: `number` (Default: `200`). Controls zoom level (World: 200, Continent: 800, Country: 4000+).
+- `scale`: `number` (Default: `200`). Controls zoom level (World: 200, Continent: 800, Country: 4000+, Street: 1000000+).
+- `focus`: `string` (Optional). Name of the area to focus on. If provided, the engine attempts to load high-detail GeoJSON from the local cache and auto-fits the view.
+- `useOsmTiles`: `boolean` (Optional). Enables OpenStreetMap street-level tile rendering behind the vector layers.
+- `mapTheme`: `"dark"` | `"light"` | `"cinematic"`. Applies color filters to OSM tiles to match the project aesthetic.
+- `showNeighbors`: `boolean` (Optional). If true, loads and displays neighboring areas defined in the map metadata.
 - `topojson_url`: `string` (Optional). URL to a custom TopoJSON file.
 - `object_name`: `string` (Optional). The key of the geometry object inside the TopoJSON (e.g., `"districts"`, `"countries"`).
 - `cities`: `array` of `{ name: string, coords: [lon, lat] }`.
 - `routes`: `array` of:
   - `from`, `to`: City names defined in `cities`.
-  - `curve`: `number` (Default: `1.2`). Control arc intensity.
   - `label`: `string`. Displayed with real-time distance telemetry.
-- `highlights`: `string[]`. List of country names to highlight (e.g., `["Brazil", "China"]`).
+  - `type`: `"air"` | `"sea"` | `"land"`. Affects line style and animation speed.
+- `highlights`: `string[]`. List of area names to highlight.
 - `width`, `height`: Canvas dimensions.
 - `position`: `{ x: number, y: number }`.
 
