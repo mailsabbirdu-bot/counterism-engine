@@ -33,6 +33,21 @@ interface MapOverlayProps {
   };
 }
 
+const CountryPath = React.memo(({ feature, pathGenerator, isHighlighted, borderDrawProgress }: any) => {
+   return (
+      <path
+        d={pathGenerator(feature) || ''}
+        fill={isHighlighted ? "rgba(59, 130, 246, 0.2)" : "rgba(255, 255, 255, 0.03)"}
+        stroke={isHighlighted ? "rgba(59, 130, 246, 0.8)" : "rgba(255, 255, 255, 0.1)"}
+        strokeWidth={isHighlighted ? "2" : "0.5"}
+        pathLength="1"
+        strokeDasharray="1"
+        strokeDashoffset={1 - borderDrawProgress}
+        style={{ transition: 'fill 0.5s ease' }}
+      />
+   );
+});
+
 export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { width: videoWidth, height: videoHeight, fps } = useVideoConfig();
@@ -126,25 +141,20 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} className="relative z-10">
         {/* Animated Borders & Territories */}
         <g>
-          {useMemo(() => mapData.features.map((feature: any, i: number) => {
+          {mapData.features.map((feature: any, i: number) => {
             const countryName = feature.properties.name || feature.properties.NAME_1 || feature.id;
             const isHighlighted = overlay.highlights?.some(h => h.toLowerCase() === countryName?.toString().toLowerCase());
-            const path = pathGenerator(feature);
 
             return (
-              <path
-                key={`border-${i}`}
-                d={path || ''}
-                fill={isHighlighted ? "rgba(59, 130, 246, 0.2)" : "rgba(255, 255, 255, 0.03)"}
-                stroke={isHighlighted ? "rgba(59, 130, 246, 0.8)" : "rgba(255, 255, 255, 0.1)"}
-                strokeWidth={isHighlighted ? "2" : "0.5"}
-                pathLength="1"
-                strokeDasharray="1"
-                strokeDashoffset={1 - borderDrawProgress}
-                style={{ transition: 'fill 0.5s ease' }}
-              />
+               <CountryPath
+                  key={`country-${i}`}
+                  feature={feature}
+                  pathGenerator={pathGenerator}
+                  isHighlighted={isHighlighted}
+                  borderDrawProgress={borderDrawProgress}
+               />
             );
-          }), [mapData, borderDrawProgress, overlay.highlights, pathGenerator])}
+          })}
         </g>
 
         {/* Dynamic Travel Routes */}
@@ -157,12 +167,11 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
             const [x1, y1] = projection(startCoords) || [0, 0];
             const [x2, y2] = projection(endCoords) || [0, 0];
 
-            // Cinematic Arc
-            const dx = x2 - x1;
-            const dy = y2 - y1;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const dr = dist * (route.curve || 1.3);
-            const pathData = `M${x1},${y1}A${dr},${dr} 0 0,1 ${x2},${y2}`;
+            // Real Geodesic Path
+            const pathData = pathGenerator({
+              type: 'LineString',
+              coordinates: [startCoords, endCoords]
+            });
 
             const routeReveal = interpolate(
               travelProgress * (overlay.routes?.length || 1),
@@ -171,32 +180,32 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
               { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
             );
 
-            // Interpolate point along the path
-            const t = routeReveal;
-            const mx = (1-t)*(1-t)*x1 + 2*(1-t)*t*((x1+x2)/2) + t*t*x2;
-            const my = (1-t)*(1-t)*y1 + 2*(1-t)*t*((y1+y2)/2 - dr/4) + t*t*y2;
+            // Geodesic interpolation for the traveling marker
+            const interpolator = d3.geoInterpolate(startCoords, endCoords);
+            const currentCoords = interpolator(routeReveal);
+            const [mx, my] = projection(currentCoords) || [0, 0];
 
             const km = calculateDistance(startCoords, endCoords);
 
             return (
               <g key={`route-${i}`}>
                 {/* Background Shadow Path */}
-                <path d={pathData} fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth="4" />
+                <path d={pathData || ''} fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth="4" />
 
                 {/* Animated Line */}
                 <path
-                  d={pathData}
+                  d={pathData || ''}
                   fill="none"
                   stroke={route.type === 'sea' ? "#0ea5e9" : "#3b82f6"}
-                  strokeWidth="2"
-                  strokeDasharray="8 4"
-                  strokeDashoffset={-frame * 2}
-                  opacity={routeReveal}
+                  strokeWidth={route.type === 'sea' ? "3" : "2"}
+                  strokeDasharray={route.type === 'sea' ? "10 5" : "8 4"}
+                  strokeDashoffset={-frame * (route.type === 'sea' ? 1.5 : 2.5)}
+                  opacity={routeReveal * 0.6}
                 />
 
                 {/* The "Drawn" Path */}
                 <path
-                  d={pathData}
+                  d={pathData || ''}
                   fill="none"
                   stroke="white"
                   strokeWidth="2"
