@@ -92,11 +92,11 @@ const TileLayer: React.FC<{
   const getTileStyles = () => {
     switch (theme) {
       case 'cinematic':
-        return { filter: 'invert(100%) hue-rotate(180deg) brightness(0.6) contrast(1.2) saturate(0.5)' };
+        return { filter: 'invert(100%) hue-rotate(180deg) brightness(0.4) contrast(1.4) saturate(0.8)' };
       case 'light':
         return { filter: 'none' };
       default: // dark
-        return { filter: 'invert(100%) hue-rotate(180deg) brightness(0.6) contrast(1.2)' };
+        return { filter: 'invert(100%) hue-rotate(180deg) brightness(0.4) contrast(1.4)' };
     }
   };
 
@@ -250,11 +250,18 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
           (f.properties.name || f.properties.NAME_1 || f.id)?.toString().toLowerCase() === overlay.focus?.toLowerCase()
        );
        if (focusFeature) {
-          proj.fitSize([width, height], focusFeature);
-          // Apply a bit of padding/zoom margin if requested
-          if (overlay.zoom === 'auto') {
-             const currentScale = proj.scale();
-             proj.scale(currentScale * 0.8);
+          // If we have manual scale, use it, otherwise fit
+          if (overlay.scale && overlay.scale > 5000) {
+            proj.scale(overlay.scale)
+                .center(overlay.center || (d3.geoCentroid(focusFeature) as [number, number]))
+                .translate([width / 2, height / 2]);
+          } else {
+            proj.fitSize([width, height], focusFeature);
+            // Apply a bit of padding/zoom margin if requested
+            if (overlay.zoom === 'auto') {
+               const currentScale = proj.scale();
+               proj.scale(currentScale * 0.8);
+            }
           }
        } else {
           proj.scale(overlay.scale || 200)
@@ -317,6 +324,15 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
            style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)', backgroundSize: '40px 40px' }} />
 
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} className="relative z-10">
+        {/* Cinematic Crosshair for OSM Mode */}
+        {overlay.useOsmTiles && (
+          <g transform={`translate(${width/2}, ${height/2})`} className="opacity-40">
+            <line x1="-20" y1="0" x2="20" y2="0" stroke="white" strokeWidth="1" />
+            <line x1="0" y1="-20" x2="0" y2="20" stroke="white" strokeWidth="1" />
+            <circle r="40" fill="none" stroke="white" strokeWidth="0.5" strokeDasharray="4 4" />
+          </g>
+        )}
+
         {/* Animated Borders & Territories */}
         <g>
           {/* 1. Neighbors Layer */}
@@ -342,7 +358,10 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
 
             // Documentary highlight style
             const opacity = isFocus ? 1 : 0.1;
-            const fill = isFocus ? "rgba(59, 130, 246, 0.4)" : "rgba(255, 255, 255, 0.03)";
+            // If using OSM tiles, make the focus fill more transparent to see streets
+            const fill = isFocus
+              ? (overlay.useOsmTiles ? "rgba(59, 130, 246, 0.1)" : "rgba(59, 130, 246, 0.4)")
+              : "rgba(255, 255, 255, 0.03)";
             const stroke = isFocus ? "rgba(59, 130, 246, 1)" : "rgba(255, 255, 255, 0.1)";
 
             return (
@@ -467,7 +486,7 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
            {overlay.showLabels && metadata && Object.entries(metadata).map(([name, data]: [string, any], i) => {
               if (!data.centroid) return null;
               const coords = projection(data.centroid);
-              if (!coords) return null;
+              if (!coords || coords[0] < -50 || coords[0] > width + 50 || coords[1] < -50 || coords[1] > height + 50) return null;
               const [lx, ly] = coords;
 
               const isFocus = overlay.focus && name.toLowerCase() === overlay.focus.toLowerCase();
@@ -477,20 +496,39 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
 
               if (!isFocus && !isNeighbor) return null;
 
+              // Cleaner short names (e.g., "GULSHAN" instead of "Gulshan, Dhaka, Bangladesh")
+              const shortName = name.split(',')[0].trim();
+
               return (
-                <text
-                  key={`label-${i}`}
-                  x={lx}
-                  y={ly}
-                  fill="white"
-                  fontSize={isFocus ? "14" : "10"}
-                  fontWeight={isFocus ? "black" : "normal"}
-                  textAnchor="middle"
-                  className="font-mono uppercase"
-                  style={{ opacity: borderDrawProgress, textShadow: '0 0 10px black' }}
-                >
-                  {name}
-                </text>
+                <g key={`label-${i}`} style={{ opacity: borderDrawProgress }}>
+                  {/* Subtle Background Glow for Legibility */}
+                  <text
+                    x={lx}
+                    y={ly}
+                    fill="black"
+                    fontSize={isFocus ? "14" : "10"}
+                    fontWeight="black"
+                    textAnchor="middle"
+                    className="font-mono uppercase blur-[2px] opacity-80"
+                  >
+                    {shortName}
+                  </text>
+                  <text
+                    x={lx}
+                    y={ly}
+                    fill={isFocus ? "#3b82f6" : "white"}
+                    fontSize={isFocus ? "14" : "10"}
+                    fontWeight={isFocus ? "black" : "bold"}
+                    textAnchor="middle"
+                    className="font-mono uppercase tracking-tighter"
+                    style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}
+                  >
+                    {shortName}
+                  </text>
+                  {isFocus && (
+                    <circle cx={lx} cy={ly + 10} r="2" fill="#3b82f6" />
+                  )}
+                </g>
               );
            })}
         </g>
@@ -529,25 +567,62 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
         </g>
       </svg>
 
-      {/* Documentary UI Chrome */}
-      <div className="absolute top-12 left-12 flex items-center gap-6">
-         <div className="w-16 h-16 rounded-full border-4 border-blue-500/30 flex items-center justify-center">
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-         </div>
-         <div>
-            <h2 className="text-white font-black text-5xl tracking-tighter uppercase leading-none">Global Sector</h2>
-            <p className="text-blue-400 font-mono text-xs mt-2 font-bold tracking-[0.5em] uppercase opacity-60 overflow-hidden whitespace-nowrap">
-               Vector-Mapping Protocol: {Math.random().toString(16).slice(2, 10).toUpperCase()}
-            </p>
-         </div>
-      </div>
+      {/* Documentary UI Chrome (Optional) */}
+      {!overlay.useOsmTiles ? (
+        <>
+          <div className="absolute top-12 left-12 flex items-center gap-6">
+            <div className="w-16 h-16 rounded-full border-4 border-blue-500/30 flex items-center justify-center">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            </div>
+            <div>
+                <h2 className="text-white font-black text-5xl tracking-tighter uppercase leading-none">Global Sector</h2>
+                <p className="text-blue-400 font-mono text-xs mt-2 font-bold tracking-[0.5em] uppercase opacity-60 overflow-hidden whitespace-nowrap">
+                  Vector-Mapping Protocol: {Math.random().toString(16).slice(2, 10).toUpperCase()}
+                </p>
+            </div>
+          </div>
 
-      <div className="absolute bottom-12 right-12 text-right">
-         <div className="text-blue-500 font-mono text-4xl font-black tabular-nums">
-            {Math.round(travelProgress * 100)}%
-         </div>
-         <div className="text-white/30 font-mono text-[10px] uppercase tracking-widest font-bold">Simulation Progress</div>
-      </div>
+          <div className="absolute bottom-12 right-12 text-right">
+            <div className="text-blue-500 font-mono text-4xl font-black tabular-nums">
+                {Math.round(travelProgress * 100)}%
+            </div>
+            <div className="text-white/30 font-mono text-[10px] uppercase tracking-widest font-bold">Simulation Progress</div>
+          </div>
+        </>
+      ) : (
+        <div className="absolute top-12 left-12 flex flex-col gap-1 p-5 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            <span className="text-blue-400 font-mono text-[10px] uppercase tracking-[0.3em] font-black">Satellite Intel Link</span>
+          </div>
+          <div className="text-white font-black text-3xl tracking-tighter uppercase leading-none mt-1">
+            {overlay.focus?.split(',')[0] || "Area Scan"}
+          </div>
+          <div className="flex gap-6 mt-3 pt-3 border-t border-white/10">
+            <div>
+              <div className="text-white/40 font-mono text-[8px] uppercase tracking-widest">Lat. Coordinate</div>
+              <div className="text-white font-mono text-xs tabular-nums font-bold">
+                {overlay.center?.[1]?.toFixed(4) || "23.7884"}°N
+              </div>
+            </div>
+            <div>
+              <div className="text-white/40 font-mono text-[8px] uppercase tracking-widest">Lon. Coordinate</div>
+              <div className="text-white font-mono text-xs tabular-nums font-bold">
+                {overlay.center?.[0]?.toFixed(4) || "90.4132"}°E
+              </div>
+            </div>
+            <div>
+              <div className="text-white/40 font-mono text-[8px] uppercase tracking-widest">Zoom Factor</div>
+              <div className="text-white font-mono text-xs tabular-nums font-bold">
+                {(projection.scale() / 1000).toFixed(1)}K
+              </div>
+            </div>
+          </div>
+          <div className="mt-2 text-[8px] text-white/20 font-mono uppercase tracking-widest text-right">
+            © OpenStreetMap contributors
+          </div>
+        </div>
+      )}
     </div>
   );
 };

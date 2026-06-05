@@ -19,6 +19,8 @@ export interface CameraKeyframe {
 export type ShotStyle =
 	| "push_in"
 	| "pull_out"
+	| "slow_push"
+	| "slow_pull"
 	| "pan_left"
 	| "pan_right"
 	| "tilt_up"

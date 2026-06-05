@@ -1,0 +1,56 @@
+{
+  "project_name": "OSM Map Test V2",
+  "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
+  "scenes": [
+    {
+      "scene_id": "OSM-MAP-GULSHAN-V2",
+      "duration_in_frames": 450,
+      "background_type": "procedural",
+      "procedural_config": { "variant": "neon_grid", "primaryColor": "#020617", "secondaryColor": "#0f172a" },
+      "camera": {
+        "enabled": true,
+        "shots": [
+          { "targetId": "GULSHAN_MAP", "startFrame": 0, "duration": 450, "zoom": 1.2, "style": "slow_push" }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "GULSHAN_MAP",
+          "type": "map",
+          "start": 0,
+          "duration": 450,
+          "position": { "x": 960, "y": 540 },
+          "width": 1400,
+          "height": 900,
+          "focus": "Gulshan, Dhaka, Bangladesh",
+          "center": [90.413, 23.788],
+          "useOsmTiles": true,
+          "mapTheme": "cinematic",
+          "showNeighbors": true,
+          "showLabels": true,
+          "scale": 500000,
+          "cities": [
+             { "name": "Gulshan 1", "coords": [90.413, 23.778] },
+             { "name": "Gulshan 2", "coords": [90.413, 23.792] }
+          ],
+          "routes": [
+            { "from": "Gulshan 1", "to": "Gulshan 2", "label": "AVENUE-LINK" }
+          ],
+          "zIndex": 30
+        },
+        {
+          "id": "OSM_LABEL",
+          "type": "text",
+          "content": "STREET-LEVEL INTELLIGENCE",
+          "start": 30,
+          "duration": 420,
+          "position": { "x": 960, "y": 150 },
+          "fontSize": "60px",
+          "animation": "cinematicGlow",
+          "style": "font-black text-blue-400 uppercase tracking-widest text-center",
+          "zIndex": 50
+        }
+      ]
+    }
+  ]
+}
