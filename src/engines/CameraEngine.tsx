@@ -159,10 +159,10 @@ export const CameraEngine: React.FC<{
             let endZoom = zoom;
             let currentEasing = shot.easing || 'in-out';
 
-            if (shot.style === 'push_in') {
+            if (shot.style === 'push_in' || shot.style === 'slow_push') {
                 startZoom = zoom * 0.85;
                 endZoom = zoom;
-            } else if (shot.style === 'pull_out') {
+            } else if (shot.style === 'pull_out' || shot.style === 'slow_pull') {
                 startZoom = zoom * 1.15;
                 endZoom = zoom;
             } else if (shot.style === 'whip_pan') {
