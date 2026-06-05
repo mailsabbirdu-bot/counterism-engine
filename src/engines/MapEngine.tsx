@@ -8,6 +8,7 @@ const WORLD_TOPO = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.js
 
 // Global cache to prevent redundant fetches
 const mapCache: Record<string, any> = {};
+let metadataCache: any = null;
 
 interface City {
   name: string;
@@ -51,6 +52,7 @@ const CountryPath = React.memo(({ feature, pathGenerator, isHighlighted, borderD
 export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { width: videoWidth, height: videoHeight, fps } = useVideoConfig();
+  const [metadata, setMetadata] = useState<any>(null);
   const relativeFrame = frame - overlay.start;
 
   const width = overlay.width || 1200;
@@ -60,6 +62,20 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
   const [handle] = useState(() => delayRender('Loading SVG Map Data'));
 
   useEffect(() => {
+    // 1. Fetch Metadata first
+    if (metadataCache) {
+      setMetadata(metadataCache);
+    } else {
+      fetch('/maps/metadata.json')
+        .then(res => res.json())
+        .then(data => {
+          metadataCache = data;
+          setMetadata(data);
+        })
+        .catch(() => console.warn("No map metadata found. Using manual config."));
+    }
+
+    // 2. Fetch Map Geometry
     const url = overlay.topojson_url || WORLD_TOPO;
     const objName = overlay.object_name || 'countries';
     const cacheKey = `${url}-${objName}`;
@@ -87,15 +103,35 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
       });
   }, [overlay.topojson_url, overlay.object_name]);
 
-  // 1. Precise Geodesic Projection
-  const projection = useMemo(() => {
-    return d3.geoMercator()
-      .scale(overlay.scale || 200)
-      .center(overlay.center || [0, 20])
-      .translate([width / 2, height / 2]);
-  }, [overlay.scale, overlay.center, width, height]);
+  // 1. Precise Geodesic Projection with Auto-Fit capability
+  const { projection, pathGenerator } = useMemo(() => {
+    const proj = d3.geoMercator();
+    const pathGen = d3.geoPath().projection(proj);
 
-  const pathGenerator = d3.geoPath().projection(projection);
+    if (overlay.focus && mapData) {
+       const focusFeature = mapData.features.find((f: any) =>
+          (f.properties.name || f.properties.NAME_1 || f.id)?.toString().toLowerCase() === overlay.focus?.toLowerCase()
+       );
+       if (focusFeature) {
+          proj.fitSize([width, height], focusFeature);
+          // Apply a bit of padding/zoom margin if requested
+          if (overlay.zoom === 'auto') {
+             const currentScale = proj.scale();
+             proj.scale(currentScale * 0.8);
+          }
+       } else {
+          proj.scale(overlay.scale || 200)
+              .center(overlay.center || [0, 20])
+              .translate([width / 2, height / 2]);
+       }
+    } else {
+       proj.scale(overlay.scale || 200)
+           .center(overlay.center || [0, 20])
+           .translate([width / 2, height / 2]);
+    }
+
+    return { projection: proj, pathGenerator: pathGen };
+  }, [overlay.scale, overlay.center, overlay.focus, overlay.zoom, width, height, mapData]);
 
   // 2. Cinematic Timings
   const entrance = spring({ frame: relativeFrame, fps, config: { damping: 20 } });
@@ -143,16 +179,30 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
         <g>
           {mapData.features.map((feature: any, i: number) => {
             const countryName = feature.properties.name || feature.properties.NAME_1 || feature.id;
-            const isHighlighted = overlay.highlights?.some(h => h.toLowerCase() === countryName?.toString().toLowerCase());
+            const isFocus = overlay.focus && countryName?.toString().toLowerCase() === overlay.focus.toLowerCase();
+            const isNeighbor = overlay.showNeighbors && metadata?.[overlay.focus || '']?.neighbors?.some(
+              (n: string) => n.toLowerCase() === countryName?.toString().toLowerCase()
+            );
+
+            const isHighlighted = overlay.highlights?.some(h => h.toLowerCase() === countryName?.toString().toLowerCase()) || isFocus;
+
+            // Documentary highlight style
+            const opacity = isFocus ? 1 : (isNeighbor ? 0.4 : 0.1);
+            const fill = isFocus ? "rgba(59, 130, 246, 0.4)" : (isNeighbor ? "rgba(59, 130, 246, 0.1)" : "rgba(255, 255, 255, 0.03)");
+            const stroke = isFocus ? "rgba(59, 130, 246, 1)" : (isNeighbor ? "rgba(59, 130, 246, 0.5)" : "rgba(255, 255, 255, 0.1)");
 
             return (
-               <CountryPath
-                  key={`country-${i}`}
-                  feature={feature}
-                  pathGenerator={pathGenerator}
-                  isHighlighted={isHighlighted}
-                  borderDrawProgress={borderDrawProgress}
-               />
+               <path
+                key={`border-${i}`}
+                d={pathGenerator(feature) || ''}
+                fill={fill}
+                stroke={stroke}
+                strokeWidth={isFocus ? "2" : "0.5"}
+                pathLength="1"
+                strokeDasharray="1"
+                strokeDashoffset={1 - borderDrawProgress}
+                style={{ opacity, transition: 'all 0.5s ease' }}
+              />
             );
           })}
         </g>
@@ -240,6 +290,38 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
               </g>
             );
           })}
+        </g>
+
+        {/* Automatic Labels from Metadata */}
+        <g>
+           {overlay.showLabels && metadata && Object.entries(metadata).map(([name, data]: [string, any], i) => {
+              const coords = projection(data.centroid);
+              if (!coords) return null;
+              const [lx, ly] = coords;
+
+              const isFocus = overlay.focus && name.toLowerCase() === overlay.focus.toLowerCase();
+              const isNeighbor = overlay.showNeighbors && metadata?.[overlay.focus || '']?.neighbors?.some(
+                (n: string) => n.toLowerCase() === name.toLowerCase()
+              );
+
+              if (!isFocus && !isNeighbor) return null;
+
+              return (
+                <text
+                  key={`label-${i}`}
+                  x={lx}
+                  y={ly}
+                  fill="white"
+                  fontSize={isFocus ? "14" : "10"}
+                  fontWeight={isFocus ? "black" : "normal"}
+                  textAnchor="middle"
+                  className="font-mono uppercase"
+                  style={{ opacity: borderDrawProgress, textShadow: '0 0 10px black' }}
+                >
+                  {name}
+                </text>
+              );
+           })}
         </g>
 
         {/* City Infrastructure */}
