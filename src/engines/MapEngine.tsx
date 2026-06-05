@@ -20,6 +20,10 @@ interface MapOverlayProps {
     id: string;
     center?: [number, number];
     scale?: number;
+    focus?: string;
+    zoom?: string | number;
+    showNeighbors?: boolean;
+    showLabels?: boolean;
     cities?: City[];
     routes?: { from: string; to: string; curve?: number; label?: string; type?: 'air' | 'sea' | 'land' }[];
     highlights?: string[];
