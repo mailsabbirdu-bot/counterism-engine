@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate, spring, Easing, continueRender, delayRender } from 'remotion';
+import { useCurrentFrame, useVideoConfig, interpolate, spring, Easing, continueRender, delayRender, staticFile } from 'remotion';
 import * as d3 from 'd3-geo';
 import { feature } from 'topojson-client';
 
@@ -22,6 +22,8 @@ interface MapOverlayProps {
     scale?: number;
     focus?: string;
     zoom?: string | number;
+    useOsmTiles?: boolean;
+    mapTheme?: 'dark' | 'light' | 'cinematic';
     showNeighbors?: boolean;
     showLabels?: boolean;
     cities?: City[];
@@ -38,20 +40,105 @@ interface MapOverlayProps {
   };
 }
 
-const CountryPath = React.memo(({ feature, pathGenerator, isHighlighted, borderDrawProgress }: any) => {
+const AreaPath = React.memo(({ feature, pathGenerator, isHighlighted, borderDrawProgress, fill, stroke, opacity, isFocus }: any) => {
    return (
       <path
         d={pathGenerator(feature) || ''}
-        fill={isHighlighted ? "rgba(59, 130, 246, 0.2)" : "rgba(255, 255, 255, 0.03)"}
-        stroke={isHighlighted ? "rgba(59, 130, 246, 0.8)" : "rgba(255, 255, 255, 0.1)"}
-        strokeWidth={isHighlighted ? "2" : "0.5"}
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={isFocus ? "2" : "0.5"}
         pathLength="1"
         strokeDasharray="1"
         strokeDashoffset={1 - borderDrawProgress}
-        style={{ transition: 'fill 0.5s ease' }}
+        style={{ opacity, transition: 'all 0.5s ease' }}
       />
    );
 });
+
+const TileLayer: React.FC<{
+  projection: d3.GeoProjection;
+  width: number;
+  height: number;
+  theme?: string;
+}> = ({ projection, width, height, theme }) => {
+  const scale = projection.scale();
+
+  // OSM zoom level calculation for D3 Mercator
+  const zoom = Math.max(0, Math.min(19, Math.floor(Math.log2((scale * Math.PI) / 128))));
+
+  const tiles = useMemo(() => {
+    if (!projection.invert) return [];
+    const tl = projection.invert([0, 0]);
+    const br = projection.invert([width, height]);
+    if (!tl || !br) return [];
+
+    const lonToTileX = (lon: number, z: number) => (lon + 180) / 360 * Math.pow(2, z);
+    const latToTileY = (lat: number, z: number) => (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z);
+
+    const x0 = Math.floor(lonToTileX(tl[0], zoom));
+    const x1 = Math.floor(lonToTileX(br[0], zoom));
+    const y0 = Math.floor(latToTileY(tl[1], zoom));
+    const y1 = Math.floor(latToTileY(br[1], zoom));
+
+    const t = [];
+    for (let x = x0; x <= x1; x++) {
+      for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
+        t.push({ x, y, z: zoom });
+      }
+    }
+    return t;
+  }, [projection, width, height, zoom]);
+
+  const getTileStyles = () => {
+    switch (theme) {
+      case 'cinematic':
+        return { filter: 'invert(100%) hue-rotate(180deg) brightness(0.6) contrast(1.2) saturate(0.5)' };
+      case 'light':
+        return { filter: 'none' };
+      default: // dark
+        return { filter: 'invert(100%) hue-rotate(180deg) brightness(0.6) contrast(1.2)' };
+    }
+  };
+
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden" style={getTileStyles()}>
+      {tiles.map(tile => {
+        const tileToLon = (x: number, z: number) => (x / Math.pow(2, z)) * 360 - 180;
+        const tileToLat = (y: number, z: number) => {
+          const n = Math.PI - (2 * Math.PI * y) / Math.pow(2, z);
+          return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+        };
+
+        const lon = tileToLon(tile.x, tile.z);
+        const lat = tileToLat(tile.y, tile.z);
+        const [px, py] = projection([lon, lat]) || [0, 0];
+
+        const nextLon = tileToLon(tile.x + 1, tile.z);
+        const nextLat = tileToLat(tile.y + 1, tile.z);
+        const [npx, npy] = projection([nextLon, nextLat]) || [0, 0];
+
+        const w = npx - px;
+        const h = npy - py;
+        const wrappedX = (tile.x % Math.pow(2, tile.z) + Math.pow(2, tile.z)) % Math.pow(2, tile.z);
+
+        return (
+          <img
+            key={`${tile.z}/${tile.x}/${tile.y}`}
+            src={`https://tile.openstreetmap.org/${tile.z}/${wrappedX}/${tile.y}.png`}
+            loading="eager"
+            style={{
+              position: 'absolute',
+              left: px - 0.5,
+              top: py - 0.5,
+              width: Math.abs(w) + 1,
+              height: Math.abs(h) + 1,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+};
 
 export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
   const frame = useCurrentFrame();
@@ -63,49 +150,95 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
   const height = overlay.height || 800;
 
   const [mapData, setMapData] = useState<any>(null);
-  const [handle] = useState(() => delayRender('Loading SVG Map Data'));
+  const [neighborsData, setNeighborsData] = useState<any[]>([]);
+  const [handle] = useState(() => delayRender('Loading Map Geometry'));
 
   useEffect(() => {
-    // 1. Fetch Metadata first
-    if (metadataCache) {
-      setMetadata(metadataCache);
-    } else {
-      fetch('/maps/metadata.json')
-        .then(res => res.json())
-        .then(data => {
-          metadataCache = data;
-          setMetadata(data);
-        })
-        .catch(() => console.warn("No map metadata found. Using manual config."));
-    }
+    const loadMapData = async () => {
+      try {
+        // 1. Fetch Metadata
+        let currentMetadata = metadataCache;
+        if (!currentMetadata) {
+          try {
+            const res = await fetch(staticFile('/maps/metadata.json'));
+            currentMetadata = await res.json();
+            metadataCache = currentMetadata;
+          } catch (e) {
+            console.warn("Metadata load failed", e);
+          }
+        }
+        setMetadata(currentMetadata);
 
-    // 2. Fetch Map Geometry
-    const url = overlay.topojson_url || WORLD_TOPO;
-    const objName = overlay.object_name || 'countries';
-    const cacheKey = `${url}-${objName}`;
+        const focusEntry = currentMetadata ? currentMetadata[overlay.focus || ''] : null;
+        const features: any[] = [];
 
-    if (mapCache[cacheKey]) {
-      setMapData(mapCache[cacheKey]);
-      continueRender(handle);
-      return;
-    }
+        // 2. Load Focus Area (from cache if available)
+        if (focusEntry) {
+          const cacheUrl = staticFile(`/maps/cache/${focusEntry.id}.geojson`);
+          if (mapCache[cacheUrl]) {
+            features.push(...mapCache[cacheUrl].features);
+          } else {
+            const res = await fetch(cacheUrl);
+            const data = await res.json();
+            mapCache[cacheUrl] = data;
+            features.push(...data.features);
+          }
 
-    fetch(url)
-      .then(res => res.json())
-      .then(data => {
-        const obj = data.objects[objName] || Object.values(data.objects)[0];
-        if (!obj) throw new Error(`Object ${objName} not found in TopoJSON`);
-        const geojson = feature(data, obj as any);
-        mapCache[cacheKey] = geojson;
-        setMapData(geojson);
+          // 3. Load Neighbors if requested
+          if (overlay.showNeighbors && focusEntry.neighbors) {
+            const nData = [];
+            for (const neighborName of focusEntry.neighbors) {
+              const nEntry = currentMetadata[neighborName];
+              if (nEntry) {
+                const nUrl = staticFile(`/maps/cache/${nEntry.id}.geojson`);
+                if (mapCache[nUrl]) {
+                  nData.push(...mapCache[nUrl].features);
+                } else {
+                  try {
+                    const res = await fetch(nUrl);
+                    const data = await res.json();
+                    mapCache[nUrl] = data;
+                    nData.push(...data.features);
+                  } catch (e) {
+                    console.warn(`Failed to load neighbor: ${neighborName}`);
+                  }
+                }
+              }
+            }
+            setNeighborsData(nData);
+          }
+        }
+
+        // 4. Fallback to TopoJSON if no focus features found
+        if (features.length === 0) {
+          const url = overlay.topojson_url || WORLD_TOPO;
+          const objName = overlay.object_name || 'countries';
+          const cacheKey = `${url}-${objName}`;
+
+          if (mapCache[cacheKey]) {
+            setMapData(mapCache[cacheKey]);
+          } else {
+            const res = await fetch(url);
+            const data = await res.json();
+            const obj = data.objects[objName] || Object.values(data.objects)[0];
+            const geojson = feature(data, obj as any);
+            mapCache[cacheKey] = geojson;
+            setMapData(geojson);
+          }
+        } else {
+          setMapData({ type: 'FeatureCollection', features });
+        }
+
         continueRender(handle);
-      })
-      .catch(err => {
-        console.error("Map Data Fetch Error:", err);
-        setMapData({ features: [] });
+      } catch (err) {
+        console.error("Map Data Loading Error:", err);
+        setMapData({ type: 'FeatureCollection', features: [] });
         continueRender(handle);
-      });
-  }, [overlay.topojson_url, overlay.object_name]);
+      }
+    };
+
+    loadMapData();
+  }, [overlay.topojson_url, overlay.object_name, overlay.focus, overlay.showNeighbors]);
 
   // 1. Precise Geodesic Projection with Auto-Fit capability
   const { projection, pathGenerator } = useMemo(() => {
@@ -174,6 +307,11 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
         transform: `translate(-50%, -50%) scale(${0.95 + entrance * 0.05})`,
       }}
     >
+      {/* 1. Tile Layer (OSM) */}
+      {overlay.useOsmTiles && (
+        <TileLayer projection={projection} width={width} height={height} theme={overlay.mapTheme} />
+      )}
+
       {/* Technical Grid Overlay */}
       <div className="absolute inset-0 opacity-10 pointer-events-none"
            style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)', backgroundSize: '40px 40px' }} />
@@ -181,31 +319,43 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} className="relative z-10">
         {/* Animated Borders & Territories */}
         <g>
+          {/* 1. Neighbors Layer */}
+          {neighborsData.map((feature: any, i: number) => (
+             <AreaPath
+                key={`neighbor-${i}`}
+                feature={feature}
+                pathGenerator={pathGenerator}
+                isFocus={false}
+                fill="rgba(59, 130, 246, 0.1)"
+                stroke="rgba(59, 130, 246, 0.3)"
+                opacity={0.4}
+                borderDrawProgress={borderDrawProgress}
+              />
+          ))}
+
+          {/* 2. Primary Features Layer */}
           {mapData.features.map((feature: any, i: number) => {
             const countryName = feature.properties.name || feature.properties.NAME_1 || feature.id;
             const isFocus = overlay.focus && countryName?.toString().toLowerCase() === overlay.focus.toLowerCase();
-            const isNeighbor = overlay.showNeighbors && metadata?.[overlay.focus || '']?.neighbors?.some(
-              (n: string) => n.toLowerCase() === countryName?.toString().toLowerCase()
-            );
 
             const isHighlighted = overlay.highlights?.some(h => h.toLowerCase() === countryName?.toString().toLowerCase()) || isFocus;
 
             // Documentary highlight style
-            const opacity = isFocus ? 1 : (isNeighbor ? 0.4 : 0.1);
-            const fill = isFocus ? "rgba(59, 130, 246, 0.4)" : (isNeighbor ? "rgba(59, 130, 246, 0.1)" : "rgba(255, 255, 255, 0.03)");
-            const stroke = isFocus ? "rgba(59, 130, 246, 1)" : (isNeighbor ? "rgba(59, 130, 246, 0.5)" : "rgba(255, 255, 255, 0.1)");
+            const opacity = isFocus ? 1 : 0.1;
+            const fill = isFocus ? "rgba(59, 130, 246, 0.4)" : "rgba(255, 255, 255, 0.03)";
+            const stroke = isFocus ? "rgba(59, 130, 246, 1)" : "rgba(255, 255, 255, 0.1)";
 
             return (
-               <path
+               <AreaPath
                 key={`border-${i}`}
-                d={pathGenerator(feature) || ''}
+                feature={feature}
+                pathGenerator={pathGenerator}
+                isFocus={isFocus}
+                isHighlighted={isHighlighted}
                 fill={fill}
                 stroke={stroke}
-                strokeWidth={isFocus ? "2" : "0.5"}
-                pathLength="1"
-                strokeDasharray="1"
-                strokeDashoffset={1 - borderDrawProgress}
-                style={{ opacity, transition: 'all 0.5s ease' }}
+                opacity={opacity}
+                borderDrawProgress={borderDrawProgress}
               />
             );
           })}
@@ -221,11 +371,14 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
             const [x1, y1] = projection(startCoords) || [0, 0];
             const [x2, y2] = projection(endCoords) || [0, 0];
 
-            // Real Geodesic Path
-            const pathData = pathGenerator({
+            // High-Resolution Geodesic Path (for curvature on long routes)
+            const interpolator = d3.geoInterpolate(startCoords, endCoords);
+            const samples = 50;
+            const geojsonLine = {
               type: 'LineString',
-              coordinates: [startCoords, endCoords]
-            });
+              coordinates: Array.from({ length: samples + 1 }, (_, i) => interpolator(i / samples))
+            };
+            const pathData = pathGenerator(geojsonLine as any);
 
             const routeReveal = interpolate(
               travelProgress * (overlay.routes?.length || 1),
@@ -235,7 +388,6 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
             );
 
             // Geodesic interpolation for the traveling marker
-            const interpolator = d3.geoInterpolate(startCoords, endCoords);
             const currentCoords = interpolator(routeReveal);
             const [mx, my] = projection(currentCoords) || [0, 0];
 
@@ -268,11 +420,25 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
                   strokeDashoffset={1 - routeReveal}
                 />
 
+                {/* Start Marker */}
+                <g transform={`translate(${x1}, ${y1})`}>
+                   <circle r={8 * pingScale} fill="#3b82f6" style={{ opacity: pingOpacity }} />
+                   <circle r="4" fill="white" stroke="#3b82f6" strokeWidth="2" />
+                </g>
+
+                {/* End Marker */}
+                <g transform={`translate(${x2}, ${y2})`}>
+                   {routeReveal > 0.95 && <circle r={12 * pingScale} fill="#10b981" style={{ opacity: pingOpacity }} />}
+                   <circle r="4" fill={routeReveal > 0.95 ? "#10b981" : "white"} stroke="white" strokeWidth="2" />
+                </g>
+
                 {/* Traveling Icon/Pulse */}
                 {routeReveal > 0 && routeReveal < 1 && (
                   <g transform={`translate(${mx}, ${my})`}>
                     <circle r={10 * pingScale} fill="#3b82f6" style={{ opacity: pingOpacity }} />
-                    <circle r="5" fill="white" stroke="#3b82f6" strokeWidth="2" />
+                    <circle r="6" fill="white" stroke="#3b82f6" strokeWidth="2" />
+                    {/* Direction Indicator */}
+                    <path d="M -4 -4 L 4 0 L -4 4 Z" fill="#3b82f6" transform={`rotate(${Math.atan2(y2-y1, x2-x1) * 180 / Math.PI})`} />
                   </g>
                 )}
 
@@ -299,6 +465,7 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
         {/* Automatic Labels from Metadata */}
         <g>
            {overlay.showLabels && metadata && Object.entries(metadata).map(([name, data]: [string, any], i) => {
+              if (!data.centroid) return null;
               const coords = projection(data.centroid);
               if (!coords) return null;
               const [lx, ly] = coords;
