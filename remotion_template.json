@@ -1,33 +1,69 @@
 {
-  "project_name": "Travel Verification",
-  "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
+  "project_name": "OSM Map Cinematic Test",
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
   "scenes": [
     {
-      "scene_id": "transit_verify",
-      "duration_in_frames": 150,
-      "camera": { "enabled": true },
+      "scene_id": "map_test_cinematic",
+      "duration_in_frames": 300,
+      "camera": {
+        "enabled": true,
+        "shake": { "enabled": true, "intensity": 1.0 },
+        "shots": [
+          {
+            "targetId": "travel_map",
+            "startFrame": 0,
+            "duration": 300,
+            "style": "slow_push",
+            "zoom": 1.2
+          }
+        ]
+      },
       "overlays": [
         {
-          "id": "map_1",
+          "id": "travel_map",
           "type": "map",
           "start": 0,
-          "duration": 150,
+          "duration": 300,
           "position": { "x": 960, "y": 540 },
-          "width": 1280,
-          "height": 720,
+          "width": 1600,
+          "height": 900,
           "config": {
-            "focus": "dhaka_bangladesh",
+            "focus": "Berlin, Germany",
             "useOsmTiles": true,
-            "showNeighbors": false,
-            "scale": 50000,
-            "center": [90.41, 23.81],
+            "showNeighbors": true,
+            "mapTheme": "cinematic",
+            "scale": 12000,
+            "showLabels": true,
             "cities": [
-              { "name": "Start", "coords": [90.41, 23.81] },
-              { "name": "End", "coords": [90.43, 23.78] }
+              { "name": "Brandenburg Gate", "coords": [13.3777, 52.5163], "icon": "🏛️" },
+              { "name": "Berlin TV Tower", "coords": [13.4094, 52.5208], "icon": "🗼" }
             ],
             "routes": [
-              { "from": "Start", "to": "End", "curve": 50 }
+              {
+                "from": "Brandenburg Gate",
+                "to": "Berlin TV Tower",
+                "curve": -40,
+                "label": "City Transit"
+              }
             ]
+          }
+        },
+        {
+          "id": "header",
+          "type": "text",
+          "text": "OSM HYBRID ENGINE V4",
+          "start": 20,
+          "duration": 260,
+          "position": { "x": 960, "y": 150 },
+          "style": {
+            "fontSize": 80,
+            "fontWeight": "900",
+            "color": "#ffffff",
+            "letterSpacing": "0.2em"
           }
         }
       ]
