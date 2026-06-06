@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from 'remotion';
 import { getPresetKeyframes } from '../lib/cameraPresets';
 import { CameraConfig, CameraKeyframe, CameraPreset } from '../types/camera';
+import { useMapTelemetry } from '../lib/MapTelemetryContext';
 
 // Professional Ease-In-Out Quintic for cinematic feel
 const cinematicEase = Easing.bezier(0.65, 0, 0.35, 1);
@@ -32,9 +33,32 @@ const parseEasing = (easing: string | any) => {
   return cinematicEase;
 };
 
-const resolveTarget = (lookAt: string | { x: number, y: number } | undefined, overlays: any[], width: number, height: number) => {
+const resolveTarget = (
+  lookAt: string | { x: number, y: number } | undefined,
+  overlays: any[],
+  width: number,
+  height: number,
+  mapTelemetry: any,
+  trackMap?: 'pulse' | 'focus'
+) => {
   const cx = width / 2;
   const cy = height / 2;
+
+  // Handle Dynamic Map Tracking
+  if (trackMap && mapTelemetry?.current) {
+    const coords = trackMap === 'pulse'
+        ? (mapTelemetry.current.pulseScreenCoords || mapTelemetry.current.focusScreenCoords)
+        : mapTelemetry.current.focusScreenCoords;
+
+    if (coords) {
+        return {
+            x: coords.x,
+            y: coords.y,
+            zoom: null,
+            offset: { x: 0, y: 0 }
+        };
+    }
+  }
 
   if (!lookAt) return { x: cx, y: cy, zoom: null, offset: { x: 0, y: 0 } };
 
@@ -55,7 +79,7 @@ const resolveTarget = (lookAt: string | { x: number, y: number } | undefined, ov
   return { x: lookAt.x, y: lookAt.y, zoom: null, offset: { x: 0, y: 0 } };
 };
 
-const getCameraState = (frame: number, keyframes: CameraKeyframe[], overlays: any[], width: number, height: number) => {
+const getCameraState = (frame: number, keyframes: CameraKeyframe[], overlays: any[], width: number, height: number, mapTelemetry: any) => {
   const cx = width / 2;
   const cy = height / 2;
 
@@ -74,7 +98,7 @@ const getCameraState = (frame: number, keyframes: CameraKeyframe[], overlays: an
   const k2 = sorted[Math.min(i + 1, sorted.length - 1)];
 
   const getTarget = (k: CameraKeyframe) => {
-    if (k.lookAt) return resolveTarget(k.lookAt, overlays, width, height);
+    if (k.lookAt || k.trackMap) return resolveTarget(k.lookAt, overlays, width, height, mapTelemetry, k.trackMap);
     return {
       x: k.x !== undefined ? cx + k.x : cx,
       y: k.y !== undefined ? cy + k.y : cy,
@@ -167,6 +191,19 @@ export const CameraEngine: React.FC<{
                 endZoom = zoom;
             } else if (shot.style === 'whip_pan') {
                 currentEasing = { type: 'bezier', bezier: [1, 0, 0, 1] } as any;
+            } else if (shot.style === 'dramatic_reveal') {
+                startZoom = zoom * 1.5;
+                endZoom = zoom;
+                currentEasing = { type: 'bezier', bezier: [0.16, 1, 0.3, 1] } as any; // Ease Out Expo-ish
+
+                // Add an extra keyframe for the "reveal" tilt/rotate
+                keys.push({
+                    frame: shot.startFrame,
+                    rotationX: 25,
+                    rotationY: -10,
+                    z: -200,
+                    easing: 'out'
+                });
             }
 
             // Reach target
@@ -196,8 +233,9 @@ export const CameraEngine: React.FC<{
     return Array.from(uniqueKeysMap.values()).sort((a, b) => a.frame - b.frame);
   }, [config, durationInFrames]);
 
-  const cameraState = useMemo(() => getCameraState(frame, mergedKeyframes, overlays, width, height), [frame, mergedKeyframes, overlays, width, height]);
-  const nextFrameState = useMemo(() => getCameraState(frame + 0.5, mergedKeyframes, overlays, width, height), [frame, mergedKeyframes, overlays, width, height]);
+  const mapTelemetry = useMapTelemetry();
+  const cameraState = useMemo(() => getCameraState(frame, mergedKeyframes, overlays, width, height, mapTelemetry), [frame, mergedKeyframes, overlays, width, height, mapTelemetry]);
+  const nextFrameState = useMemo(() => getCameraState(frame + 0.5, mergedKeyframes, overlays, width, height, mapTelemetry), [frame, mergedKeyframes, overlays, width, height, mapTelemetry]);
 
   if (!config?.enabled) {
     return <div style={{ width, height, position: 'relative' }}>{backgroundLayer}{children}</div>;

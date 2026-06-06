@@ -1,0 +1,13 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Banani" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[90.39, 23.79], [90.41, 23.79], [90.41, 23.80], [90.39, 23.80], [90.39, 23.79]]]
+      }
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+Remotion root directory: /app
+No config file loaded.
+Checking if DHAKA-BARISHAL-TRAVEL is the entry file
+Selected /app/src/index.ts as the entry point because file exists and is a common entry point and no entry point was explicitly selected
+Entry point = /app/src/index.ts (common paths)
+Ensuring browser executable
+Ensured browser is available.
+[openBrowser()] Opening browser: gl = null, executable = /app/node_modules/.remotion/chrome-headless-shell/linux64/chrome-headless-shell-linux64/chrome-headless-shell, enableMultiProcessOnLinux = true
+Using setpriv --pdeathsig SIGKILL so the browser is killed if the Node parent process dies (Linux).
+Bundling 6%
+Bundling 49%
+Bundling 65%
+Bundling 71%
+Bundling 76%
+Bundling 81%
+Bundling 86%
+Bundling 91%
+Bundling 98%
+Bundling 100%
+Bundling done in 3835ms
+Copying done in 0ms
+Getting composition
+Bundled under /tmp/remotion-webpack-bundle-2WDEVn
+Created directory for temporary files /tmp/remotion-v4.0.468-assets4t6yrah7kq
+[compositor] Starting Rust process. Max video cache size: 3457MB, max threads = 2
+[Tab 0, delayRender()] "Loading root component - See https://remotion.dev/docs/troubleshooting/loading-root-component if you experience a timeout" handle was cleared after 0ms
+[Tab 0, delayRender()] "Waiting for root component to load - See https://remotion.dev/docs/troubleshooting/loading-root-component if you experience a timeout" handle was cleared after 14ms
+[Tab 0, delayRender()] "Loading Fonts" handle was cleared after 2ms
+[selectComposition()] Running calculateMetadata()...
+[Tab 0, delayRender()] "Running the calculateMetadata() function for composition DHAKA-BARISHAL-TRAVEL" handle was cleared after 0ms
+[selectComposition()] calculateMetadata() took 3ms
+Composition = DHAKA-BARISHAL-TRAVEL (Passed as argument)
+Format = png (Out name extension)
+Output = out/arrival_debug.png
+Rendered 0/1
+Rendered 0/1
+Rendered 0/1
+Rendered 0/1
+Rendered 0/1
+Rendered 0/1
+Rendered 0/1
+Rendered 0/1
+Rendered 0/1
+Rendered 1/1
++                    out/arrival_debug.png
+Cleaning up...
+Cleanup job "Delete /tmp/remotion-webpack-bundle-2WDEVn" done
+Cleanup job "Close server" done
+Cleanup job "Cleanup bundle" done
+Received SIGTERM signal. Killing browser process
+Trying to kill browser process group -732310
+Cleanup job "Close browser" done
+Cleanup done in 16ms
