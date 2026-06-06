@@ -1,0 +1,45 @@
+{
+  "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
+  "scenes": [
+    {
+      "scene_id": "verify_map_v4",
+      "duration_in_frames": 150,
+      "config": {
+        "background": { "type": "procedural", "config": { "color": "#0a0a0a" } }
+      },
+      "camera": {
+        "enabled": true,
+        "perspective": 2000,
+        "keyframes": [
+          { "frame": 0, "zoom": 1, "lookAt": "main_map" },
+          { "frame": 60, "trackMap": "pulse" }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "main_map",
+          "type": "map",
+          "start": 0,
+          "duration": 150,
+          "position": { "x": 960, "y": 540 },
+          "width": 1280,
+          "height": 720,
+          "config": {
+            "focus": "Dhaka, Bangladesh",
+            "useOsmTiles": true,
+            "mapTheme": "dark",
+            "showNeighbors": true,
+            "scale": 40000,
+            "cities": [
+              { "name": "Gulshan", "coords": [90.4152, 23.7925] },
+              { "name": "Badda", "coords": [90.4255, 23.7805] }
+            ],
+            "routes": [
+              { "from": "Gulshan", "to": "Badda", "curve": 100 }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

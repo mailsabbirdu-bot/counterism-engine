@@ -1,18 +1,25 @@
-import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate, spring, Easing, continueRender, delayRender, staticFile } from 'remotion';
+import React, { useMemo, useEffect, useState } from 'react';
+import { useCurrentFrame, useVideoConfig, interpolate, spring, Easing, continueRender, delayRender, Img } from 'remotion';
 import * as d3 from 'd3-geo';
 import { feature } from 'topojson-client';
+import { getBanglaName, fetchBoundary, fetchNeighbors } from '../lib/mapUtils';
+import { useMapTelemetry } from '../lib/MapTelemetryContext';
+import { resolveAsset } from '../lib/resolveAsset';
 
-// Professional TopoJSON Sources
 const WORLD_TOPO = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
-
-// Global cache to prevent redundant fetches
-const mapCache: Record<string, any> = {};
-let metadataCache: any = null;
 
 interface City {
   name: string;
-  coords: [number, number]; // [lon, lat]
+  coords: [number, number];
+  icon?: string;
+}
+
+interface Route {
+  from: string;
+  to: string;
+  curve?: number;
+  label?: string;
+  type?: 'air' | 'sea' | 'land';
 }
 
 interface MapOverlayProps {
@@ -31,26 +38,154 @@ interface MapOverlayProps {
     highlights?: string[];
     topojson_url?: string;
     object_name?: string;
+    focusDelay?: number;
     start: number;
     duration: number;
     position?: { x: number; y: number };
     width?: number;
     height?: number;
     zIndex?: number;
+    depth?: number;
   };
 }
 
-const AreaPath = React.memo(({ feature, pathGenerator, isHighlighted, borderDrawProgress, fill, stroke, opacity, isFocus }: any) => {
+const MarkerLayer: React.FC<{
+  cities: City[];
+  projection: d3.GeoProjection;
+  progress: number;
+}> = ({ cities, projection, progress }) => {
+  return (
+    <g>
+      {cities.map((city, i) => {
+        const coords = projection(city.coords);
+        if (!coords) return null;
+
+        const entrance = interpolate(progress, [0.1 + i * 0.05, 0.3 + i * 0.05], [0, 1], { extrapolateRight: 'clamp' });
+        const scale = spring({ frame: progress * 100, fps: 30, config: { damping: 12 } });
+
+        return (
+          <g key={i} transform={`translate(${coords[0]}, ${coords[1]}) scale(${entrance * scale})`} style={{ opacity: entrance }}>
+            {/* Outer Ring */}
+            <circle r="12" fill="none" stroke="white" strokeWidth="2" opacity={0.5}>
+               <animate attributeName="r" values="12;20;12" dur="2s" repeatCount="indefinite" />
+               <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite" />
+            </circle>
+            {/* Core */}
+            {city.icon ? (
+               <text fontSize="24" textAnchor="middle" dominantBaseline="middle" style={{ filter: 'drop-shadow(0 0 5px rgba(0,0,0,0.5))' }}>
+                 {city.icon}
+               </text>
+            ) : (
+               <circle r="6" fill="#4ade80" stroke="white" strokeWidth="2" />
+            )}
+            <text
+              y="-18"
+              fill="white"
+              fontSize="14"
+              fontWeight="900"
+              textAnchor="middle"
+              className="uppercase tracking-wider"
+              style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))' }}
+            >
+              {city.name}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+};
+
+const RouteLayer: React.FC<{
+  routes: Route[];
+  cities: City[];
+  projection: d3.GeoProjection;
+  progress: number;
+}> = ({ routes, cities, projection, progress }) => {
+  return (
+    <g>
+      {routes.map((route, i) => {
+        const startCity = cities.find(c => c.name === route.from);
+        const endCity = cities.find(c => c.name === route.to);
+        if (!startCity || !endCity) return null;
+
+        const p1 = projection(startCity.coords);
+        const p2 = projection(endCity.coords);
+        if (!p1 || !p2) return null;
+
+        const mid: [number, number] = [
+          (p1[0] + p2[0]) / 2,
+          (p1[1] + p2[1]) / 2 - (route.curve || 0)
+        ];
+
+        const path = `M ${p1[0]} ${p1[1]} Q ${mid[0]} ${mid[1]} ${p2[0]} ${p2[1]}`;
+
+        return (
+          <g key={i}>
+            {/* Glow Track */}
+            <path
+              d={path}
+              fill="none"
+              stroke="#4ade80"
+              strokeWidth="4"
+              style={{ opacity: progress * 0.2, filter: 'blur(4px)' }}
+            />
+            {/* Dashed Line */}
+            <path
+              d={path}
+              fill="none"
+              stroke="white"
+              strokeWidth="2"
+              strokeDasharray="8 4"
+              pathLength="1"
+              strokeDashoffset={1 - progress}
+              style={{ opacity: 0.6 }}
+            />
+            {/* The moving pulse */}
+            {(() => {
+               const t = progress;
+               const x = (1 - t) * (1 - t) * p1[0] + 2 * (1 - t) * t * mid[0] + t * t * p2[0];
+               const y = (1 - t) * (1 - t) * p1[1] + 2 * (1 - t) * t * mid[1] + t * t * p2[1];
+
+               return (
+                 <g transform={`translate(${x}, ${y})`}>
+                    <circle r="15" fill="#4ade80" opacity="0.3">
+                      <animate attributeName="r" values="10;20;10" dur="1s" repeatCount="indefinite" />
+                    </circle>
+                    <circle r="5" fill="#4ade80" stroke="white" strokeWidth="2" />
+                 </g>
+               );
+            })()}
+          </g>
+        );
+      })}
+    </g>
+  );
+};
+
+const AreaPath = React.memo(({ feature, pathGenerator, borderDrawProgress, fill, stroke, opacity, isFocus, isArrived, arrivalColor }: any) => {
+   const isDone = borderDrawProgress > 0.95;
+   const d = useMemo(() => pathGenerator(feature) || '', [feature, pathGenerator]);
+
+   const finalFill = isFocus && isArrived && arrivalColor ? arrivalColor : fill;
+   const finalStroke = isFocus && isArrived && arrivalColor ? arrivalColor : stroke;
+
+   let strokeWidth = isFocus ? (isArrived ? "10" : (isDone ? "6" : "3")) : "0.5";
+
    return (
       <path
-        d={pathGenerator(feature) || ''}
-        fill={fill}
-        stroke={stroke}
-        strokeWidth={isFocus ? "2" : "0.5"}
+        d={d}
+        fill={finalFill}
+        stroke={finalStroke}
+        strokeWidth={strokeWidth}
         pathLength="1"
         strokeDasharray="1"
         strokeDashoffset={1 - borderDrawProgress}
-        style={{ opacity, transition: 'all 0.5s ease' }}
+        style={{
+          opacity,
+          transition: 'stroke-width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), stroke 0.5s ease',
+          filter: (isFocus && isArrived) ? `drop-shadow(0 0 25px ${stroke})` : 'none'
+        }}
       />
    );
 });
@@ -62,46 +197,45 @@ const TileLayer: React.FC<{
   theme?: string;
 }> = ({ projection, width, height, theme }) => {
   const scale = projection.scale();
-
-  // OSM zoom level calculation for D3 Mercator
-  const zoom = Math.max(0, Math.min(19, Math.floor(Math.log2((scale * Math.PI) / 128))));
+  // Standard zoom level formula for Mercator
+  const zoom = Math.max(0, Math.min(19, Math.round(Math.log2((scale * Math.PI) / 128))));
 
   const tiles = useMemo(() => {
     if (!projection.invert) return [];
-    const tl = projection.invert([0, 0]);
-    const br = projection.invert([width, height]);
-    if (!tl || !br) return [];
+
+    const centerLonLat = projection.invert([width / 2, height / 2]);
+    if (!centerLonLat) return [];
 
     const lonToTileX = (lon: number, z: number) => (lon + 180) / 360 * Math.pow(2, z);
     const latToTileY = (lat: number, z: number) => (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z);
 
-    const x0 = Math.floor(lonToTileX(tl[0], zoom));
-    const x1 = Math.floor(lonToTileX(br[0], zoom));
-    const y0 = Math.floor(latToTileY(tl[1], zoom));
-    const y1 = Math.floor(latToTileY(br[1], zoom));
+    const centerX = lonToTileX(centerLonLat[0], zoom);
+    const centerY = latToTileY(centerLonLat[1], zoom);
+
+    // Calculate how many tiles we need to cover the viewport
+    // A tile is 256px at zoom Z. But we are at 'scale'.
+    const tilesToCoverX = Math.ceil(width / 256) + 2;
+    const tilesToCoverY = Math.ceil(height / 256) + 2;
 
     const t = [];
-    for (let x = x0; x <= x1; x++) {
-      for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
+    for (let x = Math.floor(centerX - tilesToCoverX / 2); x <= Math.ceil(centerX + tilesToCoverX / 2); x++) {
+      for (let y = Math.floor(centerY - tilesToCoverY / 2); y <= Math.ceil(centerY + tilesToCoverY / 2); y++) {
         t.push({ x, y, z: zoom });
       }
     }
     return t;
   }, [projection, width, height, zoom]);
 
-  const getTileStyles = () => {
+  const filter = useMemo(() => {
     switch (theme) {
-      case 'cinematic':
-        return { filter: 'invert(100%) hue-rotate(180deg) brightness(0.4) contrast(1.4) saturate(0.8)' };
-      case 'light':
-        return { filter: 'none' };
-      default: // dark
-        return { filter: 'invert(100%) hue-rotate(180deg) brightness(0.4) contrast(1.4)' };
+      case 'cinematic': return 'invert(100%) hue-rotate(180deg) brightness(0.8) contrast(1.2) saturate(0.8)';
+      case 'light': return 'none';
+      default: return 'invert(100%) hue-rotate(180deg) brightness(0.7) contrast(1.2)';
     }
-  };
+  }, [theme]);
 
   return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden" style={getTileStyles()}>
+    <div className="absolute inset-0 pointer-events-none bg-zinc-900" style={{ filter }}>
       {tiles.map(tile => {
         const tileToLon = (x: number, z: number) => (x / Math.pow(2, z)) * 360 - 180;
         const tileToLat = (y: number, z: number) => {
@@ -109,27 +243,23 @@ const TileLayer: React.FC<{
           return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
         };
 
-        const lon = tileToLon(tile.x, tile.z);
-        const lat = tileToLat(tile.y, tile.z);
-        const [px, py] = projection([lon, lat]) || [0, 0];
+        const [px, py] = projection([tileToLon(tile.x, tile.z), tileToLat(tile.y, tile.z)]) || [0, 0];
+        const [nx, ny] = projection([tileToLon(tile.x + 1, tile.z), tileToLat(tile.y + 1, tile.z)]) || [0, 0];
 
-        const nextLon = tileToLon(tile.x + 1, tile.z);
-        const nextLat = tileToLat(tile.y + 1, tile.z);
-        const [npx, npy] = projection([nextLon, nextLat]) || [0, 0];
-
-        const w = npx - px;
-        const h = npy - py;
+        const w = nx - px;
+        const h = ny - py;
         const wrappedX = (tile.x % Math.pow(2, tile.z) + Math.pow(2, tile.z)) % Math.pow(2, tile.z);
 
+        if (tile.y < 0 || tile.y >= Math.pow(2, tile.z)) return null;
+
         return (
-          <img
+          <Img
             key={`${tile.z}/${tile.x}/${tile.y}`}
             src={`https://tile.openstreetmap.org/${tile.z}/${wrappedX}/${tile.y}.png`}
-            loading="eager"
             style={{
               position: 'absolute',
-              left: px - 0.5,
-              top: py - 0.5,
+              left: px,
+              top: py,
               width: Math.abs(w) + 1,
               height: Math.abs(h) + 1,
             }}
@@ -142,486 +272,237 @@ const TileLayer: React.FC<{
 
 export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
   const frame = useCurrentFrame();
+  const telemetry = useMapTelemetry();
   const { width: videoWidth, height: videoHeight, fps } = useVideoConfig();
-  const [metadata, setMetadata] = useState<any>(null);
-  const relativeFrame = frame - overlay.start;
 
-  const width = overlay.width || 1200;
-  const height = overlay.height || 800;
+  const config = useMemo(() => ({
+    useOsmTiles: true,
+    showNeighbors: true,
+    mapTheme: 'dark',
+    ...overlay,
+    ...(overlay as any).config
+  }), [overlay]);
+  const relativeFrame = frame - (overlay.start || 0);
+  const width = overlay.width || config.width || videoWidth;
+  const height = overlay.height || config.height || videoHeight;
 
   const [mapData, setMapData] = useState<any>(null);
-  const [neighborsData, setNeighborsData] = useState<any[]>([]);
-  const [handle] = useState(() => delayRender('Loading Map Geometry'));
+  const [neighborData, setNeighborData] = useState<any[]>([]);
+  const [worldData, setWorldData] = useState<any>(null);
+  const [handle] = useState(() => delayRender('MapEngine Data Load'));
 
   useEffect(() => {
-    const loadMapData = async () => {
+    const load = async () => {
       try {
-        // 1. Fetch Metadata
-        let currentMetadata = metadataCache;
-        if (!currentMetadata) {
-          try {
-            const res = await fetch(staticFile('/maps/metadata.json'));
-            currentMetadata = await res.json();
-            metadataCache = currentMetadata;
-          } catch (e) {
-            console.warn("Metadata load failed", e);
+        // Load background world context always for transitions
+        const worldRes = await fetch(WORLD_TOPO);
+        const worldRaw = await worldRes.json();
+        setWorldData(feature(worldRaw, worldRaw.objects.countries as any));
+
+        let mainData = null;
+        if (config.focus && config.focus !== 'world') {
+          mainData = await fetchBoundary(config.focus);
+          setMapData(mainData);
+
+          if (config.showNeighbors) {
+            const neighbors = await fetchNeighbors(mainData);
+            setNeighborData(neighbors);
           }
-        }
-        setMetadata(currentMetadata);
-
-        const focusEntry = currentMetadata ? currentMetadata[overlay.focus || ''] : null;
-        const features: any[] = [];
-
-        // 2. Load Focus Area (from cache if available)
-        if (focusEntry) {
-          const cacheUrl = staticFile(`/maps/cache/${focusEntry.id}.geojson`);
-          if (mapCache[cacheUrl]) {
-            features.push(...mapCache[cacheUrl].features);
-          } else {
-            const res = await fetch(cacheUrl);
-            const data = await res.json();
-            mapCache[cacheUrl] = data;
-            features.push(...data.features);
-          }
-
-          // 3. Load Neighbors if requested
-          if (overlay.showNeighbors && focusEntry.neighbors) {
-            const nData = [];
-            for (const neighborName of focusEntry.neighbors) {
-              const nEntry = currentMetadata[neighborName];
-              if (nEntry) {
-                const nUrl = staticFile(`/maps/cache/${nEntry.id}.geojson`);
-                if (mapCache[nUrl]) {
-                  nData.push(...mapCache[nUrl].features);
-                } else {
-                  try {
-                    const res = await fetch(nUrl);
-                    const data = await res.json();
-                    mapCache[nUrl] = data;
-                    nData.push(...data.features);
-                  } catch (e) {
-                    console.warn(`Failed to load neighbor: ${neighborName}`);
-                  }
-                }
-              }
-            }
-            setNeighborsData(nData);
-          }
-        }
-
-        // 4. Fallback to TopoJSON if no focus features found
-        if (features.length === 0) {
-          const url = overlay.topojson_url || WORLD_TOPO;
-          const objName = overlay.object_name || 'countries';
-          const cacheKey = `${url}-${objName}`;
-
-          if (mapCache[cacheKey]) {
-            setMapData(mapCache[cacheKey]);
-          } else {
-            const res = await fetch(url);
-            const data = await res.json();
-            const obj = data.objects[objName] || Object.values(data.objects)[0];
-            const geojson = feature(data, obj as any);
-            mapCache[cacheKey] = geojson;
-            setMapData(geojson);
-          }
+        } else if (config.topojson_url) {
+          const res = await fetch(resolveAsset(config.topojson_url));
+          const data = await res.json();
+          const objName = config.object_name || 'countries';
+          setMapData(feature(data, data.objects[objName] || Object.values(data.objects)[0] as any));
         } else {
-          setMapData({ type: 'FeatureCollection', features });
+          setMapData(feature(worldRaw, worldRaw.objects.countries as any));
         }
-
         continueRender(handle);
-      } catch (err) {
-        console.error("Map Data Loading Error:", err);
-        setMapData({ type: 'FeatureCollection', features: [] });
+      } catch (e) {
+        console.error("Map Load Error", e);
         continueRender(handle);
       }
     };
+    load();
+  }, [config.focus, config.topojson_url]);
 
-    loadMapData();
-  }, [overlay.topojson_url, overlay.object_name, overlay.focus, overlay.showNeighbors]);
-
-  // 1. Precise Geodesic Projection with Auto-Fit capability
   const { projection, pathGenerator } = useMemo(() => {
-    const proj = d3.geoMercator();
+    const proj = d3.geoMercator().translate([width / 2, height / 2]);
     const pathGen = d3.geoPath().projection(proj);
 
-    if (overlay.focus && mapData) {
-       const focusFeature = mapData.features.find((f: any) =>
-          (f.properties.name || f.properties.NAME_1 || f.id)?.toString().toLowerCase() === overlay.focus?.toLowerCase()
-       );
-       if (focusFeature) {
-          // If we have manual scale, use it, otherwise fit
-          if (overlay.scale && overlay.scale > 5000) {
-            proj.scale(overlay.scale)
-                .center(overlay.center || (d3.geoCentroid(focusFeature) as [number, number]))
-                .translate([width / 2, height / 2]);
-          } else {
-            proj.fitSize([width, height], focusFeature);
-            // Apply a bit of padding/zoom margin if requested
-            if (overlay.zoom === 'auto') {
-               const currentScale = proj.scale();
-               proj.scale(currentScale * 0.8);
-            }
-          }
-       } else {
-          proj.scale(overlay.scale || 200)
-              .center(overlay.center || [0, 20])
-              .translate([width / 2, height / 2]);
-       }
+    const features = mapData?.features || (mapData ? [mapData] : []);
+
+    if (config.focus && features.length > 0) {
+      const focusFeature = features.find((f: any) => {
+        const name = (f.properties?.name || f.properties?.NAME_1 || f.id || "").toString().toLowerCase();
+        return name.includes(config.focus!.toLowerCase()) || config.focus!.toLowerCase().includes(name);
+      }) || features[0];
+
+      if (config.scale && config.scale > 2000) {
+        proj.scale(config.scale).center(config.center || d3.geoCentroid(focusFeature));
+      } else {
+        proj.fitSize([width * 0.8, height * 0.8], focusFeature);
+        if (config.scale) proj.scale(config.scale);
+      }
     } else {
-       proj.scale(overlay.scale || 200)
-           .center(overlay.center || [0, 20])
-           .translate([width / 2, height / 2]);
+      proj.scale(config.scale || width / 6.5).center(config.center || [0, 20]);
     }
 
     return { projection: proj, pathGenerator: pathGen };
-  }, [overlay.scale, overlay.center, overlay.focus, overlay.zoom, width, height, mapData]);
+  }, [mapData, width, height, config.focus, config.scale, config.center]);
 
-  // 2. Cinematic Timings
-  const entrance = spring({ frame: relativeFrame, fps, config: { damping: 20 } });
-  const exitFrame = overlay.duration - 15;
-  const exit = interpolate(relativeFrame, [exitFrame, exitFrame + 15], [1, 0], { extrapolateRight: 'clamp' });
+  // Animations
+  const entrance = spring({ frame: Math.max(0, relativeFrame), fps, config: { damping: 20 } });
 
-  const borderDrawProgress = interpolate(relativeFrame, [10, Math.min(120, overlay.duration - 30)], [0, 1], { extrapolateRight: 'clamp', easing: Easing.bezier(0.22, 1, 0.36, 1) });
-  const travelProgress = interpolate(relativeFrame, [60, overlay.duration - 30], [0, 1], { extrapolateRight: 'clamp' });
+  const duration = overlay.duration || 100;
+  const exitStart = Math.max(0, duration - 15);
+  const exitEnd = Math.max(exitStart + 1, duration);
+  const exit = interpolate(relativeFrame, [exitStart, exitEnd], [1, 0], { extrapolateRight: 'clamp' });
 
-  // Staggered opacity for "ping" effect using Remotion
-  const pingScale = interpolate((relativeFrame % 30), [0, 30], [1, 3], { extrapolateRight: 'clamp' });
-  const pingOpacity = interpolate((relativeFrame % 30), [0, 30], [0.6, 0], { extrapolateRight: 'clamp' });
+  const drawStart = 10;
+  const drawEnd = Math.max(drawStart + 1, Math.min(60, duration - 10));
+  const drawProg = interpolate(relativeFrame, [drawStart, drawEnd], [0, 1], { extrapolateRight: 'clamp' });
 
-  // 3. Helpers
-  const getCityCoords = (name: string) => overlay.cities?.find(c => c.name === name)?.coords;
+  const travelStart = 60;
+  const travelEnd = Math.max(travelStart + 1, duration - 10);
+  const travelProg = interpolate(relativeFrame, [travelStart, travelEnd], [0, 1], { extrapolateRight: 'clamp' });
+  const isArrived = travelProg > 0.99;
 
-  const calculateDistance = (c1: [number, number], c2: [number, number]) => {
-    const R = 6371;
-    const dLat = (c2[1] - c1[1]) * Math.PI / 180;
-    const dLon = (c2[0] - c1[0]) * Math.PI / 180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(c1[1]*Math.PI/180) * Math.cos(c2[1]*Math.PI/180) * Math.sin(dLon/2)**2;
-    return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-  };
+  // Telemetry
+  useEffect(() => {
+    if (!telemetry?.current || !mapData) return;
+    const ox = overlay.position?.x ?? 960;
+    const oy = overlay.position?.y ?? 540;
 
-  if (frame < overlay.start || frame > overlay.start + overlay.duration || !mapData) return null;
+    telemetry.current.focusScreenCoords = { x: ox, y: oy };
+
+    if (config.routes?.length > 0) {
+      const r = config.routes[0];
+      const startCity = config.cities?.find((c:any) => c.name === r.from);
+      const endCity = config.cities?.find((c:any) => c.name === r.to);
+
+      if (startCity && endCity) {
+        const p1 = projection(startCity.coords);
+        const p2 = projection(endCity.coords);
+
+        if (p1 && p2) {
+          const t = travelProg;
+          const mid: [number, number] = [
+            (p1[0] + p2[0]) / 2,
+            (p1[1] + p2[1]) / 2 - (r.curve || 0)
+          ];
+
+          // Quadratic Bezier interpolation for screen-space sync
+          const sx = (1 - t) * (1 - t) * p1[0] + 2 * (1 - t) * t * mid[0] + t * t * p2[0];
+          const sy = (1 - t) * (1 - t) * p1[1] + 2 * (1 - t) * t * mid[1] + t * t * p2[1];
+
+          telemetry.current.pulseScreenCoords = {
+            x: ox + sx - width/2,
+            y: oy + sy - height/2
+          };
+        }
+      }
+    }
+  }, [frame, travelProg, projection, mapData]);
+
+  if (relativeFrame < 0 || relativeFrame > (overlay.duration || Infinity) || !mapData) return null;
 
   return (
     <div
-      className="absolute bg-zinc-950/80 backdrop-blur-3xl rounded-[3rem] border-2 border-white/20 shadow-[0_60px_100px_rgba(0,0,0,0.8)] overflow-hidden"
+      className="absolute overflow-hidden rounded-[3rem] border-2 border-white/20 shadow-2xl bg-black"
       style={{
         width, height,
-        left: `${overlay.position?.x ?? 960}px`,
-        top: `${overlay.position?.y ?? 540}px`,
+        left: overlay.position?.x ?? 960,
+        top: overlay.position?.y ?? 540,
         opacity: entrance * exit,
-        zIndex: overlay.zIndex ?? 30,
-        transform: `translate(-50%, -50%) scale(${0.95 + entrance * 0.05})`,
+        transform: `translate(-50%, -50%) scale(${0.9 + entrance * 0.1})`,
+        zIndex: overlay.zIndex || 30
       }}
     >
-      {/* 1. Tile Layer (OSM) */}
-      {overlay.useOsmTiles && (
-        <TileLayer projection={projection} width={width} height={height} theme={overlay.mapTheme} />
-      )}
+      {config.useOsmTiles && <TileLayer projection={projection} width={width} height={height} theme={config.mapTheme} />}
 
-      {/* Technical Grid Overlay */}
-      <div className="absolute inset-0 opacity-10 pointer-events-none"
-           style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)', backgroundSize: '40px 40px' }} />
-
-      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} className="relative z-10">
-        {/* Cinematic Crosshair for OSM Mode */}
-        {overlay.useOsmTiles && (
-          <g transform={`translate(${width/2}, ${height/2})`} className="opacity-40">
-            <line x1="-20" y1="0" x2="20" y2="0" stroke="white" strokeWidth="1" />
-            <line x1="0" y1="-20" x2="0" y2="20" stroke="white" strokeWidth="1" />
-            <circle r="40" fill="none" stroke="white" strokeWidth="0.5" strokeDasharray="4 4" />
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="relative z-10">
+        {worldData && !config.useOsmTiles && (
+          <g opacity={0.1}>
+            {worldData.features.map((f: any, i: number) => (
+              <path key={i} d={pathGenerator(f) || ''} fill="white" stroke="white" strokeWidth="0.5" />
+            ))}
           </g>
         )}
 
-        {/* Animated Borders & Territories */}
         <g>
-          {/* 1. Neighbors Layer */}
-          {neighborsData.map((feature: any, i: number) => (
+          {neighborData.map((f: any, i: number) => (
              <AreaPath
                 key={`neighbor-${i}`}
-                feature={feature}
+                feature={f}
                 pathGenerator={pathGenerator}
+                borderDrawProgress={drawProg * 0.8}
+                fill="rgba(255,255,255,0.02)"
+                stroke="rgba(255,255,255,0.1)"
+                opacity={0.3}
                 isFocus={false}
-                fill="rgba(59, 130, 246, 0.1)"
-                stroke="rgba(59, 130, 246, 0.3)"
-                opacity={0.4}
-                borderDrawProgress={borderDrawProgress}
-              />
+             />
           ))}
-
-          {/* 2. Primary Features Layer */}
-          {mapData.features.map((feature: any, i: number) => {
-            const countryName = feature.properties.name || feature.properties.NAME_1 || feature.id;
-            const isFocus = overlay.focus && countryName?.toString().toLowerCase() === overlay.focus.toLowerCase();
-
-            const isHighlighted = overlay.highlights?.some(h => h.toLowerCase() === countryName?.toString().toLowerCase()) || isFocus;
-
-            // Documentary highlight style
-            const opacity = isFocus ? 1 : 0.1;
-            // If using OSM tiles, make the focus fill more transparent to see streets
-            const fill = isFocus
-              ? (overlay.useOsmTiles ? "rgba(59, 130, 246, 0.1)" : "rgba(59, 130, 246, 0.4)")
-              : "rgba(255, 255, 255, 0.03)";
-            const stroke = isFocus ? "rgba(59, 130, 246, 1)" : "rgba(255, 255, 255, 0.1)";
-
+          {(mapData.features || [mapData]).map((f: any, i: number) => {
+            const name = (f.properties?.name || f.properties?.NAME_1 || f.id || "").toString().toLowerCase();
+            const isFocus = config.focus && (name.includes(config.focus.toLowerCase()) || config.focus.toLowerCase().includes(name));
             return (
-               <AreaPath
-                key={`border-${i}`}
-                feature={feature}
+              <AreaPath
+                key={i}
+                feature={f}
                 pathGenerator={pathGenerator}
+                borderDrawProgress={drawProg}
+                fill={isFocus ? "rgba(74, 222, 128, 0.1)" : "rgba(255,255,255,0.05)"}
+                stroke={isFocus ? "#4ade80" : "rgba(255,255,255,0.3)"}
+                opacity={isFocus ? 1 : 0.4}
                 isFocus={isFocus}
-                isHighlighted={isHighlighted}
-                fill={fill}
-                stroke={stroke}
-                opacity={opacity}
-                borderDrawProgress={borderDrawProgress}
+                isArrived={isArrived}
               />
             );
           })}
         </g>
 
-        {/* Dynamic Travel Routes */}
-        <g>
-          {overlay.routes?.map((route, i) => {
-            const startCoords = getCityCoords(route.from);
-            const endCoords = getCityCoords(route.to);
-            if (!startCoords || !endCoords) return null;
+        {config.cities && (
+           <MarkerLayer
+             cities={config.cities}
+             projection={projection}
+             progress={drawProg}
+           />
+        )}
 
-            const [x1, y1] = projection(startCoords) || [0, 0];
-            const [x2, y2] = projection(endCoords) || [0, 0];
+        {config.routes && config.cities && (
+           <RouteLayer
+              routes={config.routes}
+              cities={config.cities}
+              projection={projection}
+              progress={travelProg}
+           />
+        )}
 
-            // High-Resolution Geodesic Path (for curvature on long routes)
-            const interpolator = d3.geoInterpolate(startCoords, endCoords);
-            const samples = 50;
-            const geojsonLine = {
-              type: 'LineString',
-              coordinates: Array.from({ length: samples + 1 }, (_, i) => interpolator(i / samples))
-            };
-            const pathData = pathGenerator(geojsonLine as any);
-
-            const routeReveal = interpolate(
-              travelProgress * (overlay.routes?.length || 1),
-              [i, i + 0.8],
-              [0, 1],
-              { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
-            );
-
-            // Geodesic interpolation for the traveling marker
-            const currentCoords = interpolator(routeReveal);
-            const [mx, my] = projection(currentCoords) || [0, 0];
-
-            const km = calculateDistance(startCoords, endCoords);
-
-            return (
-              <g key={`route-${i}`}>
-                {/* Background Shadow Path */}
-                <path d={pathData || ''} fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth="4" />
-
-                {/* Animated Line */}
-                <path
-                  d={pathData || ''}
-                  fill="none"
-                  stroke={route.type === 'sea' ? "#0ea5e9" : "#3b82f6"}
-                  strokeWidth={route.type === 'sea' ? "3" : "2"}
-                  strokeDasharray={route.type === 'sea' ? "10 5" : "8 4"}
-                  strokeDashoffset={-frame * (route.type === 'sea' ? 1.5 : 2.5)}
-                  opacity={routeReveal * 0.6}
-                />
-
-                {/* The "Drawn" Path */}
-                <path
-                  d={pathData || ''}
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="2"
-                  pathLength="1"
-                  strokeDasharray="1"
-                  strokeDashoffset={1 - routeReveal}
-                />
-
-                {/* Start Marker */}
-                <g transform={`translate(${x1}, ${y1})`}>
-                   <circle r={8 * pingScale} fill="#3b82f6" style={{ opacity: pingOpacity }} />
-                   <circle r="4" fill="white" stroke="#3b82f6" strokeWidth="2" />
-                </g>
-
-                {/* End Marker */}
-                <g transform={`translate(${x2}, ${y2})`}>
-                   {routeReveal > 0.95 && <circle r={12 * pingScale} fill="#10b981" style={{ opacity: pingOpacity }} />}
-                   <circle r="4" fill={routeReveal > 0.95 ? "#10b981" : "white"} stroke="white" strokeWidth="2" />
-                </g>
-
-                {/* Traveling Icon/Pulse */}
-                {routeReveal > 0 && routeReveal < 1 && (
-                  <g transform={`translate(${mx}, ${my})`}>
-                    <circle r={10 * pingScale} fill="#3b82f6" style={{ opacity: pingOpacity }} />
-                    <circle r="6" fill="white" stroke="#3b82f6" strokeWidth="2" />
-                    {/* Direction Indicator */}
-                    <path d="M -4 -4 L 4 0 L -4 4 Z" fill="#3b82f6" transform={`rotate(${Math.atan2(y2-y1, x2-x1) * 180 / Math.PI})`} />
-                  </g>
-                )}
-
-                {/* Real-time Telemetry */}
-                {routeReveal > 0.05 && (
-                  <text
-                    x={(x1 + x2) / 2}
-                    y={(y1 + y2) / 2 - 30}
-                    fill="white"
-                    fontSize="10"
-                    fontWeight="900"
-                    textAnchor="middle"
-                    className="font-mono tracking-tighter"
-                    style={{ opacity: routeReveal }}
-                  >
-                    {route.label || 'TRANSIT'}: {Math.round(km * routeReveal)} / {km} KM
-                  </text>
-                )}
-              </g>
-            );
-          })}
-        </g>
-
-        {/* Automatic Labels from Metadata */}
-        <g>
-           {overlay.showLabels && metadata && Object.entries(metadata).map(([name, data]: [string, any], i) => {
-              if (!data.centroid) return null;
-              const coords = projection(data.centroid);
-              if (!coords || coords[0] < -50 || coords[0] > width + 50 || coords[1] < -50 || coords[1] > height + 50) return null;
-              const [lx, ly] = coords;
-
-              const isFocus = overlay.focus && name.toLowerCase() === overlay.focus.toLowerCase();
-              const isNeighbor = overlay.showNeighbors && metadata?.[overlay.focus || '']?.neighbors?.some(
-                (n: string) => n.toLowerCase() === name.toLowerCase()
-              );
-
-              if (!isFocus && !isNeighbor) return null;
-
-              // Cleaner short names (e.g., "GULSHAN" instead of "Gulshan, Dhaka, Bangladesh")
-              const shortName = name.split(',')[0].trim();
-
-              return (
-                <g key={`label-${i}`} style={{ opacity: borderDrawProgress }}>
-                  {/* Subtle Background Glow for Legibility */}
-                  <text
-                    x={lx}
-                    y={ly}
-                    fill="black"
-                    fontSize={isFocus ? "14" : "10"}
-                    fontWeight="black"
-                    textAnchor="middle"
-                    className="font-mono uppercase blur-[2px] opacity-80"
-                  >
-                    {shortName}
-                  </text>
-                  <text
-                    x={lx}
-                    y={ly}
-                    fill={isFocus ? "#3b82f6" : "white"}
-                    fontSize={isFocus ? "14" : "10"}
-                    fontWeight={isFocus ? "black" : "bold"}
-                    textAnchor="middle"
-                    className="font-mono uppercase tracking-tighter"
-                    style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}
-                  >
-                    {shortName}
-                  </text>
-                  {isFocus && (
-                    <circle cx={lx} cy={ly + 10} r="2" fill="#3b82f6" />
-                  )}
-                </g>
-              );
-           })}
-        </g>
-
-        {/* City Infrastructure */}
-        <g>
-          {overlay.cities?.map((city, i) => {
-            const coords = projection(city.coords);
-            if (!coords) return null;
-            const [cx, cy] = coords;
-
-            const cityReveal = spring({
-               frame: relativeFrame - (i * 10),
-               fps,
-               config: { stiffness: 200 }
-            });
-
-            return (
-              <g key={`city-${i}`} style={{ opacity: cityReveal, transform: `scale(${cityReveal})` }}>
-                <circle cx={cx} cy={cy} r="3" fill="white" />
-                <circle cx={cx} cy={cy} r="8" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-                <text
-                  x={cx + 12}
-                  y={cy + 4}
-                  fill="white"
-                  fontSize="12"
-                  fontWeight="black"
-                  className="font-mono uppercase tracking-tighter"
-                  style={{ textShadow: '0 2px 10px rgba(0,0,0,1)' }}
-                >
-                  {city.name}
-                </text>
-              </g>
-            );
-          })}
-        </g>
+        {config.showLabels && (mapData.features || [mapData]).map((f: any, i: number) => {
+          const coords = projection(d3.geoCentroid(f));
+          if (!coords) return null;
+          return (
+            <text
+              key={i}
+              x={coords[0]}
+              y={coords[1]}
+              fill="white"
+              fontSize={24}
+              fontWeight="bold"
+              textAnchor="middle"
+              style={{ opacity: drawProg, textShadow: '0 2px 10px black' }}
+            >
+              {getBanglaName(f.properties) || f.properties?.name || f.id}
+            </text>
+          );
+        })}
       </svg>
 
-      {/* Documentary UI Chrome (Optional) */}
-      {!overlay.useOsmTiles ? (
-        <>
-          <div className="absolute top-12 left-12 flex items-center gap-6">
-            <div className="w-16 h-16 rounded-full border-4 border-blue-500/30 flex items-center justify-center">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-            </div>
-            <div>
-                <h2 className="text-white font-black text-5xl tracking-tighter uppercase leading-none">Global Sector</h2>
-                <p className="text-blue-400 font-mono text-xs mt-2 font-bold tracking-[0.5em] uppercase opacity-60 overflow-hidden whitespace-nowrap">
-                  Vector-Mapping Protocol: {Math.random().toString(16).slice(2, 10).toUpperCase()}
-                </p>
-            </div>
-          </div>
-
-          <div className="absolute bottom-12 right-12 text-right">
-            <div className="text-blue-500 font-mono text-4xl font-black tabular-nums">
-                {Math.round(travelProgress * 100)}%
-            </div>
-            <div className="text-white/30 font-mono text-[10px] uppercase tracking-widest font-bold">Simulation Progress</div>
-          </div>
-        </>
-      ) : (
-        <div className="absolute top-12 left-12 flex flex-col gap-1 p-5 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-            <span className="text-blue-400 font-mono text-[10px] uppercase tracking-[0.3em] font-black">Satellite Intel Link</span>
-          </div>
-          <div className="text-white font-black text-3xl tracking-tighter uppercase leading-none mt-1">
-            {overlay.focus?.split(',')[0] || "Area Scan"}
-          </div>
-          <div className="flex gap-6 mt-3 pt-3 border-t border-white/10">
-            <div>
-              <div className="text-white/40 font-mono text-[8px] uppercase tracking-widest">Lat. Coordinate</div>
-              <div className="text-white font-mono text-xs tabular-nums font-bold">
-                {overlay.center?.[1]?.toFixed(4) || "23.7884"}°N
-              </div>
-            </div>
-            <div>
-              <div className="text-white/40 font-mono text-[8px] uppercase tracking-widest">Lon. Coordinate</div>
-              <div className="text-white font-mono text-xs tabular-nums font-bold">
-                {overlay.center?.[0]?.toFixed(4) || "90.4132"}°E
-              </div>
-            </div>
-            <div>
-              <div className="text-white/40 font-mono text-[8px] uppercase tracking-widest">Zoom Factor</div>
-              <div className="text-white font-mono text-xs tabular-nums font-bold">
-                {(projection.scale() / 1000).toFixed(1)}K
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[8px] text-white/20 font-mono uppercase tracking-widest text-right">
-            © OpenStreetMap contributors
-          </div>
-        </div>
+      {config.useOsmTiles && (
+         <div className="absolute top-10 left-10 p-4 bg-black/60 backdrop-blur-md rounded-xl border border-white/20 z-20">
+            <div className="text-[10px] text-blue-400 font-mono tracking-widest uppercase">Live Geo Intel</div>
+            <div className="text-white font-bold text-xl uppercase">{config.focus || "Region Scan"}</div>
+         </div>
       )}
     </div>
   );

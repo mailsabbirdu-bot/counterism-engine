@@ -1,11 +1,17 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { AbsoluteFill, OffthreadVideo, useVideoConfig } from 'remotion';
 import { OverlayManager } from './OverlayManager';
 import { ProceduralBackground } from './engines/ProceduralBackground';
 import { CameraEngine } from './engines/CameraEngine';
 import { resolveAsset } from './lib/resolveAsset';
+import { MapTelemetryContext, MapTelemetry } from './lib/MapTelemetryContext';
 
 export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
+  const telemetryRef = useRef<MapTelemetry>({
+    pulseScreenCoords: null,
+    focusScreenCoords: null,
+    isArrived: false
+  });
   const { durationInFrames } = useVideoConfig();
 
   if (!sceneData) {
@@ -13,7 +19,7 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
   }
 
   const renderBackground = () => {
-    switch (sceneData.background_type) {
+    switch (sceneData.config?.background?.type || sceneData.background_type) {
       case 'video':
         if (!sceneData.video_path) return null;
         const bgUrl = resolveAsset(sceneData.video_path);
@@ -30,7 +36,7 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
           </>
         );
       case 'procedural':
-        return <ProceduralBackground config={sceneData.procedural_config || {}} />;
+        return <ProceduralBackground config={sceneData.config?.background?.config || sceneData.procedural_config || {}} />;
       case 'none':
         return null;
       default:
@@ -54,13 +60,15 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
 
   return (
     <AbsoluteFill className="bg-black">
-      <CameraEngine
-        config={sceneData.camera}
-        overlays={sceneData.overlays || []}
-        backgroundLayer={renderBackground()}
-      >
-        <OverlayManager overlays={sceneData.overlays || []} />
-      </CameraEngine>
+      <MapTelemetryContext.Provider value={telemetryRef}>
+        <CameraEngine
+          config={sceneData.camera}
+          overlays={sceneData.overlays || []}
+          backgroundLayer={renderBackground()}
+        >
+          <OverlayManager overlays={sceneData.overlays || []} />
+        </CameraEngine>
+      </MapTelemetryContext.Provider>
     </AbsoluteFill>
   );
 };

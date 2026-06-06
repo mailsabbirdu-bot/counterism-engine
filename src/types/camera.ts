@@ -14,6 +14,7 @@ export interface CameraKeyframe {
 		x: number;
 		y: number;
 	};
+	trackMap?: 'pulse' | 'focus';
 }
 
 export type ShotStyle =
