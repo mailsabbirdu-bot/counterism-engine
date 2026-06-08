@@ -11,9 +11,10 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     return null;
   }
 
+  const text = overlay.text || overlay.content || '';
   const items = overlay.splitMode === 'char'
-    ? overlay.content.split('')
-    : overlay.content.split(' ');
+    ? text.split('')
+    : text.split(' ');
 
   const baseFontSize = overlay.fontSize || "120px";
   const x = overlay.position?.x ?? width / 2;

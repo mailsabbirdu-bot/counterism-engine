@@ -294,6 +294,7 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
   useEffect(() => {
     const load = async () => {
       try {
+        console.log(`[MapEngine] Loading data for ${config.focus || 'world'}...`);
         // Load background world context always for transitions
         const worldRes = await fetch(WORLD_TOPO);
         const worldRaw = await worldRes.json();
@@ -302,12 +303,15 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
         let mainData = null;
         if (config.focus && config.focus !== 'world') {
           mainData = await fetchBoundary(config.focus);
-          setMapData(mainData);
+          console.log(`[MapEngine] Focus boundary loaded for ${config.focus}`);
 
-          if (config.showNeighbors) {
-            const neighbors = await fetchNeighbors(mainData);
-            setNeighborData(neighbors);
+          let neighbors: any[] = [];
+          if (config.showNeighbors && mainData) {
+            neighbors = await fetchNeighbors(mainData);
+            console.log(`[MapEngine] Neighbors loaded: ${neighbors.length}`);
           }
+          setNeighborData(neighbors);
+          setMapData(mainData);
         } else if (config.topojson_url) {
           const res = await fetch(resolveAsset(config.topojson_url));
           const data = await res.json();
@@ -329,26 +333,41 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
     const proj = d3.geoMercator().translate([width / 2, height / 2]);
     const pathGen = d3.geoPath().projection(proj);
 
-    const features = mapData?.features || (mapData ? [mapData] : []);
+    if (!mapData) {
+       proj.scale(config.scale || 100).center(config.center || [0, 0]);
+       return { projection: proj, pathGenerator: pathGen };
+    }
 
-    if (config.focus && features.length > 0) {
+    const features = mapData.features || [mapData];
+
+    if (config.focus && config.focus !== 'world' && features.length > 0) {
       const focusFeature = features.find((f: any) => {
-        const name = (f.properties?.name || f.properties?.NAME_1 || f.id || "").toString().toLowerCase();
-        return name.includes(config.focus!.toLowerCase()) || config.focus!.toLowerCase().includes(name);
+        const name = (f.properties?.name || f.properties?.NAME_1 || f.properties?.display_name || f.id || "").toString().toLowerCase();
+        const search = config.focus!.toLowerCase();
+        return name.includes(search) || search.includes(name.split(',')[0].toLowerCase());
       }) || features[0];
 
-      if (config.scale && config.scale > 2000) {
+      if (config.scale) {
         proj.scale(config.scale).center(config.center || d3.geoCentroid(focusFeature));
+      } else if (config.zoom) {
+        const z = typeof config.zoom === 'string' ? parseFloat(config.zoom) : config.zoom;
+        const s = (width * Math.pow(2, z)) / (2 * Math.PI);
+        proj.scale(s).center(config.center || d3.geoCentroid(focusFeature));
       } else {
         proj.fitSize([width * 0.8, height * 0.8], focusFeature);
-        if (config.scale) proj.scale(config.scale);
       }
     } else {
-      proj.scale(config.scale || width / 6.5).center(config.center || [0, 20]);
+      if (config.zoom) {
+        const z = typeof config.zoom === 'string' ? parseFloat(config.zoom) : config.zoom;
+        const s = (width * Math.pow(2, z)) / (2 * Math.PI);
+        proj.scale(s).center(config.center || [0, 20]);
+      } else {
+        proj.scale(config.scale || width / 6.5).center(config.center || [0, 20]);
+      }
     }
 
     return { projection: proj, pathGenerator: pathGen };
-  }, [mapData, width, height, config.focus, config.scale, config.center]);
+  }, [mapData, width, height, config.focus, config.scale, config.zoom, config.center]);
 
   // Animations
   const entrance = spring({ frame: Math.max(0, relativeFrame), fps, config: { damping: 20 } });
@@ -404,7 +423,7 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
     }
   }, [frame, travelProg, projection, mapData]);
 
-  if (relativeFrame < 0 || relativeFrame > (overlay.duration || Infinity) || !mapData) return null;
+  if (relativeFrame < 0 || relativeFrame > (overlay.duration || Infinity)) return null;
 
   return (
     <div
@@ -430,7 +449,7 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
         )}
 
         <g>
-          {neighborData.map((f: any, i: number) => (
+          {neighborData && neighborData.map((f: any, i: number) => (
              <AreaPath
                 key={`neighbor-${i}`}
                 feature={f}
@@ -442,8 +461,8 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
                 isFocus={false}
              />
           ))}
-          {(mapData.features || [mapData]).map((f: any, i: number) => {
-            const name = (f.properties?.name || f.properties?.NAME_1 || f.id || "").toString().toLowerCase();
+          {mapData && (mapData.features || [mapData]).map((f: any, i: number) => {
+            const name = (f.properties?.name || f.properties?.NAME_1 || f.properties?.display_name || f.id || "").toString().toLowerCase();
             const isFocus = config.focus && (name.includes(config.focus.toLowerCase()) || config.focus.toLowerCase().includes(name));
             return (
               <AreaPath
@@ -478,7 +497,7 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
            />
         )}
 
-        {config.showLabels && (mapData.features || [mapData]).map((f: any, i: number) => {
+        {config.showLabels && mapData && (mapData.features || [mapData]).map((f: any, i: number) => {
           const coords = projection(d3.geoCentroid(f));
           if (!coords) return null;
           return (
@@ -498,10 +517,10 @@ export const MapEngine: React.FC<MapOverlayProps> = ({ overlay }) => {
         })}
       </svg>
 
-      {config.useOsmTiles && (
+        {config.useOsmTiles && config.focus && (
          <div className="absolute top-10 left-10 p-4 bg-black/60 backdrop-blur-md rounded-xl border border-white/20 z-20">
             <div className="text-[10px] text-blue-400 font-mono tracking-widest uppercase">Live Geo Intel</div>
-            <div className="text-white font-bold text-xl uppercase">{config.focus || "Region Scan"}</div>
+            <div className="text-white font-bold text-xl uppercase">{config.focus}</div>
          </div>
       )}
     </div>
