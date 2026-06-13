@@ -1,191 +1,156 @@
-# 📖 Counterism Studio V4 Master Guideline
+# 📖 Counterism Studio V4 Ultimate Master Guideline
 
-This document defines the comprehensive JSON schema for `remotion_template.json`, the architectural brain of the automated cinematic pipeline.
+This document serves as the definitive technical specification for the Counterism Studio V4 Remotion engine. It defines the JSON schema for `remotion_template.json`, the architectural principles of the cinematic pipeline, and best practices for creating professional-grade automated documentaries.
 
 ---
 
-## 🏗️ Root Configuration
+## 🏗️ Architectural Core Principles
+
+### 1. 🎯 Mathematical Pivot-Centering
+Every visual element in Studio V4 is **Center-Anchored**.
+- **Standard Layout:** `top: 0, left: 0` + `transform: translate(-50%, -50%)`.
+- **Why:** This ensures that when the Camera Engine's `lookAt` system targets an element (using its `{x, y}` position), the focal point is mathematically perfect. It eliminates "zoom-drift" common in standard CSS transforms.
+
+### 2. 🎥 V4 Camera Engine (Cinematic V4)
+The camera is a 3D pivot-based system that operates in a virtual 1920x1080 space.
+- **Hardware Acceleration:** Uses `translate3d`, `scale3d`, and `rotateZ` to bypass CPU layout recalculations.
+- **Velocity-Aware Motion Blur:** Calculates blur intensity based on sub-frame velocity deltas (`(pos_t0.5 - pos_t0) * zoom`).
+- **Organic Shake:** Seeded simplex-noise handheld simulation for realism.
+- **Perspective:** Standardized at `2000px` for optimal 3D parallax without extreme distortion.
+
+### 3. ⚡ CPU Optimization (Google Colab Ready)
+- **Native Primitives:** Uses Remotion's `interpolate` and `spring` for 60fps performance on high-latency CPU environments.
+- **No Framer Motion:** Heavy animation libraries have been removed to minimize main-thread blocking.
+- **Rounded Blurs:** CSS blur filters are rounded to the nearest pixel to reduce rendering cost.
+
+---
+
+## 📁 Root Configuration Schema
+
+| Key | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `project_name` | `string` | - | Identifier for the render job. |
+| `global_settings` | `object` | - | Canvas and engine-wide constants. |
+| `scenes` | `array` | - | Collection of scene objects. |
+
+### `global_settings` Details
+- `width`: `number` (1920)
+- `height`: `number` (1080)
+- `fps`: `number` (30)
+
+---
+
+## 🎬 Scene Configuration
+
 | Key | Type | Description |
 | :--- | :--- | :--- |
-| `project_name` | `string` | Human-readable project identifier. |
-| `global_settings` | `object` | Global canvas and timing configurations. |
-| `scenes` | `array` | List of scene objects to process. |
+| `scene_id` | `string` | Unique ID. Becomes the output filename. |
+| `background_type` | `string` | `"video"`, `"procedural"`, or `"none"`. |
+| `video_path` | `string` | Path in `public/`. (Engine automatically syncs scene duration to video). |
+| `audio_enabled` | `boolean` | If true, background video audio is mixed into the final render. |
+| `procedural_config` | `object` | Config for the dynamic background engine. |
+| `duration_in_frames` | `number` | Total scene length (if not video-driven). |
+| `camera` | `object` | Focal and movement configuration. |
+| `overlays` | `array` | List of visual components. |
 
-### `global_settings`
-- `width`: `number` (Default: 1920)
-- `height`: `number` (Default: 1080)
-- `fps`: `number` (Default: 30)
-
----
-
-## 🎬 Scene Schema
-| Key | Type | Description |
-| :--- | :--- | :--- |
-| `scene_id` | `string` | Unique ID (used for output filename). |
-| `background_type` | `string` | `"video"` \| `"procedural"` \| `"none"`. |
-| `video_path` | `string` | (Required for video) Path relative to `public/`. |
-| `audio_enabled` | `boolean` | Enable/disable audio for background video. |
-| `procedural_config` | `object` | `{ speed: number, variant: string, primaryColor: string, secondaryColor: string }`. |
-| `duration_in_frames` | `number` | Total frames for this scene. (VITAL: If `background_type` is "video", the engine automatically overrides this with the video's actual duration). |
-| `camera` | `object` | (Optional) Cinematic camera configuration for the scene. |
-| `overlays` | `array` | Collection of all visual layers (Text, UI, Charts, etc.). |
+### `procedural_config` Variants
+- `"neon_grid"`, `"dark_particles"`, `"gradient_wave"`, `"cosmic_dust"`, `"liquid_gradient"`.
+- Supports: `primaryColor`, `secondaryColor`, `speed`, `intensity`.
 
 ---
 
-## 🎥 Professional Cinematic Camera (V4)
+## 🎥 Camera Keyframes & Shots
+
+### `camera` Root Properties
+- `enabled`: `boolean`.
+- `motionBlur`: `{ enabled: boolean, intensity: number (0-2) }`.
+- `shake`: `{ enabled: boolean, intensity: number, speed: number }`.
+- `preset`: `CameraPreset` (Optional).
 
 ### 🎬 Camera Presets
-V4 includes a collection of professional camera move presets that can be applied to any scene using the `camera.preset` field. These presets are designed to provide high-quality movement without manual keyframing.
+| Name | Effect |
+| :--- | :--- |
+| `slow_push` | 1.0x -> 1.2x zoom. Building tension. |
+| `slow_pull` | 1.2x -> 1.0x zoom. Revealing context. |
+| `ken_burns` | Diagonal pan + zoom. Atmospheric depth. |
+| `dramatic_reveal` | RotateX (25deg) -> Pull back & Center. High impact. |
+| `handheld_static` | Subtle organic drift. Realism. |
+| `whip_pan` | Ultra-fast move with motion blur streak. |
 
-| Preset | Description | Best Use Case |
-| :--- | :--- | :--- |
-| `slow_push` | A gentle zoom-in (1.0x to 1.2x) over the scene duration. | Use for **emphasis** and building tension. Ideal for headlines or single data points. |
-| `slow_pull` | A gentle zoom-out (1.2x to 1.0x). | Use for **revealing context** or transitioning away from a specific detail. |
-| `ken_burns` | A classic pan-and-zoom move from one corner to the opposite. | Use for **atmospheric backgrounds** or high-resolution images to create life and movement. |
-| `dramatic_reveal` | Starts with a tight, tilted zoom and pulls back to a centered wide shot. | Use for **introductions** or high-impact scene openings. |
-| `handheld_static` | A subtle, organic drift with micro-rotations. | Use for **realism** and "humanizing" the shot. Perfect for long-duration data displays. |
-| `whip_pan_right` | A high-velocity horizontal blur entering from the left. | Use for **high-energy transitions** between scenes. |
-| `whip_pan_left` | A high-velocity horizontal blur entering from the right. | Use for **high-energy transitions** between scenes. |
-
-The V4 Camera Engine utilizes a **Mathematical Pivot-Centering Architecture**. Unlike standard transforms that cause "drift" during zoom-pans, V4 dynamically calculates the `transform-origin` based on the focal target and applies a compensating translation to the viewport center.
-
-### 1. 🚀 Performance Optimization (CPU/Colab)
-- **Hardware Acceleration:** Uses `translate3d` and `scale3d` to bypass main-thread layout recalculations.
-- **Hinting:** Applies `will-change: transform` and `backface-visibility: hidden` to the overlay container to prevent jitter/flicker on low-power environments.
-- **Native Remotion Primitives:** Animations are driven by `interpolate` and `spring` for deterministic, frame-accurate rendering.
-
-### 2. `camera` Configuration
-- `enabled`: `boolean`
-- `perspective`: `number` (Default: 1000). Controls 3D depth perception.
-- `motionBlur`: `object`
-  - `enabled`: `boolean`
-  - `intensity`: `number` (Default: 0.8). Uses sub-frame velocity deltas to calculate realistic blur.
-- `shake`: `object`
-  - `enabled`: `boolean`
-  - `intensity`: `number` (Default: 1.0). Seeded Simplex-noise handheld motion.
-  - `speed`: `number` (Default: 1.0). Frequency of the shake.
-
-### 3. 🎯 Focal Precision (`keyframes` & `shots`)
-- `lookAt`: `string` | `object`.
-  - **ID Targeting:** Provide the `id` of any overlay (e.g., `"TEXT-01"`). The camera will lock onto its mathematical center.
-  - **Coordinate Targeting:** `{ "x": 960, "y": 540 }`.
-- `zoom`: `number` (1.0 = Default, 4.0 = Extreme detail).
-- `easing`: `"linear"`, `"ease"`, `"bezier"`, `"step"`, `"quintic"`.
-
-### 4. `camera.shots` (Cinematic Choreography)
-The `shots` system handles smooth transitions between focal points automatically:
-- `targetId`: `string`. Overlay ID to focus on.
-- `startFrame`: `number`. When the shot starts.
-- `duration`: `number`. How long to stay on target.
-- `zoom`: `number`. Magnification for this specific shot.
-- `style`: `string`. Cinematic move style.
-  - `"push_in"`, `"pull_out"`, `"pan_left"`, `"pan_right"`, `"tilt_up"`, `"tilt_down"`, `"orbit"`, `"whip_pan"`, `"dramatic_reveal"`, `"static"`.
-- `inDuration`: `number`. Transition time into the shot.
+### 🎯 `camera.shots` (High-Level Automation)
+The `shots` array allows you to choreograph the camera by targeting overlay IDs.
+```json
+{
+  "targetId": "OVERLAY_ID",
+  "startFrame": 0,
+  "duration": 90,
+  "zoom": 1.5,
+  "style": "dramatic_reveal",
+  "inDuration": 30
+}
+```
+- **Styles:** `push_in`, `pull_out`, `pan_left`, `pan_right`, `tilt_up`, `tilt_down`, `orbit`, `whip_pan`, `dramatic_reveal`, `static`.
 
 ---
 
-## ✨ Overlay Types & Standardization
-**VITAL:** All overlays in V4 are **Center-Anchored**. When you set `position: {x, y}`, the mathematical center of the element is placed exactly at those coordinates. This ensures the camera's `lookAt` system is frame-perfect.
+## ✨ Overlay Types (Standard V4 Engine)
 
 ### 1. `text` (Cinematic Typography)
-- `content`: `string`. Supports multi-line.
-- `animation`: `"cinematicGlow"`, `"slideUp"`, `"wordByWord"`.
-- `splitMode`: `"word"` \| `"char"`.
-- `font`: `string`. Google Font name.
+- `content`: `string`. (Supports `\n`).
+- `font`: `string`. Google Font name (auto-loaded).
 - `fontSize`: `string`. e.g., `"120px"`.
-- `style`: `string`. Tailwind classes (e.g., `"text-blue-500 font-black uppercase tracking-tighter"`).
+- `animation`: `"cinematicGlow"`, `"slideUp"`, `"wordByWord"`.
+- `style`: `string`. Tailwind classes.
 - `position`: `{ x: number, y: number }`.
 
-### 2. `ui_panel` (Glassmorphism UI)
-- `title`, `description`, `iconType` (`terminal`, `cpu`, `activity`, `security`, `box`), `nodeId`.
-- `variant`: `"glass"` \| `"dark"`.
-- `initialProgress`, `targetProgress`: `0-100`. (Animates a progress bar inside the panel).
-- `position`: `{ x: number, y: number }`.
+### 2. `ui_panel` (Documentary UI)
+- `title`, `description`: Text content.
+- `iconType`: `"activity"`, `"terminal"`, `"cpu"`, `"security"`, `"box"`.
+- `variant`: `"glass"` (Blur) or `"dark"` (Opaque).
+- `initialProgress`, `targetProgress`: `0-100`. Animates internal bar.
 
 ### 3. `chart` (Nivo Data Viz)
-Comprehensive data visualization system for documentaries and infographics.
 - `chart_type`:
-  - **Comparison:** `"horizontalBar"` (rankings), `"verticalBar"` (categories), `"groupedBar"` (multi-series), `"stackedBar"` (composition), `"barRace"` (dynamic rankings).
-  - **Time Series:** `"line"` (trends), `"multiLine"` (multi-trends), `"area"` (magnitude), `"stackedArea"` (changing composition), `"forecast"` (predictions).
-  - **Composition:** `"pie"` (few categories), `"donut"` (composition + center), `"treemap"` (large hierarchies), `"sunburst"` (nested hierarchies).
-  - **Distribution:** `"histogram"` (density), `"boxPlot"` (outliers), `"violinPlot"` (density spread).
-  - **Relational/Flow:** `"scatter"` (correlation), `"bubble"` (3D data), `"sankey"` (flow), `"chord"` (connections).
-  - **Advanced:** `"network"` (relationships), `"choropleth"` (geographic density), `"bubbleMap"` (point-based geography).
-- `title`, `subtitle`: Header strings.
-- `data`: Standard Nivo data array/object.
-- `keys`: `string[]` (Required for bar/chord/barRace).
-- `indexBy`: `string` (Required for bar/barRace).
-- `width`, `height`: Canvas size.
-- `position`: `{ x: number, y: number }`.
+  - `"verticalBar"`, `"horizontalBar"`, `"groupedBar"`, `"stackedBar"`, `"barRace"`.
+  - `"line"`, `"area"`, `"stackedArea"`, `"forecast"`.
+  - `"pie"`, `"donut"`, `"treemap"`, `"sunburst"`.
+  - `"histogram"`, `"boxPlot"`, `"violinPlot"`.
+  - `"scatter"`, `"bubble"`, `"sankey"`, `"chord"`, `"network"`.
+- `data`: Standard Nivo format.
+- `keys`, `indexBy`: Mapping keys.
+- `title`, `subtitle`: Canvas headers.
 
 ### 4. `data_indicator` (Modern Metrics)
-Fluid, Framer-motion driven indicators for single metrics.
 - `indicator_type`:
-  - **Numeric:** `"kpiNumber"` (single big stat), `"percentageCounter"` (0-100 progress), `"comparisonKPI"` (two values side-by-side), `"deltaIndicator"` (+/- % change), `"countdown"` (approaching event).
-  - **Progress:** `"progressBar"` (horizontal growth), `"circularProgress"` (conic-fill circle), `"semiGauge"` (speedometer-style), `"milestoneTracker"` (step-by-step phases).
-  - **Cards & Timelines:** `"dashboardCard"` (summary tile), `"timeline"` (chronological event list), `"milestoneTimeline"` (major historical stages).
-- `value`, `label`, `prefix`, `suffix`: Data fields.
-- `milestones`, `events`: Arrays for trackers and timelines.
-- `position`: `{ x: number, y: number }`.
+  - `"kpiNumber"`, `"percentageCounter"`, `"comparisonKPI"`, `"deltaIndicator"`, `"countdown"`.
+  - `"progressBar"`, `"circularProgress"`, `"semiGauge"`, `"milestoneTracker"`.
+  - `"dashboardCard"`, `"timeline"`, `"milestoneTimeline"`.
+- `value`, `label`, `prefix`, `suffix`.
+- `milestones`, `events`: Arrays for trackers.
 
-### 5. `graph` (Force-Directed Graph)
-- `nodes`: `number` (Default: 30).
-- `links`: `number` (Default: 40).
-- `nodeColor`: `string` (Hex or rgba).
-- `linkColor`: `string` (Hex or rgba).
-- `speed`: `number` (Default: 0.05). Rotation speed.
-- `position`: `{ x: number, y: number }`.
+### 5. `graph` (Abstract Tech)
+- `nodes`, `links`: Density counts.
+- `nodeColor`, `linkColor`: Hex/RGBA.
+- `speed`: Rotation velocity.
 
-### 6. `shape` (Geometric Motion)
-- `shape_type`: `"circle"` \| `"rect"` \| `"line"`.
-- `animation`: `"pulse"` \| `"float"` \| `"morph"`.
-- `decorated`: `boolean`. Adds orbit rings and decorative elements.
-- `color`: `string`.
-- `size`: `number`.
-- `position`: `{ x: number, y: number }`.
+### 6. `shape` (Motion Graphics)
+- `shape_type`: `"circle"`, `"rect"`, `"line"`.
+- `animation`: `"pulse"`, `"float"`, `"morph"`.
+- `decorated`: `boolean`. Adds technical orbital rings.
 
-### 7. `map` (Advanced Vector Geospatial Engine)
-High-fidelity SVG mapping system using D3, real-world GeoJSON/TopoJSON data, and OpenStreetMap tiles.
-- `center`: `[longitude, latitude]` (Default: `[0, 20]`).
-- `scale`: `number` (Default: `200`). Controls zoom level (World: 200, Continent: 800, Country: 4000+, Street: 1000000+).
-- `focus`: `string` (Optional). Name of the area to focus on. If provided, the engine attempts to load high-detail GeoJSON from the local cache and auto-fits the view.
-- `useOsmTiles`: `boolean` (Optional). Enables OpenStreetMap street-level tile rendering behind the vector layers.
-- `mapTheme`: `"dark"` | `"light"` | `"cinematic"`. Applies color filters to OSM tiles to match the project aesthetic.
-- `showNeighbors`: `boolean` (Optional). If true, loads and displays neighboring areas defined in the map metadata.
-- `topojson_url`: `string` (Optional). URL to a custom TopoJSON file.
-- `object_name`: `string` (Optional). The key of the geometry object inside the TopoJSON (e.g., `"districts"`, `"countries"`).
-- `cities`: `array` of `{ name: string, coords: [lon, lat] }`.
-- `routes`: `array` of:
-  - `from`, `to`: City names defined in `cities`.
-  - `label`: `string`. Displayed with real-time distance telemetry.
-  - `type`: `"air"` | `"sea"` | `"land"`. Affects line style and animation speed.
-- `highlights`: `string[]`. List of area names to highlight.
-- `width`, `height`: Canvas dimensions.
-- `position`: `{ x: number, y: number }`.
-
-### 8. `video` & `image` (Media Overlays)
-- `src`: Path in `public/`.
-- `width`, `height`: Size in pixels.
-- `borderRadius`: `number`.
-- `shadow`: `boolean`.
-- `border`: `{ width: number, color: string }`.
-- `position`: `{ x: number, y: number }`.
+### 7. `video` & `image` (Media)
+- `src`: Path or URL.
+- `borderRadius`, `shadow`, `border`.
+- `position`, `width`, `height`.
 
 ---
 
-## 🎨 Shared Layer Properties
-- `id`: `string` (**CRITICAL**: Must be unique for `lookAt` targeting).
-- `start`: `number` (Entry frame).
-- `duration`: `number` (Visibility duration).
-- `depth`: `number` (Optional. Z-axis displacement for parallax effects. Positive moves closer to camera).
-- `zIndex`: `number` (Stacking order).
-  - Recommended: Background (0), Shapes (10), Graphs (25), Charts (30), UI (40), Text (50), Media (100).
-- `cameraFocus`: `object` (** Framing Intelligence **).
-  - `zoom`: `number`. Preferred zoom level when this element is targeted.
-  - `offsetX`, `offsetY`: `number`. Pixel offsets from the element's center.
-  - `fitMode`: `"contain"` \| `"cover"`. How the element should fit the framing.
-  - `focusBounds`: `boolean`. If true, framing is calculated from element dimensions.
-  - `preferredDuration`: `number`. Suggested hold time for AI generators.
-  - `moveStyle`: `"smooth"` \| `"whip"` \| `"dramatic"`. Preferred transition feel.
-
-> **Note:** The `cameraFocus` property allows you to move framing knowledge into the overlay itself. When a `shot` or `lookAt` targets an ID, the engine automatically reads these values to provide perfect, context-aware framing.
+## 🎨 Common Properties (All Overlays)
+- `id`: `string` (**CRITICAL**: Must be unique for camera targeting).
+- `start`, `duration`: Visibility timing.
+- `zIndex`: Stacking order.
+- `depth`: `number` (Z-axis offset for parallax).
+- `cameraFocus`:
+  - `zoom`: Preferred magnification for this element.
+  - `offsetX`, `offsetY`: Framing offsets.
+  - `moveStyle`: `"smooth"`, `"whip"`, `"dramatic"`.

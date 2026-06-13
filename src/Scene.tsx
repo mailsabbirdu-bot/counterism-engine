@@ -4,14 +4,8 @@ import { OverlayManager } from './OverlayManager';
 import { ProceduralBackground } from './engines/ProceduralBackground';
 import { CameraEngine } from './engines/CameraEngine';
 import { resolveAsset } from './lib/resolveAsset';
-import { MapTelemetryContext, MapTelemetry } from './lib/MapTelemetryContext';
 
 export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
-  const telemetryRef = useRef<MapTelemetry>({
-    pulseScreenCoords: null,
-    focusScreenCoords: null,
-    isArrived: false
-  });
   const { durationInFrames } = useVideoConfig();
 
   if (!sceneData) {
@@ -60,15 +54,13 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
 
   return (
     <AbsoluteFill className="bg-black">
-      <MapTelemetryContext.Provider value={telemetryRef}>
-        <CameraEngine
-          config={sceneData.camera}
-          overlays={sceneData.overlays || []}
-          backgroundLayer={renderBackground()}
-        >
-          <OverlayManager overlays={sceneData.overlays || []} />
-        </CameraEngine>
-      </MapTelemetryContext.Provider>
+      <CameraEngine
+        config={sceneData.camera}
+        overlays={sceneData.overlays || []}
+        backgroundLayer={renderBackground()}
+      >
+        <OverlayManager overlays={sceneData.overlays || []} />
+      </CameraEngine>
     </AbsoluteFill>
   );
 };
