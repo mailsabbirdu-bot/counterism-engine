@@ -21,7 +21,7 @@ PROJECT_NAME = "counterism-engine"
 
 # Input/Output Drive Path: /content/drive/MyDrive/Counterism_Studio_V4/
 DRIVE_BASE_PATH = "/content/drive/MyDrive/Counterism_Studio_V4"
-STORY_FILE = f"{DRIVE_BASE_PATH}/manifests/guideline_prompt.txt"
+STORY_FILE = f"{DRIVE_BASE_PATH}/audio/story.txt"
 
 # Manifest and Prompt Output Path: /content/drive/MyDrive/Counterism_Studio_V4/manifests/
 OUTPUT_JSON = f"{DRIVE_BASE_PATH}/manifests/remotion_render.json"
@@ -58,7 +58,7 @@ if os.path.exists(STORY_FILE):
     print(f"✅ Found story file at: {STORY_FILE}")
 else:
     print(f"❌ FATAL: Story file NOT FOUND: {STORY_FILE}")
-    print(f"Please ensure your story and durations are in 'guideline_prompt.txt' inside: {DRIVE_BASE_PATH}/manifests/")
+    print(f"Please ensure your story and durations are in 'story.txt' inside: {DRIVE_BASE_PATH}/audio/")
     sys.exit("Input story file missing.")
 
 # 4. Generate Master JSON
@@ -72,7 +72,7 @@ print("🚀 Using Playwright to interact with Gemini. This may take a few minute
     --story-file="{STORY_FILE}" \
     --output="{OUTPUT_JSON}" \
     --prompt-output="{PROMPT_FILE}" \
-    --drive-prompt="{STORY_FILE}" \
+    --drive-prompt="/content/counterism-engine/guideline_prompt.txt" \
     --user-data-dir="{USER_DATA_DIR}"
 
 print_banner("🏁 PROCESS FINISHED")
