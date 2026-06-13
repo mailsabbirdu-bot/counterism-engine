@@ -44,7 +44,17 @@ if not os.path.exists(PROJECT_NAME):
 else:
     print("✅ Engine already cloned.")
 
-%cd {PROJECT_NAME}/remotion_jsonMaker
+%cd {PROJECT_NAME}
+
+# Symlink Drive assets to Remotion public folder
+print_banner("🔗 SYMLINKING DRIVE ASSETS")
+!mkdir -p public/renders
+!mkdir -p public/fonts
+!ln -sfn {DRIVE_BASE_PATH}/renders/* public/renders/
+!ln -sfn {DRIVE_BASE_PATH}/fonts/* public/fonts/
+print("✅ Symlinks created for renders and fonts.")
+
+%cd remotion_jsonMaker
 
 print_banner("🛠️ INSTALLING PLAYWRIGHT STACK")
 !pip install -r requirements.txt

@@ -30,18 +30,42 @@ export const RemotionRoot: React.FC = () => {
     Promise.all(Array.from(fontsToLoad).map(async (fontName) => {
       try {
         console.log(`Loading font: ${fontName}`);
-        // For Remotion V4 and standard Google Fonts, we can often just inject a link tag
-        // or use the @remotion/google-fonts package if we know the font at compile time.
-        // For dynamic loading, let's use the WebFont loader pattern or simply a dynamic link tag.
 
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:wght@400;700&display=swap`;
-        document.head.appendChild(link);
+        // 1. Try to load as a local font from /public/fonts/
+        // We attempt to fetch the font file to see if it exists
+        const localFontUrl = staticFile(`fonts/${fontName}.ttf`);
+        const localFontUrlOtf = staticFile(`fonts/${fontName}.otf`);
 
-        // Wait for font to load
-        await document.fonts.load(`1em ${fontName}`);
-        console.log(`Loaded font: ${fontName}`);
+        let fontUrl = '';
+        try {
+            const response = await fetch(localFontUrl, { method: 'HEAD' });
+            if (response.ok) fontUrl = localFontUrl;
+            else {
+                const responseOtf = await fetch(localFontUrlOtf, { method: 'HEAD' });
+                if (responseOtf.ok) fontUrl = localFontUrlOtf;
+            }
+        } catch (e) {
+            // Fetch might fail in some environments, ignore and fallback
+        }
+
+        if (fontUrl) {
+            console.log(`Found local font file for ${fontName}: ${fontUrl}`);
+            const fontFace = new FontFace(fontName, `url(${fontUrl})`);
+            await fontFace.load();
+            document.fonts.add(fontFace);
+        } else {
+            // 2. Fallback to Google Fonts
+            console.log(`Local font not found, falling back to Google Fonts for ${fontName}`);
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:wght@400;700&display=swap`;
+            document.head.appendChild(link);
+
+            // Wait for font to load
+            await document.fonts.load(`1em ${fontName}`);
+        }
+
+        console.log(`Successfully loaded font: ${fontName}`);
       } catch (e) {
         console.error(`Failed to load font: ${fontName}`, e);
       }

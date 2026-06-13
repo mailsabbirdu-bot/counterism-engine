@@ -122,6 +122,29 @@ class RemotionJsonMaker:
 
         return guidelines
 
+    def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
+        """
+        Iterates through scenes and ensures duration_in_frames is perfectly
+        aligned with the actual background video duration at 30fps.
+        """
+        if not data.get('scenes'):
+            return data
+
+        for scene in data['scenes']:
+            if scene.get('background_type') == 'video' and scene.get('video_path'):
+                vpath = scene['video_path']
+                abs_vpath = os.path.join(public_dir, vpath)
+
+                if os.path.exists(abs_vpath):
+                    duration_sec, fps = self.probe_video_duration_and_fps(abs_vpath)
+                    if duration_sec > 0:
+                        target_fps = data.get('global_settings', {}).get('fps', 30)
+                        new_duration = int(round(duration_sec * target_fps))
+                        print(f"🎯 Finalizing {vpath}: {duration_sec}s ({fps}fps) -> {new_duration}f (@{target_fps}fps)")
+                        scene['duration_in_frames'] = new_duration
+
+        return data
+
     def generate(self, story: str, guidelines: str, prompt_output_path: str = None) -> Dict[str, Any]:
         # Note: We keep the example JSON in guidelines as it provides critical structure for Nivo charts and Camera shots
 
@@ -149,6 +172,8 @@ class RemotionJsonMaker:
             "   - MANDATORY VIDEO BACKGROUNDS: Every scene MUST use 'background_type': 'video'.\n"
             "   - VIDEO PATH CONVENTION: Use 'video_path': 'renders/scene_SC_01.mp4' for the first scene, 'renders/scene_SC_02.mp4' for the second, and so on.\n"
             "   - MANDATORY AUDIO: Every scene MUST have 'audio_enabled': true.\n"
+            "   - UNIQUE PROCEDURAL: If using procedural backgrounds, ensure 'procedural_config' is unique and non-repetitive per scene. Use modern, balanced colors.\n"
+            "   - OVERLAY DENSITY: Do NOT crowd the screen. Number of overlays must be proportional to scene duration. Shorter scenes (<150 frames) should have fewer (1-2) overlays.\n"
             "   - DECORATIVE DEPTH: Use multiple 'shape' and 'graph' overlays at low zIndex (-20 to -40) with subtle animations (pulse, float) to create a dense, tech-forward background.\n"
             "4. CENTER ANCHORING & CONCISE TEXT:\n"
             "   - ALL overlays are center-anchored. Position {x: 960, y: 540} is dead center.\n"
@@ -347,6 +372,9 @@ def main():
     print(f"✨ Generating JSON for story via Gemini...")
     try:
         render_json = maker.generate(story, guidelines, prompt_output_path=args.prompt_output)
+
+        print("🛠️  Performing final frame-accurate duration synchronization...")
+        render_json = maker.finalize_json_durations(render_json)
 
         os.makedirs(os.path.dirname(args.output), exist_ok=True)
         with open(args.output, 'w', encoding='utf-8') as f:
