@@ -148,6 +148,7 @@ class RemotionJsonMaker:
             "3. DEPTH, LAYERING & POLISH:\n"
             "   - MANDATORY VIDEO BACKGROUNDS: Every scene MUST use 'background_type': 'video'.\n"
             "   - VIDEO PATH CONVENTION: Use 'video_path': 'renders/scene_SC_01.mp4' for the first scene, 'renders/scene_SC_02.mp4' for the second, and so on.\n"
+            "   - MANDATORY AUDIO: Every scene MUST have 'audio_enabled': true.\n"
             "   - DECORATIVE DEPTH: Use multiple 'shape' and 'graph' overlays at low zIndex (-20 to -40) with subtle animations (pulse, float) to create a dense, tech-forward background.\n"
             "4. CENTER ANCHORING & CONCISE TEXT:\n"
             "   - ALL overlays are center-anchored. Position {x: 960, y: 540} is dead center.\n"
