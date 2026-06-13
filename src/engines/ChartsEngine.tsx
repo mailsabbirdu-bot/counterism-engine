@@ -10,55 +10,6 @@ import { ResponsiveScatterPlot } from '@nivo/scatterplot';
 import { ResponsiveSankey } from '@nivo/sankey';
 import { ResponsiveChord } from '@nivo/chord';
 import { ResponsiveNetwork } from '@nivo/network';
-import { ResponsiveChoropleth } from '@nivo/geo';
-
-const MapChart: React.FC<{ overlay: any; dataProgress: number; commonProps: any }> = ({ overlay, dataProgress, commonProps }) => {
-   const animatedData = overlay.data.map((item: any) => ({
-      ...item,
-      value: item.value * dataProgress
-   }));
-
-   return (
-      <div className="relative w-full h-full">
-         <ResponsiveChoropleth
-            {...commonProps}
-            data={animatedData}
-            features={overlay.features.features}
-            margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
-            colors="nivo"
-            domain={[0, 1000000]}
-            unknownColor="#151515"
-            label="properties.name"
-            valueFormat=".2s"
-            projectionScale={overlay.projectionScale || 150}
-            projectionTranslation={overlay.projectionTranslation || [0.5, 0.5]}
-            projectionRotation={[0, 0, 0]}
-            enableGraticule={true}
-            graticuleLineColor="#ffffff10"
-            borderWidth={0.5}
-            borderColor="#ffffff30"
-         />
-         {overlay.chart_type === 'bubbleMap' && overlay.bubbles && (
-            <div className="absolute inset-0 pointer-events-none">
-               {overlay.bubbles.map((b: any, i: number) => (
-                  <div
-                     key={i}
-                     className="absolute bg-blue-500/60 rounded-full border border-blue-400"
-                     style={{
-                        left: `${b.x}%`,
-                        top: `${b.y}%`,
-                        width: `${b.size * dataProgress}px`,
-                        height: `${b.size * dataProgress}px`,
-                        transform: 'translate(-50%, -50%)',
-                        boxShadow: '0 0 20px rgba(59,130,246,0.5)'
-                     }}
-                  />
-               ))}
-            </div>
-         )}
-      </div>
-   );
-};
 
 const ViolinPlot: React.FC<{ overlay: any; dataProgress: number; commonProps: any }> = ({ overlay, dataProgress }) => {
   return (
@@ -449,9 +400,6 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
        );
     }
 
-    if (['choropleth', 'bubbleMap'].includes(overlay.chart_type)) {
-       return <MapChart overlay={overlay} dataProgress={dataProgress} commonProps={commonProps} />;
-    }
 
     return null;
   };

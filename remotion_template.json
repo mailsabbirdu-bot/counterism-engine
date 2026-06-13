@@ -1,5 +1,5 @@
 {
-  "project_name": "OSM Map Cinematic Test",
+  "project_name": "Counterism Studio V4 - Ultimate Master Template",
   "global_settings": {
     "width": 1920,
     "height": 1080,
@@ -7,64 +7,297 @@
   },
   "scenes": [
     {
-      "scene_id": "map_test_cinematic",
-      "duration_in_frames": 300,
+      "scene_id": "SCENE_01_INTRO",
+      "background_type": "procedural",
+      "procedural_config": {
+        "variant": "neon_grid",
+        "primaryColor": "#0f172a",
+        "secondaryColor": "#3b82f6"
+      },
+      "duration_in_frames": 150,
       "camera": {
         "enabled": true,
-        "shake": { "enabled": true, "intensity": 1.0 },
+        "motionBlur": { "enabled": true, "intensity": 1.2 },
+        "shake": { "enabled": true, "intensity": 2.0 },
         "shots": [
           {
-            "targetId": "travel_map",
+            "targetId": "TITLE_MAIN",
             "startFrame": 0,
-            "duration": 300,
-            "style": "slow_push",
-            "zoom": 1.2
+            "duration": 90,
+            "zoom": 1.2,
+            "style": "dramatic_reveal"
+          },
+          {
+            "targetId": "SUB_TITLE",
+            "startFrame": 100,
+            "duration": 50,
+            "zoom": 1.5,
+            "style": "slow_push"
           }
         ]
       },
       "overlays": [
         {
-          "id": "travel_map",
-          "type": "map",
-          "start": 0,
-          "duration": 300,
+          "id": "DECO_CIRCLE",
+          "type": "shape",
+          "shape_type": "circle",
+          "animation": "pulse",
+          "decorated": true,
+          "color": "#3b82f6",
+          "size": 800,
           "position": { "x": 960, "y": 540 },
-          "width": 1600,
-          "height": 900,
-          "config": {
-            "focus": "Berlin, Germany",
-            "useOsmTiles": true,
-            "showNeighbors": true,
-            "mapTheme": "cinematic",
-            "scale": 12000,
-            "showLabels": true,
-            "cities": [
-              { "name": "Brandenburg Gate", "coords": [13.3777, 52.5163], "icon": "🏛️" },
-              { "name": "Berlin TV Tower", "coords": [13.4094, 52.5208], "icon": "🗼" }
-            ],
-            "routes": [
-              {
-                "from": "Brandenburg Gate",
-                "to": "Berlin TV Tower",
-                "curve": -40,
-                "label": "City Transit"
-              }
-            ]
-          }
+          "start": 0,
+          "duration": 150,
+          "zIndex": 5
         },
         {
-          "id": "header",
+          "id": "TITLE_MAIN",
           "type": "text",
-          "text": "OSM HYBRID ENGINE V4",
+          "content": "STUDIO V4\nCINEMATIC ENGINE",
+          "animation": "cinematicGlow",
+          "font": "Orbitron",
+          "fontSize": "160px",
+          "style": "text-white font-black tracking-tighter text-center",
+          "position": { "x": 960, "y": 500 },
+          "start": 10,
+          "duration": 140,
+          "zIndex": 50,
+          "cameraFocus": { "zoom": 1.1, "moveStyle": "dramatic" }
+        },
+        {
+          "id": "SUB_TITLE",
+          "type": "text",
+          "content": "THE FUTURE OF AUTOMATED STORYTELLING",
+          "animation": "slideUp",
+          "font": "Inter",
+          "fontSize": "40px",
+          "style": "text-blue-400 font-bold tracking-[0.5em] text-center",
+          "position": { "x": 960, "y": 680 },
+          "start": 40,
+          "duration": 110,
+          "zIndex": 51
+        }
+      ]
+    },
+    {
+      "scene_id": "SCENE_02_ANALYTICS",
+      "background_type": "procedural",
+      "procedural_config": {
+        "variant": "dark_particles",
+        "primaryColor": "#020617",
+        "secondaryColor": "#1e1b4b"
+      },
+      "duration_in_frames": 300,
+      "camera": {
+        "enabled": true,
+        "shots": [
+          { "targetId": "KPI_CORE", "startFrame": 10, "duration": 60, "zoom": 2.0, "style": "push_in" },
+          { "targetId": "SYSTEM_GRAPH", "startFrame": 80, "duration": 100, "zoom": 1.4, "style": "pan_right" },
+          { "targetId": "UI_STATUS", "startFrame": 190, "duration": 100, "zoom": 1.8, "style": "tilt_up" }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "SYSTEM_GRAPH",
+          "type": "graph",
+          "nodes": 40,
+          "links": 60,
+          "nodeColor": "#4ade80",
+          "linkColor": "#ffffff20",
+          "speed": 0.08,
+          "position": { "x": 480, "y": 540 },
+          "start": 0,
+          "duration": 300,
+          "zIndex": 20
+        },
+        {
+          "id": "KPI_CORE",
+          "type": "data_indicator",
+          "indicator_type": "kpiNumber",
+          "value": 99.9,
+          "label": "SYSTEM UPTIME",
+          "suffix": "%",
+          "position": { "x": 1400, "y": 300 },
           "start": 20,
+          "duration": 280,
+          "zIndex": 40
+        },
+        {
+          "id": "UI_STATUS",
+          "type": "ui_panel",
+          "title": "CORE ENGINE STATUS",
+          "description": "All subsystems operational. Hardware acceleration engaged.",
+          "iconType": "activity",
+          "variant": "glass",
+          "targetProgress": 85,
+          "position": { "x": 1400, "y": 700 },
+          "start": 40,
           "duration": 260,
-          "position": { "x": 960, "y": 150 },
-          "style": {
-            "fontSize": 80,
-            "fontWeight": "900",
-            "color": "#ffffff",
-            "letterSpacing": "0.2em"
-          }
+          "zIndex": 45
+        }
+      ]
+    },
+    {
+      "scene_id": "SCENE_03_DATA_VIZ",
+      "background_type": "procedural",
+      "procedural_config": { "variant": "gradient_wave", "primaryColor": "#000000" },
+      "duration_in_frames": 400,
+      "camera": {
+        "enabled": true,
+        "shots": [
+          { "targetId": "MAIN_CHART", "startFrame": 0, "duration": 150, "zoom": 1.0, "style": "slow_push" },
+          { "targetId": "KPI_DELTA", "startFrame": 160, "duration": 100, "zoom": 2.2, "style": "whip_pan" },
+          { "targetId": "PIE_MARKET", "startFrame": 270, "duration": 120, "zoom": 1.6, "style": "slow_pull" }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "MAIN_CHART",
+          "type": "chart",
+          "chart_type": "verticalBar",
+          "title": "ANNUAL REVENUE GROWTH",
+          "subtitle": "Global Performance Metrics (Q1-Q4)",
+          "keys": ["revenue", "profit"],
+          "indexBy": "month",
+          "data": [
+            { "month": "JAN", "revenue": 120, "profit": 40 },
+            { "month": "FEB", "revenue": 150, "profit": 55 },
+            { "month": "MAR", "revenue": 180, "profit": 70 },
+            { "month": "APR", "revenue": 220, "profit": 95 }
+          ],
+          "position": { "x": 700, "y": 540 },
+          "width": 1000,
+          "height": 600,
+          "start": 10,
+          "duration": 380,
+          "zIndex": 30
+        },
+        {
+          "id": "KPI_DELTA",
+          "type": "data_indicator",
+          "indicator_type": "deltaIndicator",
+          "value": 24.5,
+          "label": "MOM GROWTH",
+          "prefix": "+",
+          "suffix": "%",
+          "position": { "x": 1500, "y": 250 },
+          "start": 50,
+          "duration": 340,
+          "zIndex": 40
+        },
+        {
+          "id": "PIE_MARKET",
+          "type": "chart",
+          "chart_type": "donut",
+          "title": "MARKET SHARE",
+          "data": [
+            { "id": "A", "label": "ALPHA", "value": 45 },
+            { "id": "B", "label": "BETA", "value": 30 },
+            { "id": "C", "label": "GAMMA", "value": 25 }
+          ],
+          "position": { "x": 1500, "y": 700 },
+          "width": 500,
+          "height": 500,
+          "start": 80,
+          "duration": 310,
+          "zIndex": 30
+        }
+      ]
+    },
+    {
+      "scene_id": "SCENE_04_HIERARCHY",
+      "background_type": "procedural",
+      "procedural_config": { "variant": "cosmic_dust" },
+      "duration_in_frames": 300,
+      "camera": {
+        "enabled": true,
+        "shots": [
+          { "targetId": "TREE_MAP", "startFrame": 0, "duration": 140, "zoom": 1.1, "style": "slow_push" },
+          { "targetId": "SUN_BURST", "startFrame": 150, "duration": 140, "zoom": 1.4, "style": "dramatic_reveal" }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "TREE_MAP",
+          "type": "chart",
+          "chart_type": "treemap",
+          "title": "RESOURCE ALLOCATION",
+          "data": {
+            "name": "root",
+            "children": [
+              { "name": "R&D", "value": 500 },
+              { "name": "Marketing", "value": 300 },
+              { "name": "Sales", "value": 200 },
+              { "name": "HR", "value": 100 }
+            ]
+          },
+          "position": { "x": 500, "y": 540 },
+          "width": 800,
+          "height": 700,
+          "start": 10,
+          "duration": 280,
+          "zIndex": 30
+        },
+        {
+          "id": "SUN_BURST",
+          "type": "chart",
+          "chart_type": "sunburst",
+          "title": "PROJECT BREAKDOWN",
+          "data": {
+            "name": "projects",
+            "children": [
+              { "name": "App", "children": [{ "name": "iOS", "value": 50 }, { "name": "Android", "value": 50 }] },
+              { "name": "Web", "value": 80 },
+              { "name": "Cloud", "value": 120 }
+            ]
+          },
+          "position": { "x": 1350, "y": 540 },
+          "width": 700,
+          "height": 700,
+          "start": 40,
+          "duration": 250,
+          "zIndex": 31
+        }
+      ]
+    },
+    {
+      "scene_id": "SCENE_05_MEDIA",
+      "background_type": "procedural",
+      "procedural_config": { "variant": "liquid_gradient" },
+      "duration_in_frames": 200,
+      "camera": {
+        "enabled": true,
+        "shots": [
+          { "targetId": "IMG_FRAME", "startFrame": 0, "duration": 100, "zoom": 1.3, "style": "push_in" },
+          { "targetId": "IMG_LABEL", "startFrame": 110, "duration": 80, "zoom": 1.8, "style": "slow_pull" }
+        ]
+      },
+      "overlays": [
+        {
+          "id": "IMG_FRAME",
+          "type": "image",
+          "src": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000&auto=format&fit=crop",
+          "width": 1200,
+          "height": 675,
+          "borderRadius": 40,
+          "shadow": true,
+          "border": { "width": 8, "color": "#ffffff30" },
+          "position": { "x": 960, "y": 540 },
+          "start": 10,
+          "duration": 180,
+          "zIndex": 100
+        },
+        {
+          "id": "IMG_LABEL",
+          "type": "text",
+          "content": "GLOBAL CONNECTIVITY",
+          "font": "Inter",
+          "fontSize": "60px",
+          "style": "text-white font-black italic tracking-tighter",
+          "position": { "x": 960, "y": 800 },
+          "start": 40,
+          "duration": 150,
+          "zIndex": 101
         }
       ]
     }
