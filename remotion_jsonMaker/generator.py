@@ -200,10 +200,19 @@ class RemotionJsonMaker:
                 page.wait_for_selector(input_selector, timeout=45000)
 
                 print("⌨️ Injecting prompt...")
+                page.click(input_selector)
                 page.fill(input_selector, full_prompt)
 
                 # Press Enter to send
                 page.keyboard.press("Enter")
+
+                # Fallback: Click send button if enter didn't work (Gemini send button selector)
+                try:
+                    send_button = "button[aria-label*='Send'], .send-button, button.send-icon"
+                    if page.is_visible(send_button, timeout=3000):
+                        page.click(send_button)
+                except:
+                    pass
 
                 print("⏳ Waiting for Gemini to generate response...")
 
@@ -211,7 +220,9 @@ class RemotionJsonMaker:
                     ".model-response-text",
                     "message-content",
                     ".markdown.message-content",
-                    "div[class*='model-response']"
+                    "div[class*='model-response']",
+                    "[data-message-author-role='assistant']",
+                    "div[role='log']"
                 ]
 
                 found_selector = None
