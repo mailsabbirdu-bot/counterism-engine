@@ -47,7 +47,9 @@ export const RemotionRoot: React.FC = () => {
             for (const ext of extensions) {
                 const urls = [
                     staticFile(`fonts/${variant}.${ext}`),
-                    staticFile(`fonts/drive_fonts/${variant}.${ext}`)
+                    staticFile(`fonts/drive_fonts/${variant}.${ext}`),
+                    `/fonts/${variant}.${ext}`, // Direct path fallback
+                    `./fonts/${variant}.${ext}`, // Relative path fallback
                 ];
 
                 for (const url of urls) {

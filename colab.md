@@ -72,6 +72,16 @@ if os.path.exists(drive_audio):
     !cp -r {drive_audio}/* public/audio/
     print(f"✅ Copied {len(os.listdir('public/audio'))} audio files.")
 
+drive_fonts = f"{DRIVE_BASE_PATH}/fonts"
+os.makedirs("public/fonts", exist_ok=True)
+if os.path.exists(drive_fonts):
+    print(f"📡 Found Drive fonts folder: {drive_fonts}")
+    !rm -rf public/fonts/*
+    !cp -r {drive_fonts}/* public/fonts/
+    print(f"✅ Copied {len(os.listdir('public/fonts'))} font assets.")
+else:
+    print(f"⚠️  Drive fonts folder NOT FOUND: {drive_fonts}")
+
 # 4. Manifest Verification
 print_banner("📜 MANIFEST VERIFICATION")
 
