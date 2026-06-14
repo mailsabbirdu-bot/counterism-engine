@@ -78,6 +78,23 @@ const start = async () => {
       // Verify overlays
       if (scene.overlays) {
         for (const overlay of scene.overlays) {
+          // Verify Fonts
+          if (overlay.type === 'text' && overlay.font) {
+            const fontFound = [
+                path.join(process.cwd(), 'public/fonts', `${overlay.font}.ttf`),
+                path.join(process.cwd(), 'public/fonts', `${overlay.font}.otf`),
+                path.join(process.cwd(), 'public/fonts', `${overlay.font}.woff`),
+                path.join(process.cwd(), 'public/fonts', `${overlay.font}.woff2`),
+            ].some(p => fs.existsSync(p));
+
+            if (fontFound) {
+              console.log(`✅ Font FOUND: ${overlay.font}`);
+            } else {
+              console.error(`❌ Font MISSING: ${overlay.font} (Expected in public/fonts/)`);
+              assetsMissing = true;
+            }
+          }
+
           if ((overlay.type === 'video' || overlay.type === 'image') && overlay.src) {
             const overlayPath = path.join(process.cwd(), 'public', overlay.src);
             if (fs.existsSync(overlayPath)) {
