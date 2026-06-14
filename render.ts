@@ -48,11 +48,13 @@ const start = async () => {
 
     console.log('🚚 Ensuring public assets are correctly placed in bundle root (Follow symlinks)...');
     try {
-      // Use -RL to follow symlinks (Google Drive assets) during copy
-      execSync(`cp -RL ${publicDir}/* ${bundleLocation}/ 2>/dev/null || true`);
+      // Use -RL to follow symlinks (Google Drive assets) during copy.
+      // Using . instead of * to ensure all files (including hidden ones) are copied correctly.
+      execSync(`cp -RL ${publicDir}/. ${bundleLocation}/`);
       console.log('✅ Manual asset synchronization complete (Symlinks followed).');
     } catch (e) {
-      console.warn('⚠️  Manual asset copy encountered an issue, continuing with bundler defaults.');
+      console.warn('⚠️  Manual asset copy encountered an issue:', e instanceof Error ? e.message : String(e));
+      console.log('Continuing with bundler defaults...');
     }
 
     console.log('\n🔍 Pre-render Asset Verification:');

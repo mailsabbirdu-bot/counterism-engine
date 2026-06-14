@@ -32,31 +32,64 @@ export const RemotionRoot: React.FC = () => {
         console.log(`Loading font: ${fontName}`);
 
         // 1. Try to load as a local font from /public/fonts/
-        // We try common extensions and use direct FontFace loading which is more robust
         const extensions = ['ttf', 'otf', 'woff2', 'woff'];
+        const nameVariants = [
+            fontName,
+            fontName.replace(/ /g, '_'),
+            fontName.replace(/ /g, '-'),
+            fontName.toLowerCase().replace(/ /g, '_'),
+            fontName.toLowerCase().replace(/ /g, '-')
+        ];
+
         let loadedLocally = false;
 
-        for (const ext of extensions) {
-            try {
-                const fontUrl = staticFile(`fonts/${fontName}.${ext}`);
-                // Simple check for drive_fonts path as well
-                const driveFontUrl = staticFile(`fonts/drive_fonts/${fontName}.${ext}`);
+        for (const variant of Array.from(new Set(nameVariants))) {
+            for (const ext of extensions) {
+                const urls = [
+                    staticFile(`fonts/${variant}.${ext}`),
+                    staticFile(`fonts/drive_fonts/${variant}.${ext}`)
+                ];
 
-                for (const url of [fontUrl, driveFontUrl]) {
-                    const fontFace = new FontFace(fontName, `url(${url})`);
+                for (const url of urls) {
                     try {
+                        // Encode URL to handle spaces/special chars
+                        const safeUrl = url.includes('%') ? url : encodeURI(url);
+                        const fontFace = new FontFace(fontName, `url(${safeUrl})`);
                         await fontFace.load();
                         document.fonts.add(fontFace);
-                        console.log(`Found and loaded local font: ${fontName} via ${url}`);
+                        console.log(`✅ Success: Loaded local font "${fontName}" from variant "${variant}" via ${safeUrl}`);
                         loadedLocally = true;
                         break;
                     } catch (e) {
-                        // Extension/URL didn't work, continue
+                        // Try next URL/extension/variant
                     }
                 }
                 if (loadedLocally) break;
+            }
+            if (loadedLocally) break;
+        }
+
+        // 1b. Fallback: Try injecting @font-face style if FontFace API is being picky
+        if (!loadedLocally) {
+            console.log(`⚠️ FontFace API failed for ${fontName}, trying @font-face injection...`);
+            const style = document.createElement('style');
+            // Try a likely filename
+            const variant = fontName.replace(/ /g, '_');
+            const safeUrl = encodeURI(staticFile(`fonts/${variant}.ttf`));
+            style.appendChild(document.createTextNode(`
+                @font-face {
+                    font-family: '${fontName}';
+                    src: url('${safeUrl}') format('truetype');
+                }
+            `));
+            document.head.appendChild(style);
+
+            try {
+                await document.fonts.load(`1em ${fontName}`);
+                console.log(`✅ Success: Loaded local font "${fontName}" via @font-face injection.`);
+                loadedLocally = true;
             } catch (e) {
-                // Ignore and try next
+                // Style injection failed too
             }
         }
 
