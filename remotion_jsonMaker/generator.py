@@ -189,11 +189,12 @@ class RemotionJsonMaker:
 
             # Prompt Gemini to provide word-level timestamps
             ts_prompt = (
-                f"For the following voiceover text (Scene {scene_num}), provide word-level timestamps in seconds. "
-                f"The total duration is {duration_sec} seconds. Start from 0.0s.\n"
+                f"For the following voiceover text (Scene {scene_num}), provide word-level timestamps in FRAMES for a 30fps project. "
+                f"The total duration is {duration_sec} seconds, which is {int(round(duration_sec * 30))} frames. "
+                f"Start from frame 0.\n"
                 f"TEXT: {scene_text}\n"
-                "Format: [0.0s - 0.5s] Word1, [0.5s - 1.2s] Word2, ...\n"
-                "Return ONLY the timestamp sequence. No commentary."
+                "Format: [Frame 0 - Frame 15] Word1, [Frame 15 - Frame 36] Word2, ...\n"
+                "Return ONLY the frame-based timestamp sequence. No commentary."
             )
 
             # Re-use Gemini interaction logic for timestamps
@@ -304,9 +305,9 @@ class RemotionJsonMaker:
             "   - CONCISE VIBE TEXT: 'text' overlay 'content' fields MUST be extremely concise (2-3 words maximum). Do NOT summarize the whole story; instead, capture the 'feeling' or 'vibe' of that specific moment.\n\n"
             f"SYSTEM GUIDELINES AND SCHEMA:\n{guidelines}\n\n"
             f"STORY AND SCENE REQUIREMENTS:\n{story}\n\n"
-            f"WORD-LEVEL TIMESTAMPS (CONTEXT):\n{timestamp_context or 'No timestamps provided.'}\n\n"
+            f"WORD-LEVEL TIMESTAMPS (FRAMES @ 30FPS):\n{timestamp_context or 'No timestamps provided.'}\n\n"
             "3. CONTENT ACCURACY & SYNC:\n"
-            "   - Use the timestamps to set precise 'start' and 'duration' for focal overlays.\n"
+            "   - CRITICAL: Use the provided frame-based timestamps to set precise 'start' and 'duration' for focal overlays. These frames are already optimized for the 30fps project output.\n"
             "   - Use the story as a reference to pick the most impactful 2-3 words for the 'text' overlays.\n\n"
             "TASK:\nGenerate the complete JSON manifest. Ensure Bengali text is used where appropriate. "
             "Return ONLY the raw JSON object. No markdown, no preamble, no commentary."
