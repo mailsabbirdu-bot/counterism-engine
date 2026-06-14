@@ -372,41 +372,41 @@ class RemotionJsonMaker:
 
         try:
             # Robust JSON extraction
-                # 1. Try to find content between the first { and the last }
-                start_idx = raw_output.find('{')
-                end_idx = raw_output.rfind('}')
+            # 1. Try to find content between the first { and the last }
+            start_idx = raw_output.find('{')
+            end_idx = raw_output.rfind('}')
 
-                if start_idx != -1 and end_idx != -1:
-                    json_str = raw_output[start_idx:end_idx+1]
+            if start_idx != -1 and end_idx != -1:
+                json_str = raw_output[start_idx:end_idx+1]
+                try:
+                    return json.loads(json_str)
+                except json.JSONDecodeError:
+                    # 2. Try deep cleaning markdown and comments if simple extraction fails
+                    cleaned = json_str
+                    cleaned = re.sub(r'//.*$', '', cleaned, flags=re.MULTILINE) # Remove single line comments
+                    cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL) # Remove block comments
                     try:
-                        return json.loads(json_str)
-                    except json.JSONDecodeError:
-                        # 2. Try deep cleaning markdown and comments if simple extraction fails
-                        cleaned = json_str
-                        cleaned = re.sub(r'//.*$', '', cleaned, flags=re.MULTILINE) # Remove single line comments
-                        cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL) # Remove block comments
-                        try:
-                            return json.loads(cleaned)
-                        except:
-                            pass
-
-                # 3. Fallback to regex if indices failed or were messy
-                json_match = re.search(r'(\{.*\})', raw_output, re.DOTALL)
-                if json_match:
-                    try:
-                        return json.loads(json_match.group(1))
-                    except json.JSONDecodeError:
-                        cleaned = json_match.group(1).strip()
-                        cleaned = re.sub(r'^```json\s*', '', cleaned)
-                        cleaned = re.sub(r'^```\s*', '', cleaned)
-                        cleaned = re.sub(r'\s*```$', '', cleaned)
                         return json.loads(cleaned)
+                    except:
+                        pass
 
-                # 4. Final attempt: the raw output stripped
-                return json.loads(raw_output.strip())
+            # 3. Fallback to regex if indices failed or were messy
+            json_match = re.search(r'(\{.*\})', raw_output, re.DOTALL)
+            if json_match:
+                try:
+                    return json.loads(json_match.group(1))
+                except json.JSONDecodeError:
+                    cleaned = json_match.group(1).strip()
+                    cleaned = re.sub(r'^```json\s*', '', cleaned)
+                    cleaned = re.sub(r'^```\s*', '', cleaned)
+                    cleaned = re.sub(r'\s*```$', '', cleaned)
+                    return json.loads(cleaned)
 
-            finally:
-                pass
+            # 4. Final attempt: the raw output stripped
+            return json.loads(raw_output.strip())
+
+        finally:
+            pass
 
 def main():
     parser = argparse.ArgumentParser(description="Counterism Studio V4 JSON Maker (Playwright Gemini Edition)")
