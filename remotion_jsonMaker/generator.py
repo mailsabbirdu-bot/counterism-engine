@@ -163,7 +163,106 @@ class RemotionJsonMaker:
 
         return data
 
-    def generate(self, story: str, guidelines: str, prompt_output_path: str = None) -> Dict[str, Any]:
+    def generate_word_timestamps(self, story: str, public_dir: str = "../public") -> str:
+        """
+        Parses story.txt, maps to videos, and uses Gemini to estimate word-level timestamps.
+        Returns the content for timestamp.txt.
+        """
+        print("🎙️  Generating word-level timestamps via Gemini...")
+
+        # Simple parsing logic for scene-based story
+        scenes = re.split(r'দৃশ্য\s+\d+', story)
+        scenes = [s.strip() for s in scenes if s.strip()]
+
+        timestamp_data = []
+
+        for i, scene_text in enumerate(scenes):
+            scene_num = i + 1
+            vpath = f"renders/scene_SC_{scene_num:02d}.mp4"
+            abs_vpath = os.path.join(public_dir, vpath)
+
+            duration_sec = 0.0
+            if os.path.exists(abs_vpath):
+                duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
+
+            if duration_sec == 0: duration_sec = 5.0 # Fallback
+
+            # Prompt Gemini to provide word-level timestamps
+            ts_prompt = (
+                f"For the following voiceover text (Scene {scene_num}), provide word-level timestamps in seconds. "
+                f"The total duration is {duration_sec} seconds. Start from 0.0s.\n"
+                f"TEXT: {scene_text}\n"
+                "Format: [0.0s - 0.5s] Word1, [0.5s - 1.2s] Word2, ...\n"
+                "Return ONLY the timestamp sequence. No commentary."
+            )
+
+            # Re-use Gemini interaction logic for timestamps
+            # Note: We'll implement a helper for raw interaction to avoid code duplication
+            try:
+                raw_ts = self._interact_with_gemini(ts_prompt)
+                timestamp_data.append(f"SCENE_{scene_num:02d}:\n{raw_ts}\n")
+            except Exception as e:
+                print(f"⚠️ Error getting timestamps for scene {scene_num}: {e}")
+                timestamp_data.append(f"SCENE_{scene_num:02d}:\nError generating timestamps.\n")
+
+        return "\n".join(timestamp_data)
+
+    def _interact_with_gemini(self, prompt: str) -> str:
+        """Helper method for raw Gemini browser interaction."""
+        with sync_playwright() as p:
+            browser_args = ["--disable-blink-features=AutomationControlled", "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+            if self.user_data_dir:
+                context = p.chromium.launch_persistent_context(self.user_data_dir, headless=self.headless, args=browser_args)
+            else:
+                browser = p.chromium.launch(headless=self.headless, args=browser_args)
+                context = browser.new_context()
+
+            page = context.new_page()
+            playwright_stealth.Stealth().apply_stealth_sync(page)
+            page.goto("https://gemini.google.com/app", wait_until="networkidle", timeout=60000)
+
+            try:
+                input_selector = "div[contenteditable='true']"
+                page.wait_for_selector(input_selector, timeout=45000)
+                page.click(input_selector)
+                page.fill(input_selector, prompt)
+                page.keyboard.press("Enter")
+
+                try:
+                    send_button = "button[aria-label*='Send'], .send-button, button.send-icon"
+                    if page.is_visible(send_button, timeout=3000):
+                        page.click(send_button)
+                except:
+                    pass
+
+                # Stabilize and extract
+                response_selectors = [".model-response-text", "message-content", ".markdown.message-content", "div[class*='model-response']", "[data-message-author-role='assistant']", "div[role='log']"]
+                found_selector = None
+                for selector in response_selectors:
+                    try:
+                        page.wait_for_selector(selector, timeout=15000)
+                        found_selector = selector
+                        break
+                    except: continue
+
+                if not found_selector: return "Error: Response not found."
+
+                last_len = 0
+                for _ in range(30):
+                    time.sleep(2)
+                    responses = page.query_selector_all(found_selector)
+                    if not responses: continue
+                    current_text = responses[-1].inner_text()
+                    if len(current_text) > 0 and len(current_text) == last_len: break
+                    last_len = len(current_text)
+
+                responses = page.query_selector_all(found_selector)
+                return responses[-1].inner_text() if responses else "Error: Response empty."
+            finally:
+                if self.user_data_dir: context.close()
+                else: browser.close()
+
+    def generate(self, story: str, guidelines: str, prompt_output_path: str = None, timestamp_context: str = None) -> Dict[str, Any]:
         # Note: We keep the example JSON in guidelines as it provides critical structure for Nivo charts and Camera shots
 
         print("⚖️ Checking and adjusting video durations in prompt for 30fps target...")
@@ -205,7 +304,9 @@ class RemotionJsonMaker:
             "   - CONCISE VIBE TEXT: 'text' overlay 'content' fields MUST be extremely concise (2-3 words maximum). Do NOT summarize the whole story; instead, capture the 'feeling' or 'vibe' of that specific moment.\n\n"
             f"SYSTEM GUIDELINES AND SCHEMA:\n{guidelines}\n\n"
             f"STORY AND SCENE REQUIREMENTS:\n{story}\n\n"
-            "3. CONTENT ACCURACY:\n"
+            f"WORD-LEVEL TIMESTAMPS (CONTEXT):\n{timestamp_context or 'No timestamps provided.'}\n\n"
+            "3. CONTENT ACCURACY & SYNC:\n"
+            "   - Use the timestamps to set precise 'start' and 'duration' for focal overlays.\n"
             "   - Use the story as a reference to pick the most impactful 2-3 words for the 'text' overlays.\n\n"
             "TASK:\nGenerate the complete JSON manifest. Ensure Bengali text is used where appropriate. "
             "Return ONLY the raw JSON object. No markdown, no preamble, no commentary."
@@ -366,6 +467,7 @@ def main():
     parser.add_argument("--story", help="The story or topic for the video")
     parser.add_argument("--story-file", help="Path to a text file containing the story/topic")
     parser.add_argument("--output", required=True, help="Path to save remotion_render.json")
+    parser.add_argument("--timestamp-output", help="Path to save word-level timestamps")
     parser.add_argument("--prompt-output", help="Path to save the generated prompt (remotion_prompt.txt)")
     parser.add_argument("--user-data-dir", help="Path to Chromium user data directory for persistent session")
     parser.add_argument("--no-headless", action="store_false", dest="headless", help="Run browser in non-headless mode")
@@ -396,7 +498,17 @@ def main():
 
     print(f"✨ Generating JSON for story via Gemini...")
     try:
-        render_json = maker.generate(story, guidelines, prompt_output_path=args.prompt_output)
+        # Step 1: Generate word-level timestamps if requested
+        timestamp_content = None
+        if args.timestamp_output:
+            timestamp_content = maker.generate_word_timestamps(story)
+            os.makedirs(os.path.dirname(args.timestamp_output), exist_ok=True)
+            with open(args.timestamp_output, 'w', encoding='utf-8') as f:
+                f.write(timestamp_content)
+            print(f"✅ Timestamps saved to: {args.timestamp_output}")
+
+        # Step 2: Generate Manifest with timestamp context
+        render_json = maker.generate(story, guidelines, prompt_output_path=args.prompt_output, timestamp_context=timestamp_content)
 
         print("🛠️  Performing final frame-accurate duration synchronization...")
         render_json = maker.finalize_json_durations(render_json)
