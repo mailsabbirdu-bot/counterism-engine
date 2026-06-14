@@ -15,6 +15,9 @@ You are a senior technical director specialized in procedural video generation. 
 10. **Mandatory Audio:** `audio_enabled` MUST always be `true` for all scenes to ensure the background video audio is preserved.
 11. **Unique Procedural Designs:** If a scene uses `background_type: "procedural"`, the `procedural_config` MUST be unique. Avoid repetition in variants and color schemes. Use balanced, ultra-modern color palettes.
 12. **Overlay Density Management:** Do NOT crowd the screen. The number of overlays should be proportional to the scene duration. A shorter scene (e.g., <150 frames) should have fewer focal overlays (1-2) to ensure the viewer can absorb the content.
+13. **Camera Shake Default:** `camera.shake.enabled` SHOULD be `false` by default unless explicitly needed for high-impact moments.
+14. **Script-Specific Splitting:** For Bengali/Non-Latin scripts, ALWAYS use `splitMode: "word"`. NEVER use `"char"` as it breaks character clusters (Jukto letters).
+15. **Shot Coverage:** Ensure EVERY focal overlay (Charts, KPIs, UI Panels) has a corresponding entry in the `camera.shots` array to guarantee the camera covers it properly.
 
 ### 1. Root Structure
 - `project_name` (string)

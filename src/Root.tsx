@@ -32,28 +32,35 @@ export const RemotionRoot: React.FC = () => {
         console.log(`Loading font: ${fontName}`);
 
         // 1. Try to load as a local font from /public/fonts/
-        // We attempt to fetch the font file to see if it exists
-        const localFontUrl = staticFile(`fonts/${fontName}.ttf`);
-        const localFontUrlOtf = staticFile(`fonts/${fontName}.otf`);
+        // We try common extensions and use direct FontFace loading which is more robust
+        const extensions = ['ttf', 'otf', 'woff2', 'woff'];
+        let loadedLocally = false;
 
-        let fontUrl = '';
-        try {
-            const response = await fetch(localFontUrl, { method: 'HEAD' });
-            if (response.ok) fontUrl = localFontUrl;
-            else {
-                const responseOtf = await fetch(localFontUrlOtf, { method: 'HEAD' });
-                if (responseOtf.ok) fontUrl = localFontUrlOtf;
+        for (const ext of extensions) {
+            try {
+                const fontUrl = staticFile(`fonts/${fontName}.${ext}`);
+                // Simple check for drive_fonts path as well
+                const driveFontUrl = staticFile(`fonts/drive_fonts/${fontName}.${ext}`);
+
+                for (const url of [fontUrl, driveFontUrl]) {
+                    const fontFace = new FontFace(fontName, `url(${url})`);
+                    try {
+                        await fontFace.load();
+                        document.fonts.add(fontFace);
+                        console.log(`Found and loaded local font: ${fontName} via ${url}`);
+                        loadedLocally = true;
+                        break;
+                    } catch (e) {
+                        // Extension/URL didn't work, continue
+                    }
+                }
+                if (loadedLocally) break;
+            } catch (e) {
+                // Ignore and try next
             }
-        } catch (e) {
-            // Fetch might fail in some environments, ignore and fallback
         }
 
-        if (fontUrl) {
-            console.log(`Found local font file for ${fontName}: ${fontUrl}`);
-            const fontFace = new FontFace(fontName, `url(${fontUrl})`);
-            await fontFace.load();
-            document.fonts.add(fontFace);
-        } else {
+        if (!loadedLocally) {
             // 2. Fallback to Google Fonts
             console.log(`Local font not found, falling back to Google Fonts for ${fontName}`);
             const link = document.createElement('link');
