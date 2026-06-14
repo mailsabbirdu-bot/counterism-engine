@@ -58,9 +58,11 @@ print_banner("🔗 LINKING DRIVE ASSETS")
 !ln -sfn {DRIVE_BASE_PATH}/renders public/renders/drive_renders
 !ln -sfn {DRIVE_BASE_PATH}/fonts public/fonts/drive_fonts
 
-# Also try to link contents directly for easier access
-!ln -sf {DRIVE_BASE_PATH}/renders/* public/renders/ 2>/dev/null
-!ln -sf {DRIVE_BASE_PATH}/fonts/* public/fonts/ 2>/dev/null
+# Deep link all files to ensure visibility during bundling
+print("Linking individual font files...")
+!find {DRIVE_BASE_PATH}/fonts -maxdepth 2 -type f -exec ln -sf '{{}}' public/fonts/ ';' 2>/dev/null
+print("Linking individual render files...")
+!find {DRIVE_BASE_PATH}/renders -maxdepth 2 -type f -exec ln -sf '{{}}' public/renders/ ';' 2>/dev/null
 
 print("✅ Drive assets linked to public folder.")
 
