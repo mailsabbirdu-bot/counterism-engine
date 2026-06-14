@@ -27,6 +27,7 @@ STORY_FILE = f"{DRIVE_BASE_PATH}/audio/story.txt"
 # Manifest and Prompt Output Path: /content/drive/MyDrive/Counterism_Studio_V4/manifests/
 OUTPUT_JSON = f"{DRIVE_BASE_PATH}/manifests/remotion_render.json"
 PROMPT_FILE = f"{DRIVE_BASE_PATH}/manifests/remotion_prompt.txt"
+TIMESTAMP_FILE = f"{DRIVE_BASE_PATH}/manifests/timestamp.txt"
 
 # Path for persistent browser session (optional)
 # This can still be kept in a separate folder or same base
@@ -90,6 +91,7 @@ print("🚀 Using Playwright to interact with Gemini. This may take a few minute
 !xvfb-run python generator.py \
     --story-file="{STORY_FILE}" \
     --output="{OUTPUT_JSON}" \
+    --timestamp-output="{TIMESTAMP_FILE}" \
     --prompt-output="{PROMPT_FILE}" \
     --drive-prompt="{PROJECT_PATH}/guideline_prompt.txt" \
     --user-data-dir="{USER_DATA_DIR}"
@@ -97,6 +99,7 @@ print("🚀 Using Playwright to interact with Gemini. This may take a few minute
 print_banner("🏁 PROCESS FINISHED")
 if os.path.exists(OUTPUT_JSON):
     print(f"✅ Master manifest saved to: {OUTPUT_JSON}")
+    print(f"🎙️ Word-level timestamps saved to: {TIMESTAMP_FILE}")
     print(f"📄 Full prompt saved to: {PROMPT_FILE}")
 else:
     print(f"❌ ERROR: Output JSON was not created. Check the logs above.")
