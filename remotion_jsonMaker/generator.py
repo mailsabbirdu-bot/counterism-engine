@@ -102,6 +102,24 @@ class RemotionJsonMaker:
 
         return text
 
+    def get_local_fonts(self, public_dir: str = "../public") -> str:
+        """Scans the public/fonts directory and returns a descriptive string of available fonts."""
+        fonts_dir = os.path.join(public_dir, "fonts")
+        if not os.path.exists(fonts_dir):
+            return "No local fonts detected."
+
+        font_files = []
+        for root, dirs, files in os.walk(fonts_dir):
+            for file in files:
+                if file.lower().endswith(('.ttf', '.otf', '.woff', '.woff2')):
+                    name = os.path.splitext(file)[0]
+                    font_files.append(name)
+
+        if not font_files:
+            return "No local font files found in public/fonts."
+
+        return ", ".join(sorted(list(set(font_files))))
+
     def load_guidelines(self, local_guideline_path: str, local_prompt_path: str, drive_prompt_path: str) -> str:
         guidelines = ""
 
@@ -152,6 +170,8 @@ class RemotionJsonMaker:
         story = self.adjust_durations_in_text(story)
         guidelines = self.adjust_durations_in_text(guidelines)
 
+        local_fonts = self.get_local_fonts()
+
         full_prompt = (
             "You are a world-class Motion Graphics Director and Remotion V4 JSON Engineer. "
             "Your task is to generate an ULTRA MODERN, HIGH-END, and VIEWER-CENTRIC cinematic JSON manifest. "
@@ -178,8 +198,10 @@ class RemotionJsonMaker:
             "   - BENGALI SUPPORT: For Bengali text, ALWAYS use 'splitMode': 'word'. NEVER use 'char' to avoid breaking clusters.\n"
             "   - SHOT COVERAGE: Every focal overlay (Chart, KPI, UI) MUST have a corresponding camera 'shot' to ensure it is covered by the camera.\n"
             "   - DECORATIVE DEPTH: Use multiple 'shape' and 'graph' overlays at low zIndex (-20 to -40) with subtle animations (pulse, float) to create a dense, tech-forward background.\n"
-            "4. CENTER ANCHORING & CONCISE TEXT:\n"
+            "4. CENTER ANCHORING, TYPOGRAPHY & CONCISE TEXT:\n"
             "   - ALL overlays are center-anchored. Position {x: 960, y: 540} is dead center.\n"
+            f"   - DETECTED LOCAL FONTS: {local_fonts}\n"
+            "   - SCRIPT-SPECIFIC FONTS: Identify which of the detected fonts are Bangla and which are English. Use the Bangla font for all Bengali text and the English font for all English text in the 'font' field.\n"
             "   - CONCISE VIBE TEXT: 'text' overlay 'content' fields MUST be extremely concise (2-3 words maximum). Do NOT summarize the whole story; instead, capture the 'feeling' or 'vibe' of that specific moment.\n\n"
             f"SYSTEM GUIDELINES AND SCHEMA:\n{guidelines}\n\n"
             f"STORY AND SCENE REQUIREMENTS:\n{story}\n\n"
