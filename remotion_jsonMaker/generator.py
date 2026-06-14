@@ -142,20 +142,21 @@ class RemotionJsonMaker:
         return text
 
     def get_local_fonts(self, public_dir: str = "../public") -> str:
-        """Scans the public/fonts directory and returns a descriptive string of available fonts."""
+        """Scans the public/fonts directory and returns available font names."""
         fonts_dir = os.path.join(public_dir, "fonts")
-        if not os.path.exists(fonts_dir):
-            return "No local fonts detected."
+        # Check both /fonts and /fonts/drive_fonts due to symlinking logic
+        potential_dirs = [fonts_dir, os.path.join(fonts_dir, "drive_fonts")]
 
         font_files = []
-        for root, dirs, files in os.walk(fonts_dir):
-            for file in files:
-                if file.lower().endswith(('.ttf', '.otf', '.woff', '.woff2')):
-                    name = os.path.splitext(file)[0]
-                    font_files.append(name)
+        for d in potential_dirs:
+            if os.path.exists(d):
+                for file in os.listdir(d):
+                    if file.lower().endswith(('.ttf', '.otf', '.woff', '.woff2')):
+                        name = os.path.splitext(file)[0]
+                        font_files.append(name)
 
         if not font_files:
-            return "No local font files found in public/fonts."
+            return "No local fonts detected."
 
         return ", ".join(sorted(list(set(font_files))))
 
@@ -254,33 +255,32 @@ class RemotionJsonMaker:
         page = self.page
 
         try:
-            # Clear input if necessary and wait for it to be ready
+            # Wait for the input area
             input_selector = "div[contenteditable='true']"
             page.wait_for_selector(input_selector, timeout=45000)
 
-            # Ensure we are at the bottom of the page
+            # Clear input and scroll to bottom
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
 
             print("⌨️  Sending prompt to Gemini...")
             page.click(input_selector)
-            # Use keyboard for potentially large prompts to be more "human"
+
+            # For very large prompts, fill() is safer but we use a small sleep after
             page.fill(input_selector, prompt)
             time.sleep(1)
             page.keyboard.press("Enter")
 
-            # Fallback Send button
+            # Fallback Send button check
             try:
-                send_button = "button[aria-label*='Send message']"
+                send_button = "button[aria-label*='Send message'], button[aria-label*='Submit']"
                 if page.is_visible(send_button, timeout=2000):
                     page.click(send_button)
             except:
                 pass
 
-            # Wait for the generation to finish by monitoring the 'Stop' button or similar indicator
-            # Gemini typically shows a 'Stop generating' button or hides the send button
             print("⏳  Waiting for Gemini to finish generating...")
 
-            # response_selectors ranked by accuracy for current Gemini UI
+            # Response detection logic
             response_selectors = [
                 "message-content",
                 ".markdown.message-content",
@@ -289,12 +289,11 @@ class RemotionJsonMaker:
                 "[data-message-author-role='assistant']"
             ]
 
-            # Logic: Wait for any response container to exist AND for its text to stop changing
             last_text = ""
             stable_count = 0
 
-            # Total timeout 3 minutes for complex manifests
-            for i in range(180):
+            # Increased timeout to 5 minutes for massive JSON manifests
+            for i in range(150): # 150 * 2s = 300s = 5m
                 time.sleep(2)
 
                 current_text = ""
@@ -309,22 +308,25 @@ class RemotionJsonMaker:
                 if found_msg and len(current_text) > 0:
                     if current_text == last_text:
                         stable_count += 1
-                        # Require 3 consecutive stable readings (6 seconds)
-                        if stable_count >= 3:
-                            print(f"✅  Generation stabilized at {len(current_text)} characters.")
+                        # Wait for 4 consecutive stable readings (8 seconds) to be sure
+                        if stable_count >= 4:
+                            print(f"✅  Generation complete ({len(current_text)} characters).")
                             return current_text
                     else:
                         stable_count = 0
                         last_text = current_text
-                        if i % 5 == 0:
-                            print(f"   ...streaming: {len(current_text)} chars")
-                elif i > 30: # If no message found after 60 seconds
+                        if i % 10 == 0:
+                            print(f"   ...generating: {len(current_text)} chars")
+                elif i > 45: # Break if no message found after 90 seconds
+                    print("⚠️  No message detected in response selectors after 90s.")
                     break
 
-            # Final attempt extraction
+            # Last ditch attempt: grab the last message content regardless of stability
             for sel in response_selectors:
                 msgs = page.query_selector_all(sel)
-                if msgs: return msgs[-1].inner_text()
+                if msgs:
+                    final_attempt = msgs[-1].inner_text()
+                    if len(final_attempt) > 50: return final_attempt
 
             return "Error: Failed to extract response from Gemini."
         except Exception as e:

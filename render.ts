@@ -46,11 +46,11 @@ const start = async () => {
     console.log(`📡 Bundle Location: ${bundleLocation}`);
     console.log(`📂 Public Directory: ${publicDir}`);
 
-    console.log('🚚 Ensuring public assets are correctly placed in bundle root...');
+    console.log('🚚 Ensuring public assets are correctly placed in bundle root (Follow symlinks)...');
     try {
-      // Manually copy public content to bundle root to bypass potential bundling quirks in Colab
-      execSync(`cp -R ${publicDir}/* ${bundleLocation}/ 2>/dev/null || true`);
-      console.log('✅ Manual asset synchronization complete.');
+      // Use -RL to follow symlinks (Google Drive assets) during copy
+      execSync(`cp -RL ${publicDir}/* ${bundleLocation}/ 2>/dev/null || true`);
+      console.log('✅ Manual asset synchronization complete (Symlinks followed).');
     } catch (e) {
       console.warn('⚠️  Manual asset copy encountered an issue, continuing with bundler defaults.');
     }
