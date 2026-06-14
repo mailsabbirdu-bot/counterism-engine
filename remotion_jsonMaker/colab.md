@@ -17,7 +17,8 @@ def print_banner(text):
     print("="*80)
 
 # 1. Configuration
-PROJECT_NAME = "counterism-engine"
+# Fixed absolute path to prevent nested repositories
+PROJECT_PATH = "/content/engine"
 
 # Input/Output Drive Path: /content/drive/MyDrive/Counterism_Studio_V4/
 DRIVE_BASE_PATH = "/content/drive/MyDrive/Counterism_Studio_V4"
@@ -38,21 +39,29 @@ drive.mount('/content/drive')
 # Ensure we are in the right base directory
 %cd /content
 
-if not os.path.exists(PROJECT_NAME):
+if not os.path.exists(PROJECT_PATH):
     print("🚀 Cloning engine...")
-    !git clone https://github.com/mailsabbirdu-bot/counterism-engine
+    !git clone https://github.com/mailsabbirdu-bot/counterism-engine {PROJECT_PATH}
 else:
     print("✅ Engine already cloned.")
 
-%cd {PROJECT_NAME}
+%cd {PROJECT_PATH}
 
-# Symlink Drive assets to Remotion public folder
-print_banner("🔗 SYMLINKING DRIVE ASSETS")
+# Link Drive assets to Remotion public folder
+print_banner("🔗 LINKING DRIVE ASSETS")
+# Ensure public directories exist
 !mkdir -p public/renders
 !mkdir -p public/fonts
-!ln -sfn {DRIVE_BASE_PATH}/renders/* public/renders/
-!ln -sfn {DRIVE_BASE_PATH}/fonts/* public/fonts/
-print("✅ Symlinks created for renders and fonts.")
+
+# Use robust symlinking for directories
+!ln -sfn {DRIVE_BASE_PATH}/renders public/renders/drive_renders
+!ln -sfn {DRIVE_BASE_PATH}/fonts public/fonts/drive_fonts
+
+# Also try to link contents directly for easier access
+!ln -sf {DRIVE_BASE_PATH}/renders/* public/renders/ 2>/dev/null
+!ln -sf {DRIVE_BASE_PATH}/fonts/* public/fonts/ 2>/dev/null
+
+print("✅ Drive assets linked to public folder.")
 
 %cd remotion_jsonMaker
 
@@ -82,7 +91,7 @@ print("🚀 Using Playwright to interact with Gemini. This may take a few minute
     --story-file="{STORY_FILE}" \
     --output="{OUTPUT_JSON}" \
     --prompt-output="{PROMPT_FILE}" \
-    --drive-prompt="/content/counterism-engine/guideline_prompt.txt" \
+    --drive-prompt="{PROJECT_PATH}/guideline_prompt.txt" \
     --user-data-dir="{USER_DATA_DIR}"
 
 print_banner("🏁 PROCESS FINISHED")
