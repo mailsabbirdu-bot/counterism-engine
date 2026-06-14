@@ -12,6 +12,45 @@ class RemotionJsonMaker:
     def __init__(self, user_data_dir: str = None, headless: bool = True):
         self.user_data_dir = user_data_dir
         self.headless = headless
+        self.playwright = None
+        self.browser = None
+        self.context = None
+        self.page = None
+
+    def start_browser(self):
+        """Initializes a persistent browser session."""
+        if self.page: return
+
+        self.playwright = sync_playwright().start()
+        print("🚀 Launching persistent browser...")
+        browser_args = [
+            "--disable-blink-features=AutomationControlled",
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage"
+        ]
+
+        if self.user_data_dir:
+            self.context = self.playwright.chromium.launch_persistent_context(
+                self.user_data_dir,
+                headless=self.headless,
+                args=browser_args
+            )
+        else:
+            self.browser = self.playwright.chromium.launch(headless=self.headless, args=browser_args)
+            self.context = self.browser.new_context()
+
+        self.page = self.context.new_page()
+        playwright_stealth.Stealth().apply_stealth_sync(self.page)
+        print("🌐 Navigating to Gemini...")
+        self.page.goto("https://gemini.google.com/app", wait_until="networkidle", timeout=60000)
+
+    def stop_browser(self):
+        """Closes the browser session."""
+        if self.context: self.context.close()
+        if self.browser: self.browser.close()
+        if self.playwright: self.playwright.stop()
+        self.page = None
 
     def probe_video_duration_and_fps(self, video_path: str):
         """Probes a video file for its duration and FPS using ffprobe."""
@@ -165,103 +204,110 @@ class RemotionJsonMaker:
 
     def generate_word_timestamps(self, story: str, public_dir: str = "../public") -> str:
         """
-        Parses story.txt, maps to videos, and uses Gemini to estimate word-level timestamps.
+        Parses story.txt, maps to videos, and uses Gemini to estimate word-level timestamps for all scenes in one go.
         Returns the content for timestamp.txt.
         """
-        print("🎙️  Generating word-level timestamps via Gemini...")
+        print("🎙️  Generating word-level timestamps via Gemini (All Scenes)...")
+        self.start_browser()
 
-        # Simple parsing logic for scene-based story
-        scenes = re.split(r'দৃশ্য\s+\d+', story)
-        scenes = [s.strip() for s in scenes if s.strip()]
+        # Robust parsing logic for scene-based story supporting Bengali digits
+        scene_markers = re.findall(r'দৃশ্য\s+[0-9১-৯]+', story)
+        scene_texts = re.split(r'দৃশ্য\s+[0-9১-৯]+', story)
+        scene_texts = [s.strip() for s in scene_texts if s.strip()]
 
-        timestamp_data = []
+        full_ts_prompt = (
+            "You are a Voiceover Alignment Assistant. Below is a story with multiple scenes. "
+            "For each scene, I will provide the text and the total duration. "
+            "Provide word-level timestamps in FRAMES for a 30fps project. Start every scene from frame 0.\n\n"
+        )
 
-        for i, scene_text in enumerate(scenes):
+        for i, scene_text in enumerate(scene_texts):
             scene_num = i + 1
             vpath = f"renders/scene_SC_{scene_num:02d}.mp4"
             abs_vpath = os.path.join(public_dir, vpath)
-
             duration_sec = 0.0
             if os.path.exists(abs_vpath):
                 duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
+            if duration_sec == 0: duration_sec = 6.0 # Reasonable fallback
 
-            if duration_sec == 0: duration_sec = 5.0 # Fallback
-
-            # Prompt Gemini to provide word-level timestamps
-            ts_prompt = (
-                f"For the following voiceover text (Scene {scene_num}), provide word-level timestamps in FRAMES for a 30fps project. "
-                f"The total duration is {duration_sec} seconds, which is {int(round(duration_sec * 30))} frames. "
-                f"Start from frame 0.\n"
-                f"TEXT: {scene_text}\n"
-                "Format: [Frame 0 - Frame 15] Word1, [Frame 15 - Frame 36] Word2, ...\n"
-                "Return ONLY the frame-based timestamp sequence. No commentary."
+            full_ts_prompt += (
+                f"--- SCENE {scene_num:02d} ({duration_sec}s / {int(round(duration_sec * 30))} frames) ---\n"
+                f"TEXT: {scene_text}\n\n"
             )
 
-            # Re-use Gemini interaction logic for timestamps
-            # Note: We'll implement a helper for raw interaction to avoid code duplication
-            try:
-                raw_ts = self._interact_with_gemini(ts_prompt)
-                timestamp_data.append(f"SCENE_{scene_num:02d}:\n{raw_ts}\n")
-            except Exception as e:
-                print(f"⚠️ Error getting timestamps for scene {scene_num}: {e}")
-                timestamp_data.append(f"SCENE_{scene_num:02d}:\nError generating timestamps.\n")
+        full_ts_prompt += (
+            "INSTRUCTIONS:\n"
+            "1. Format: SCENE_XX: [Frame X - Frame Y] Word1, [Frame Y - Frame Z] Word2...\n"
+            "2. Ensure timestamps are frame-accurate for 30fps.\n"
+            "3. Return ONLY the timestamps for all scenes. No conversational text."
+        )
 
-        return "\n".join(timestamp_data)
+        try:
+            return self._interact_with_gemini(full_ts_prompt)
+        except Exception as e:
+            print(f"⚠️ Error generating bulk timestamps: {e}")
+            return "Error generating timestamps."
 
     def _interact_with_gemini(self, prompt: str) -> str:
-        """Helper method for raw Gemini browser interaction."""
-        with sync_playwright() as p:
-            browser_args = ["--disable-blink-features=AutomationControlled", "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
-            if self.user_data_dir:
-                context = p.chromium.launch_persistent_context(self.user_data_dir, headless=self.headless, args=browser_args)
-            else:
-                browser = p.chromium.launch(headless=self.headless, args=browser_args)
-                context = browser.new_context()
+        """Helper method for raw Gemini browser interaction using persistent page."""
+        self.start_browser()
+        page = self.page
 
-            page = context.new_page()
-            playwright_stealth.Stealth().apply_stealth_sync(page)
-            page.goto("https://gemini.google.com/app", wait_until="networkidle", timeout=60000)
+        try:
+            input_selector = "div[contenteditable='true']"
+            page.wait_for_selector(input_selector, timeout=45000)
+            page.click(input_selector)
+            page.fill(input_selector, prompt)
+            page.keyboard.press("Enter")
 
             try:
-                input_selector = "div[contenteditable='true']"
-                page.wait_for_selector(input_selector, timeout=45000)
-                page.click(input_selector)
-                page.fill(input_selector, prompt)
-                page.keyboard.press("Enter")
+                send_button = "button[aria-label*='Send'], .send-button, button.send-icon"
+                if page.is_visible(send_button, timeout=3000):
+                    page.click(send_button)
+            except:
+                pass
 
-                try:
-                    send_button = "button[aria-label*='Send'], .send-button, button.send-icon"
-                    if page.is_visible(send_button, timeout=3000):
-                        page.click(send_button)
-                except:
-                    pass
+            # Wait for response to START appearing
+            response_selectors = [".model-response-text", "message-content", ".markdown.message-content", "div[class*='model-response']", "[data-message-author-role='assistant']", "div[role='log']"]
+            found_selector = None
 
-                # Stabilize and extract
-                response_selectors = [".model-response-text", "message-content", ".markdown.message-content", "div[class*='model-response']", "[data-message-author-role='assistant']", "div[role='log']"]
-                found_selector = None
-                for selector in response_selectors:
-                    try:
-                        page.wait_for_selector(selector, timeout=15000)
-                        found_selector = selector
-                        break
-                    except: continue
+            # Use a loop to check for the LAST message appearing
+            initial_count = len(page.query_selector_all("div[class*='model-response'], [data-message-author-role='assistant']"))
 
-                if not found_selector: return "Error: Response not found."
+            for _ in range(45): # Wait up to 45s for start
+                time.sleep(1)
+                current_responses = page.query_selector_all("div[class*='model-response'], [data-message-author-role='assistant']")
+                if len(current_responses) > initial_count:
+                    # New response detected, now find which selector works for it
+                    for selector in response_selectors:
+                        if page.query_selector(selector):
+                            found_selector = selector
+                            break
+                    if found_selector: break
 
-                last_len = 0
-                for _ in range(30):
-                    time.sleep(2)
-                    responses = page.query_selector_all(found_selector)
-                    if not responses: continue
-                    current_text = responses[-1].inner_text()
-                    if len(current_text) > 0 and len(current_text) == last_len: break
-                    last_len = len(current_text)
+            if not found_selector:
+                print("⚠️ Standard selectors not found, falling back to position-based extraction...")
+                found_selector = "div[class*='model-response'], [data-message-author-role='assistant']"
 
+            # Wait for stabilization (streaming to finish)
+            last_len = 0
+            stable_ticks = 0
+            for _ in range(60):
+                time.sleep(1)
                 responses = page.query_selector_all(found_selector)
-                return responses[-1].inner_text() if responses else "Error: Response empty."
-            finally:
-                if self.user_data_dir: context.close()
-                else: browser.close()
+                if not responses: continue
+                current_text = responses[-1].inner_text()
+                if len(current_text) > 0 and len(current_text) == last_len:
+                    stable_ticks += 1
+                    if stable_ticks >= 3: break
+                else:
+                    stable_ticks = 0
+                last_len = len(current_text)
+
+            responses = page.query_selector_all(found_selector)
+            return responses[-1].inner_text() if responses else "Error: Response empty."
+        except Exception as e:
+            return f"Error during interaction: {e}"
 
     def generate(self, story: str, guidelines: str, prompt_output_path: str = None, timestamp_context: str = None) -> Dict[str, Any]:
         # Note: We keep the example JSON in guidelines as it provides critical structure for Nivo charts and Camera shots
@@ -296,12 +342,13 @@ class RemotionJsonMaker:
             "   - OVERLAY DENSITY: Do NOT crowd the screen. Number of overlays must be proportional to scene duration. Shorter scenes (<150 frames) should have fewer (1-2) focal overlays.\n"
             "   - SHAKE OFF: 'camera.shake.enabled' MUST be false by default. Only enable for extreme impact.\n"
             "   - BENGALI SUPPORT: For Bengali text, ALWAYS use 'splitMode': 'word'. NEVER use 'char' to avoid breaking clusters.\n"
-            "   - SHOT COVERAGE: Every focal overlay (Chart, KPI, UI) MUST have a corresponding camera 'shot' to ensure it is covered by the camera.\n"
+            "   - OVERLAY DENSITY & PACING: Do NOT crowd the screen. Use a maximum of 1 focal overlay (Chart/UI/KPI) per 60 frames of scene duration. A scene with 180 frames should have at most 3 focal elements appearing at different times.\n"
+            "   - SHOT COVERAGE: Every single focal overlay MUST have its own camera 'shot' in the 'shots' array. The camera must move to cover each element as it becomes active.\n"
             "   - DECORATIVE DEPTH: Use multiple 'shape' and 'graph' overlays at low zIndex (-20 to -40) with subtle animations (pulse, float) to create a dense, tech-forward background.\n"
             "4. CENTER ANCHORING, TYPOGRAPHY & CONCISE TEXT:\n"
             "   - ALL overlays are center-anchored. Position {x: 960, y: 540} is dead center.\n"
             f"   - DETECTED LOCAL FONTS: {local_fonts}\n"
-            "   - SCRIPT-SPECIFIC FONTS: Identify which of the detected fonts are Bangla and which are English. Use the Bangla font for all Bengali text and the English font for all English text in the 'font' field.\n"
+            "   - SCRIPT-SPECIFIC FONTS: You MUST identify which of the detected fonts are Bangla and which are English. Use the Bangla font for all Bengali text and the English font for all English text in the 'font' field.\n"
             "   - CONCISE VIBE TEXT: 'text' overlay 'content' fields MUST be extremely concise (2-3 words maximum). Do NOT summarize the whole story; instead, capture the 'feeling' or 'vibe' of that specific moment.\n\n"
             f"SYSTEM GUIDELINES AND SCHEMA:\n{guidelines}\n\n"
             f"STORY AND SCENE REQUIREMENTS:\n{story}\n\n"
@@ -320,110 +367,11 @@ class RemotionJsonMaker:
                 f.write(full_prompt)
             print(f"📝 Prompt saved to: {prompt_output_path}")
 
-        with sync_playwright() as p:
-            print("🚀 Launching browser...")
-            browser_args = [
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage"
-            ]
+        raw_output = self._interact_with_gemini(full_prompt)
+        print(f"✅ Response received (Length: {len(raw_output)}).")
 
-            if self.user_data_dir:
-                context = p.chromium.launch_persistent_context(
-                    self.user_data_dir,
-                    headless=self.headless,
-                    args=browser_args
-                )
-            else:
-                browser = p.chromium.launch(headless=self.headless, args=browser_args)
-                context = browser.new_context()
-
-            page = context.new_page()
-            playwright_stealth.Stealth().apply_stealth_sync(page)
-
-            print("🌐 Navigating to Gemini...")
-            page.goto("https://gemini.google.com/app", wait_until="networkidle", timeout=60000)
-
-            try:
-                # Wait for the text area - Gemini uses a contenteditable div
-                print("📝 Waiting for input area...")
-                input_selector = "div[contenteditable='true']"
-                page.wait_for_selector(input_selector, timeout=45000)
-
-                print("⌨️ Injecting prompt...")
-                page.click(input_selector)
-                page.fill(input_selector, full_prompt)
-
-                # Press Enter to send
-                page.keyboard.press("Enter")
-
-                # Fallback: Click send button if enter didn't work (Gemini send button selector)
-                try:
-                    send_button = "button[aria-label*='Send'], .send-button, button.send-icon"
-                    if page.is_visible(send_button, timeout=3000):
-                        page.click(send_button)
-                except:
-                    pass
-
-                print("⏳ Waiting for Gemini to generate response...")
-
-                response_selectors = [
-                    ".model-response-text",
-                    "message-content",
-                    ".markdown.message-content",
-                    "div[class*='model-response']",
-                    "[data-message-author-role='assistant']",
-                    "div[role='log']"
-                ]
-
-                found_selector = None
-                for selector in response_selectors:
-                    try:
-                        page.wait_for_selector(selector, timeout=10000)
-                        found_selector = selector
-                        break
-                    except:
-                        continue
-
-                if not found_selector:
-                    print("⚠️ Standard selectors not found, waiting for stabilization...")
-                    time.sleep(10)
-                    found_selector = ".model-response-text"
-
-                last_len = 0
-                stable_count = 0
-                for _ in range(60):
-                    time.sleep(2)
-                    responses = page.query_selector_all(found_selector)
-                    if not responses:
-                        responses = page.query_selector_all("div[class*='message-content']")
-
-                    if not responses: continue
-
-                    current_text = responses[-1].inner_text()
-                    current_len = len(current_text)
-
-                    if current_len > 0 and current_len == last_len:
-                        stable_count += 1
-                        if stable_count >= 3:
-                            break
-                    else:
-                        stable_count = 0
-
-                    last_len = current_len
-
-                responses = page.query_selector_all(found_selector)
-                if not responses:
-                    responses = page.query_selector_all("div[class*='message-content']")
-
-                if not responses:
-                    raise Exception("Failed to find Gemini response after waiting.")
-
-                raw_output = responses[-1].inner_text()
-                print(f"✅ Response received (Length: {len(raw_output)}).")
-
-                # Robust JSON extraction
+        try:
+            # Robust JSON extraction
                 # 1. Try to find content between the first { and the last }
                 start_idx = raw_output.find('{')
                 end_idx = raw_output.rfind('}')
@@ -458,10 +406,7 @@ class RemotionJsonMaker:
                 return json.loads(raw_output.strip())
 
             finally:
-                if self.user_data_dir:
-                    context.close()
-                else:
-                    browser.close()
+                pass
 
 def main():
     parser = argparse.ArgumentParser(description="Counterism Studio V4 JSON Maker (Playwright Gemini Edition)")
@@ -510,6 +455,9 @@ def main():
 
         # Step 2: Generate Manifest with timestamp context
         render_json = maker.generate(story, guidelines, prompt_output_path=args.prompt_output, timestamp_context=timestamp_content)
+
+        # Cleanup browser
+        maker.stop_browser()
 
         print("🛠️  Performing final frame-accurate duration synchronization...")
         render_json = maker.finalize_json_durations(render_json)
