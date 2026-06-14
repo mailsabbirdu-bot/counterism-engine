@@ -211,8 +211,8 @@ class RemotionJsonMaker:
         self.start_browser()
 
         # Robust parsing logic for scene-based story supporting Bengali digits
-        scene_markers = re.findall(r'দৃশ্য\s+[0-9১-৯]+', story)
-        scene_texts = re.split(r'দৃশ্য\s+[0-9১-৯]+', story)
+        scene_markers = re.findall(r'দৃশ্য\s+[0-9০-৯]+', story)
+        scene_texts = re.split(r'দৃশ্য\s+[0-9০-৯]+', story)
         scene_texts = [s.strip() for s in scene_texts if s.strip()]
 
         full_ts_prompt = (
@@ -254,58 +254,79 @@ class RemotionJsonMaker:
         page = self.page
 
         try:
+            # Clear input if necessary and wait for it to be ready
             input_selector = "div[contenteditable='true']"
             page.wait_for_selector(input_selector, timeout=45000)
+
+            # Ensure we are at the bottom of the page
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+
+            print("⌨️  Sending prompt to Gemini...")
             page.click(input_selector)
+            # Use keyboard for potentially large prompts to be more "human"
             page.fill(input_selector, prompt)
+            time.sleep(1)
             page.keyboard.press("Enter")
 
+            # Fallback Send button
             try:
-                send_button = "button[aria-label*='Send'], .send-button, button.send-icon"
-                if page.is_visible(send_button, timeout=3000):
+                send_button = "button[aria-label*='Send message']"
+                if page.is_visible(send_button, timeout=2000):
                     page.click(send_button)
             except:
                 pass
 
-            # Wait for response to START appearing
-            response_selectors = [".model-response-text", "message-content", ".markdown.message-content", "div[class*='model-response']", "[data-message-author-role='assistant']", "div[role='log']"]
-            found_selector = None
+            # Wait for the generation to finish by monitoring the 'Stop' button or similar indicator
+            # Gemini typically shows a 'Stop generating' button or hides the send button
+            print("⏳  Waiting for Gemini to finish generating...")
 
-            # Use a loop to check for the LAST message appearing
-            initial_count = len(page.query_selector_all("div[class*='model-response'], [data-message-author-role='assistant']"))
+            # response_selectors ranked by accuracy for current Gemini UI
+            response_selectors = [
+                "message-content",
+                ".markdown.message-content",
+                ".model-response-text",
+                "div[class*='model-response']",
+                "[data-message-author-role='assistant']"
+            ]
 
-            for _ in range(45): # Wait up to 45s for start
-                time.sleep(1)
-                current_responses = page.query_selector_all("div[class*='model-response'], [data-message-author-role='assistant']")
-                if len(current_responses) > initial_count:
-                    # New response detected, now find which selector works for it
-                    for selector in response_selectors:
-                        if page.query_selector(selector):
-                            found_selector = selector
-                            break
-                    if found_selector: break
+            # Logic: Wait for any response container to exist AND for its text to stop changing
+            last_text = ""
+            stable_count = 0
 
-            if not found_selector:
-                print("⚠️ Standard selectors not found, falling back to position-based extraction...")
-                found_selector = "div[class*='model-response'], [data-message-author-role='assistant']"
+            # Total timeout 3 minutes for complex manifests
+            for i in range(180):
+                time.sleep(2)
 
-            # Wait for stabilization (streaming to finish)
-            last_len = 0
-            stable_ticks = 0
-            for _ in range(60):
-                time.sleep(1)
-                responses = page.query_selector_all(found_selector)
-                if not responses: continue
-                current_text = responses[-1].inner_text()
-                if len(current_text) > 0 and len(current_text) == last_len:
-                    stable_ticks += 1
-                    if stable_ticks >= 3: break
-                else:
-                    stable_ticks = 0
-                last_len = len(current_text)
+                current_text = ""
+                found_msg = False
+                for sel in response_selectors:
+                    msgs = page.query_selector_all(sel)
+                    if msgs:
+                        current_text = msgs[-1].inner_text()
+                        found_msg = True
+                        break
 
-            responses = page.query_selector_all(found_selector)
-            return responses[-1].inner_text() if responses else "Error: Response empty."
+                if found_msg and len(current_text) > 0:
+                    if current_text == last_text:
+                        stable_count += 1
+                        # Require 3 consecutive stable readings (6 seconds)
+                        if stable_count >= 3:
+                            print(f"✅  Generation stabilized at {len(current_text)} characters.")
+                            return current_text
+                    else:
+                        stable_count = 0
+                        last_text = current_text
+                        if i % 5 == 0:
+                            print(f"   ...streaming: {len(current_text)} chars")
+                elif i > 30: # If no message found after 60 seconds
+                    break
+
+            # Final attempt extraction
+            for sel in response_selectors:
+                msgs = page.query_selector_all(sel)
+                if msgs: return msgs[-1].inner_text()
+
+            return "Error: Failed to extract response from Gemini."
         except Exception as e:
             return f"Error during interaction: {e}"
 
