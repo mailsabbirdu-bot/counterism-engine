@@ -20,26 +20,14 @@ class RemotionJsonMaker:
     def start_browser(self):
         """Initializes a persistent browser session."""
         if self.page: return
-
         self.playwright = sync_playwright().start()
         print("🚀 Launching persistent browser...")
-        browser_args = [
-            "--disable-blink-features=AutomationControlled",
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage"
-        ]
-
+        browser_args = ["--disable-blink-features=AutomationControlled", "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
         if self.user_data_dir:
-            self.context = self.playwright.chromium.launch_persistent_context(
-                self.user_data_dir,
-                headless=self.headless,
-                args=browser_args
-            )
+            self.context = self.playwright.chromium.launch_persistent_context(self.user_data_dir, headless=self.headless, args=browser_args)
         else:
             self.browser = self.playwright.chromium.launch(headless=self.headless, args=browser_args)
             self.context = self.browser.new_context()
-
         self.page = self.context.new_page()
         playwright_stealth.Stealth().apply_stealth_sync(self.page)
         print("🌐 Navigating to Gemini...")
@@ -55,11 +43,7 @@ class RemotionJsonMaker:
     def probe_video_duration_and_fps(self, video_path: str):
         """Probes a video file for its duration and FPS using ffprobe."""
         try:
-            cmd = [
-                "ffprobe", "-v", "error", "-select_streams", "v:0",
-                "-show_entries", "stream=duration,nb_frames,r_frame_rate",
-                "-of", "json", video_path
-            ]
+            cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration,nb_frames,r_frame_rate", "-of", "json", video_path]
             output = subprocess.check_output(cmd).decode("utf-8")
             data = json.loads(output)
             if not data.get('streams'):
@@ -67,7 +51,6 @@ class RemotionJsonMaker:
                 output = subprocess.check_output(cmd).decode("utf-8")
                 data = json.loads(output)
                 return float(data['format'].get('duration', 0)), 30.0
-
             stream = data['streams'][0]
             duration = float(stream.get('duration', 0))
             if duration == 0:
@@ -75,17 +58,8 @@ class RemotionJsonMaker:
                 output = subprocess.check_output(cmd).decode("utf-8")
                 data = json.loads(output)
                 duration = float(data['format'].get('duration', 0))
-
-            fps_str = stream.get('r_frame_rate', '30/1')
-            if '/' in fps_str:
-                num, den = map(float, fps_str.split('/'))
-                fps = num / den if den != 0 else 30.0
-            else: fps = float(fps_str)
-
-            return duration, fps
-        except Exception as e:
-            print(f"⚠️ Warning: {e}")
-            return 0.0, 30.0
+            return duration, 30.0
+        except Exception as e: return 0.0, 30.0
 
     def adjust_durations_in_text(self, text: str, public_dir: str = "../public") -> str:
         """Scans text for video_path and duration_in_frames and adjusts them."""
@@ -131,44 +105,34 @@ class RemotionJsonMaker:
     def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
         """Ensures frame-accurate duration and clamps overlay properties to safe zones."""
         if not data or not data.get('scenes'): return data
-
-        # Force strict global settings
         data['global_settings'] = { "width": 1920, "height": 1080, "fps": 30 }
-
         for scene in data['scenes']:
-            scene_duration = scene.get('duration_in_frames', 150)
+            scene_duration = scene.get('duration_in_frames', 180) # Default to 6s
             if scene.get('background_type') == 'video' and scene.get('video_path'):
-                vpath = scene['video_path']
-                abs_vpath = os.path.join(public_dir, vpath)
+                abs_vpath = os.path.join(public_dir, scene['video_path'])
                 if os.path.exists(abs_vpath):
                     duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
                     if duration_sec > 0:
-                        scene_duration = int(round(duration_sec * 30))
+                        scene_duration = max(180, int(round(duration_sec * 30))) # Min 6s
                         scene['duration_in_frames'] = scene_duration
-
             if scene.get('overlays'):
                 for ov in scene['overlays']:
-                    # Force clamp coordinates to safe zone (X: 200-1720, Y: 150-930)
                     if ov.get('position'):
-                        ov['position']['x'] = max(200, min(1720, int(ov['position'].get('x', 960))))
-                        ov['position']['y'] = max(150, min(930, int(ov['position'].get('y', 540))))
-                    else:
-                        ov['position'] = {"x": 960, "y": 540}
-
-                    # Timing integrity
+                        ov['position']['x'] = max(250, min(1670, int(ov['position'].get('x', 960))))
+                        ov['position']['y'] = max(200, min(880, int(ov['position'].get('y', 540))))
+                    else: ov['position'] = {"x": 960, "y": 540}
                     if ov.get('start', 0) >= scene_duration:
                         ov['start'] = max(0, scene_duration - 60)
                     if ov.get('start', 0) + ov.get('duration', 60) > scene_duration:
                         ov['duration'] = scene_duration - ov.get('start', 0)
-                    if ov.get('duration', 0) < 30:
-                        ov['duration'] = 30
+                    if ov.get('duration', 0) < 60: ov['duration'] = 60 # Min overlay stay
         return data
 
     def generate_word_timestamps(self, story: str, public_dir: str = "../public") -> str:
         """Parses story and estimates word-level timestamps via Gemini."""
         print("🎙️  Generating word-level timestamps...")
         scene_texts = [s.strip() for s in re.split(r'দৃশ্য\s+[0-9০-৯]+', story) if s.strip()]
-        full_ts_prompt = "You are a Voiceover Alignment Assistant. Provide word-level timestamps in FRAMES for a 30fps project.\n\n"
+        full_ts_prompt = "You are a Voiceover Alignment Assistant. Provide word-level timestamps in FRAMES for a 30fps project. MINIMUM scene duration is 180 frames.\n\n"
         for i, scene_text in enumerate(scene_texts):
             scene_num = i + 1
             vpath = f"renders/scene_SC_{scene_num:02d}.mp4"
@@ -189,18 +153,15 @@ class RemotionJsonMaker:
                 input_selector = "div[contenteditable='true']"
                 page.wait_for_selector(input_selector, timeout=45000)
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                print(f"⌨️  Sending prompt to Gemini (Attempt {attempt+1})...")
+                print(f"⌨️  Sending prompt to Gemini (Attempt {attempt+1}/{retry_count+1})...")
                 page.click(input_selector)
                 page.fill(input_selector, prompt)
                 time.sleep(1)
                 page.keyboard.press("Enter")
-
-                # Manual send if needed
                 try:
                     btn = "button[aria-label*='Send message'], button[aria-label*='Submit']"
                     if page.is_visible(btn, timeout=2000): page.click(btn)
                 except: pass
-
                 print("⏳  Waiting for Gemini...")
                 response_selectors = ["message-content", ".markdown.message-content", ".model-response-text", "[data-message-author-role='assistant']"]
                 last_text = ""
@@ -234,13 +195,13 @@ class RemotionJsonMaker:
         story = self.adjust_durations_in_text(story)
         guidelines = self.adjust_durations_in_text(guidelines)
         local_fonts = self.get_local_fonts()
-
         full_prompt = (
             "You are a world-class Motion Graphics Director. Generate an ULTRA MODERN cinematic JSON manifest.\n\n"
-            "CRITICAL RULES:\n"
-            "1. TIMING: Every scene duration MUST match its video duration. Visuals MUST sync with word-level timestamps.\n"
-            "2. CANVAS SAFETY: Center is {x: 960, y: 540}. Content MUST stay within X: [200, 1720] and Y: [150, 930].\n"
-            "3. CINEMATOGRAPHY: Use 'slow_push' or 'ken_burns'. 45-60 frames of resting time per focal element.\n"
+            "CRITICAL TIMING & CANVAS RULES:\n"
+            "1. TIMING: SCENE_DURATION MUST be at least 180 frames (6s). Visuals MUST enter and exit within these bounds, synced with word-level timestamps.\n"
+            "2. CAMERA & CANVAS: Center is {x: 960, y: 540}. All overlays MUST be clustered between X: [250, 1670] and Y: [200, 880]. "
+            "IMPORTANT: When the camera zooms in (zoom > 1.2), keep overlays closer to the center (x: 960, y: 540) to prevent them being pushed off-canvas.\n"
+            "3. PROFESSIONAL CINEMATOGRAPHY: Use 'slow_push' or 'ken_burns'. Shot 'inDuration' 30-45 frames. Minimum 60 frames of resting time.\n"
             "4. MANDATORY: 'background_type': 'video', 'audio_enabled': true, 'camera.shake.enabled': false.\n"
             "5. SCRIPTS: For Bengali, ALWAYS use 'splitMode': 'word'.\n"
             f"6. DETECTED FONTS: {local_fonts}\n\n"
@@ -249,10 +210,8 @@ class RemotionJsonMaker:
             f"TIMESTAMPS:\n{timestamp_context or 'No timestamps.'}\n\n"
             "TASK: Generate complete JSON manifest. Return ONLY raw JSON."
         )
-
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
-
         raw_output = self._interact_with_gemini(full_prompt)
         try:
             start_idx, end_idx = raw_output.find('{'), raw_output.rfind('}')
@@ -266,9 +225,7 @@ class RemotionJsonMaker:
                     cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL)
                     return json.loads(cleaned)
             return json.loads(raw_output.strip())
-        except Exception as e:
-            print(f"❌ Extraction error: {e}")
-            return {}
+        except: return {}
 
 def main():
     parser = argparse.ArgumentParser()
@@ -281,28 +238,22 @@ def main():
     parser.add_argument("--drive-prompt")
     parser.set_defaults(headless=True)
     args = parser.parse_args()
-
     if not os.path.exists(args.story_file): exit(1)
     with open(args.story_file, 'r', encoding='utf-8') as f: story = f.read()
-
     maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, headless=args.headless)
     guidelines = maker.load_guidelines("../guideline.md", "../guideline_prompt.txt", args.drive_prompt)
-
     try:
         ts_content = None
         if args.timestamp_output:
             ts_content = maker.generate_word_timestamps(story)
             with open(args.timestamp_output, 'w', encoding='utf-8') as f: f.write(ts_content)
-
         render_json = maker.generate(story, guidelines, args.prompt_output, ts_content)
         maker.stop_browser()
         render_json = maker.finalize_json_durations(render_json)
-
         sfx_path = os.path.join(os.path.dirname(args.output), "../renders/audios/timestamp_audio.txt")
         if os.path.exists(sfx_path):
             with open(sfx_path, 'r', encoding='utf-8') as sf:
                 render_json['audio_sfx_manifest'] = json.load(sf)
-
         with open(args.output, 'w', encoding='utf-8') as f:
             json.dump(render_json, f, indent=2, ensure_ascii=False)
         print(f"✅ Master JSON created: {args.output}")
