@@ -84,6 +84,7 @@ class RemotionJsonMaker:
         return text
 
     def get_local_fonts(self, public_dir: str = "../public") -> str:
+        """Scans the public/fonts directory and returns available font names."""
         fonts_dir = os.path.join(public_dir, "fonts")
         potential_dirs = [fonts_dir, os.path.join(fonts_dir, "drive_fonts")]
         font_files = []
@@ -113,26 +114,31 @@ class RemotionJsonMaker:
                 if os.path.exists(abs_vpath):
                     duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
                     if duration_sec > 0:
-                        scene_duration = max(180, int(round(duration_sec * 30))) # Min 6s
+                        # Force frame-accurate 30fps target
+                        scene_duration = int(round(duration_sec * 30))
                         scene['duration_in_frames'] = scene_duration
+
             if scene.get('overlays'):
                 for ov in scene['overlays']:
+                    # Aggressive Clamp for Canvas Safety (Keep away from edges)
                     if ov.get('position'):
-                        ov['position']['x'] = max(250, min(1670, int(ov['position'].get('x', 960))))
-                        ov['position']['y'] = max(200, min(880, int(ov['position'].get('y', 540))))
+                        ov['position']['x'] = max(300, min(1620, int(ov['position'].get('x', 960))))
+                        ov['position']['y'] = max(250, min(830, int(ov['position'].get('y', 540))))
                     else: ov['position'] = {"x": 960, "y": 540}
+
+                    # Ensure overlays fit within the scene
                     if ov.get('start', 0) >= scene_duration:
                         ov['start'] = max(0, scene_duration - 60)
                     if ov.get('start', 0) + ov.get('duration', 60) > scene_duration:
                         ov['duration'] = scene_duration - ov.get('start', 0)
-                    if ov.get('duration', 0) < 60: ov['duration'] = 60 # Min overlay stay
+                    if ov.get('duration', 0) < 60: ov['duration'] = 60 # Min stay
         return data
 
     def generate_word_timestamps(self, story: str, public_dir: str = "../public") -> str:
         """Parses story and estimates word-level timestamps via Gemini."""
         print("🎙️  Generating word-level timestamps...")
         scene_texts = [s.strip() for s in re.split(r'দৃশ্য\s+[0-9০-৯]+', story) if s.strip()]
-        full_ts_prompt = "You are a Voiceover Alignment Assistant. Provide word-level timestamps in FRAMES for a 30fps project. MINIMUM scene duration is 180 frames.\n\n"
+        full_ts_prompt = "You are a Voiceover Alignment Assistant. Provide word-level timestamps in FRAMES for a 30fps project.\n\n"
         for i, scene_text in enumerate(scene_texts):
             scene_num = i + 1
             vpath = f"renders/scene_SC_{scene_num:02d}.mp4"
@@ -177,7 +183,7 @@ class RemotionJsonMaker:
                     if current_text and current_text == last_text:
                         stable_count += 1
                         if stable_count >= 5:
-                            print(f"✅  Received ({len(current_text)} chars).")
+                            print(f"✅  Received ({len(current_text)} characters).")
                             if len(current_text) > 100: return current_text
                             break
                     else:
@@ -197,16 +203,18 @@ class RemotionJsonMaker:
         local_fonts = self.get_local_fonts()
         full_prompt = (
             "You are a world-class Motion Graphics Director. Generate an ULTRA MODERN cinematic JSON manifest.\n\n"
-            "CRITICAL TIMING & CANVAS RULES:\n"
-            "1. TIMING: SCENE_DURATION MUST be at least 180 frames (6s). Visuals MUST enter and exit within these bounds, synced with word-level timestamps.\n"
-            "2. CAMERA & CANVAS: Center is {x: 960, y: 540}. All overlays MUST be clustered between X: [250, 1670] and Y: [200, 880]. "
-            "IMPORTANT: When the camera zooms in (zoom > 1.2), keep overlays closer to the center (x: 960, y: 540) to prevent them being pushed off-canvas.\n"
-            "3. PROFESSIONAL CINEMATOGRAPHY: Use 'slow_push' or 'ken_burns'. Shot 'inDuration' 30-45 frames. Minimum 60 frames of resting time.\n"
-            "4. MANDATORY: 'background_type': 'video', 'audio_enabled': true, 'camera.shake.enabled': false.\n"
-            "5. SCRIPTS: For Bengali, ALWAYS use 'splitMode': 'word'.\n"
-            f"6. DETECTED FONTS: {local_fonts}\n\n"
+            "CRITICAL RULES:\n"
+            "1. TIMING: Every scene duration MUST match its video duration. Visuals MUST sync with word-level timestamps.\n"
+            "2. CANVAS SAFETY & OVERLAP: Position {x: 960, y: 540} is center. Content MUST stay within X: [300, 1620] and Y: [250, 830]. "
+            "TEXT AND CHART LAYERS MUST NOT OVERLAP; use unique positions for each focal element to ensure clarity.\n"
+            "3. CINEMATOGRAPHY: Use 'slow_push' or 'ken_burns'. 45-60 frames of resting time per focal element. IMPORTANT: Clustered overlays must be close to camera targets.\n"
+            "4. POLISH & CONCISION: 'text' overlay 'content' MUST BE STRICTLY 2-3 words. Capture the VIBE of the scene. No summary.\n"
+            "5. NIVO: ALL nivo layers should start at frame 0 (empty state) and build up. NO REPETITION of nivo elements across scenes.\n"
+            "6. MANDATORY: 'background_type': 'video', 'audio_enabled': true, 'camera.shake.enabled': false.\n"
+            "7. SCRIPTS: For Bengali, ALWAYS use 'splitMode': 'word'.\n"
+            f"8. DETECTED FONTS: {local_fonts}\n\n"
             f"SYSTEM GUIDELINES:\n{guidelines}\n\n"
-            f"STORY:\n{story}\n\n"
+            f"STORY REQUIREMENTS:\n{story}\n\n"
             f"TIMESTAMPS:\n{timestamp_context or 'No timestamps.'}\n\n"
             "TASK: Generate complete JSON manifest. Return ONLY raw JSON."
         )

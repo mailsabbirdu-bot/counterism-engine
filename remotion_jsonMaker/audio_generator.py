@@ -27,7 +27,7 @@ class AudioManifestGenerator:
             self.context = self.browser.new_context()
         self.page = self.context.new_page()
         playwright_stealth.Stealth().apply_stealth_sync(self.page)
-        print("🌐 Navigating to Gemini for Audio Design...")
+        print("🌐 Navigating to Gemini for Layer SFX Design...")
         self.page.goto("https://gemini.google.com/app", wait_until="networkidle", timeout=60000)
 
     def stop_browser(self):
@@ -43,7 +43,7 @@ class AudioManifestGenerator:
             input_selector = "div[contenteditable='true']"
             page.wait_for_selector(input_selector, timeout=45000)
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            print("⌨️  Sending Audio Design prompt...")
+            print("⌨️  Sending Layer SFX Design prompt...")
             page.click(input_selector)
             page.fill(input_selector, prompt)
             time.sleep(1)
@@ -77,15 +77,16 @@ class AudioManifestGenerator:
                 scene_info['overlays'].append({ "id": ov['id'], "type": ov['type'], "start": ov['start'], "duration": ov['duration'], "animation": ov.get('animation') })
             simplified.append(scene_info)
         prompt = (
-            f"You are a Professional Cinematic Sound Designer. Sync SFX with visual events.\n\n"
+            f"You are a Professional Sound Designer. Create sound effects ONLY for visual layers (text, charts, etc.).\n\n"
             f"MANIFEST:\n{json.dumps(simplified, indent=2)}\n\n"
-            "TASK: Assign a high-quality non-copyright SFX for EVERY entrance/exit.\n"
+            "TASK: Assign a high-quality non-copyright SFX for EVERY entrance and exit of each layer.\n"
             "RULES:\n"
-            "1. CONTEXT: If scene text implies a city/large location (e.g. Dhaka), use 'city traffic ambience' or 'airy wind' for background.\n"
-            "2. NO TYPEWRITING: Do NOT use typewriting sounds for general text titles unless explicitly technical. Use 'cinematic whoosh', 'deep swell', or 'glitch'.\n"
-            "3. SYNC: Start/end MUST match visual timing.\n"
+            "1. NO BACKGROUND SOUNDS: Do NOT add background ambience or music for the whole scene. ONLY layer-specific SFX.\n"
+            "2. LAYER SFX: Assign sounds to 'start' (entrance) and 'duration' (exit if applicable).\n"
+            "3. NO TYPEWRITING: Do NOT use typewriting sounds. Use 'cinematic transition swell', 'digital pop', or 'high tech glitch'.\n"
+            "4. SYNC: Start/end MUST match visual timing.\n"
             "RETURN ONLY RAW JSON LIST:\n"
-            '[ { "scene_id": "SCENE_01", "start_frame": 0, "end_frame": 30, "query": "cinematic transition swell", "volume": 0.5, "label": "intro" } ]'
+            '[ { "scene_id": "SCENE_01", "start_frame": 10, "end_frame": 40, "query": "digital pop reveal", "volume": 0.5, "label": "layer_entrance" } ]'
         )
         raw = self._interact_with_gemini(prompt)
         match = re.search(r'\[.*\]', raw, re.DOTALL)
