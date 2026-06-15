@@ -27,7 +27,12 @@ During the rendering process, the Remotion project:
 
 ## 🛠️ Usage
 
-In Google Colab, the system is executed via:
-```bash
-python audio_generator.py --story-file="story.txt" --timestamp-file="timestamp.txt" --output-dir="/content/drive/MyDrive/Counterism_Studio_V4/renders/audios"
-```
+The entire video production pipeline (Manifest Generation -> SFX Orchestration -> Video Rendering) is unified in a single Colab cell.
+
+**Entry Point:** `remotion_jsonMaker/colab.md`
+
+1.  **Mount Drive:** Accesses story, renders, and fonts.
+2.  **Dependencies:** Installs Playwright, `yt-dlp`, Node.js, and FFmpeg.
+3.  **JSON Maker:** Generates the master Remotion manifest using Gemini.
+4.  **Audio Generator:** Analyzes the manifest, downloads SFX, and creates the audio timestamp mapping.
+5.  **Remotion Renderer:** Executes the multi-scene render and syncs the final `.mp4` files back to Google Drive.

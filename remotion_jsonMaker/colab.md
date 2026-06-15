@@ -62,22 +62,29 @@ print_banner("🔗 LINKING DRIVE ASSETS")
 
 # Deep link all files to ensure visibility during bundling
 print("Linking individual font files...")
-!find {DRIVE_BASE_PATH}/fonts -maxdepth 2 -type f -exec ln -sf '{{}}' public/fonts/ ';' 2>/dev/null
+!find {DRIVE_BASE_PATH}/fonts -maxdepth 2 -type f -exec ln -sf '{}' public/fonts/ ';' 2>/dev/null
 print("Linking individual render files...")
 # Exclude audios folder from direct render linking to preserve structure
-!find {DRIVE_BASE_PATH}/renders -maxdepth 1 -type f -exec ln -sf '{{}}' public/renders/ ';' 2>/dev/null
+!find {DRIVE_BASE_PATH}/renders -maxdepth 1 -type f -exec ln -sf '{}' public/renders/ ';' 2>/dev/null
 print("Linking audio SFX files...")
-!find {DRIVE_BASE_PATH}/renders/audios -maxdepth 2 -type f -exec ln -sf '{{}}' public/renders/audios/ ';' 2>/dev/null
+!find {DRIVE_BASE_PATH}/renders/audios -maxdepth 2 -type f -exec ln -sf '{}' public/renders/audios/ ';' 2>/dev/null
 
 print("✅ Drive assets linked to public folder.")
 
 %cd remotion_jsonMaker
 
-print_banner("🛠️ INSTALLING PLAYWRIGHT STACK")
+print_banner("🛠️ INSTALLING PROJECT DEPENDENCIES")
+# System tools
+!apt-get update -y && apt-get install -y ffmpeg build-essential
+# Python stack
 !pip install -r requirements.txt
 !pip install yt-dlp
 !playwright install chromium
 !playwright install-deps chromium
+# Node.js stack
+%cd {PROJECT_PATH}
+!npm install
+%cd remotion_jsonMaker
 
 # 3. Context Verification
 print_banner("📝 CONTEXT VERIFICATION")
@@ -113,11 +120,29 @@ SFX_DIR = f"{DRIVE_BASE_PATH}/renders/audios"
     --output-dir="{SFX_DIR}" \
     --user-data-dir="{USER_DATA_DIR}"
 
-print_banner("🏁 PROCESS FINISHED")
-if os.path.exists(OUTPUT_JSON):
-    print(f"✅ Master manifest saved to: {OUTPUT_JSON}")
-    print(f"🎙️ Word-level timestamps saved to: {TIMESTAMP_FILE}")
-    print(f"📄 Full prompt saved to: {PROMPT_FILE}")
+print_banner("🎬 STARTING RENDERING PIPELINE")
+%cd {PROJECT_PATH}
+# The pipeline will use remotion_render.json from Drive by default via render.ts logic
+!npm run render -- --concurrency=1
+
+print_banner("💾 SAVING RESULTS TO GOOGLE DRIVE")
+LOCAL_RENDER_DIR = "renders/overlays/remotion"
+DRIVE_RENDER_DIR = f"{DRIVE_BASE_PATH}/renders/overlays/remotion"
+
+if os.path.exists(LOCAL_RENDER_DIR):
+    print(f"📡 Syncing local renders to Drive: {DRIVE_RENDER_DIR}")
+    os.makedirs(DRIVE_RENDER_DIR, exist_ok=True)
+    !cp -rvu {LOCAL_RENDER_DIR}/* {DRIVE_RENDER_DIR}/
+    print("✅ Renders synced.")
 else:
-    print(f"❌ ERROR: Output JSON was not created. Check the logs above.")
+    print("ℹ️ Renders were produced directly in Drive or rendering failed.")
+
+print_banner("🏁 FULL PROCESS COMPLETE")
+if os.path.exists(OUTPUT_JSON):
+    print(f"✅ Master manifest: {OUTPUT_JSON}")
+    print(f"🎙️ Word-level timestamps: {TIMESTAMP_FILE}")
+    print(f"📄 Full prompt: {PROMPT_FILE}")
+    print(f"🎥 Final videos are in: {DRIVE_RENDER_DIR}")
+else:
+    print(f"❌ ERROR: Output JSON was not created. Rendering might have used a stale manifest.")
 ```
