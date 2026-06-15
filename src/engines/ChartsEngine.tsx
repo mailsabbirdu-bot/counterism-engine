@@ -96,8 +96,15 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
 
     if (['line', 'multiLine', 'area', 'stackedArea', 'forecast'].includes(overlay.chart_type)) {
       if (!Array.isArray(overlay.data)) return null;
-      const animatedData = overlay.data.map((series: any) => {
-        if (!series?.data) return series;
+
+      // Handle flat data arrays by wrapping them in a series object
+      const isFlatData = overlay.data.length > 0 && !overlay.data[0].data;
+      const seriesArray = isFlatData
+        ? [{ id: overlay.title || 'Data', data: overlay.data }]
+        : overlay.data;
+
+      const animatedData = seriesArray.map((series: any) => {
+        if (!Array.isArray(series?.data)) return series;
         return {
           ...series,
           data: series.data.map((p: any, i: number) => {
@@ -107,7 +114,9 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
               [0, 1],
               { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
             );
-            return { ...p, y: p.y * pointReveal };
+            // Ensure y is a number before multiplying
+            const yValue = typeof p.y === 'number' ? p.y : (p[overlay.keys?.[0]] || 0);
+            return { ...p, x: p.x || p.year || p.label, y: yValue * pointReveal };
           })
         };
       });
