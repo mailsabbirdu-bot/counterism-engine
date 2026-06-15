@@ -81,10 +81,10 @@ print_banner("🛠️ INSTALLING PROJECT DEPENDENCIES")
 !pip install yt-dlp
 !playwright install chromium
 !playwright install-deps chromium
-# Node.js stack
-%cd {PROJECT_PATH}
-!npm install
-%cd remotion_jsonMaker
+# Node.js stack (Optional for generation, but good for local checks)
+# %cd {PROJECT_PATH}
+# !npm install
+# %cd remotion_jsonMaker
 
 # 3. Context Verification
 print_banner("📝 CONTEXT VERIFICATION")

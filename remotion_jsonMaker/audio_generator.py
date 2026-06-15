@@ -19,12 +19,7 @@ class AudioManifestGenerator:
     def start_browser(self):
         if self.page: return
         self.playwright = sync_playwright().start()
-        args = [
-            "--disable-blink-features=AutomationControlled",
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage"
-        ]
+        args = ["--disable-blink-features=AutomationControlled", "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
         if self.user_data_dir:
             self.context = self.playwright.chromium.launch_persistent_context(self.user_data_dir, headless=self.headless, args=args)
         else:
@@ -32,7 +27,6 @@ class AudioManifestGenerator:
             self.context = self.browser.new_context()
         self.page = self.context.new_page()
         playwright_stealth.Stealth().apply_stealth_sync(self.page)
-        print("🌐 Navigating to Gemini for Audio Orchestration...")
         self.page.goto("https://gemini.google.com/app", wait_until="networkidle", timeout=60000)
 
     def stop_browser(self):
@@ -58,7 +52,6 @@ class AudioManifestGenerator:
             response_selectors = ["message-content", ".markdown.message-content", ".model-response-text"]
             last_text = ""
             stable_count = 0
-
             for i in range(100):
                 time.sleep(2)
                 current_text = ""
@@ -69,22 +62,17 @@ class AudioManifestGenerator:
                         current_text = msgs[-1].inner_text()
                         found_msg = True
                         break
-
                 if found_msg and len(current_text) > 0:
                     if current_text == last_text:
                         stable_count += 1
-                        if stable_count >= 4:
-                            print(f"✅  SFX plan received.")
-                            return current_text
+                        if stable_count >= 4: return current_text
                     else:
                         stable_count = 0
                         last_text = current_text
             return last_text
-        except Exception as e:
-            return f"Error: {e}"
+        except Exception as e: return f"Error: {e}"
 
     def generate_sfx_plan(self, manifest_json):
-        # Extract essential info from manifest for the designer
         simplified_manifest = []
         for scene in manifest_json.get('scenes', []):
             scene_info = {
@@ -94,106 +82,72 @@ class AudioManifestGenerator:
             }
             for ov in scene.get('overlays', []):
                 scene_info['overlays'].append({
-                    "id": ov['id'],
-                    "type": ov['type'],
-                    "start": ov['start'],
-                    "duration": ov['duration'],
-                    "animation": ov.get('animation')
+                    "id": ov['id'], "type": ov['type'], "start": ov['start'],
+                    "duration": ov['duration'], "animation": ov.get('animation')
                 })
             simplified_manifest.append(scene_info)
 
         prompt = (
-            f"You are a Professional Cinematic Sound Designer. Below is a Remotion Video Manifest JSON structure.\n\n"
+            f"You are a Professional Sound Designer. Sync SFX precisely with visual transitions.\n\n"
             f"MANIFEST:\n{json.dumps(simplified_manifest, indent=2)}\n\n"
-            "TASK:\n"
-            "Identify EVERY visual entrance and exit in the manifest and assign a high-quality sound effect (SFX).\n\n"
-            "RULES:\n"
-            "1. PRIORITY: Sound effects MUST be precisely synced with the 'start' and 'duration' of the overlays.\n"
-            "2. TYPE-SPECIFIC SOUNDS:\n"
-            "   - 'text' with 'slideUp' or 'cinematicGlow' -> Needs a 'cinematic transition whoosh' or 'ethereal swell'.\n"
-            "   - 'chart' or 'data_indicator' -> Needs 'digital computer typing', 'high-tech UI glitch', or 'data processing' sounds.\n"
-            "   - Camera movements/transitions -> Needs 'deep cinematic bass drop' or 'riser'.\n"
-            "3. UNIQUE SELECTION: Do not repeat the same sound too often. Use variants.\n\n"
-            "RETURN ONLY A RAW JSON LIST OF SFX OBJECTS:\n"
-            '[ { "scene_id": "SCENE_01", "start_frame": 10, "end_frame": 40, "query": "high tech digital glitch sound effect no copyright", "volume": 0.4, "label": "data_reveal" }, ... ]'
+            "TASK: Assign a high-quality SFX query for EVERY overlay entrance/exit.\n"
+            "RULES:\n1. MUST sync with 'start' and 'duration'.\n"
+            "2. Pick non-copyright queries (e.g. 'tech whoosh sound effect no copyright').\n"
+            "RETURN ONLY RAW JSON LIST:\n"
+            '[ { "scene_id": "SCENE_01", "start_frame": 10, "end_frame": 40, "query": "cinematic hit", "volume": 0.5, "label": "intro" } ]'
         )
-
         raw_output = self._interact_with_gemini(prompt)
         json_match = re.search(r'\[.*\]', raw_output, re.DOTALL)
         if json_match:
             try:
-                # Clean possible trailing commas or markdown
                 cleaned = json_match.group(0)
                 cleaned = re.sub(r',\s*}', '}', cleaned)
                 cleaned = re.sub(r',\s*\]', ']', cleaned)
                 return json.loads(cleaned)
-            except:
-                pass
+            except: pass
         return []
 
     def download_sfx(self, sfx_plan, output_dir):
         os.makedirs(output_dir, exist_ok=True)
         timestamp_entries = []
+        # Modern yt-dlp config to bypass bot detection
+        base_cmd = [
+            "yt-dlp", "--extract-audio", "--audio-format", "mp3",
+            "--no-check-certificates", "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "--prefer-free-formats", "--limit-rate", "1M"
+        ]
 
-        print(f"📥 Processing {len(sfx_plan)} SFX downloads via yt-dlp...")
         for i, item in enumerate(sfx_plan):
-            clean_label = re.sub(r'[^a-z0-9]', '_', item.get('label', 'sfx').lower())
-            filename = f"sfx_{item['scene_id']}_{i:02d}_{clean_label}.mp3"
+            filename = f"sfx_{item['scene_id']}_{i:02d}_{re.sub(r'[^a-z0-9]', '_', item.get('label', 'sfx').lower())}.mp3"
             filepath = os.path.join(output_dir, filename)
-
             print(f"🔍 Searching: {item['query']}")
-            cmd = [
-                "yt-dlp", "--extract-audio", "--audio-format", "mp3",
-                "--output", filepath, f"ytsearch1:{item['query']}"
-            ]
-
+            cmd = base_cmd + ["--output", filepath, f"ytsearch1:{item['query']}"]
             try:
-                subprocess.run(cmd, check=True, timeout=120)
-                print(f"✅ Saved to {filename}")
+                subprocess.run(cmd, check=True, timeout=180)
                 timestamp_entries.append({
-                    "scene_id": item['scene_id'],
-                    "file": filename,
-                    "start": item['start_frame'],
-                    "end": item['end_frame'],
-                    "volume": item['volume']
+                    "scene_id": item['scene_id'], "file": filename,
+                    "start": item['start_frame'], "end": item['end_frame'], "volume": item['volume']
                 })
-            except Exception as e:
-                print(f"❌ Failed download: {e}")
-
+            except Exception as e: print(f"❌ Failed: {e}")
         return timestamp_entries
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--manifest-file", required=True, help="Path to remotion_render.json")
-    parser.add_argument("--output-dir", required=True, help="Folder to download SFX into")
+    parser.add_argument("--manifest-file", required=True)
+    parser.add_argument("--output-dir", required=True)
     parser.add_argument("--user-data-dir")
     args = parser.parse_args()
 
-    if not os.path.exists(args.manifest_file):
-        print(f"❌ Manifest not found: {args.manifest_file}")
-        return
-
-    with open(args.manifest_file, 'r', encoding='utf-8') as f:
-        manifest_json = json.load(f)
-
+    with open(args.manifest_file, 'r', encoding='utf-8') as f: manifest_json = json.load(f)
     generator = AudioManifestGenerator(user_data_dir=args.user_data_dir)
     try:
         sfx_plan = generator.generate_sfx_plan(manifest_json)
-        timestamp_audio_data = generator.download_sfx(sfx_plan, args.output_dir)
-
-        manifest_path = os.path.join(args.output_dir, "timestamp_audio.txt")
-        with open(manifest_path, 'w', encoding='utf-8') as f:
-            f.write(json.dumps(timestamp_audio_data, indent=2))
-        print(f"🎉 Final audio manifest created at {manifest_path}")
-
-        # Post-process: Update manifest with audio data for injection
-        manifest_json['audio_sfx_manifest'] = timestamp_audio_data
+        ts_audio = generator.download_sfx(sfx_plan, args.output_dir)
+        with open(os.path.join(args.output_dir, "timestamp_audio.txt"), 'w') as f:
+            json.dump(ts_audio, f, indent=2)
+        manifest_json['audio_sfx_manifest'] = ts_audio
         with open(args.manifest_file, 'w', encoding='utf-8') as f:
             json.dump(manifest_json, f, indent=2, ensure_ascii=False)
-        print(f"✅ Updated {args.manifest_file} with injected SFX manifest.")
+    finally: generator.stop_browser()
 
-    finally:
-        generator.stop_browser()
-
-if __name__ == "__main__":
-    main()
+if __name__ == "__main__": main()
