@@ -42,19 +42,20 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     return null;
   }
 
-  // Smooth entrance animation for the whole container
-  const entrance = spring({
-    frame: relativeFrame,
-    fps,
-    config: { damping: 20, stiffness: 60 },
-  });
+  // Soft, professional entrance for the container
+  const entrance = interpolate(
+    relativeFrame,
+    [0, 30],
+    [0, 1],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.2, 0, 0.2, 1) }
+  );
 
-  const exitFrame = overlay.duration - 15;
+  const exitFrame = overlay.duration - 20;
   const exit = interpolate(
     relativeFrame,
-    [exitFrame, exitFrame + 15],
+    [exitFrame, exitFrame + 20],
     [1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.4, 0, 1, 1) }
   );
 
   const progress = entrance * exit;
@@ -83,14 +84,14 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       animate: false,
     };
 
-    // Smoother data reveal - adapts to overlay duration
-    const animationStart = 20;
-    const animationEnd = Math.min(overlay.duration - 15, 150);
+    // Refined data reveal - slower and more stable
+    const animationStart = 45; // Start after container is fully settled
+    const animationEnd = Math.min(overlay.duration - 30, 180);
     const dataProgress = interpolate(
       relativeFrame,
       [animationStart, animationEnd],
       [0, 1],
-      { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.4, 0, 0.2, 1) }
+      { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.33, 1, 0.68, 1) }
     );
 
     if (['line', 'multiLine', 'area', 'stackedArea', 'forecast'].includes(overlay.chart_type)) {
@@ -414,8 +415,9 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         top: `${overlay.position?.y ?? 540}px`,
         opacity: progress,
         zIndex: overlay.zIndex ?? 30,
-        transform: `translate(-50%, -50%) scale(${0.9 + progress * 0.1}) translateY(${(1 - entrance) * 100 + (1 - exit) * -100}px)`,
-        filter: `blur(${(1 - exit) * 20}px)`
+        // Removed heavy Y-translation to stop jumpiness, focus on clean scale/opacity
+        transform: `translate(-50%, -50%) scale(${0.98 + progress * 0.02})`,
+        filter: `blur(${(1 - progress) * 10}px)`
       }}
     >
       <div className="flex justify-between items-center mb-10">
