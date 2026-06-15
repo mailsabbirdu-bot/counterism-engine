@@ -120,29 +120,11 @@ SFX_DIR = f"{DRIVE_BASE_PATH}/renders/audios"
     --output-dir="{SFX_DIR}" \
     --user-data-dir="{USER_DATA_DIR}"
 
-print_banner("🎬 STARTING RENDERING PIPELINE")
-%cd {PROJECT_PATH}
-# The pipeline will use remotion_render.json from Drive by default via render.ts logic
-!npm run render -- --concurrency=1
-
-print_banner("💾 SAVING RESULTS TO GOOGLE DRIVE")
-LOCAL_RENDER_DIR = "renders/overlays/remotion"
-DRIVE_RENDER_DIR = f"{DRIVE_BASE_PATH}/renders/overlays/remotion"
-
-if os.path.exists(LOCAL_RENDER_DIR):
-    print(f"📡 Syncing local renders to Drive: {DRIVE_RENDER_DIR}")
-    os.makedirs(DRIVE_RENDER_DIR, exist_ok=True)
-    !cp -rvu {LOCAL_RENDER_DIR}/* {DRIVE_RENDER_DIR}/
-    print("✅ Renders synced.")
-else:
-    print("ℹ️ Renders were produced directly in Drive or rendering failed.")
-
-print_banner("🏁 FULL PROCESS COMPLETE")
+print_banner("🏁 PROCESS FINISHED")
 if os.path.exists(OUTPUT_JSON):
-    print(f"✅ Master manifest: {OUTPUT_JSON}")
-    print(f"🎙️ Word-level timestamps: {TIMESTAMP_FILE}")
-    print(f"📄 Full prompt: {PROMPT_FILE}")
-    print(f"🎥 Final videos are in: {DRIVE_RENDER_DIR}")
+    print(f"✅ Master manifest saved to: {OUTPUT_JSON}")
+    print(f"🎙️ Word-level timestamps saved to: {TIMESTAMP_FILE}")
+    print(f"📄 Full prompt saved to: {PROMPT_FILE}")
 else:
-    print(f"❌ ERROR: Output JSON was not created. Rendering might have used a stale manifest.")
+    print(f"❌ ERROR: Output JSON was not created. Check the logs above.")
 ```
