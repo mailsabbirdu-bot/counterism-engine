@@ -110,7 +110,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
        const keys = overlay.keys || ['value'];
        const animatedData = overlay.data.map((item: any) => {
          const newItem = { ...item };
-         keys.forEach((key: string) => { if (typeof item[key] === 'number') newItem[key] = item[key] * dataProgress; });
+         keys.forEach((key: string) => { if (typeof item[key] === 'number') newItem[key] = (item[key] || 0) * dataProgress; });
          return newItem;
        });
        return (
