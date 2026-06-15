@@ -95,7 +95,9 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     );
 
     if (['line', 'multiLine', 'area', 'stackedArea', 'forecast'].includes(overlay.chart_type)) {
+      if (!Array.isArray(overlay.data)) return null;
       const animatedData = overlay.data.map((series: any) => {
+        if (!series?.data) return series;
         return {
           ...series,
           data: series.data.map((p: any, i: number) => {
@@ -136,6 +138,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     }
 
     if (['bar', 'horizontalBar', 'verticalBar', 'groupedBar', 'stackedBar', 'barRace'].includes(overlay.chart_type)) {
+       if (!Array.isArray(overlay.data)) return null;
        let chartData = [...overlay.data];
 
        // Bar Race sorting logic
@@ -175,9 +178,10 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     }
 
     if (['pie', 'donut'].includes(overlay.chart_type)) {
+       if (!Array.isArray(overlay.data)) return null;
        const animatedData = overlay.data.map((item: any) => ({
           ...item,
-          value: item.value * dataProgress
+          value: (item.value ?? 0) * dataProgress
        }));
 
        return (
@@ -246,9 +250,10 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     }
 
     if (overlay.chart_type === 'histogram') {
+        if (!Array.isArray(overlay.data)) return null;
         const animatedData = overlay.data.map((item: any) => ({
            ...item,
-           count: item.count * dataProgress
+           count: (item.count ?? 0) * dataProgress
         }));
 
         return (
@@ -268,6 +273,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     }
 
     if (overlay.chart_type === 'boxPlot') {
+        if (!Array.isArray(overlay.data)) return null;
         const animatedData = overlay.data.map((item: any) => ({
            ...item,
            mu: (item.mu ?? 0) * dataProgress,
@@ -295,15 +301,17 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     }
 
     if (overlay.chart_type === 'violinPlot') {
+       if (!Array.isArray(overlay.data)) return null;
        return <ViolinPlot overlay={overlay} dataProgress={dataProgress} commonProps={commonProps} />;
     }
 
     if (['scatter', 'bubble'].includes(overlay.chart_type)) {
+       if (!Array.isArray(overlay.data)) return null;
        const animatedData = overlay.data.map((series: any) => ({
           ...series,
-          data: series.data.map((p: any) => ({
+          data: (series.data || []).map((p: any) => ({
              ...p,
-             y: p.y * dataProgress,
+             y: (p.y ?? 0) * dataProgress,
              z: (p.z || 10) * dataProgress
           }))
        }));
@@ -353,7 +361,8 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     }
 
     if (overlay.chart_type === 'chord') {
-       const animatedData = overlay.data.map((row: any) => row.map((val: number) => val * dataProgress));
+       if (!Array.isArray(overlay.data)) return null;
+       const animatedData = overlay.data.map((row: any) => (row || []).map((val: number) => val * dataProgress));
        return (
          <ResponsiveChord
             {...commonProps}
