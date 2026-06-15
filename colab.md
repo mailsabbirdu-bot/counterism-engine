@@ -74,6 +74,16 @@ if os.path.exists(drive_audio):
 
 drive_fonts = f"{DRIVE_BASE_PATH}/fonts"
 os.makedirs("public/fonts", exist_ok=True)
+
+# 3.5 SFX Folder Sync
+os.makedirs("public/renders/audios", exist_ok=True)
+drive_sfx = f"{DRIVE_BASE_PATH}/renders/audios"
+if os.path.exists(drive_sfx):
+    print(f"📡 Found Drive SFX folder: {drive_sfx}")
+    !rm -rf public/renders/audios/*
+    !cp -r {drive_sfx}/* public/renders/audios/
+    print(f"✅ Copied SFX assets.")
+
 if os.path.exists(drive_fonts):
     print(f"📡 Found Drive fonts folder: {drive_fonts}")
     !rm -rf public/fonts/*
