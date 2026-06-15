@@ -369,8 +369,9 @@ class RemotionJsonMaker:
             "   - OVERLAY DENSITY & PACING: Use a maximum of 1 focal overlay per 60 frames of scene duration. A 180f scene should have at most 3 focal elements appearing at different times.\n"
             "   - SHOT COVERAGE: Every single focal overlay MUST have its own camera 'shot'. The camera must move to cover each element as it becomes active.\n"
             "   - DECORATIVE DEPTH: Use multiple 'shape' and 'graph' overlays at low zIndex (-20 to -40). These MUST be unique per scene to avoid dullness.\n"
-            "4. CENTER ANCHORING, TYPOGRAPHY & CONCISE TEXT:\n"
+            "4. CENTER ANCHORING, CANVAS LIMITS & CONCISE TEXT:\n"
             "   - ALL overlays are center-anchored. Position {x: 960, y: 540} is dead center.\n"
+            "   - CANVAS SAFETY: Ensure all x coordinates are between 200 and 1720, and y between 150 and 930 to prevent content from going off-canvas.\n"
             f"   - DETECTED LOCAL FONTS: {local_fonts}\n"
             "   - SCRIPT-SPECIFIC FONTS: You MUST identify which of the detected fonts are Bangla and which are English. Use the Bangla font for all Bengali text and the English font for all English text in the 'font' field.\n"
             "   - CONCISE VIBE TEXT: 'text' overlay 'content' fields MUST be extremely concise (2-3 words maximum). Do NOT summarize the whole story; instead, capture the 'feeling' or 'vibe' of that specific moment.\n\n"
@@ -485,6 +486,16 @@ def main():
 
         print("🛠️  Performing final frame-accurate duration synchronization...")
         render_json = maker.finalize_json_durations(render_json)
+
+        # Inject SFX manifest if available
+        sfx_manifest_path = os.path.join(os.path.dirname(args.output), "../renders/audios/timestamp_audio.txt")
+        if os.path.exists(sfx_manifest_path):
+            try:
+                with open(sfx_manifest_path, 'r', encoding='utf-8') as sf:
+                    render_json['audio_sfx_manifest'] = json.load(sf)
+                print("🎵 Injected SFX manifest into master JSON.")
+            except:
+                print("⚠️  Could not load SFX manifest for injection.")
 
         os.makedirs(os.path.dirname(args.output), exist_ok=True)
         with open(args.output, 'w', encoding='utf-8') as f:

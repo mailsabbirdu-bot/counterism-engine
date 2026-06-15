@@ -9,12 +9,21 @@ interface AudioEntry {
   volume: number;
 }
 
+import { getInputProps } from 'remotion';
+
 export const AudioEngine: React.FC<{ sceneId: string }> = ({ sceneId }) => {
   const [audioManifest, setAudioManifest] = useState<AudioEntry[]>([]);
+  const props = getInputProps() as any;
+  const template = props?.scenes ? props : (props?.templateData || {});
 
   useEffect(() => {
-    // Attempt to fetch the manifest from the public folder
-    // This is linked to drive/renders/audios/timestamp_audio.txt
+    // 1. Try to get manifest from injected props (fastest)
+    if (template?.audio_sfx_manifest) {
+        setAudioManifest(template.audio_sfx_manifest);
+        return;
+    }
+
+    // 2. Fallback: Attempt to fetch the manifest from the public folder
     const fetchManifest = async () => {
       try {
         const response = await fetch(staticFile('renders/audios/timestamp_audio.txt'));
@@ -23,13 +32,12 @@ export const AudioEngine: React.FC<{ sceneId: string }> = ({ sceneId }) => {
           setAudioManifest(data);
         }
       } catch (e) {
-        // No SFX manifest found, which is fine
         console.log("No SFX manifest detected for this project.");
       }
     };
 
     fetchManifest();
-  }, []);
+  }, [template]);
 
   const sceneSfx = audioManifest.filter(entry => entry.scene_id === sceneId);
 
