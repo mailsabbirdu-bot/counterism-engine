@@ -371,7 +371,7 @@ class RemotionJsonMaker:
             "   - DECORATIVE DEPTH: Use multiple 'shape' and 'graph' overlays at low zIndex (-20 to -40). These MUST be unique per scene to avoid dullness.\n"
             "4. CENTER ANCHORING, CANVAS LIMITS & CONCISE TEXT:\n"
             "   - ALL overlays are center-anchored. Position {x: 960, y: 540} is dead center.\n"
-            "   - CANVAS SAFETY: Ensure all x coordinates are between 200 and 1720, and y between 150 and 930 to prevent content from going off-canvas.\n"
+            "   - CANVAS SAFETY: Content MUST stay within the central 80% of the canvas. Strict X: [200, 1720], Strict Y: [150, 930]. NEVER exceed these bounds.\n"
             f"   - DETECTED LOCAL FONTS: {local_fonts}\n"
             "   - SCRIPT-SPECIFIC FONTS: You MUST identify which of the detected fonts are Bangla and which are English. Use the Bangla font for all Bengali text and the English font for all English text in the 'font' field.\n"
             "   - CONCISE VIBE TEXT: 'text' overlay 'content' fields MUST be extremely concise (2-3 words maximum). Do NOT summarize the whole story; instead, capture the 'feeling' or 'vibe' of that specific moment.\n\n"
@@ -408,6 +408,9 @@ class RemotionJsonMaker:
                 except json.JSONDecodeError:
                     # 2. Try deep cleaning markdown and comments if simple extraction fails
                     cleaned = json_str
+                    # Remove trailing commas that break json.loads
+                    cleaned = re.sub(r',\s*}', '}', cleaned)
+                    cleaned = re.sub(r',\s*\]', ']', cleaned)
                     cleaned = re.sub(r'//.*$', '', cleaned, flags=re.MULTILINE) # Remove single line comments
                     cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL) # Remove block comments
                     try:
