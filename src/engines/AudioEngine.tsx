@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Audio, staticFile, Sequence } from 'remotion';
+import { Audio, staticFile, Sequence, getInputProps } from 'remotion';
 
 interface AudioEntry {
   scene_id: string;
@@ -7,9 +7,8 @@ interface AudioEntry {
   start: number;
   end: number;
   volume: number;
+  status?: string;
 }
-
-import { getInputProps } from 'remotion';
 
 export const AudioEngine: React.FC<{ sceneId: string }> = ({ sceneId }) => {
   const [audioManifest, setAudioManifest] = useState<AudioEntry[]>([]);
@@ -17,7 +16,7 @@ export const AudioEngine: React.FC<{ sceneId: string }> = ({ sceneId }) => {
   const template = props?.scenes ? props : (props?.templateData || {});
 
   useEffect(() => {
-    // 1. Try to get manifest from injected props (fastest)
+    // 1. Try to get manifest from injected props (fastest & reliable)
     if (template?.audio_sfx_manifest) {
         setAudioManifest(template.audio_sfx_manifest);
         return;
@@ -32,22 +31,30 @@ export const AudioEngine: React.FC<{ sceneId: string }> = ({ sceneId }) => {
           setAudioManifest(data);
         }
       } catch (e) {
-        console.log("No SFX manifest detected for this project.");
+        // No SFX manifest found, which is fine
       }
     };
 
     fetchManifest();
   }, [template]);
 
-  const sceneSfx = audioManifest.filter(entry => entry.scene_id === sceneId);
+  const sceneSfx = audioManifest.filter(entry =>
+    entry.scene_id === sceneId && entry.status !== 'failed'
+  );
+
+  if (sceneSfx.length > 0) {
+      console.log(`[AudioEngine] Playing ${sceneSfx.length} SFX for ${sceneId}`);
+  }
 
   return (
     <>
       {sceneSfx.map((sfx, i) => (
-        <Sequence from={sfx.start} durationInFrames={sfx.end - sfx.start} key={`${sfx.file}-${i}`}>
+        <Sequence from={sfx.start} durationInFrames={Math.max(1, sfx.end - sfx.start)} key={`${sfx.file}-${i}`}>
           <Audio
             src={staticFile(`renders/audios/${sfx.file}`)}
             volume={sfx.volume}
+            // Defensive error handling for missing files
+            onError={(e) => console.warn(`[AudioEngine] Failed to play SFX: ${sfx.file}`, e)}
           />
         </Sequence>
       ))}
