@@ -72,6 +72,13 @@ if os.path.exists(drive_audio):
     !cp -r {drive_audio}/* public/audio/
     print(f"✅ Copied {len(os.listdir('public/audio'))} audio files.")
 
+# Deep Sync for SFX
+drive_audios_folder = f"{DRIVE_BASE_PATH}/renders/audios"
+os.makedirs("public/renders/audios", exist_ok=True)
+if os.path.exists(drive_audios_folder):
+    print(f"📡 Found Drive SFX folder: {drive_audios_folder}")
+    !cp -rvu {drive_audios_folder}/* public/renders/audios/ 2>/dev/null || true
+
 drive_fonts = f"{DRIVE_BASE_PATH}/fonts"
 os.makedirs("public/fonts", exist_ok=True)
 
