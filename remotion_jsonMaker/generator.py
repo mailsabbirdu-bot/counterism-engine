@@ -124,13 +124,6 @@ class RemotionJsonMaker:
 
             return block
 
-        # Find blocks that are likely individual scene definitions or adjacent properties.
-        # We look for pairs that don't have another instance of either key between them.
-        # This is more robust against scene crossing.
-
-        # Strategy: Match any block that contains both keys within a reasonable range,
-        # ensuring we don't skip over another scene.
-
         # Pattern 1: video_path ... duration_in_frames
         pattern1 = r'("video_path":\s*"[^"]+"(?:(?!"video_path"|"duration_in_frames").){0,300}?"duration_in_frames"\s*:\s*\d+)'
         text = re.sub(pattern1, replacement_logic, text, flags=re.DOTALL)
@@ -144,7 +137,6 @@ class RemotionJsonMaker:
     def get_local_fonts(self, public_dir: str = "../public") -> str:
         """Scans the public/fonts directory and returns available font names."""
         fonts_dir = os.path.join(public_dir, "fonts")
-        # Check both /fonts and /fonts/drive_fonts due to symlinking logic
         potential_dirs = [fonts_dir, os.path.join(fonts_dir, "drive_fonts")]
 
         font_files = []
@@ -162,351 +154,230 @@ class RemotionJsonMaker:
 
     def load_guidelines(self, local_guideline_path: str, local_prompt_path: str, drive_prompt_path: str) -> str:
         guidelines = ""
-
-        # Load local guideline.md from the repository root
         if os.path.exists(local_guideline_path):
             with open(local_guideline_path, 'r', encoding='utf-8') as f:
                 guidelines += f"\n--- ENGINE SYSTEM GUIDELINES ---\n{f.read()}\n"
-
-        # Load local guideline_prompt.txt from the repository root
         if os.path.exists(local_prompt_path):
             with open(local_prompt_path, 'r', encoding='utf-8') as f:
                 guidelines += f"\n--- TECHNICAL SCHEMA & COMPONENTS ---\n{f.read()}\n"
-
-        # Load drive guideline_prompt.txt (this contains story and specific instructions)
         if drive_prompt_path and os.path.exists(drive_prompt_path):
             with open(drive_prompt_path, 'r', encoding='utf-8') as f:
                 guidelines += f"\n--- STORY AND DURATION SPECIFICATIONS (DRIVE) ---\n{f.read()}\n"
-
         return guidelines
 
     def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
-        """
-        Iterates through scenes and ensures duration_in_frames is perfectly
-        aligned with the actual background video duration at 30fps.
-        """
-        if not data.get('scenes'):
+        """Ensures frame-accurate duration and clamps overlay properties."""
+        if not data or not data.get('scenes'):
             return data
 
         for scene in data['scenes']:
+            scene_duration = scene.get('duration_in_frames', 150)
             if scene.get('background_type') == 'video' and scene.get('video_path'):
                 vpath = scene['video_path']
                 abs_vpath = os.path.join(public_dir, vpath)
-
                 if os.path.exists(abs_vpath):
                     duration_sec, fps = self.probe_video_duration_and_fps(abs_vpath)
                     if duration_sec > 0:
                         target_fps = data.get('global_settings', {}).get('fps', 30)
-                        new_duration = int(round(duration_sec * target_fps))
-                        print(f"🎯 Finalizing {vpath}: {duration_sec}s ({fps}fps) -> {new_duration}f (@{target_fps}fps)")
-                        scene['duration_in_frames'] = new_duration
+                        scene_duration = int(round(duration_sec * target_fps))
+                        print(f"🎯 Finalizing {vpath}: {duration_sec}s -> {scene_duration}f")
+                        scene['duration_in_frames'] = scene_duration
 
+            if scene.get('overlays'):
+                for ov in scene['overlays']:
+                    if ov.get('position'):
+                        ov['position']['x'] = max(200, min(1720, ov['position'].get('x', 960)))
+                        ov['position']['y'] = max(150, min(930, ov['position'].get('y', 540)))
+
+                    if ov.get('start', 0) >= scene_duration:
+                        ov['start'] = max(0, scene_duration - 60)
+
+                    if ov.get('start', 0) + ov.get('duration', 0) > scene_duration:
+                        ov['duration'] = scene_duration - ov.get('start', 0)
+
+                    if ov.get('duration', 0) < 30:
+                        ov['duration'] = 30
         return data
 
     def generate_word_timestamps(self, story: str, public_dir: str = "../public") -> str:
-        """
-        Parses story.txt, maps to videos, and uses Gemini to estimate word-level timestamps for all scenes in one go.
-        Returns the content for timestamp.txt.
-        """
-        print("🎙️  Generating word-level timestamps via Gemini (All Scenes)...")
-        self.start_browser()
-
-        # Robust parsing logic for scene-based story supporting Bengali digits
+        """Parses story and estimates word-level timestamps."""
+        print("🎙️  Generating word-level timestamps via Gemini...")
         scene_markers = re.findall(r'দৃশ্য\s+[0-9০-৯]+', story)
         scene_texts = re.split(r'দৃশ্য\s+[0-9০-৯]+', story)
         scene_texts = [s.strip() for s in scene_texts if s.strip()]
 
         full_ts_prompt = (
-            "You are a Voiceover Alignment Assistant. Below is a story with multiple scenes. "
-            "For each scene, I will provide the text and the total duration. "
-            "Provide word-level timestamps in FRAMES for a 30fps project. Start every scene from frame 0.\n\n"
+            "You are a Voiceover Alignment Assistant. Provide word-level timestamps in FRAMES for a 30fps project. Start every scene from frame 0.\n\n"
         )
-
         for i, scene_text in enumerate(scene_texts):
             scene_num = i + 1
             vpath = f"renders/scene_SC_{scene_num:02d}.mp4"
             abs_vpath = os.path.join(public_dir, vpath)
-            duration_sec = 0.0
+            duration_sec = 6.0
             if os.path.exists(abs_vpath):
                 duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
-            if duration_sec == 0: duration_sec = 6.0 # Reasonable fallback
 
             full_ts_prompt += (
                 f"--- SCENE {scene_num:02d} ({duration_sec}s / {int(round(duration_sec * 30))} frames) ---\n"
                 f"TEXT: {scene_text}\n\n"
             )
+        full_ts_prompt += "Format: SCENE_XX: [Frame X - Frame Y] Word1, ...\nReturn ONLY the timestamps."
+        return self._interact_with_gemini(full_ts_prompt)
 
-        full_ts_prompt += (
-            "INSTRUCTIONS:\n"
-            "1. Format: SCENE_XX: [Frame X - Frame Y] Word1, [Frame Y - Frame Z] Word2...\n"
-            "2. Ensure timestamps are frame-accurate for 30fps.\n"
-            "3. Return ONLY the timestamps for all scenes. No conversational text."
-        )
-
-        try:
-            return self._interact_with_gemini(full_ts_prompt)
-        except Exception as e:
-            print(f"⚠️ Error generating bulk timestamps: {e}")
-            return "Error generating timestamps."
-
-    def _interact_with_gemini(self, prompt: str) -> str:
-        """Helper method for raw Gemini browser interaction using persistent page."""
-        self.start_browser()
-        page = self.page
-
-        try:
-            # Wait for the input area
-            input_selector = "div[contenteditable='true']"
-            page.wait_for_selector(input_selector, timeout=45000)
-
-            # Clear input and scroll to bottom
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-
-            print("⌨️  Sending prompt to Gemini...")
-            page.click(input_selector)
-
-            # For very large prompts, fill() is safer but we use a small sleep after
-            page.fill(input_selector, prompt)
-            time.sleep(1)
-            page.keyboard.press("Enter")
-
-            # Fallback Send button check
+    def _interact_with_gemini(self, prompt: str, retry_count: int = 2) -> str:
+        """Helper method for raw Gemini browser interaction with retry logic."""
+        for attempt in range(retry_count + 1):
+            self.start_browser()
+            page = self.page
             try:
-                send_button = "button[aria-label*='Send message'], button[aria-label*='Submit']"
-                if page.is_visible(send_button, timeout=2000):
-                    page.click(send_button)
-            except:
-                pass
+                input_selector = "div[contenteditable='true']"
+                page.wait_for_selector(input_selector, timeout=45000)
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
 
-            print("⏳  Waiting for Gemini to finish generating...")
+                print(f"⌨️  Sending prompt to Gemini (Attempt {attempt+1}/{retry_count+1})...")
+                page.click(input_selector)
+                page.fill(input_selector, prompt)
+                time.sleep(1)
+                page.keyboard.press("Enter")
 
-            # Response detection logic
-            response_selectors = [
-                "message-content",
-                ".markdown.message-content",
-                ".model-response-text",
-                "div[class*='model-response']",
-                "[data-message-author-role='assistant']"
-            ]
+                # Fallback Send button
+                try:
+                    send_button = "button[aria-label*='Send message'], button[aria-label*='Submit']"
+                    if page.is_visible(send_button, timeout=2000):
+                        page.click(send_button)
+                except: pass
 
-            last_text = ""
-            stable_count = 0
+                print("⏳  Waiting for Gemini to finish generating...")
+                response_selectors = ["message-content", ".markdown.message-content", ".model-response-text", "div[class*='model-response']", "[data-message-author-role='assistant']"]
 
-            # Increased timeout to 5 minutes for massive JSON manifests
-            for i in range(150): # 150 * 2s = 300s = 5m
-                time.sleep(2)
+                last_text = ""
+                stable_count = 0
+                for i in range(150):
+                    time.sleep(2)
+                    current_text = ""
+                    found_msg = False
+                    for sel in response_selectors:
+                        msgs = page.query_selector_all(sel)
+                        if msgs:
+                            current_text = msgs[-1].inner_text()
+                            found_msg = True
+                            break
 
-                current_text = ""
-                found_msg = False
-                for sel in response_selectors:
-                    msgs = page.query_selector_all(sel)
-                    if msgs:
-                        current_text = msgs[-1].inner_text()
-                        found_msg = True
-                        break
+                    if found_msg and len(current_text) > 0:
+                        if current_text == last_text:
+                            stable_count += 1
+                            if stable_count >= 4:
+                                print(f"✅  Generation complete ({len(current_text)} characters).")
+                                if len(current_text) > 100: return current_text
+                                break
+                        else:
+                            stable_count = 0
+                            last_text = current_text
+                    elif i > 45: break
 
-                if found_msg and len(current_text) > 0:
-                    if current_text == last_text:
-                        stable_count += 1
-                        # Wait for 4 consecutive stable readings (8 seconds) to be sure
-                        if stable_count >= 4:
-                            print(f"✅  Generation complete ({len(current_text)} characters).")
-                            return current_text
-                    else:
-                        stable_count = 0
-                        last_text = current_text
-                        if i % 10 == 0:
-                            print(f"   ...generating: {len(current_text)} chars")
-                elif i > 45: # Break if no message found after 90 seconds
-                    print("⚠️  No message detected in response selectors after 90s.")
-                    break
-
-            # Last ditch attempt: grab the last message content regardless of stability
-            for sel in response_selectors:
-                msgs = page.query_selector_all(sel)
-                if msgs:
-                    final_attempt = msgs[-1].inner_text()
-                    if len(final_attempt) > 50: return final_attempt
-
-            return "Error: Failed to extract response from Gemini."
-        except Exception as e:
-            return f"Error during interaction: {e}"
+                print("🔄  Reloading for retry...")
+                page.reload(wait_until="networkidle")
+                time.sleep(5)
+            except Exception as e:
+                print(f"⚠️ Error: {e}")
+                if attempt < retry_count: page.reload(wait_until="networkidle")
+                else: return f"Error: {e}"
+        return "Error: Failed to extract valid response."
 
     def generate(self, story: str, guidelines: str, prompt_output_path: str = None, timestamp_context: str = None) -> Dict[str, Any]:
-        # Note: We keep the example JSON in guidelines as it provides critical structure for Nivo charts and Camera shots
-
-        print("⚖️ Checking and adjusting video durations in prompt for 30fps target...")
+        print("⚖️ Adjusting durations in prompt...")
         story = self.adjust_durations_in_text(story)
         guidelines = self.adjust_durations_in_text(guidelines)
-
         local_fonts = self.get_local_fonts()
 
         full_prompt = (
-            "You are a world-class Motion Graphics Director and Remotion V4 JSON Engineer. "
-            "Your task is to generate an ULTRA MODERN, HIGH-END, and VIEWER-CENTRIC cinematic JSON manifest. "
-            "The video must be top-notch and catchy, utilizing professional documentary motion design principles.\n\n"
-            "CRITICAL TECHNICAL RULES:\n"
-            "1. DATA ACCURACY (Nivo Charts):\n"
-            "   - 'chart' overlays MUST have a valid 'data' array.\n"
-            "   - Line Chart: [ { 'id': 'Metric Name', 'data': [ { 'x': 'Label', 'y': 123 }, ... ] } ]\n"
-            "   - Bar Chart: [ { 'id': 'Metric Name', 'data': [ { 'x': 'Label', 'y': 123 }, ... ] } ]\n"
-            "   - Ensure all numbers match the story (e.g. 2 crore = 20000000). Use realistic variations for historical data.\n"
-            "2. PROFESSIONAL CINEMATOGRAPHY & PACING:\n"
-            "   - USE PRESETS: For the best results, use 'preset': 'slow_push' or 'ken_burns' in the camera object.\n"
-            "   - NO JUMPS: Every 'shot' in the camera array MUST target an overlay that has 'cameraFocus' defined.\n"
-            "   - ZOOM CONSISTENCY: The 'zoom' value in a camera 'shot' MUST EXACTLY MATCH the 'zoom' value in the target overlay's 'cameraFocus' object to prevent visual jumps.\n"
-            "   - ZOOM LIMITS: Keep 'zoom' between 1.1 and 1.8 for text, up to 2.2 for data details. NEVER exceed 3.0.\n"
-            "   - TRANSITIONS & RESTING: 'inDuration' for shots should be 30-45 frames. CRITICAL: Ensure 'duration' - 'inDuration' is at least 45-60 frames (1.5-2s at 30fps) for the viewer to 'rest' on and read the content.\n"
-            "   - ULTRA MODERN SHOTS: Use 'slow_push' style for focal points. Avoid quick pans unless the scene demands it.\n"
-            "3. DEPTH, LAYERING & POLISH:\n"
-            "   - MANDATORY VIDEO BACKGROUNDS: Every scene MUST use 'background_type': 'video'.\n"
-            "   - VIDEO PATH CONVENTION: Use 'video_path': 'renders/scene_SC_01.mp4' for the first scene, 'renders/scene_SC_02.mp4' for the second, and so on.\n"
-            "   - MANDATORY AUDIO: Every scene MUST have 'audio_enabled': true.\n"
-            "   - NON-REPETITIVE DESIGN: Every scene MUST have a unique visual signature. Rotate 'procedural_config' variants. Decorative elements ('shape', 'graph') MUST be unique per scene (change types, sizes, colors).\n"
-            "   - DENSITY CONTROL: For scenes < 8 seconds, limit to 1 focal overlay (Chart/KPI/UI) + 1 concise text. Do NOT crowd. Focal overlays MUST stay for at least 4 seconds (120 frames).\n"
-            "   - SHAKE OFF: 'camera.shake.enabled' MUST ALWAYS be false. No exceptions.\n"
-            "   - BENGALI SUPPORT: For Bengali text, ALWAYS use 'splitMode': 'word'. NEVER use 'char' to avoid breaking clusters.\n"
-            "   - OVERLAY DENSITY & PACING: Use a maximum of 1 focal overlay per 60 frames of scene duration. A 180f scene should have at most 3 focal elements appearing at different times.\n"
-            "   - SHOT COVERAGE: Every single focal overlay MUST have its own camera 'shot'. The camera must move to cover each element as it becomes active.\n"
-            "   - DECORATIVE DEPTH: Use multiple 'shape' and 'graph' overlays at low zIndex (-20 to -40). These MUST be unique per scene to avoid dullness.\n"
-            "4. CENTER ANCHORING, CANVAS LIMITS & CONCISE TEXT:\n"
-            "   - ALL overlays are center-anchored. Position {x: 960, y: 540} is dead center.\n"
-            "   - CANVAS SAFETY: Content MUST stay within the central 80% of the canvas. Strict X: [200, 1720], Strict Y: [150, 930]. NEVER exceed these bounds.\n"
-            f"   - DETECTED LOCAL FONTS: {local_fonts}\n"
-            "   - SCRIPT-SPECIFIC FONTS: You MUST identify which of the detected fonts are Bangla and which are English. Use the Bangla font for all Bengali text and the English font for all English text in the 'font' field.\n"
-            "   - CONCISE VIBE TEXT: 'text' overlay 'content' fields MUST be extremely concise (2-3 words maximum). Do NOT summarize the whole story; instead, capture the 'feeling' or 'vibe' of that specific moment.\n\n"
-            f"SYSTEM GUIDELINES AND SCHEMA:\n{guidelines}\n\n"
-            f"STORY AND SCENE REQUIREMENTS:\n{story}\n\n"
-            f"WORD-LEVEL TIMESTAMPS (FRAMES @ 30FPS):\n{timestamp_context or 'No timestamps provided.'}\n\n"
-            "3. CONTENT ACCURACY & SYNC:\n"
-            "   - CRITICAL AUDIO SYNC: You MUST use the provided frame-based timestamps from timestamp.txt for 'start' and 'duration' of EVERY overlay. This is mandatory for professional audio synchronization.\n"
-            "   - Use the story as a reference to pick the most impactful 2-3 words for the 'text' overlays.\n\n"
-            "TASK:\nGenerate the complete JSON manifest. Ensure Bengali text is used where appropriate. "
-            "Return ONLY the raw JSON object. No markdown, no preamble, no commentary."
+            "You are a world-class Motion Graphics Director. Generate an ULTRA MODERN cinematic JSON manifest.\n\n"
+            "CRITICAL TIMING & CANVAS RULES:\n"
+            "1. Each scene's 'duration_in_frames' MUST exactly match the background video duration (approx 150-180 frames).\n"
+            "2. Visual overlays MUST enter and exit within these bounds. Sync them with the provided word-level timestamps.\n"
+            "3. CANVAS SAFETY: Position {x: 960, y: 540} is center. Content MUST stay within X: [200, 1720] and Y: [150, 930].\n\n"
+            "4. PROFESSIONAL CINEMATOGRAPHY:\n"
+            "   - Use 'slow_push' or 'ken_burns' presets.\n"
+            "   - Shot 'inDuration' should be 30-45 frames. Ensure 45-60 frames of resting time.\n\n"
+            "5. POLISH:\n"
+            "   - MANDATORY VIDEO BACKGROUNDS: 'background_type': 'video'. Path: 'renders/scene_SC_##.mp4'.\n"
+            "   - MANDATORY AUDIO: 'audio_enabled': true.\n"
+            "   - SHAKE OFF: 'camera.shake.enabled': false.\n"
+            "   - BENGALI: 'splitMode': 'word'. Use script-appropriate fonts.\n"
+            f"   - DETECTED FONTS: {local_fonts}\n\n"
+            f"SYSTEM GUIDELINES:\n{guidelines}\n\n"
+            f"STORY REQUIREMENTS:\n{story}\n\n"
+            f"WORD-LEVEL TIMESTAMPS:\n{timestamp_context or 'No timestamps.'}\n\n"
+            "TASK: Generate the complete JSON manifest. Return ONLY raw JSON."
         )
 
-        # Save the prompt to a file if requested
         if prompt_output_path:
             os.makedirs(os.path.dirname(prompt_output_path), exist_ok=True)
-            with open(prompt_output_path, 'w', encoding='utf-8') as f:
-                f.write(full_prompt)
-            print(f"📝 Prompt saved to: {prompt_output_path}")
+            with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
 
         raw_output = self._interact_with_gemini(full_prompt)
-        print(f"✅ Response received (Length: {len(raw_output)}).")
+        print(f"✅ Response received ({len(raw_output)}).")
 
         try:
-            # Robust JSON extraction
-            # 1. Try to find content between the first { and the last }
             start_idx = raw_output.find('{')
             end_idx = raw_output.rfind('}')
-
             if start_idx != -1 and end_idx != -1:
                 json_str = raw_output[start_idx:end_idx+1]
-                try:
-                    return json.loads(json_str)
-                except json.JSONDecodeError:
-                    # 2. Try deep cleaning markdown and comments if simple extraction fails
-                    cleaned = json_str
-                    # Remove trailing commas that break json.loads
-                    cleaned = re.sub(r',\s*}', '}', cleaned)
+                try: return json.loads(json_str)
+                except:
+                    cleaned = re.sub(r',\s*}', '}', json_str)
                     cleaned = re.sub(r',\s*\]', ']', cleaned)
-                    cleaned = re.sub(r'//.*$', '', cleaned, flags=re.MULTILINE) # Remove single line comments
-                    cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL) # Remove block comments
-                    try:
-                        return json.loads(cleaned)
-                    except:
-                        pass
-
-            # 3. Fallback to regex if indices failed or were messy
-            json_match = re.search(r'(\{.*\})', raw_output, re.DOTALL)
-            if json_match:
-                try:
-                    return json.loads(json_match.group(1))
-                except json.JSONDecodeError:
-                    cleaned = json_match.group(1).strip()
-                    cleaned = re.sub(r'^```json\s*', '', cleaned)
-                    cleaned = re.sub(r'^```\s*', '', cleaned)
-                    cleaned = re.sub(r'\s*```$', '', cleaned)
+                    cleaned = re.sub(r'//.*$', '', cleaned, flags=re.MULTILINE)
+                    cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL)
                     return json.loads(cleaned)
-
-            # 4. Final attempt: the raw output stripped
             return json.loads(raw_output.strip())
-
-        finally:
-            pass
+        except Exception as e:
+            print(f"❌ Extraction error: {e}")
+            return {}
 
 def main():
-    parser = argparse.ArgumentParser(description="Counterism Studio V4 JSON Maker (Playwright Gemini Edition)")
-    parser.add_argument("--story", help="The story or topic for the video")
-    parser.add_argument("--story-file", help="Path to a text file containing the story/topic")
-    parser.add_argument("--output", required=True, help="Path to save remotion_render.json")
-    parser.add_argument("--timestamp-output", help="Path to save word-level timestamps")
-    parser.add_argument("--prompt-output", help="Path to save the generated prompt (remotion_prompt.txt)")
-    parser.add_argument("--user-data-dir", help="Path to Chromium user data directory for persistent session")
-    parser.add_argument("--no-headless", action="store_false", dest="headless", help="Run browser in non-headless mode")
-    parser.add_argument("--drive-prompt", help="Path to the guideline_prompt.txt on Google Drive")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--story", help="Story text")
+    parser.add_argument("--story-file", help="Path to story text")
+    parser.add_argument("--output", required=True, help="Manifest output path")
+    parser.add_argument("--timestamp-output", help="Timestamp output path")
+    parser.add_argument("--prompt-output", help="Prompt output path")
+    parser.add_argument("--user-data-dir", help="Chrome data dir")
+    parser.add_argument("--no-headless", action="store_false", dest="headless")
+    parser.add_argument("--drive-prompt", help="Guideline prompt path")
     parser.set_defaults(headless=True)
-
     args = parser.parse_args()
 
-    # Determine the story source
     story = args.story
     if args.story_file and os.path.exists(args.story_file):
-        with open(args.story_file, 'r', encoding='utf-8') as f:
-            story = f.read()
-
-    if not story:
-        print("❌ Error: No story provided. Use --story or --story-file.")
-        exit(1)
+        with open(args.story_file, 'r', encoding='utf-8') as f: story = f.read()
+    if not story: exit(1)
 
     maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, headless=args.headless)
+    guidelines = maker.load_guidelines("../guideline.md", "../guideline_prompt.txt", args.drive_prompt)
 
-    # Paths (relative to the remotion_jsonMaker folder)
-    local_guideline = "../guideline.md"
-    local_prompt = "../guideline_prompt.txt"
-    drive_prompt = args.drive_prompt
-
-    print("📋 Loading guidelines and context...")
-    guidelines = maker.load_guidelines(local_guideline, local_prompt, drive_prompt)
-
-    print(f"✨ Generating JSON for story via Gemini...")
     try:
-        # Step 1: Generate word-level timestamps if requested
-        timestamp_content = None
+        ts_content = None
         if args.timestamp_output:
-            timestamp_content = maker.generate_word_timestamps(story)
+            ts_content = maker.generate_word_timestamps(story)
             os.makedirs(os.path.dirname(args.timestamp_output), exist_ok=True)
-            with open(args.timestamp_output, 'w', encoding='utf-8') as f:
-                f.write(timestamp_content)
-            print(f"✅ Timestamps saved to: {args.timestamp_output}")
+            with open(args.timestamp_output, 'w', encoding='utf-8') as f: f.write(ts_content)
 
-        # Step 2: Generate Manifest with timestamp context
-        render_json = maker.generate(story, guidelines, prompt_output_path=args.prompt_output, timestamp_context=timestamp_content)
-
-        # Cleanup browser
+        render_json = maker.generate(story, guidelines, args.prompt_output, ts_content)
         maker.stop_browser()
-
-        print("🛠️  Performing final frame-accurate duration synchronization...")
         render_json = maker.finalize_json_durations(render_json)
 
-        # Inject SFX manifest if available
         sfx_manifest_path = os.path.join(os.path.dirname(args.output), "../renders/audios/timestamp_audio.txt")
         if os.path.exists(sfx_manifest_path):
-            try:
-                with open(sfx_manifest_path, 'r', encoding='utf-8') as sf:
-                    render_json['audio_sfx_manifest'] = json.load(sf)
-                print("🎵 Injected SFX manifest into master JSON.")
-            except:
-                print("⚠️  Could not load SFX manifest for injection.")
+            with open(sfx_manifest_path, 'r', encoding='utf-8') as sf:
+                render_json['audio_sfx_manifest'] = json.load(sf)
 
         os.makedirs(os.path.dirname(args.output), exist_ok=True)
         with open(args.output, 'w', encoding='utf-8') as f:
             json.dump(render_json, f, indent=2, ensure_ascii=False)
-
-        print(f"✅ Master JSON created successfully at: {args.output}")
+        print(f"✅ Master JSON created: {args.output}")
     except Exception as e:
-        print(f"❌ Error during generation: {e}")
+        print(f"❌ Error: {e}")
         exit(1)
 
 if __name__ == "__main__":
