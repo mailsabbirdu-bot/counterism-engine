@@ -27,6 +27,7 @@ class AudioManifestGenerator:
             self.context = self.browser.new_context()
         self.page = self.context.new_page()
         playwright_stealth.Stealth().apply_stealth_sync(self.page)
+        print("🌐 Navigating to Gemini for Audio Orchestration...")
         self.page.goto("https://gemini.google.com/app", wait_until="networkidle", timeout=60000)
 
     def stop_browser(self):
@@ -110,25 +111,48 @@ class AudioManifestGenerator:
     def download_sfx(self, sfx_plan, output_dir):
         os.makedirs(output_dir, exist_ok=True)
         timestamp_entries = []
-        # Modern yt-dlp config to bypass bot detection
+        # Enhanced yt-dlp config to bypass bot detection/sign-in
+        # Use multiple player clients and additional bypass args
         base_cmd = [
             "yt-dlp", "--extract-audio", "--audio-format", "mp3",
-            "--no-check-certificates", "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "--prefer-free-formats", "--limit-rate", "1M"
+            "--no-check-certificates",
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "--extractor-args", "youtube:player_client=android,web",
+            "--prefer-free-formats", "--limit-rate", "1M",
+            "--geo-bypass", "--no-warnings"
         ]
 
         for i, item in enumerate(sfx_plan):
-            filename = f"sfx_{item['scene_id']}_{i:02d}_{re.sub(r'[^a-z0-9]', '_', item.get('label', 'sfx').lower())}.mp3"
+            clean_label = re.sub(r'[^a-z0-9]', '_', item.get('label', 'sfx').lower())
+            filename = f"sfx_{item['scene_id']}_{i:02d}_{clean_label}.mp3"
             filepath = os.path.join(output_dir, filename)
+
             print(f"🔍 Searching: {item['query']}")
-            cmd = base_cmd + ["--output", filepath, f"ytsearch1:{item['query']}"]
+            # Use a slightly broader search to avoid specific sign-in wall videos
+            search_query = f"ytsearch1:{item['query']} royalty free"
+            cmd = base_cmd + ["--output", filepath, search_query]
+
             try:
-                subprocess.run(cmd, check=True, timeout=180)
+                # Add check for existing file to avoid redundant downloads
+                if os.path.exists(filepath):
+                    print(f"✅ Already exists: {filename}")
+                else:
+                    subprocess.run(cmd, check=True, timeout=180)
+                    print(f"✅ Saved to {filename}")
+
                 timestamp_entries.append({
                     "scene_id": item['scene_id'], "file": filename,
                     "start": item['start_frame'], "end": item['end_frame'], "volume": item['volume']
                 })
-            except Exception as e: print(f"❌ Failed: {e}")
+            except Exception as e:
+                print(f"❌ Failed download: {e}")
+                # We still add it to the manifest so the engine knows it was intended,
+                # but the file will just be missing during render (handled by AudioEngine)
+                timestamp_entries.append({
+                    "scene_id": item['scene_id'], "file": filename,
+                    "start": item['start_frame'], "end": item['end_frame'], "volume": item['volume'],
+                    "status": "failed"
+                })
         return timestamp_entries
 
 def main():
@@ -138,16 +162,23 @@ def main():
     parser.add_argument("--user-data-dir")
     args = parser.parse_args()
 
+    if not os.path.exists(args.manifest_file):
+        print(f"❌ Manifest not found: {args.manifest_file}")
+        return
+
     with open(args.manifest_file, 'r', encoding='utf-8') as f: manifest_json = json.load(f)
     generator = AudioManifestGenerator(user_data_dir=args.user_data_dir)
     try:
         sfx_plan = generator.generate_sfx_plan(manifest_json)
         ts_audio = generator.download_sfx(sfx_plan, args.output_dir)
+
         with open(os.path.join(args.output_dir, "timestamp_audio.txt"), 'w') as f:
             json.dump(ts_audio, f, indent=2)
+
         manifest_json['audio_sfx_manifest'] = ts_audio
         with open(args.manifest_file, 'w', encoding='utf-8') as f:
             json.dump(manifest_json, f, indent=2, ensure_ascii=False)
+        print(f"✅ Master JSON updated with SFX manifest.")
     finally: generator.stop_browser()
 
 if __name__ == "__main__": main()
