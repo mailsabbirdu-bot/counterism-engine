@@ -4,6 +4,7 @@ import { OverlayManager } from './OverlayManager';
 import { ProceduralBackground } from './engines/ProceduralBackground';
 import { CameraEngine } from './engines/CameraEngine';
 import { resolveAsset } from './lib/resolveAsset';
+import { AudioEngine } from './engines/AudioEngine';
 
 export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
   const { durationInFrames } = useVideoConfig();
@@ -54,6 +55,7 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
 
   return (
     <AbsoluteFill className="bg-black">
+      <AudioEngine sceneId={sceneData.scene_id} />
       <CameraEngine
         config={sceneData.camera}
         overlays={sceneData.overlays || []}

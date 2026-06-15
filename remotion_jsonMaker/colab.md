@@ -53,16 +53,21 @@ print_banner("🔗 LINKING DRIVE ASSETS")
 # Ensure public directories exist
 !mkdir -p public/renders
 !mkdir -p public/fonts
+!mkdir -p public/renders/audios
 
 # Use robust symlinking for directories
 !ln -sfn {DRIVE_BASE_PATH}/renders public/renders/drive_renders
 !ln -sfn {DRIVE_BASE_PATH}/fonts public/fonts/drive_fonts
+!ln -sfn {DRIVE_BASE_PATH}/renders/audios public/renders/audios/drive_audios
 
 # Deep link all files to ensure visibility during bundling
 print("Linking individual font files...")
 !find {DRIVE_BASE_PATH}/fonts -maxdepth 2 -type f -exec ln -sf '{{}}' public/fonts/ ';' 2>/dev/null
 print("Linking individual render files...")
-!find {DRIVE_BASE_PATH}/renders -maxdepth 2 -type f -exec ln -sf '{{}}' public/renders/ ';' 2>/dev/null
+# Exclude audios folder from direct render linking to preserve structure
+!find {DRIVE_BASE_PATH}/renders -maxdepth 1 -type f -exec ln -sf '{{}}' public/renders/ ';' 2>/dev/null
+print("Linking audio SFX files...")
+!find {DRIVE_BASE_PATH}/renders/audios -maxdepth 2 -type f -exec ln -sf '{{}}' public/renders/audios/ ';' 2>/dev/null
 
 print("✅ Drive assets linked to public folder.")
 
@@ -70,6 +75,7 @@ print("✅ Drive assets linked to public folder.")
 
 print_banner("🛠️ INSTALLING PLAYWRIGHT STACK")
 !pip install -r requirements.txt
+!pip install yt-dlp
 !playwright install chromium
 !playwright install-deps chromium
 
@@ -83,7 +89,7 @@ else:
     print(f"Please ensure your story and durations are in 'story.txt' inside: {DRIVE_BASE_PATH}/audio/")
     sys.exit("Input story file missing.")
 
-# 4. Generate Master JSON
+# 4. Generate Master JSON & Audio SFX
 print_banner("🧠 GEMINI BROWSER AUTOMATION")
 print("🚀 Using Playwright to interact with Gemini. This may take a few minutes.")
 
@@ -96,6 +102,15 @@ print("🚀 Using Playwright to interact with Gemini. This may take a few minute
     --timestamp-output="{TIMESTAMP_FILE}" \
     --prompt-output="{PROMPT_FILE}" \
     --drive-prompt="{PROJECT_PATH}/guideline_prompt.txt" \
+    --user-data-dir="{USER_DATA_DIR}"
+
+print_banner("🎵 GENERATING AUDIO SFX")
+# Generate SFX Plan and Download
+SFX_DIR = f"{DRIVE_BASE_PATH}/renders/audios"
+!xvfb-run python audio_generator.py \
+    --story-file="{STORY_FILE}" \
+    --timestamp-file="{TIMESTAMP_FILE}" \
+    --output-dir="{SFX_DIR}" \
     --user-data-dir="{USER_DATA_DIR}"
 
 print_banner("🏁 PROCESS FINISHED")
