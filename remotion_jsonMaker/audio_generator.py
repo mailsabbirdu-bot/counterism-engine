@@ -83,26 +83,52 @@ class AudioManifestGenerator:
         except Exception as e:
             return f"Error: {e}"
 
-    def generate_sfx_plan(self, story, timestamps):
+    def generate_sfx_plan(self, manifest_json):
+        # Extract essential info from manifest for the designer
+        simplified_manifest = []
+        for scene in manifest_json.get('scenes', []):
+            scene_info = {
+                "scene_id": scene['scene_id'],
+                "duration_in_frames": scene['duration_in_frames'],
+                "overlays": []
+            }
+            for ov in scene.get('overlays', []):
+                scene_info['overlays'].append({
+                    "id": ov['id'],
+                    "type": ov['type'],
+                    "start": ov['start'],
+                    "duration": ov['duration'],
+                    "animation": ov.get('animation')
+                })
+            simplified_manifest.append(scene_info)
+
         prompt = (
-            f"You are a Professional Sound Designer for cinematic videos. "
-            f"Below is the story and timestamps (frames @ 30fps).\n\n"
-            f"STORY:\n{story}\n\n"
-            f"TIMESTAMPS:\n{timestamps}\n\n"
+            f"You are a Professional Cinematic Sound Designer. Below is a Remotion Video Manifest JSON structure.\n\n"
+            f"MANIFEST:\n{json.dumps(simplified_manifest, indent=2)}\n\n"
             "TASK:\n"
-            "1. Identify key moments for sound effects (SFX).\n"
-            "2. For each SFX, provide:\n"
-            "   - Scene ID (SCENE_XX)\n"
-            "   - Start and End Frame.\n"
-            "   - A YouTube search query for a non-copyright version of this sound.\n"
-            "   - Suggested volume (0.0 to 1.0).\n\n"
-            "RETURN ONLY A RAW JSON LIST OF OBJECTS:\n"
-            '[ { "scene_id": "SCENE_01", "start_frame": 10, "end_frame": 40, "query": "digital glich sfx", "volume": 0.4, "label": "glitch" } ]'
+            "Identify EVERY visual entrance and exit in the manifest and assign a high-quality sound effect (SFX).\n\n"
+            "RULES:\n"
+            "1. PRIORITY: Sound effects MUST be precisely synced with the 'start' and 'duration' of the overlays.\n"
+            "2. TYPE-SPECIFIC SOUNDS:\n"
+            "   - 'text' with 'slideUp' or 'cinematicGlow' -> Needs a 'cinematic transition whoosh' or 'ethereal swell'.\n"
+            "   - 'chart' or 'data_indicator' -> Needs 'digital computer typing', 'high-tech UI glitch', or 'data processing' sounds.\n"
+            "   - Camera movements/transitions -> Needs 'deep cinematic bass drop' or 'riser'.\n"
+            "3. UNIQUE SELECTION: Do not repeat the same sound too often. Use variants.\n\n"
+            "RETURN ONLY A RAW JSON LIST OF SFX OBJECTS:\n"
+            '[ { "scene_id": "SCENE_01", "start_frame": 10, "end_frame": 40, "query": "high tech digital glitch sound effect no copyright", "volume": 0.4, "label": "data_reveal" }, ... ]'
         )
+
         raw_output = self._interact_with_gemini(prompt)
         json_match = re.search(r'\[.*\]', raw_output, re.DOTALL)
         if json_match:
-            return json.loads(json_match.group(0))
+            try:
+                # Clean possible trailing commas or markdown
+                cleaned = json_match.group(0)
+                cleaned = re.sub(r',\s*}', '}', cleaned)
+                cleaned = re.sub(r',\s*\]', ']', cleaned)
+                return json.loads(cleaned)
+            except:
+                pass
         return []
 
     def download_sfx(self, sfx_plan, output_dir):
@@ -111,7 +137,7 @@ class AudioManifestGenerator:
 
         print(f"📥 Processing {len(sfx_plan)} SFX downloads via yt-dlp...")
         for i, item in enumerate(sfx_plan):
-            clean_label = re.sub(r'[^a-z0-9]', '_', item['label'].lower())
+            clean_label = re.sub(r'[^a-z0-9]', '_', item.get('label', 'sfx').lower())
             filename = f"sfx_{item['scene_id']}_{i:02d}_{clean_label}.mp3"
             filepath = os.path.join(output_dir, filename)
 
@@ -138,24 +164,34 @@ class AudioManifestGenerator:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--story-file", required=True)
-    parser.add_argument("--timestamp-file", required=True)
-    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--manifest-file", required=True, help="Path to remotion_render.json")
+    parser.add_argument("--output-dir", required=True, help="Folder to download SFX into")
     parser.add_argument("--user-data-dir")
     args = parser.parse_args()
 
-    with open(args.story_file, 'r') as f: story = f.read()
-    with open(args.timestamp_file, 'r') as f: timestamps = f.read()
+    if not os.path.exists(args.manifest_file):
+        print(f"❌ Manifest not found: {args.manifest_file}")
+        return
+
+    with open(args.manifest_file, 'r', encoding='utf-8') as f:
+        manifest_json = json.load(f)
 
     generator = AudioManifestGenerator(user_data_dir=args.user_data_dir)
     try:
-        sfx_plan = generator.generate_sfx_plan(story, timestamps)
+        sfx_plan = generator.generate_sfx_plan(manifest_json)
         timestamp_audio_data = generator.download_sfx(sfx_plan, args.output_dir)
 
         manifest_path = os.path.join(args.output_dir, "timestamp_audio.txt")
-        with open(manifest_path, 'w') as f:
+        with open(manifest_path, 'w', encoding='utf-8') as f:
             f.write(json.dumps(timestamp_audio_data, indent=2))
         print(f"🎉 Final audio manifest created at {manifest_path}")
+
+        # Post-process: Update manifest with audio data for injection
+        manifest_json['audio_sfx_manifest'] = timestamp_audio_data
+        with open(args.manifest_file, 'w', encoding='utf-8') as f:
+            json.dump(manifest_json, f, indent=2, ensure_ascii=False)
+        print(f"✅ Updated {args.manifest_file} with injected SFX manifest.")
+
     finally:
         generator.stop_browser()
 

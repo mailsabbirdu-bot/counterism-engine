@@ -112,11 +112,10 @@ print("🚀 Using Playwright to interact with Gemini. This may take a few minute
     --user-data-dir="{USER_DATA_DIR}"
 
 print_banner("🎵 GENERATING AUDIO SFX")
-# Generate SFX Plan and Download
+# Generate SFX Plan based on the Manifest and Download
 SFX_DIR = f"{DRIVE_BASE_PATH}/renders/audios"
 !xvfb-run python audio_generator.py \
-    --story-file="{STORY_FILE}" \
-    --timestamp-file="{TIMESTAMP_FILE}" \
+    --manifest-file="{OUTPUT_JSON}" \
     --output-dir="{SFX_DIR}" \
     --user-data-dir="{USER_DATA_DIR}"
 
