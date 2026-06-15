@@ -42,10 +42,6 @@ export const AudioEngine: React.FC<{ sceneId: string }> = ({ sceneId }) => {
     entry.scene_id === sceneId && entry.status !== 'failed'
   );
 
-  if (sceneSfx.length > 0) {
-      console.log(`[AudioEngine] Playing ${sceneSfx.length} SFX for ${sceneId}`);
-  }
-
   return (
     <>
       {sceneSfx.map((sfx, i) => (
@@ -53,8 +49,8 @@ export const AudioEngine: React.FC<{ sceneId: string }> = ({ sceneId }) => {
           <Audio
             src={staticFile(`renders/audios/${sfx.file}`)}
             volume={sfx.volume}
-            // Defensive error handling for missing files
-            onError={(e) => console.warn(`[AudioEngine] Failed to play SFX: ${sfx.file}`, e)}
+            // Mute error to keep terminal output clean
+            onError={() => {}}
           />
         </Sequence>
       ))}
