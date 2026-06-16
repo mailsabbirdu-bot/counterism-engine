@@ -98,7 +98,6 @@ class RemotionJsonMaker:
         return guidelines
 
     def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
-        """Ensures frame-accurate duration and strictly clamps coordinates."""
         if not data or not data.get('scenes'): return data
         data['global_settings'] = { "width": 1920, "height": 1080, "fps": 30 }
         for scene in data['scenes']:
@@ -108,26 +107,26 @@ class RemotionJsonMaker:
                 if os.path.exists(abs_vpath):
                     duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
                     if duration_sec > 0:
-                        scene_duration = max(180, int(round(duration_sec * 30)))
+                        # Absolute target: exactly duration * 30
+                        scene_duration = int(round(duration_sec * 30))
                         scene['duration_in_frames'] = scene_duration
 
             if scene.get('overlays'):
                 for i, ov in enumerate(scene['overlays']):
-                    # Aggressive Coordinate Clamping (Safe Zone)
                     if ov.get('position'):
+                        # Tight coordinate safe zone (Safe Area cluster)
                         x, y = int(ov['position'].get('x', 960)), int(ov['position'].get('y', 540))
                         ov['position']['x'] = max(350, min(1570, x))
                         ov['position']['y'] = max(300, min(780, y))
                     else: ov['position'] = {"x": 960, "y": 540}
 
-                    # Nudge Logic: Prevent overlap between adjacent overlays
+                    # Prevent overlap (Nudge)
                     if i > 0:
                         prev = scene['overlays'][i-1]
                         if prev.get('position') and ov.get('position'):
-                            if abs(ov['position']['x'] - prev['position']['x']) < 300 and abs(ov['position']['y'] - prev['position']['y']) < 200:
-                                ov['position']['y'] += 250 # Push down if too close
+                            if abs(ov['position']['x'] - prev['position']['x']) < 350 and abs(ov['position']['y'] - prev['position']['y']) < 250:
+                                ov['position']['y'] += 300 # Push down significantly
 
-                    # Timing Integrity
                     if ov.get('start', 0) >= scene_duration: ov['start'] = max(0, scene_duration - 60)
                     if ov.get('start', 0) + ov.get('duration', 60) > scene_duration: ov['duration'] = scene_duration - ov.get('start', 0)
                     if ov.get('duration', 0) < 60: ov['duration'] = 60
@@ -179,7 +178,6 @@ class RemotionJsonMaker:
                     if current_text and current_text == last_text:
                         stable_count += 1
                         if stable_count >= 5:
-                            print(f"✅  Received ({len(current_text)} characters).")
                             if len(current_text) > 100: return current_text
                             break
                     else:
@@ -200,12 +198,12 @@ class RemotionJsonMaker:
         full_prompt = (
             "You are a world-class Motion Graphics Director. Generate an ULTRA MODERN cinematic JSON manifest.\n\n"
             "CRITICAL RULES:\n"
-            "1. TIMING: Every scene duration MUST be at least 180 frames (6s). Visuals MUST enter and exit within these bounds, synced with word-level timestamps.\n"
-            "2. CANVAS SAFETY & OVERLAP: Position {x: 960, y: 540} is center. Content MUST stay within X: [350, 1570] and Y: [300, 780]. "
+            "1. TIMING: Every scene duration MUST match its video duration (calculated at 30fps). Sync visuals with word-level timestamps.\n"
+            "2. CANVAS SAFETY & OVERLAP: Center is {x: 960, y: 540}. Content MUST stay within X: [350, 1570] and Y: [300, 780]. "
             "TEXT AND CHART LAYERS MUST NEVER OVERLAP; space them out properly.\n"
-            "3. CINEMATOGRAPHY: Use 'slow_push' or 'ken_burns'. 45-60 frames of resting time. IMPORTANT: If camera zooms in (zoom > 1.2), cluster overlays toward center.\n"
-            "4. TEXT POLICY: 'text' overlay 'content' MUST BE STRICTLY 2-3 words. Capture the VIBE. No summaries.\n"
-            "5. NIVO: ALL nivo layers should start at frame 0 (zero-state). NO REPETITION of nivo elements across scenes.\n"
+            "3. CINEMATOGRAPHY: Use 'slow_push' or 'ken_burns'. 45-60 frames of resting time per focal element. IMPORTANT: Clustered overlays must be close to camera targets.\n"
+            "4. TEXT CONCISION: 'text' overlay 'content' MUST BE STRICTLY 2-3 words. Capture the VIBE. No summaries.\n"
+            "5. NIVO: ALL nivo layers should start at frame 0 (empty state) relative to their 'start'. NO REPETITION of nivo elements across scenes.\n"
             "6. MANDATORY: 'background_type': 'video', 'audio_enabled': true, 'camera.shake.enabled': false.\n"
             "7. SCRIPTS: For Bengali, ALWAYS use 'splitMode': 'word'.\n"
             f"8. DETECTED FONTS: {local_fonts}\n\n"
@@ -262,5 +260,4 @@ def main():
     except Exception as e:
         print(f"❌ Error: {e}")
         exit(1)
-
 if __name__ == "__main__": main()

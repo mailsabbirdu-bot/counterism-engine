@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Audio, staticFile, Sequence, getInputProps } from 'remotion';
+import { Audio, Sequence, getInputProps } from 'remotion';
+import { resolveAsset } from '../lib/resolveAsset';
 
 interface AudioEntry {
   scene_id: string;
@@ -16,23 +17,20 @@ export const AudioEngine: React.FC<{ sceneId: string }> = ({ sceneId }) => {
   const template = props?.scenes ? props : (props?.templateData || {});
 
   useEffect(() => {
-    // 1. Try to get manifest from injected props (fastest & reliable)
     if (template?.audio_sfx_manifest) {
         setAudioManifest(template.audio_sfx_manifest);
         return;
     }
 
-    // 2. Fallback: Attempt to fetch the manifest from the public folder
     const fetchManifest = async () => {
       try {
-        const response = await fetch(staticFile('renders/audios/timestamp_audio.txt'));
+        const url = resolveAsset('renders/audios/timestamp_audio.txt');
+        const response = await fetch(url);
         if (response.ok) {
           const data = await response.json();
           setAudioManifest(data);
         }
-      } catch (e) {
-        // No SFX manifest found, which is fine
-      }
+      } catch (e) {}
     };
 
     fetchManifest();
@@ -47,9 +45,9 @@ export const AudioEngine: React.FC<{ sceneId: string }> = ({ sceneId }) => {
       {sceneSfx.map((sfx, i) => (
         <Sequence from={sfx.start} durationInFrames={Math.max(1, sfx.end - sfx.start)} key={`${sfx.file}-${i}`}>
           <Audio
-            src={staticFile(`renders/audios/${sfx.file}`)}
+            src={resolveAsset(`renders/audios/${sfx.file}`)}
             volume={sfx.volume}
-            // Mute error to keep terminal output clean
+            // Mute error to prevent render crash on 404
             onError={() => {}}
           />
         </Sequence>

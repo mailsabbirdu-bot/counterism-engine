@@ -77,16 +77,16 @@ class AudioManifestGenerator:
                 scene_info['overlays'].append({ "id": ov['id'], "type": ov['type'], "start": ov['start'], "duration": ov['duration'], "animation": ov.get('animation') })
             simplified.append(scene_info)
         prompt = (
-            f"You are a Professional Sound Designer. DESIGN sound effects ONLY for layer transitions.\n\n"
+            f"You are a Professional Sound Designer. DESIGN sound effects ONLY for visual layer transitions.\n\n"
             f"MANIFEST:\n{json.dumps(simplified, indent=2)}\n\n"
             "TASK: Assign a unique SFX query for EVERY entrance and exit.\n"
             "CRITICAL RULES:\n"
-            "1. NO BACKGROUND SOUNDS: Absolutely NO city ambience, wind, or continuous noise. SFX must be short and layer-specific.\n"
+            "1. NO BACKGROUND SOUNDS: Absolutely NO city ambience, wind, or continuous noise. SFX must be short (< 2s) and layer-specific.\n"
             "2. LAYER TRANSITIONS: Focus on 'start' and 'duration' offsets.\n"
-            "3. NO TYPEWRITING: Strictly forbid typewriting sounds. Use 'cinematic whoosh', 'digital blip', or 'tech reveal'.\n"
+            "3. NO TYPEWRITING: Strictly forbid typewriting sounds. Use 'cinematic transition swell', 'digital pop', or 'tech reveal'.\n"
             "4. UNIQUE & ROYALTY FREE: Query MUST end with 'royalty free'.\n"
             "RETURN ONLY RAW JSON LIST:\n"
-            '[ { "scene_id": "SCENE_01", "start_frame": 10, "end_frame": 40, "query": "cinematic transition swell", "volume": 0.5, "label": "layer_in" } ]'
+            '[ { "scene_id": "SCENE_01", "start_frame": 10, "end_frame": 40, "query": "digital pop reveal", "volume": 0.5, "label": "layer_in" } ]'
         )
         raw = self._interact_with_gemini(prompt)
         match = re.search(r'\[.*\]', raw, re.DOTALL)
@@ -101,12 +101,11 @@ class AudioManifestGenerator:
     def download_sfx(self, sfx_plan, output_dir):
         os.makedirs(output_dir, exist_ok=True)
         timestamp_entries = []
-        # Absolute best bypass strategy: use IOS client + android client + desktop fallback
-        # and ignore errors to keep pipeline moving.
-        clients = ["ios", "android", "web"]
+        clients = ["android", "web"]
 
         for i, item in enumerate(sfx_plan):
-            filename = f"sfx_{item['scene_id']}_{i:02d}_{re.sub(r'[^a-z0-9]', '_', item.get('label', 'sfx').lower())}.mp3"
+            clean_label = re.sub(r'[^a-z0-9]', '_', item.get('label', 'sfx').lower())
+            filename = f"sfx_{item['scene_id']}_{i:02d}_{clean_label}.mp3"
             filepath = os.path.join(output_dir, filename)
 
             if os.path.exists(filepath):
@@ -114,25 +113,30 @@ class AudioManifestGenerator:
                 continue
 
             success = False
-            for client in clients:
-                print(f"🔍 [Client: {client}] Searching: {item['query']}")
-                cmd = [
-                    "yt-dlp", "--extract-audio", "--audio-format", "mp3",
-                    "--no-check-certificates", "--geo-bypass", "--no-warnings",
-                    "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-                    "--extractor-args", f"youtube:player_client={client}",
-                    "--output", filepath, f"ytsearch1:{item['query']} royalty free"
-                ]
-                try:
-                    subprocess.run(cmd, check=True, timeout=120)
-                    success = True
-                    break
-                except: continue
+            # Fallback sequence: Original -> Simple -> Simplest
+            queries = [item['query'], "pop digital sound effect", "whoosh transition"]
+
+            for q in queries:
+                for client in clients:
+                    print(f"🔍 [Query: {q} | Client: {client}] Searching...")
+                    cmd = [
+                        "yt-dlp", "--extract-audio", "--audio-format", "mp3",
+                        "--no-check-certificates", "--geo-bypass", "--no-warnings",
+                        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+                        "--extractor-args", f"youtube:player_client={client}",
+                        "--output", filepath, f"ytsearch1:{q} royalty free"
+                    ]
+                    try:
+                        subprocess.run(cmd, check=True, timeout=120)
+                        if os.path.exists(filepath):
+                            success = True
+                            break
+                    except: continue
+                if success: break
 
             if success:
                 timestamp_entries.append({ "scene_id": item['scene_id'], "file": filename, "start": item['start_frame'], "end": item['end_frame'], "volume": item['volume'] })
             else:
-                print(f"⚠️ SFX skip: {filename}")
                 timestamp_entries.append({ "scene_id": item['scene_id'], "file": filename, "start": item['start_frame'], "end": item['end_frame'], "volume": item['volume'], "status": "failed" })
         return timestamp_entries
 
