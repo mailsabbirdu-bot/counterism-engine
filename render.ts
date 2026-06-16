@@ -60,6 +60,11 @@ const start = async () => {
     console.log('\n🔍 Pre-render Asset Verification:');
     let assetsMissing = false;
 
+    if (!template.scenes || !Array.isArray(template.scenes)) {
+        console.error('❌ FATAL: Template contains no scenes or "scenes" is not an array.');
+        process.exit(1);
+    }
+
     for (const scene of template.scenes) {
       console.log(`\n--- Scene: ${scene.scene_id} ---`);
 

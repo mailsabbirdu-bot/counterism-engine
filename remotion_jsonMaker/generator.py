@@ -4,7 +4,7 @@ import argparse
 import re
 import time
 import subprocess
-from typing import Dict, Any
+from typing import Dict, Any, List
 from playwright.sync_api import sync_playwright
 import playwright_stealth
 
@@ -135,8 +135,8 @@ class RemotionJsonMaker:
                         h = ov.get('height', 650) + 100
 
                     # 1. Initial Clamp
-                    ov['position']['x'] = max(350, min(1570, int(ov['position']['x'])))
-                    ov['position']['y'] = max(300, min(780, int(ov['position']['y'])))
+                    ov['position']['x'] = max(350, min(1570, int(ov['position'].get('x', 960))))
+                    ov['position']['y'] = max(300, min(780, int(ov['position'].get('y', 540))))
 
                     # 2. Collision Detection & Nudging
                     for prev_ov, prev_w, prev_h in placed_overlays:
@@ -273,19 +273,30 @@ class RemotionJsonMaker:
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
         raw_output = self._interact_with_gemini(full_prompt)
+
+        # Robust JSON extraction
         try:
-            start_idx, end_idx = raw_output.find('{'), raw_output.rfind('}')
+            json_pattern = r'\{(?:[^{}]|(?R))*\}' # This recursive pattern isn't supported by re, but let's try a simple approach
+            # Find the largest block starting with { and ending with }
+            start_idx = raw_output.find('{')
+            end_idx = raw_output.rfind('}')
             if start_idx != -1 and end_idx != -1:
                 json_str = raw_output[start_idx:end_idx+1]
-                try: return json.loads(json_str)
-                except:
-                    cleaned = re.sub(r',\s*}', '}', json_str)
+                # Basic cleaning
+                json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE) # Remove single line comments
+                json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL) # Remove multiline comments
+
+                try:
+                    return json.loads(json_str)
+                except json.JSONDecodeError:
+                    # Attempt a more aggressive clean for trailing commas
+                    cleaned = re.sub(r',\s*\}', '}', json_str)
                     cleaned = re.sub(r',\s*\]', ']', cleaned)
-                    cleaned = re.sub(r'//.*$', '', cleaned, flags=re.MULTILINE)
-                    cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL)
                     return json.loads(cleaned)
-            return json.loads(raw_output.strip())
-        except: return {}
+            return {}
+        except Exception as e:
+            print(f"❌ JSON extraction failed: {e}")
+            return {}
 
 def main():
     parser = argparse.ArgumentParser()
@@ -306,16 +317,26 @@ def main():
         ts_content = None
         if args.timestamp_output:
             ts_content = maker.generate_word_timestamps(story)
+            if not ts_content or len(ts_content) < 50:
+                 print("⚠️ Word timestamps generated are suspiciously short. Retrying once...")
+                 ts_content = maker.generate_word_timestamps(story)
             with open(args.timestamp_output, 'w', encoding='utf-8') as f: f.write(ts_content)
+
         render_json = maker.generate(story, guidelines, args.prompt_output, ts_content)
         maker.stop_browser()
+
+        if not render_json or 'scenes' not in render_json:
+             print("❌ ERROR: Gemini failed to produce a valid manifest.")
+             exit(1)
+
         render_json = maker.finalize_json_durations(render_json)
         sfx_path = os.path.join(os.path.dirname(args.output), "../renders/audios/timestamp_audio.txt")
         if os.path.exists(sfx_path):
             with open(sfx_path, 'r', encoding='utf-8') as sf: render_json['audio_sfx_manifest'] = json.load(sf)
+
         with open(args.output, 'w', encoding='utf-8') as f: json.dump(render_json, f, indent=2, ensure_ascii=False)
         print(f"✅ Master JSON created: {args.output}")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Error in main: {e}")
         exit(1)
 if __name__ == "__main__": main()
