@@ -101,7 +101,6 @@ class RemotionJsonMaker:
         if not data or not data.get('scenes'): return data
         data['global_settings'] = { "width": 1920, "height": 1080, "fps": 30 }
 
-        # Super conservative sizes to prevent any bleed
         TYPE_SIZES = {
             'text': (1300, 350),
             'chart': (1500, 850),
@@ -134,7 +133,6 @@ class RemotionJsonMaker:
                         w = ov.get('width', 1000) + 200
                         h = ov.get('height', 650) + 200
 
-                    # Stricter margin
                     margin = 120
                     x_min, x_max = w/2 + margin, 1920 - w/2 - margin
                     y_min, y_max = h/2 + margin, 1080 - h/2 - margin
@@ -194,7 +192,6 @@ class RemotionJsonMaker:
             self.start_browser()
             page = self.page
             try:
-                # Track current message count
                 response_selectors = ["message-content", ".markdown.message-content", ".model-response-text", "[data-message-author-role='assistant']"]
                 def get_msg_count():
                     for sel in response_selectors:
@@ -203,7 +200,7 @@ class RemotionJsonMaker:
                     return 0
 
                 initial_count = get_msg_count()
-                print(f"⌨️  Initial message count: {initial_count}")
+                print(f"⌨️  Attempt {attempt+1}: Initial message count: {initial_count}")
 
                 overlays = ["button[aria-label='Accept all']", "button:has-text('Accept')", "button:has-text('I agree')", "button:has-text('Got it')", "ins-close-button"]
                 for selector in overlays:
@@ -218,15 +215,15 @@ class RemotionJsonMaker:
                 page.evaluate("""() => {
                     const blockers = ['cdk-overlay-container', 'consent-dialog', 'cookie-banner'];
                     blockers.forEach(id => {
-                        const el = document.querySelector('.' + id) || document.getElementById(id);
-                        if (el) el.style.display = 'none';
+                        const elements = document.querySelectorAll('.' + id + ', #' + id);
+                        elements.forEach(el => el.style.display = 'none');
                     });
                 }""")
 
                 input_selector = "div[contenteditable='true']"
                 page.wait_for_selector(input_selector, timeout=30000)
 
-                print(f"⌨️  Sending prompt to Gemini (Attempt {attempt+1}/{retry_count+1})...")
+                print(f"⌨️  Sending prompt to Gemini...")
                 page.click(input_selector, force=True)
                 time.sleep(1)
                 page.fill(input_selector, prompt)
@@ -241,7 +238,7 @@ class RemotionJsonMaker:
                 print("⏳  Waiting for new message to appear...")
                 last_text = ""
                 stable_count = 0
-                for i in range(200):
+                for i in range(250):
                     time.sleep(2)
                     current_count = get_msg_count()
                     if current_count <= initial_count: continue

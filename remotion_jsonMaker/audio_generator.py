@@ -27,7 +27,7 @@ class AudioManifestGenerator:
             self.context = self.browser.new_context()
         self.page = self.context.new_page()
         playwright_stealth.Stealth().apply_stealth_sync(self.page)
-        print("🌐 Navigating to Gemini for Layer SFX Design...")
+        print("🌐 Navigating to Gemini for SFX Planning...")
         self.page.goto("https://gemini.google.com/app", wait_until="networkidle", timeout=60000)
 
     def stop_browser(self):
@@ -36,62 +36,88 @@ class AudioManifestGenerator:
         if self.playwright: self.playwright.stop()
         self.page = None
 
-    def _interact_with_gemini(self, prompt: str) -> str:
-        self.start_browser()
-        page = self.page
-        try:
-            response_selectors = ["message-content", ".markdown.message-content", ".model-response-text", "[data-message-author-role='assistant']"]
-            def get_msg_count():
-                for sel in response_selectors:
-                    msgs = page.query_selector_all(sel)
-                    if msgs: return len(msgs)
-                return 0
+    def _interact_with_gemini(self, prompt: str, retry_count: int = 2) -> str:
+        for attempt in range(retry_count + 1):
+            self.start_browser()
+            page = self.page
+            try:
+                response_selectors = ["message-content", ".markdown.message-content", ".model-response-text", "[data-message-author-role='assistant']"]
+                def get_msg_count():
+                    for sel in response_selectors:
+                        msgs = page.query_selector_all(sel)
+                        if msgs: return len(msgs)
+                    return 0
 
-            initial_count = get_msg_count()
+                initial_count = get_msg_count()
+                print(f"⌨️  Attempt {attempt+1}: Initial message count is {initial_count}")
 
-            # Dismiss overlays
-            for btn in ["button[aria-label='Accept all']", "button:has-text('Accept')", "button:has-text('I agree')"]:
+                # Aggressive obstruction dismissal
+                overlays = ["button[aria-label='Accept all']", "button:has-text('Accept')", "button:has-text('I agree')", "button:has-text('Got it')", "ins-close-button"]
+                for selector in overlays:
+                    try:
+                        elements = page.query_selector_all(selector)
+                        for el in elements:
+                            if el.is_visible():
+                                print(f"   Dismissing UI blocker: {selector}")
+                                el.click(force=True)
+                                time.sleep(1)
+                    except: pass
+
+                page.evaluate("""() => {
+                    const blockers = ['cdk-overlay-container', 'consent-dialog', 'cookie-banner', 'goog-consent-banner'];
+                    blockers.forEach(id => {
+                        const elements = document.querySelectorAll('.' + id + ', #' + id);
+                        elements.forEach(el => el.style.display = 'none');
+                    });
+                }""")
+
+                input_selector = "div[contenteditable='true']"
+                page.wait_for_selector(input_selector, timeout=30000)
+
+                print(f"⌨️  Sending SFX Design prompt to Gemini...")
+                page.click(input_selector, force=True)
+                time.sleep(1)
+                page.fill(input_selector, prompt)
+                time.sleep(1)
+                page.keyboard.press("Enter")
+
                 try:
-                    if page.is_visible(btn, timeout=2000):
-                        page.click(btn, force=True)
-                        time.sleep(1)
+                    btn = "button[aria-label*='Send message'], button[aria-label*='Submit']"
+                    if page.is_visible(btn, timeout=2000): page.click(btn, force=True)
                 except: pass
 
-            input_selector = "div[contenteditable='true']"
-            page.wait_for_selector(input_selector, timeout=45000)
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            print("⌨️  Sending Layer SFX Design prompt...")
-            page.click(input_selector, force=True)
-            page.fill(input_selector, prompt)
-            time.sleep(1)
-            page.keyboard.press("Enter")
+                print("⏳  Waiting for SFX plan to stabilize...")
+                last_text = ""
+                stable_count = 0
+                for i in range(250):
+                    time.sleep(2)
+                    current_count = get_msg_count()
+                    if current_count <= initial_count:
+                        if i % 10 == 0: print(f"   ...still waiting for new message ({i/2}s)")
+                        continue
 
-            try:
-                btn = "button[aria-label*='Send message'], button[aria-label*='Submit']"
-                if page.is_visible(btn, timeout=2000): page.click(btn, force=True)
-            except: pass
+                    current_text = ""
+                    for sel in response_selectors:
+                        msgs = page.query_selector_all(sel)
+                        if msgs:
+                            current_text = msgs[-1].inner_text()
+                            break
 
-            print("⏳  Waiting for new SFX plan from Gemini...")
-            last_text = ""
-            stable_count = 0
-            for i in range(150):
-                time.sleep(2)
-                if get_msg_count() <= initial_count: continue
+                    if current_text and current_text == last_text:
+                        stable_count += 1
+                        if stable_count >= 8:
+                            print(f"✨ SFX Plan received ({len(current_text)} chars).")
+                            return current_text
+                    else:
+                        stable_count = 0
+                        last_text = current_text
 
-                current_text = ""
-                for sel in response_selectors:
-                    msgs = page.query_selector_all(sel)
-                    if msgs:
-                        current_text = msgs[-1].inner_text()
-                        break
-                if current_text and current_text == last_text:
-                    stable_count += 1
-                    if stable_count >= 8: return current_text
-                else:
-                    stable_count = 0
-                    last_text = current_text
-            return last_text
-        except Exception as e: return f"Error: {e}"
+                print("🔄  Response taking too long, reloading Gemini...")
+                page.reload(wait_until="domcontentloaded")
+            except Exception as e:
+                print(f"⚠️ Error during Gemini SFX interaction: {e}")
+                page.reload(wait_until="domcontentloaded")
+        return ""
 
     def generate_sfx_plan(self, manifest_json):
         simplified = []
@@ -101,14 +127,14 @@ class AudioManifestGenerator:
                 scene_info['overlays'].append({ "id": ov['id'], "type": ov['type'], "start": ov['start'], "duration": ov['duration'], "animation": ov.get('animation') })
             simplified.append(scene_info)
         prompt = (
-            f"You are a Professional Sound Designer. DESIGN sound effects ONLY for visual layer transitions.\n\n"
+            f"You are a Professional Sci-Fi Sound Designer. DESIGN sound effects ONLY for visual layer transitions.\n\n"
             f"MANIFEST:\n{json.dumps(simplified, indent=2)}\n\n"
             "TASK: Assign a unique SFX query for EVERY entrance and exit.\n"
-            "STYLE: Sci-fi interface. Minimalist, high-tech, futuristic.\n"
+            "STYLE: Sci-fi interface. Minimalist, high-tech, futuristic, cybernetic.\n"
             "CRITICAL RULES:\n"
-            "1. LAYER TRANSITIONS ONLY: Use sounds only when layers appear or disappear.\n"
+            "1. LAYER TRANSITIONS ONLY: Use sounds only when layers appear (start) or disappear (end).\n"
             "2. SCI-FI TYPES: Use 'sci-fi digital reveal', 'hologram interface ping', 'cyberpunk whoosh', 'futuristic data surge'.\n"
-            "3. NO BACKGROUND SOUNDS: Absolutely NO city ambience, wind, or continuous noise.\n"
+            "3. NO BACKGROUND SOUNDS: Absolutely NO city ambience, wind, music or continuous noise.\n"
             "4. SEARCH QUERIES: Every query MUST end with 'royalty free'.\n"
             "RETURN ONLY RAW JSON LIST:\n"
             '[ { \"scene_id\": \"SCENE_01\", \"start_frame\": 10, \"end_frame\": 40, \"query\": \"sci-fi digital interface reveal royalty free\", \"volume\": 0.3, \"label\": \"layer_in\" } ]'
@@ -117,7 +143,9 @@ class AudioManifestGenerator:
         match = re.search(r'\[.*\]', raw, re.DOTALL)
         if match:
             try:
-                cleaned = re.sub(r',\s*}', '}', match.group(0))
+                cleaned = re.sub(r'//.*$', '', match.group(0), flags=re.MULTILINE)
+                cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL)
+                cleaned = re.sub(r',\s*\}', '}', cleaned)
                 cleaned = re.sub(r',\s*\]', ']', cleaned)
                 return json.loads(cleaned)
             except: pass
@@ -138,7 +166,7 @@ class AudioManifestGenerator:
                 continue
 
             success = False
-            # Broaden queries for better acquisition
+            # Broaden queries
             queries = [item['query'], "sci-fi interface sound effect", "futuristic digital ping", "tech whoosh transition"]
 
             for q in queries:
@@ -152,7 +180,7 @@ class AudioManifestGenerator:
                         "--output", filepath, f"ytsearch1:{q}"
                     ]
                     try:
-                        subprocess.run(cmd, check=True, timeout=120)
+                        subprocess.run(cmd, check=True, timeout=120, capture_output=True)
                         if os.path.exists(filepath):
                             success = True
                             break
@@ -176,10 +204,15 @@ def main():
     generator = AudioManifestGenerator(user_data_dir=args.user_data_dir)
     try:
         sfx_plan = generator.generate_sfx_plan(manifest_json)
-        ts_audio = generator.download_sfx(sfx_plan, args.output_dir)
-        with open(os.path.join(args.output_dir, "timestamp_audio.txt"), 'w') as f: json.dump(ts_audio, f, indent=2)
-        manifest_json['audio_sfx_manifest'] = ts_audio
-        with open(args.manifest_file, 'w', encoding='utf-8') as f: json.dump(manifest_json, f, indent=2, ensure_ascii=False)
+        if not sfx_plan:
+            print("⚠️ No SFX plan generated by Gemini.")
+        else:
+            print(f"✅ Planned {len(sfx_plan)} SFX events. Starting acquisition...")
+            ts_audio = generator.download_sfx(sfx_plan, args.output_dir)
+            with open(os.path.join(args.output_dir, "timestamp_audio.txt"), 'w') as f: json.dump(ts_audio, f, indent=2)
+            manifest_json['audio_sfx_manifest'] = ts_audio
+            with open(args.manifest_file, 'w', encoding='utf-8') as f: json.dump(manifest_json, f, indent=2, ensure_ascii=False)
+            print(f"✅ SFX acquisition and manifest update complete.")
     finally: generator.stop_browser()
 
 if __name__ == "__main__": main()

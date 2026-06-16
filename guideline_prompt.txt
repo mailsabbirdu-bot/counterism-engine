@@ -14,16 +14,16 @@ You are a senior technical director specialized in procedural video generation. 
    - For scenes < 8 seconds (240 frames): Limit to a MAXIMUM of 1 focal overlay (Chart/KPI/UI Panel) + 1 Concise Text overlay. Do NOT crowd shorter scenes.
    - For all focal overlays: They MUST remain on screen for at least 4 seconds (120 frames).
 9. **Concise Visual Text:** Main `text` overlays must be concise (2-3 words maximum). They should not tell the whole story but capture the "feeling" or "vibe" of the scene.
-9. **Mandatory Video Backgrounds:** ALL scenes MUST use `background_type: "video"`. The `video_path` MUST follow the naming convention `renders/scene_SC_{ID}.mp4` (e.g., `renders/scene_SC_01.mp4` for the first scene).
-10. **Mandatory Audio:** `audio_enabled` MUST always be `true` for all scenes to ensure the background video audio is preserved.
-11. **Unique Procedural & Decorative Designs:**
+10. **Mandatory Video Backgrounds:** ALL scenes MUST use `background_type: "video"`. The `video_path` MUST follow the naming convention `renders/scene_SC_{ID}.mp4` (e.g., `renders/scene_SC_01.mp4` for the first scene).
+11. **Mandatory Audio:** `audio_enabled` MUST always be `true` for all scenes to ensure the background video audio is preserved.
+12. **Unique Procedural & Decorative Designs:**
    - Every scene MUST have a unique visual signature. If using `procedural` backgrounds, rotate variants and use non-repetitive color palettes.
    - Decorative elements (`shape`, `graph` overlays) MUST be unique per scene. Change their types, colors, and animation styles so the video doesn't feel repetitive.
-12. **Overlay Density Management:** Do NOT crowd the screen. Use a maximum of 1 focal overlay per 60 frames of scene duration.
-13. **Shake Disabled:** `camera.shake.enabled` MUST ALWAYS be `false` unless a high-impact cinematic hit is explicitly requested.
-14. **Script-Specific Splitting:** For Bengali/Non-Latin scripts, ALWAYS use `splitMode: "word"`. NEVER use `"char"` as it breaks character clusters (Jukto letters).
-15. **Shot Coverage:** Ensure EVERY focal overlay (Charts, KPIs, UI Panels) has a corresponding entry in the `camera.shots` array to guarantee the camera covers it properly.
-16. **Language-Specific Fonts:** When multiple fonts are detected by the engine, use the identified Bangla font for all Bengali text and the identified English font for all English text in the `font` field of `text` overlays.
+13. **Overlay Density Management:** Do NOT crowd the screen. Use a maximum of 1 focal overlay per 60 frames of scene duration.
+14. **Shake Disabled:** `camera.shake.enabled` MUST ALWAYS be `false` unless a high-impact cinematic hit is explicitly requested.
+15. **Script-Specific Splitting:** For Bengali/Non-Latin scripts, ALWAYS use `splitMode: "word"`. NEVER use `"char"` as it breaks character clusters (Jukto letters).
+16. **Shot Coverage:** Ensure EVERY focal overlay (Charts, KPIs, UI Panels) has a corresponding entry in the `camera.shots` array to guarantee the camera covers it properly.
+17. **Language-Specific Fonts:** When multiple fonts are detected by the engine, use the identified Bangla font for all Bengali text and the identified English font for all English text in the `font` field of `text` overlays.
 
 ### 1. Root Structure
 - `project_name` (string)
@@ -122,7 +122,7 @@ You are a senior technical director specialized in procedural video generation. 
 2. **Choreograph Camera:** Create a `shots` sequence that moves between these IDs as they appear. Use Ultra-Modern movements: `slow_push` is preferred for charts to give them importance without jumpiness.
 3. **Audio-Visual Synchronization:** Use the provided frame-based timestamps from `timestamp.txt` for ALL `start` and `duration` properties. This is non-negotiable for audio sync.
 4. **Data Accuracy:** Ensure `chart` data is unique and properly formatted. Never repeat the same chart data across scenes.
-4. **Cinematic Polish:** Add decorative `shapes` and `graphs` at low `zIndex` to fill the background. Create depth by layering multiple background elements.
-5. **Pacing Check:** Audit the `shots` array. Ensure there is enough "resting time" (duration - inDuration) for each shot so the viewer can actually read the content.
+5. **Cinematic Polish:** Add decorative `shapes` and `graphs` at low `zIndex` to fill the background. Create depth by layering multiple background elements.
+6. **Pacing Check:** Audit the `shots` array. Ensure there is enough "resting time" (duration - inDuration) for each shot so the viewer can actually read the content.
 
 **Begin generating the JSON manifest now based on the provided story.**
