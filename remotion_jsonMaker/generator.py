@@ -101,16 +101,15 @@ class RemotionJsonMaker:
         if not data or not data.get('scenes'): return data
         data['global_settings'] = { "width": 1920, "height": 1080, "fps": 30 }
 
-        # Stricter sizes for collision detection to ensure they stay inside screen
-        # 1920x1080 canvas
+        # Super conservative sizes to prevent any bleed
         TYPE_SIZES = {
-            'text': (1200, 300),
-            'chart': (1400, 800),
-            'ui_panel': (700, 600),
-            'data_indicator': (600, 500),
-            'media': (800, 600),
-            'image': (800, 600),
-            'video': (800, 600)
+            'text': (1300, 350),
+            'chart': (1500, 850),
+            'ui_panel': (800, 700),
+            'data_indicator': (700, 600),
+            'media': (900, 700),
+            'image': (900, 700),
+            'video': (900, 700)
         }
 
         for scene in data['scenes']:
@@ -122,8 +121,6 @@ class RemotionJsonMaker:
                     if duration_sec > 0:
                         scene_duration = int(round(duration_sec * 30))
                         scene['duration_in_frames'] = scene_duration
-                else:
-                    print(f"⚠️ Video background not found at {abs_vpath}. Using default {scene_duration} frames.")
 
             placed_overlays = []
             if scene.get('overlays'):
@@ -132,54 +129,44 @@ class RemotionJsonMaker:
                          ov['position'] = {"x": 960, "y": 540}
 
                     ov_type = ov.get('type', 'text')
-                    w, h = TYPE_SIZES.get(ov_type, (600, 600))
+                    w, h = TYPE_SIZES.get(ov_type, (700, 700))
                     if ov_type == 'chart':
-                        w = ov.get('width', 1000) + 150
-                        h = ov.get('height', 650) + 150
+                        w = ov.get('width', 1000) + 200
+                        h = ov.get('height', 650) + 200
 
-                    # 1. Enforce Screen Boundary Clamping (Inner Safe Zone)
-                    # For center-anchored: center_x must be between [w/2, 1920 - w/2]
-                    margin = 80
-                    x_min = w/2 + margin
-                    x_max = 1920 - w/2 - margin
-                    y_min = h/2 + margin
-                    y_max = 1080 - h/2 - margin
+                    # Stricter margin
+                    margin = 120
+                    x_min, x_max = w/2 + margin, 1920 - w/2 - margin
+                    y_min, y_max = h/2 + margin, 1080 - h/2 - margin
 
-                    # If margin-based clamp is impossible (element too big), just clamp to screen center
                     if x_min > x_max: x_min, x_max = 960, 960
                     if y_min > y_max: y_min, y_max = 540, 540
 
                     ov['position']['x'] = max(x_min, min(x_max, int(ov['position'].get('x', 960))))
                     ov['position']['y'] = max(y_min, min(y_max, int(ov['position'].get('y', 540))))
 
-                    # 2. Collision Detection & Nudging (Temporal & Spatial)
                     for prev_ov, prev_w, prev_h in placed_overlays:
                         start1, end1 = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', 60)
                         start2, end2 = prev_ov.get('start', 0), prev_ov.get('start', 0) + prev_ov.get('duration', 60)
 
-                        # Check if they overlap in time
                         if max(start1, start2) < min(end1, end2):
                             x1, y1 = ov['position']['x'], ov['position']['y']
                             x2, y2 = prev_ov['position']['x'], prev_ov['position']['y']
 
-                            # Check if they overlap in space
                             if abs(x1 - x2) < (w + prev_w) / 2 and abs(y1 - y2) < (h + prev_h) / 2:
-                                # Collision! Nudge it vertically first
                                 if y1 <= y2:
-                                    ov['position']['y'] = max(y_min, y2 - (h + prev_h) / 2 - 50)
+                                    ov['position']['y'] = max(y_min, y2 - (h + prev_h) / 2 - 80)
                                 else:
-                                    ov['position']['y'] = min(y_max, y2 + (h + prev_h) / 2 + 50)
+                                    ov['position']['y'] = min(y_max, y2 + (h + prev_h) / 2 + 80)
 
-                                # If still colliding or pushed too far, nudge X
                                 if abs(ov['position']['y'] - y2) < (h + prev_h) / 2:
                                     if x1 <= x2:
-                                        ov['position']['x'] = max(x_min, x2 - (w + prev_w) / 2 - 50)
+                                        ov['position']['x'] = max(x_min, x2 - (w + prev_w) / 2 - 80)
                                     else:
-                                        ov['position']['x'] = min(x_max, x2 + (w + prev_w) / 2 + 50)
+                                        ov['position']['x'] = min(x_max, x2 + (w + prev_w) / 2 + 80)
 
                     placed_overlays.append((ov, w, h))
 
-                    # Timing Safety
                     if ov.get('start', 0) >= scene_duration: ov['start'] = max(0, scene_duration - 60)
                     if ov.get('start', 0) + ov.get('duration', 60) > scene_duration: ov['duration'] = scene_duration - ov.get('start', 0)
                     if ov.get('duration', 0) < 60: ov['duration'] = 60
@@ -189,10 +176,7 @@ class RemotionJsonMaker:
         print("🎙️  Generating precise word-level timestamps (30fps)...")
         scenes = re.split(r'দৃশ্য\s+[0-9০-৯]+', story)
         scene_texts = [s.strip() for s in scenes if s.strip()]
-        full_ts_prompt = (
-            "You are a Voiceover Alignment Expert. Generate EXACT word-level timestamps in FRAMES for a 30fps project.\n"
-            "Each scene's duration is fixed by its background video.\n\n"
-        )
+        full_ts_prompt = "You are a Voiceover Alignment Expert. Generate EXACT word-level timestamps in FRAMES for a 30fps project.\n\n"
         for i, scene_text in enumerate(scene_texts):
             scene_num = i + 1
             vpath = f"renders/scene_SC_{scene_num:02d}.mp4"
@@ -202,12 +186,7 @@ class RemotionJsonMaker:
                 duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
             total_frames = int(round(duration_sec * 30))
             full_ts_prompt += f"--- SCENE {scene_num:02d} (Target Duration: {total_frames} frames / {duration_sec}s) ---\nVOICEOVER: {scene_text}\n\n"
-        full_ts_prompt += (
-            "INSTRUCTIONS:\n"
-            "1. Format: SCENE_XX: [Frame Start - Frame End] \"Word\"\n"
-            "2. Distribute words precisely over the duration. Ensure 30fps mapping.\n"
-            "3. Return ONLY timestamps. No conversational text.\n"
-        )
+        full_ts_prompt += "INSTRUCTIONS: Format: SCENE_XX: [Frame Start - Frame End] \"Word\". Return ONLY timestamps.\n"
         return self._interact_with_gemini(full_ts_prompt)
 
     def _interact_with_gemini(self, prompt: str, retry_count: int = 2) -> str:
@@ -215,20 +194,27 @@ class RemotionJsonMaker:
             self.start_browser()
             page = self.page
             try:
-                print(f"⌨️  Checking for Gemini UI obstructions (Attempt {attempt+1})...")
-                # Dismiss overlays
+                # Track current message count
+                response_selectors = ["message-content", ".markdown.message-content", ".model-response-text", "[data-message-author-role='assistant']"]
+                def get_msg_count():
+                    for sel in response_selectors:
+                        msgs = page.query_selector_all(sel)
+                        if msgs: return len(msgs)
+                    return 0
+
+                initial_count = get_msg_count()
+                print(f"⌨️  Initial message count: {initial_count}")
+
                 overlays = ["button[aria-label='Accept all']", "button:has-text('Accept')", "button:has-text('I agree')", "button:has-text('Got it')", "ins-close-button"]
                 for selector in overlays:
                     try:
                         elements = page.query_selector_all(selector)
                         for el in elements:
                             if el.is_visible():
-                                print(f"   Dismissing overlay: {selector}")
                                 el.click(force=True)
                                 time.sleep(1)
                     except: pass
 
-                # Hider script
                 page.evaluate("""() => {
                     const blockers = ['cdk-overlay-container', 'consent-dialog', 'cookie-banner'];
                     blockers.forEach(id => {
@@ -252,21 +238,24 @@ class RemotionJsonMaker:
                     if page.is_visible(btn, timeout=2000): page.click(btn, force=True)
                 except: pass
 
-                print("⏳  Waiting for Gemini response to stabilize...")
-                response_selectors = ["message-content", ".markdown.message-content", ".model-response-text", "[data-message-author-role='assistant']"]
+                print("⏳  Waiting for new message to appear...")
                 last_text = ""
                 stable_count = 0
-                for i in range(150):
+                for i in range(200):
                     time.sleep(2)
+                    current_count = get_msg_count()
+                    if current_count <= initial_count: continue
+
                     current_text = ""
                     for sel in response_selectors:
                         msgs = page.query_selector_all(sel)
                         if msgs:
                             current_text = msgs[-1].inner_text()
                             break
+
                     if current_text and current_text == last_text:
                         stable_count += 1
-                        if stable_count >= 6:
+                        if stable_count >= 8:
                             if len(current_text) > 100:
                                  print(f"✨ Gemini response received ({len(current_text)} chars).")
                                  return current_text
@@ -292,9 +281,9 @@ class RemotionJsonMaker:
             "You are a world-class Motion Graphics Director. Generate an ULTRA MODERN cinematic JSON manifest.\n\n"
             "STYLE: Sci-fi interface aesthetic. Minimalist but high-tech.\n\n"
             "CRITICAL RULES:\n"
-            "1. AUDIO SYNC: Every focal overlay (Text, Chart, KPI) MUST start and end EXACTLY with the word-level timestamps provided. No exceptions.\n"
-            "2. OVERLAP PREVENTION: Space overlays significantly. Use different quadrants.\n"
-            "3. CANVAS SAFETY: Stay within the screen boundary. Never place text at the absolute edges.\n"
+            "1. AUDIO SYNC: Every focal overlay (Text, Chart, KPI) MUST start and end EXACTLY with the word-level timestamps provided.\n"
+            "2. OVERLAP PREVENTION: Text and Nivo (Chart) layers MUST NEVER overlap spatially.\n"
+            "3. CANVAS SAFETY: Stay within the screen boundary. No text at edges.\n"
             "4. CINEMATOGRAPHY: Use 'slow_push' or 'ken_burns'. 45-60 frames of resting time.\n"
             "5. TEXT CONCISION: 'text' content MUST BE STRICTLY 2-3 words maximum.\n"
             "6. MANDATORY: 'background_type': 'video', 'audio_enabled': true, 'camera.shake.enabled': false.\n"
@@ -309,8 +298,7 @@ class RemotionJsonMaker:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
         raw_output = self._interact_with_gemini(full_prompt)
         try:
-            start_idx = raw_output.find('{')
-            end_idx = raw_output.rfind('}')
+            start_idx, end_idx = raw_output.find('{'), raw_output.rfind('}')
             if start_idx != -1 and end_idx != -1:
                 json_str = raw_output[start_idx:end_idx+1]
                 json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
@@ -335,9 +323,7 @@ def main():
     parser.set_defaults(headless=True)
     args = parser.parse_args()
     if not os.path.exists(args.story_file): exit(1)
-
     if os.path.exists(args.output): os.remove(args.output)
-
     with open(args.story_file, 'r', encoding='utf-8') as f: story = f.read()
     maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, headless=args.headless)
     guidelines = maker.load_guidelines("../guideline.md", "../guideline_prompt.txt", args.drive_prompt)
@@ -349,8 +335,6 @@ def main():
             if not ts_content or len(ts_content) < 50:
                  ts_content = maker.generate_word_timestamps(story)
             with open(args.timestamp_output, 'w', encoding='utf-8') as f: f.write(ts_content)
-            print(f"✅ Precise timestamps written to {args.timestamp_output}")
-
         render_json = maker.generate(story, guidelines, args.prompt_output, ts_content)
         maker.stop_browser()
         if not render_json or 'scenes' not in render_json:
