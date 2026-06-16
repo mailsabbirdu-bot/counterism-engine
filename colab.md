@@ -52,6 +52,8 @@ else:
 # 3. Handle External Assets (Renders, Audio, Fonts, SFX)
 print_banner("🔍 ASSET VERIFICATION & COPYING")
 
+# Crucial: Clean and create directories in the correct order
+!rm -rf public/renders
 os.makedirs("public/renders/audios", exist_ok=True)
 os.makedirs("public/audio", exist_ok=True)
 os.makedirs("public/fonts", exist_ok=True)
@@ -60,7 +62,6 @@ os.makedirs("public/fonts", exist_ok=True)
 drive_renders = f"{DRIVE_BASE_PATH}/renders"
 if os.path.exists(drive_renders):
     print(f"📡 Syncing renders from: {drive_renders}")
-    !rm -rf public/renders/*
     # Copy all mp4 files from the renders root, but ignore the audios subfolder which we sync separately
     !find {drive_renders} -maxdepth 1 -name "*.mp4" -exec cp -t public/renders/ {{}} +
     print(f"✅ Synced background videos.")
