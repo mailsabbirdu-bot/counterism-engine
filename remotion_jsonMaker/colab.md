@@ -27,7 +27,7 @@ STORY_FILE = f"{DRIVE_BASE_PATH}/audio/story.txt"
 # Manifest and Prompt Output Path: /content/drive/MyDrive/Counterism_Studio_V4/manifests/
 OUTPUT_JSON = f"{DRIVE_BASE_PATH}/manifests/remotion_render.json"
 PROMPT_FILE = f"{DRIVE_BASE_PATH}/manifests/remotion_prompt.txt"
-TIMESTAMP_FILE = f"{DRIVE_BASE_PATH}/manifests/timestamp.txt"
+TIMESTAMP_FILE = f"{DRIVE_BASE_PATH}/manifests/timestamp_word.txt"
 
 # Path for persistent browser session (optional)
 # This can still be kept in a separate folder or same base

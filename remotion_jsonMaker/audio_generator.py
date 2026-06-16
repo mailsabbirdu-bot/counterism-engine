@@ -81,12 +81,13 @@ class AudioManifestGenerator:
             f"MANIFEST:\n{json.dumps(simplified, indent=2)}\n\n"
             "TASK: Assign a unique SFX query for EVERY entrance and exit.\n"
             "CRITICAL RULES:\n"
-            "1. NO BACKGROUND SOUNDS: Absolutely NO city ambience, wind, or continuous noise. SFX must be short (< 2s) and layer-specific.\n"
-            "2. LAYER TRANSITIONS: Focus on 'start' and 'duration' offsets.\n"
-            "3. NO TYPEWRITING: Strictly forbid typewriting sounds. Use 'cinematic transition swell', 'digital pop', or 'tech reveal'.\n"
-            "4. UNIQUE & ROYALTY FREE: Query MUST end with 'royalty free'.\n"
+            "1. ULTRA MODERN & SUBTLE: SFX must be subtle, clean, and ultra-modern. Avoid overdramatic, loud, or heavy sounds.\n"
+            "2. NO BACKGROUND SOUNDS: Absolutely NO city ambience, wind, or continuous noise. SFX must be short (< 1.5s) and layer-specific.\n"
+            "3. NO TYPEWRITING: Strictly forbid typewriting sounds.\n"
+            "4. SEARCH QUERIES: Use queries like 'subtle tech reveal', 'modern digital whoosh', 'clean interface ping', 'minimalist swell'.\n"
+            "5. ROYALTY FREE: Every query MUST end with 'royalty free'.\n"
             "RETURN ONLY RAW JSON LIST:\n"
-            '[ { "scene_id": "SCENE_01", "start_frame": 10, "end_frame": 40, "query": "digital pop reveal", "volume": 0.5, "label": "layer_in" } ]'
+            '[ { \"scene_id\": \"SCENE_01\", \"start_frame\": 10, \"end_frame\": 40, \"query\": \"subtle modern digital ping royalty free\", \"volume\": 0.3, \"label\": \"layer_in\" } ]'
         )
         raw = self._interact_with_gemini(prompt)
         match = re.search(r'\[.*\]', raw, re.DOTALL)
@@ -114,7 +115,7 @@ class AudioManifestGenerator:
 
             success = False
             # Fallback sequence: Original -> Simple -> Simplest
-            queries = [item['query'], "pop digital sound effect", "whoosh transition"]
+            queries = [item['query'], "minimalist tech sound effect", "subtle clean interface ping"]
 
             for q in queries:
                 for client in clients:
@@ -124,7 +125,7 @@ class AudioManifestGenerator:
                         "--no-check-certificates", "--geo-bypass", "--no-warnings",
                         "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
                         "--extractor-args", f"youtube:player_client={client}",
-                        "--output", filepath, f"ytsearch1:{q} royalty free"
+                        "--output", filepath, f"ytsearch1:{q}"
                     ]
                     try:
                         subprocess.run(cmd, check=True, timeout=120)
