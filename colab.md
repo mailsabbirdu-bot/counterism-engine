@@ -76,13 +76,15 @@ if os.path.exists(drive_audio):
     !cp -r {drive_audio}/* public/audio/
     print(f"✅ Synced voiceover files.")
 
-# Sync SFX
-drive_sfx = f"{DRIVE_BASE_PATH}/renders/audios"
-if os.path.exists(drive_sfx):
-    print(f"📡 Syncing SFX from: {drive_sfx}")
-    !rm -rf public/renders/audios/*
-    !cp -r {drive_sfx}/* public/renders/audios/
-    print(f"✅ Synced SFX assets.")
+# Sync SFX (from multiple possible locations)
+print("📡 Searching for SFX assets...")
+for sfx_path in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/render/audio"]:
+    if os.path.exists(sfx_path):
+        print(f"📦 Syncing SFX from: {sfx_path}")
+        !cp -ru {sfx_path}/* public/renders/audios/ 2>/dev/null || true
+
+sfx_count = len(os.listdir("public/renders/audios"))
+print(f"✅ Synced {sfx_count} SFX assets.")
 
 # Sync Fonts
 drive_fonts = f"{DRIVE_BASE_PATH}/fonts"

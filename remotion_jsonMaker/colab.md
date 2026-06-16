@@ -67,7 +67,9 @@ print("Linking individual render files...")
 # Exclude audios folder from direct render linking to preserve structure
 !find {DRIVE_BASE_PATH}/renders -maxdepth 1 -type f -exec ln -sf '{}' public/renders/ ';' 2>/dev/null
 print("Linking audio SFX files...")
+# Check if user used 'render/audio' or 'renders/audios' and link correctly
 !find {DRIVE_BASE_PATH}/renders/audios -maxdepth 2 -type f -exec ln -sf '{}' public/renders/audios/ ';' 2>/dev/null
+!find {DRIVE_BASE_PATH}/render/audio -maxdepth 2 -type f -exec ln -sf '{}' public/renders/audios/ ';' 2>/dev/null
 
 print("✅ Drive assets linked to public folder.")
 
@@ -81,10 +83,6 @@ print_banner("🛠️ INSTALLING PROJECT DEPENDENCIES")
 !pip install yt-dlp
 !playwright install chromium
 !playwright install-deps chromium
-# Node.js stack (Optional for generation, but good for local checks)
-# %cd {PROJECT_PATH}
-# !npm install
-# %cd remotion_jsonMaker
 
 # 3. Context Verification
 print_banner("📝 CONTEXT VERIFICATION")
@@ -96,7 +94,7 @@ else:
     print(f"Please ensure your story and durations are in 'story.txt' inside: {DRIVE_BASE_PATH}/audio/")
     sys.exit("Input story file missing.")
 
-# 4. Generate Master JSON & Audio SFX
+# 4. Generate Master JSON
 print_banner("🧠 GEMINI BROWSER AUTOMATION")
 print("🚀 Using Playwright to interact with Gemini. This may take a few minutes.")
 
@@ -111,19 +109,12 @@ print("🚀 Using Playwright to interact with Gemini. This may take a few minute
     --drive-prompt="{PROJECT_PATH}/guideline_prompt.txt" \
     --user-data-dir="{USER_DATA_DIR}"
 
-print_banner("🎵 GENERATING AUDIO SFX")
-# Generate SFX Plan based on the Manifest and Download
-SFX_DIR = f"{DRIVE_BASE_PATH}/renders/audios"
-!xvfb-run python audio_generator.py \
-    --manifest-file="{OUTPUT_JSON}" \
-    --output-dir="{SFX_DIR}" \
-    --user-data-dir="{USER_DATA_DIR}"
-
 print_banner("🏁 PROCESS FINISHED")
 if os.path.exists(OUTPUT_JSON):
     print(f"✅ Master manifest saved to: {OUTPUT_JSON}")
     print(f"🎙️ Word-level timestamps saved to: {TIMESTAMP_FILE}")
     print(f"📄 Full prompt saved to: {PROMPT_FILE}")
+    print(f"🎵 SFX manifest embedded in JSON based on local files.")
 else:
     print(f"❌ ERROR: Output JSON was not created. Check the logs above.")
 ```
