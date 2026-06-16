@@ -12,7 +12,7 @@ import { ResponsiveChord } from '@nivo/chord';
 import { ResponsiveNetwork } from '@nivo/network';
 
 const ViolinPlot: React.FC<{ overlay: any; dataProgress: number; commonProps: any }> = ({ overlay, dataProgress }) => {
-  if (!Array.isArray(overlay.data)) return null;
+  if (!overlay?.data || !Array.isArray(overlay.data)) return null;
   return (
     <div className="flex justify-around items-center h-full w-full px-10">
        {overlay.data.map((group: any, i: number) => (
@@ -67,14 +67,14 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     const animationEnd = Math.min(overlay.duration - 30, 180);
     const dataProgress = interpolate(relativeFrame, [animationStart, animationEnd], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.33, 1, 0.68, 1) });
 
-    if (!overlay.data) return <div className="text-white flex items-center justify-center h-full">No Data Available</div>;
+    if (!overlay?.data) return <div className="text-white flex items-center justify-center h-full">No Data Available</div>;
 
     if (['line', 'multiLine', 'area', 'stackedArea', 'forecast'].includes(overlay.chart_type)) {
       const isFlat = Array.isArray(overlay.data) && overlay.data.length > 0 && !overlay.data[0].data;
       const seriesArray = isFlat ? [{ id: overlay.title || 'Data', data: overlay.data }] : (Array.isArray(overlay.data) ? overlay.data : []);
 
       const animatedData = seriesArray.map((series: any) => {
-        if (!Array.isArray(series?.data)) return { ...series, data: [] };
+        if (!series || !Array.isArray(series.data)) return { id: 'Empty', data: [] };
         return {
           ...series,
           data: series.data.map((p: any, i: number) => {
@@ -109,6 +109,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
        if (!Array.isArray(overlay.data)) return null;
        const keys = overlay.keys || ['value'];
        const animatedData = overlay.data.map((item: any) => {
+         if (!item) return {};
          const newItem = { ...item };
          keys.forEach((key: string) => { if (typeof item[key] === 'number') newItem[key] = (item[key] || 0) * dataProgress; });
          return newItem;
@@ -131,33 +132,47 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
 
     if (['pie', 'donut'].includes(overlay.chart_type)) {
        if (!Array.isArray(overlay.data)) return null;
-       const animatedData = overlay.data.map((item: any) => ({ ...item, value: (item.value || 0) * dataProgress }));
+       const animatedData = overlay.data.map((item: any) => {
+           if (!item) return {};
+           return { ...item, value: (item.value || 0) * dataProgress };
+       });
        return <ResponsivePie {...commonProps} data={animatedData} innerRadius={overlay.chart_type === 'donut' ? 0.6 : 0} padAngle={0.7} cornerRadius={3} />;
     }
 
     if (overlay.chart_type === 'treemap') {
+       if (!overlay.data) return null;
        const anim = (node: any): any => ({ ...node, value: typeof node.value === 'number' ? node.value * dataProgress : undefined, children: node.children ? node.children.map(anim) : undefined });
        return <ResponsiveTreeMap {...commonProps} data={anim(overlay.data)} identity="name" value="value" />;
     }
 
     if (overlay.chart_type === 'sunburst') {
+       if (!overlay.data) return null;
        const anim = (node: any): any => ({ ...node, value: typeof node.value === 'number' ? node.value * dataProgress : undefined, children: node.children ? node.children.map(anim) : undefined });
        return <ResponsiveSunburst {...commonProps} data={anim(overlay.data)} id="name" value="value" />;
     }
 
     if (overlay.chart_type === 'scatter' || overlay.chart_type === 'bubble') {
         if (!Array.isArray(overlay.data)) return null;
-        const animatedData = overlay.data.map((series: any) => ({
-            ...series,
-            data: (series.data || []).map((p: any) => ({ ...p, y: (p.y || 0) * dataProgress, z: (p.z || 10) * dataProgress }))
-        }));
+        const animatedData = overlay.data.map((series: any) => {
+            if (!series || !Array.isArray(series.data)) return { ...series, data: [] };
+            return {
+                ...series,
+                data: series.data.map((p: any) => ({ ...p, y: (p.y || 0) * dataProgress, z: (p.z || 10) * dataProgress }))
+            };
+        });
         return <ResponsiveScatterPlot {...commonProps} data={animatedData} xScale={{ type: 'linear', min: 0, max: 'auto' }} yScale={{ type: 'linear', min: 0, max: 'auto' }} nodeSize={overlay.chart_type === 'bubble' ? (d: any) => d.data.z : 8} />;
     }
 
     if (overlay.chart_type === 'network') {
-       if (!overlay.data?.nodes || !overlay.data?.links) return null;
+       if (!overlay.data?.nodes || !overlay.data?.links || !Array.isArray(overlay.data.nodes)) return null;
        const animatedData = { nodes: overlay.data.nodes.map((n: any) => ({ ...n, size: (n.size || 12) * dataProgress })), links: overlay.data.links };
        return <ResponsiveNetwork {...(commonProps as any)} data={animatedData} linkDistance={e => (e as any).distance || 50} repulsivity={450} nodeColor={e => (e as any).color || '#ffffff'} linkThickness={n => (2 + 2 * ((n as any).target?.data?.index ?? 0)) * dataProgress} />;
+    }
+
+    if (overlay.chart_type === 'chord') {
+        if (!Array.isArray(overlay.data)) return null;
+        const animatedData = overlay.data.map((row: any) => (Array.isArray(row) ? row.map((val: number) => val * dataProgress) : []));
+        return <ResponsiveChord {...commonProps} data={animatedData} keys={overlay.keys || []} />;
     }
 
     if (overlay.chart_type === 'violinPlot') return <ViolinPlot overlay={overlay} dataProgress={dataProgress} commonProps={commonProps} />;
@@ -176,7 +191,8 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         opacity: progress,
         zIndex: overlay.zIndex ?? 30,
         transform: `translate(-50%, -50%) scale(${0.98 + progress * 0.02})`,
-        filter: `blur(${(1 - progress) * 10}px)`
+        // Fix: Apply blur only during transition (when progress < 1)
+        filter: progress < 1 ? `blur(${(1 - progress) * 10}px)` : 'none'
       }}
     >
       <div className="flex justify-between items-center mb-10">
