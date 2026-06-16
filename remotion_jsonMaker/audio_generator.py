@@ -40,7 +40,16 @@ class AudioManifestGenerator:
         self.start_browser()
         page = self.page
         try:
-            # Dismiss potential overlays
+            response_selectors = ["message-content", ".markdown.message-content", ".model-response-text", "[data-message-author-role='assistant']"]
+            def get_msg_count():
+                for sel in response_selectors:
+                    msgs = page.query_selector_all(sel)
+                    if msgs: return len(msgs)
+                return 0
+
+            initial_count = get_msg_count()
+
+            # Dismiss overlays
             for btn in ["button[aria-label='Accept all']", "button:has-text('Accept')", "button:has-text('I agree')"]:
                 try:
                     if page.is_visible(btn, timeout=2000):
@@ -62,12 +71,13 @@ class AudioManifestGenerator:
                 if page.is_visible(btn, timeout=2000): page.click(btn, force=True)
             except: pass
 
-            print("⏳  Waiting for SFX plan...")
-            response_selectors = ["message-content", ".markdown.message-content", ".model-response-text"]
+            print("⏳  Waiting for new SFX plan from Gemini...")
             last_text = ""
             stable_count = 0
-            for i in range(100):
+            for i in range(150):
                 time.sleep(2)
+                if get_msg_count() <= initial_count: continue
+
                 current_text = ""
                 for sel in response_selectors:
                     msgs = page.query_selector_all(sel)
@@ -76,7 +86,7 @@ class AudioManifestGenerator:
                         break
                 if current_text and current_text == last_text:
                     stable_count += 1
-                    if stable_count >= 5: return current_text
+                    if stable_count >= 8: return current_text
                 else:
                     stable_count = 0
                     last_text = current_text
@@ -128,8 +138,8 @@ class AudioManifestGenerator:
                 continue
 
             success = False
-            # Fallback sequence: Original -> Simple -> Simplest
-            queries = [item['query'], "sci-fi interface sound effect", "futuristic digital ping"]
+            # Broaden queries for better acquisition
+            queries = [item['query'], "sci-fi interface sound effect", "futuristic digital ping", "tech whoosh transition"]
 
             for q in queries:
                 for client in clients:
