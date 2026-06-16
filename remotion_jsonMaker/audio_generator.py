@@ -40,14 +40,28 @@ class AudioManifestGenerator:
         self.start_browser()
         page = self.page
         try:
+            # Dismiss potential overlays
+            for btn in ["button[aria-label='Accept all']", "button:has-text('Accept')", "button:has-text('I agree')"]:
+                try:
+                    if page.is_visible(btn, timeout=2000):
+                        page.click(btn, force=True)
+                        time.sleep(1)
+                except: pass
+
             input_selector = "div[contenteditable='true']"
             page.wait_for_selector(input_selector, timeout=45000)
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             print("⌨️  Sending Layer SFX Design prompt...")
-            page.click(input_selector)
+            page.click(input_selector, force=True)
             page.fill(input_selector, prompt)
             time.sleep(1)
             page.keyboard.press("Enter")
+
+            try:
+                btn = "button[aria-label*='Send message'], button[aria-label*='Submit']"
+                if page.is_visible(btn, timeout=2000): page.click(btn, force=True)
+            except: pass
+
             print("⏳  Waiting for SFX plan...")
             response_selectors = ["message-content", ".markdown.message-content", ".model-response-text"]
             last_text = ""
