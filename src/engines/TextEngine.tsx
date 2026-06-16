@@ -34,11 +34,14 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         left: `${x}px`,
         top: `${y}px`,
         transform: 'translate(-50%, -50%)',
+        // SCREEN SAFETY: Limit width and ensure wrapping
         width: 'auto',
+        maxWidth: '1600px',
         height: 'auto',
         textShadow: '0 4px 30px rgba(0,0,0,0.5), 0 0 100px rgba(0,0,0,0.2)',
         color: 'white',
-        whiteSpace: 'nowrap'
+        whiteSpace: 'normal', // Allow wrapping
+        lineHeight: 1.2
       }}
     >
       <div style={{
@@ -80,7 +83,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
             const brightness = interpolate(progress, [0, 1], [3, 1]);
             const scale = interpolate(progress, [0, 1], [0.9, 1]);
             const yOffset = interpolate(progress, [0, 1], [20, 0]);
-            style.filter = `blur(${blur}px) brightness(${brightness})`;
+            style.filter = progress < 1 ? `blur(${blur}px) brightness(${brightness})` : 'none';
             style.transform = `translateY(${yOffset}px) scale(${scale})`;
           } else if (overlay.animation === 'slideUp') {
             const yOffset = interpolate(progress, [0, 1], [150, 0]);
