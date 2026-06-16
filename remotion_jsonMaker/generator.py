@@ -239,7 +239,9 @@ class RemotionJsonMaker:
                     if current_text and current_text == last_text:
                         stable_count += 1
                         if stable_count >= 6: # Increased stability check
-                            if len(current_text) > 100: return current_text
+                            if len(current_text) > 100:
+                                 print(f"✨ Gemini response received ({len(current_text)} chars).")
+                                 return current_text
                             break
                     else:
                         stable_count = 0
