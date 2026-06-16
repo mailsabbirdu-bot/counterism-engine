@@ -101,14 +101,16 @@ class RemotionJsonMaker:
         if not data or not data.get('scenes'): return data
         data['global_settings'] = { "width": 1920, "height": 1080, "fps": 30 }
 
+        # Stricter sizes for collision detection to ensure they stay inside screen
+        # 1920x1080 canvas
         TYPE_SIZES = {
-            'text': (900, 250),
-            'chart': (1100, 750),
-            'ui_panel': (600, 500),
-            'data_indicator': (500, 400),
-            'media': (700, 500),
-            'image': (700, 500),
-            'video': (700, 500)
+            'text': (1200, 300),
+            'chart': (1400, 800),
+            'ui_panel': (700, 600),
+            'data_indicator': (600, 500),
+            'media': (800, 600),
+            'image': (800, 600),
+            'video': (800, 600)
         }
 
         for scene in data['scenes']:
@@ -120,6 +122,8 @@ class RemotionJsonMaker:
                     if duration_sec > 0:
                         scene_duration = int(round(duration_sec * 30))
                         scene['duration_in_frames'] = scene_duration
+                else:
+                    print(f"⚠️ Video background not found at {abs_vpath}. Using default {scene_duration} frames.")
 
             placed_overlays = []
             if scene.get('overlays'):
@@ -128,48 +132,67 @@ class RemotionJsonMaker:
                          ov['position'] = {"x": 960, "y": 540}
 
                     ov_type = ov.get('type', 'text')
-                    w, h = TYPE_SIZES.get(ov_type, (500, 500))
+                    w, h = TYPE_SIZES.get(ov_type, (600, 600))
                     if ov_type == 'chart':
-                        w = ov.get('width', 1000) + 100
-                        h = ov.get('height', 650) + 100
+                        w = ov.get('width', 1000) + 150
+                        h = ov.get('height', 650) + 150
 
-                    ov['position']['x'] = max(350, min(1570, int(ov['position'].get('x', 960))))
-                    ov['position']['y'] = max(300, min(780, int(ov['position'].get('y', 540))))
+                    # 1. Enforce Screen Boundary Clamping (Inner Safe Zone)
+                    # For center-anchored: center_x must be between [w/2, 1920 - w/2]
+                    margin = 80
+                    x_min = w/2 + margin
+                    x_max = 1920 - w/2 - margin
+                    y_min = h/2 + margin
+                    y_max = 1080 - h/2 - margin
 
+                    # If margin-based clamp is impossible (element too big), just clamp to screen center
+                    if x_min > x_max: x_min, x_max = 960, 960
+                    if y_min > y_max: y_min, y_max = 540, 540
+
+                    ov['position']['x'] = max(x_min, min(x_max, int(ov['position'].get('x', 960))))
+                    ov['position']['y'] = max(y_min, min(y_max, int(ov['position'].get('y', 540))))
+
+                    # 2. Collision Detection & Nudging (Temporal & Spatial)
                     for prev_ov, prev_w, prev_h in placed_overlays:
                         start1, end1 = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', 60)
                         start2, end2 = prev_ov.get('start', 0), prev_ov.get('start', 0) + prev_ov.get('duration', 60)
 
+                        # Check if they overlap in time
                         if max(start1, start2) < min(end1, end2):
                             x1, y1 = ov['position']['x'], ov['position']['y']
                             x2, y2 = prev_ov['position']['x'], prev_ov['position']['y']
 
+                            # Check if they overlap in space
                             if abs(x1 - x2) < (w + prev_w) / 2 and abs(y1 - y2) < (h + prev_h) / 2:
+                                # Collision! Nudge it vertically first
                                 if y1 <= y2:
-                                    ov['position']['y'] = max(250, y2 - (h + prev_h) / 2 - 50)
+                                    ov['position']['y'] = max(y_min, y2 - (h + prev_h) / 2 - 50)
                                 else:
-                                    ov['position']['y'] = min(830, y2 + (h + prev_h) / 2 + 50)
+                                    ov['position']['y'] = min(y_max, y2 + (h + prev_h) / 2 + 50)
 
+                                # If still colliding or pushed too far, nudge X
                                 if abs(ov['position']['y'] - y2) < (h + prev_h) / 2:
                                     if x1 <= x2:
-                                        ov['position']['x'] = max(300, x2 - (w + prev_w) / 2 - 50)
+                                        ov['position']['x'] = max(x_min, x2 - (w + prev_w) / 2 - 50)
                                     else:
-                                        ov['position']['x'] = min(1620, x2 + (w + prev_w) / 2 + 50)
+                                        ov['position']['x'] = min(x_max, x2 + (w + prev_w) / 2 + 50)
 
-                    ov['position']['x'] = max(300, min(1620, ov['position']['x']))
-                    ov['position']['y'] = max(250, min(830, ov['position']['y']))
                     placed_overlays.append((ov, w, h))
 
+                    # Timing Safety
                     if ov.get('start', 0) >= scene_duration: ov['start'] = max(0, scene_duration - 60)
                     if ov.get('start', 0) + ov.get('duration', 60) > scene_duration: ov['duration'] = scene_duration - ov.get('start', 0)
                     if ov.get('duration', 0) < 60: ov['duration'] = 60
         return data
 
     def generate_word_timestamps(self, story: str, public_dir: str = "../public") -> str:
-        print("🎙️  Generating precise word-level timestamps...")
+        print("🎙️  Generating precise word-level timestamps (30fps)...")
         scenes = re.split(r'দৃশ্য\s+[0-9০-৯]+', story)
         scene_texts = [s.strip() for s in scenes if s.strip()]
-        full_ts_prompt = "You are a Voiceover Alignment Expert. Generate EXACT word-level timestamps in FRAMES for a 30fps project.\n\n"
+        full_ts_prompt = (
+            "You are a Voiceover Alignment Expert. Generate EXACT word-level timestamps in FRAMES for a 30fps project.\n"
+            "Each scene's duration is fixed by its background video.\n\n"
+        )
         for i, scene_text in enumerate(scene_texts):
             scene_num = i + 1
             vpath = f"renders/scene_SC_{scene_num:02d}.mp4"
@@ -178,8 +201,13 @@ class RemotionJsonMaker:
             if os.path.exists(abs_vpath):
                 duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
             total_frames = int(round(duration_sec * 30))
-            full_ts_prompt += f"--- SCENE {scene_num:02d} (Duration: {duration_sec}s / {total_frames} frames) ---\nVOICEOVER TEXT: {scene_text}\n\n"
-        full_ts_prompt += "INSTRUCTIONS: Format: SCENE_XX: [Frame Start - Frame End] \"Word\". Return ONLY timestamps.\n"
+            full_ts_prompt += f"--- SCENE {scene_num:02d} (Target Duration: {total_frames} frames / {duration_sec}s) ---\nVOICEOVER: {scene_text}\n\n"
+        full_ts_prompt += (
+            "INSTRUCTIONS:\n"
+            "1. Format: SCENE_XX: [Frame Start - Frame End] \"Word\"\n"
+            "2. Distribute words precisely over the duration. Ensure 30fps mapping.\n"
+            "3. Return ONLY timestamps. No conversational text.\n"
+        )
         return self._interact_with_gemini(full_ts_prompt)
 
     def _interact_with_gemini(self, prompt: str, retry_count: int = 2) -> str:
@@ -188,7 +216,7 @@ class RemotionJsonMaker:
             page = self.page
             try:
                 print(f"⌨️  Checking for Gemini UI obstructions (Attempt {attempt+1})...")
-                # Dismiss potential consent/cookies/overlays more aggressively
+                # Dismiss overlays
                 overlays = ["button[aria-label='Accept all']", "button:has-text('Accept')", "button:has-text('I agree')", "button:has-text('Got it')", "ins-close-button"]
                 for selector in overlays:
                     try:
@@ -200,7 +228,7 @@ class RemotionJsonMaker:
                                 time.sleep(1)
                     except: pass
 
-                # Check for blocking transparent overlays (like Google Consent)
+                # Hider script
                 page.evaluate("""() => {
                     const blockers = ['cdk-overlay-container', 'consent-dialog', 'cookie-banner'];
                     blockers.forEach(id => {
@@ -238,7 +266,7 @@ class RemotionJsonMaker:
                             break
                     if current_text and current_text == last_text:
                         stable_count += 1
-                        if stable_count >= 6: # Increased stability check
+                        if stable_count >= 6:
                             if len(current_text) > 100:
                                  print(f"✨ Gemini response received ({len(current_text)} chars).")
                                  return current_text
@@ -262,18 +290,19 @@ class RemotionJsonMaker:
         local_fonts = self.get_local_fonts()
         full_prompt = (
             "You are a world-class Motion Graphics Director. Generate an ULTRA MODERN cinematic JSON manifest.\n\n"
+            "STYLE: Sci-fi interface aesthetic. Minimalist but high-tech.\n\n"
             "CRITICAL RULES:\n"
-            "1. AUDIO SYNC: Every focal overlay (Text, Chart, KPI) MUST start and end exactly with the word-level timestamps provided.\n"
-            "2. OVERLAP PREVENTION: Text and Nivo (Chart) layers MUST NEVER overlap spatially.\n"
-            "3. CANVAS SAFETY: Center is {x: 960, y: 540}. Content MUST stay within X: [350, 1570] and Y: [300, 780].\n"
-            "4. CINEMATOGRAPHY: Use 'slow_push' or 'ken_burns'. 45-60 frames of resting time per focal element.\n"
-            "5. TEXT CONCISION: 'text' overlay 'content' MUST BE STRICTLY 2-3 words. Capture the VIBE.\n"
+            "1. AUDIO SYNC: Every focal overlay (Text, Chart, KPI) MUST start and end EXACTLY with the word-level timestamps provided. No exceptions.\n"
+            "2. OVERLAP PREVENTION: Space overlays significantly. Use different quadrants.\n"
+            "3. CANVAS SAFETY: Stay within the screen boundary. Never place text at the absolute edges.\n"
+            "4. CINEMATOGRAPHY: Use 'slow_push' or 'ken_burns'. 45-60 frames of resting time.\n"
+            "5. TEXT CONCISION: 'text' content MUST BE STRICTLY 2-3 words maximum.\n"
             "6. MANDATORY: 'background_type': 'video', 'audio_enabled': true, 'camera.shake.enabled': false.\n"
             "7. SCRIPTS: For Bengali, ALWAYS use 'splitMode': 'word'.\n"
             f"8. DETECTED FONTS: {local_fonts}\n\n"
             f"SYSTEM GUIDELINES:\n{guidelines}\n\n"
             f"STORY REQUIREMENTS:\n{story}\n\n"
-            f"PRECISE TIMESTAMPS:\n{timestamp_context or 'No timestamps.'}\n\n"
+            f"PRECISE WORD TIMESTAMPS (USE THESE FOR SYNC):\n{timestamp_context or 'No timestamps.'}\n\n"
             "TASK: Generate complete JSON manifest. Return ONLY raw JSON."
         )
         if prompt_output_path:
@@ -307,7 +336,6 @@ def main():
     args = parser.parse_args()
     if not os.path.exists(args.story_file): exit(1)
 
-    # Pre-clean output to avoid stale manifests
     if os.path.exists(args.output): os.remove(args.output)
 
     with open(args.story_file, 'r', encoding='utf-8') as f: story = f.read()
@@ -316,10 +344,13 @@ def main():
     try:
         ts_content = None
         if args.timestamp_output:
+            if os.path.exists(args.timestamp_output): os.remove(args.timestamp_output)
             ts_content = maker.generate_word_timestamps(story)
             if not ts_content or len(ts_content) < 50:
                  ts_content = maker.generate_word_timestamps(story)
             with open(args.timestamp_output, 'w', encoding='utf-8') as f: f.write(ts_content)
+            print(f"✅ Precise timestamps written to {args.timestamp_output}")
+
         render_json = maker.generate(story, guidelines, args.prompt_output, ts_content)
         maker.stop_browser()
         if not render_json or 'scenes' not in render_json:
