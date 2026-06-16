@@ -49,53 +49,47 @@ else:
 
 %cd {PROJECT_NAME}
 
-# 3. Handle External Assets (Renders & Audio)
+# 3. Handle External Assets (Renders, Audio, Fonts, SFX)
 print_banner("🔍 ASSET VERIFICATION & COPYING")
 
-os.makedirs("public/renders", exist_ok=True)
+os.makedirs("public/renders/audios", exist_ok=True)
 os.makedirs("public/audio", exist_ok=True)
+os.makedirs("public/fonts", exist_ok=True)
 
+# Sync Background Videos
 drive_renders = f"{DRIVE_BASE_PATH}/renders"
 if os.path.exists(drive_renders):
-    print(f"📡 Found Drive renders folder: {drive_renders}")
-    print("📦 Copying assets to local public/renders...")
+    print(f"📡 Syncing renders from: {drive_renders}")
     !rm -rf public/renders/*
-    !cp -r {drive_renders}/* public/renders/
-    print(f"✅ Copied {len(os.listdir('public/renders'))} render assets.")
+    # Copy all mp4 files from the renders root, but ignore the audios subfolder which we sync separately
+    !find {drive_renders} -maxdepth 1 -name "*.mp4" -exec cp -t public/renders/ {{}} +
+    print(f"✅ Synced background videos.")
 else:
     print(f"❌ FATAL: 'renders' folder NOT FOUND in Drive: {drive_renders}")
 
+# Sync Voiceovers
 drive_audio = f"{DRIVE_BASE_PATH}/audio"
 if os.path.exists(drive_audio):
-    print(f"📡 Found Drive audio folder: {drive_audio}")
+    print(f"📡 Syncing voiceovers from: {drive_audio}")
     !rm -rf public/audio/*
     !cp -r {drive_audio}/* public/audio/
-    print(f"✅ Copied {len(os.listdir('public/audio'))} audio files.")
+    print(f"✅ Synced voiceover files.")
 
-# Deep Sync for SFX
-drive_audios_folder = f"{DRIVE_BASE_PATH}/renders/audios"
-os.makedirs("public/renders/audios", exist_ok=True)
-if os.path.exists(drive_audios_folder):
-    print(f"📡 Found Drive SFX folder: {drive_audios_folder}")
-    !cp -rvu {drive_audios_folder}/* public/renders/audios/ 2>/dev/null || true
-
-drive_fonts = f"{DRIVE_BASE_PATH}/fonts"
-os.makedirs("public/fonts", exist_ok=True)
-
-# 3.5 SFX Folder Sync
-os.makedirs("public/renders/audios", exist_ok=True)
+# Sync SFX
 drive_sfx = f"{DRIVE_BASE_PATH}/renders/audios"
 if os.path.exists(drive_sfx):
-    print(f"📡 Found Drive SFX folder: {drive_sfx}")
+    print(f"📡 Syncing SFX from: {drive_sfx}")
     !rm -rf public/renders/audios/*
     !cp -r {drive_sfx}/* public/renders/audios/
-    print(f"✅ Copied SFX assets.")
+    print(f"✅ Synced SFX assets.")
 
+# Sync Fonts
+drive_fonts = f"{DRIVE_BASE_PATH}/fonts"
 if os.path.exists(drive_fonts):
-    print(f"📡 Found Drive fonts folder: {drive_fonts}")
+    print(f"📡 Syncing fonts from: {drive_fonts}")
     !rm -rf public/fonts/*
     !cp -r {drive_fonts}/* public/fonts/
-    print(f"✅ Copied {len(os.listdir('public/fonts'))} font assets.")
+    print(f"✅ Synced font assets.")
 else:
     print(f"⚠️  Drive fonts folder NOT FOUND: {drive_fonts}")
 

@@ -101,7 +101,6 @@ class RemotionJsonMaker:
         if not data or not data.get('scenes'): return data
         data['global_settings'] = { "width": 1920, "height": 1080, "fps": 30 }
 
-        # Approximate dimensions for collision detection
         TYPE_SIZES = {
             'text': (900, 250),
             'chart': (1100, 750),
@@ -134,11 +133,9 @@ class RemotionJsonMaker:
                         w = ov.get('width', 1000) + 100
                         h = ov.get('height', 650) + 100
 
-                    # 1. Initial Clamp
                     ov['position']['x'] = max(350, min(1570, int(ov['position'].get('x', 960))))
                     ov['position']['y'] = max(300, min(780, int(ov['position'].get('y', 540))))
 
-                    # 2. Collision Detection & Nudging
                     for prev_ov, prev_w, prev_h in placed_overlays:
                         start1, end1 = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', 60)
                         start2, end2 = prev_ov.get('start', 0), prev_ov.get('start', 0) + prev_ov.get('duration', 60)
@@ -148,20 +145,17 @@ class RemotionJsonMaker:
                             x2, y2 = prev_ov['position']['x'], prev_ov['position']['y']
 
                             if abs(x1 - x2) < (w + prev_w) / 2 and abs(y1 - y2) < (h + prev_h) / 2:
-                                # Collision! Nudge it
                                 if y1 <= y2:
                                     ov['position']['y'] = max(250, y2 - (h + prev_h) / 2 - 50)
                                 else:
                                     ov['position']['y'] = min(830, y2 + (h + prev_h) / 2 + 50)
 
-                                # If still colliding or pushed too far, nudge X
                                 if abs(ov['position']['y'] - y2) < (h + prev_h) / 2:
                                     if x1 <= x2:
                                         ov['position']['x'] = max(300, x2 - (w + prev_w) / 2 - 50)
                                     else:
                                         ov['position']['x'] = min(1620, x2 + (w + prev_w) / 2 + 50)
 
-                    # Final boundary check
                     ov['position']['x'] = max(300, min(1620, ov['position']['x']))
                     ov['position']['y'] = max(250, min(830, ov['position']['y']))
                     placed_overlays.append((ov, w, h))
@@ -173,36 +167,19 @@ class RemotionJsonMaker:
 
     def generate_word_timestamps(self, story: str, public_dir: str = "../public") -> str:
         print("🎙️  Generating precise word-level timestamps...")
-        # Split by Bengali 'দৃশ্য' (Scene)
         scenes = re.split(r'দৃশ্য\s+[0-9০-৯]+', story)
         scene_texts = [s.strip() for s in scenes if s.strip()]
-
-        full_ts_prompt = (
-            "You are a Voiceover Alignment Expert. I have background videos with voiceovers.\n"
-            "Generate EXACT word-level timestamps in FRAMES for a 30fps project.\n"
-            "Each scene has a specific duration based on its background video.\n\n"
-        )
-
+        full_ts_prompt = "You are a Voiceover Alignment Expert. Generate EXACT word-level timestamps in FRAMES for a 30fps project.\n\n"
         for i, scene_text in enumerate(scene_texts):
             scene_num = i + 1
             vpath = f"renders/scene_SC_{scene_num:02d}.mp4"
-            duration_sec = 6.0 # Fallback
+            duration_sec = 6.0
             abs_vpath = os.path.join(public_dir, vpath)
             if os.path.exists(abs_vpath):
                 duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
-
             total_frames = int(round(duration_sec * 30))
-            full_ts_prompt += f"--- SCENE {scene_num:02d} (Duration: {duration_sec}s / {total_frames} frames) ---\n"
-            full_ts_prompt += f"VOICEOVER TEXT: {scene_text}\n\n"
-
-        full_ts_prompt += (
-            "INSTRUCTIONS:\n"
-            "1. Distribute words naturally over the duration.\n"
-            "2. Format: SCENE_XX: [Frame Start - Frame End] \"Word\"\n"
-            "3. Return ONLY the timestamps. No preamble.\n"
-            "4. Ensure 30fps compatibility (e.g. if a word is at 1.5s, it starts at frame 45).\n"
-        )
-
+            full_ts_prompt += f"--- SCENE {scene_num:02d} (Duration: {duration_sec}s / {total_frames} frames) ---\nVOICEOVER TEXT: {scene_text}\n\n"
+        full_ts_prompt += "INSTRUCTIONS: Format: SCENE_XX: [Frame Start - Frame End] \"Word\". Return ONLY timestamps.\n"
         return self._interact_with_gemini(full_ts_prompt)
 
     def _interact_with_gemini(self, prompt: str, retry_count: int = 2) -> str:
@@ -210,19 +187,44 @@ class RemotionJsonMaker:
             self.start_browser()
             page = self.page
             try:
+                print(f"⌨️  Checking for Gemini UI obstructions (Attempt {attempt+1})...")
+                # Dismiss potential consent/cookies/overlays more aggressively
+                overlays = ["button[aria-label='Accept all']", "button:has-text('Accept')", "button:has-text('I agree')", "button:has-text('Got it')", "ins-close-button"]
+                for selector in overlays:
+                    try:
+                        elements = page.query_selector_all(selector)
+                        for el in elements:
+                            if el.is_visible():
+                                print(f"   Dismissing overlay: {selector}")
+                                el.click(force=True)
+                                time.sleep(1)
+                    except: pass
+
+                # Check for blocking transparent overlays (like Google Consent)
+                page.evaluate("""() => {
+                    const blockers = ['cdk-overlay-container', 'consent-dialog', 'cookie-banner'];
+                    blockers.forEach(id => {
+                        const el = document.querySelector('.' + id) || document.getElementById(id);
+                        if (el) el.style.display = 'none';
+                    });
+                }""")
+
                 input_selector = "div[contenteditable='true']"
-                page.wait_for_selector(input_selector, timeout=45000)
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                page.wait_for_selector(input_selector, timeout=30000)
+
                 print(f"⌨️  Sending prompt to Gemini (Attempt {attempt+1}/{retry_count+1})...")
-                page.click(input_selector)
+                page.click(input_selector, force=True)
+                time.sleep(1)
                 page.fill(input_selector, prompt)
                 time.sleep(1)
                 page.keyboard.press("Enter")
+
                 try:
                     btn = "button[aria-label*='Send message'], button[aria-label*='Submit']"
-                    if page.is_visible(btn, timeout=2000): page.click(btn)
+                    if page.is_visible(btn, timeout=2000): page.click(btn, force=True)
                 except: pass
-                print("⏳  Waiting for Gemini...")
+
+                print("⏳  Waiting for Gemini response to stabilize...")
                 response_selectors = ["message-content", ".markdown.message-content", ".model-response-text", "[data-message-author-role='assistant']"]
                 last_text = ""
                 stable_count = 0
@@ -236,18 +238,20 @@ class RemotionJsonMaker:
                             break
                     if current_text and current_text == last_text:
                         stable_count += 1
-                        if stable_count >= 5:
+                        if stable_count >= 6: # Increased stability check
                             if len(current_text) > 100: return current_text
                             break
                     else:
                         stable_count = 0
                         last_text = current_text
+
                 print("🔄  Reloading Gemini...")
-                page.reload(wait_until="networkidle")
+                page.reload(wait_until="domcontentloaded")
                 time.sleep(5)
             except Exception as e:
-                print(f"⚠️ Error: {e}")
-                page.reload(wait_until="networkidle")
+                print(f"⚠️ Error in Gemini interaction: {e}")
+                page.reload(wait_until="domcontentloaded")
+                time.sleep(5)
         return ""
 
     def generate(self, story: str, guidelines: str, prompt_output_path: str = None, timestamp_context: str = None) -> Dict[str, Any]:
@@ -258,45 +262,35 @@ class RemotionJsonMaker:
             "You are a world-class Motion Graphics Director. Generate an ULTRA MODERN cinematic JSON manifest.\n\n"
             "CRITICAL RULES:\n"
             "1. AUDIO SYNC: Every focal overlay (Text, Chart, KPI) MUST start and end exactly with the word-level timestamps provided.\n"
-            "2. OVERLAP PREVENTION: Text and Nivo (Chart) layers MUST NEVER overlap spatially. Space them out significantly (e.g. Chart at top, Text at bottom or vice versa).\n"
+            "2. OVERLAP PREVENTION: Text and Nivo (Chart) layers MUST NEVER overlap spatially.\n"
             "3. CANVAS SAFETY: Center is {x: 960, y: 540}. Content MUST stay within X: [350, 1570] and Y: [300, 780].\n"
             "4. CINEMATOGRAPHY: Use 'slow_push' or 'ken_burns'. 45-60 frames of resting time per focal element.\n"
-            "5. TEXT CONCISION: 'text' overlay 'content' MUST BE STRICTLY 2-3 words. Capture the VIBE. No summaries.\n"
+            "5. TEXT CONCISION: 'text' overlay 'content' MUST BE STRICTLY 2-3 words. Capture the VIBE.\n"
             "6. MANDATORY: 'background_type': 'video', 'audio_enabled': true, 'camera.shake.enabled': false.\n"
             "7. SCRIPTS: For Bengali, ALWAYS use 'splitMode': 'word'.\n"
             f"8. DETECTED FONTS: {local_fonts}\n\n"
             f"SYSTEM GUIDELINES:\n{guidelines}\n\n"
             f"STORY REQUIREMENTS:\n{story}\n\n"
-            f"PRECISE TIMESTAMPS (USE THESE FOR ALL OVERLAY START/DURATION):\n{timestamp_context or 'No timestamps.'}\n\n"
+            f"PRECISE TIMESTAMPS:\n{timestamp_context or 'No timestamps.'}\n\n"
             "TASK: Generate complete JSON manifest. Return ONLY raw JSON."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
         raw_output = self._interact_with_gemini(full_prompt)
-
-        # Robust JSON extraction
         try:
-            json_pattern = r'\{(?:[^{}]|(?R))*\}' # This recursive pattern isn't supported by re, but let's try a simple approach
-            # Find the largest block starting with { and ending with }
             start_idx = raw_output.find('{')
             end_idx = raw_output.rfind('}')
             if start_idx != -1 and end_idx != -1:
                 json_str = raw_output[start_idx:end_idx+1]
-                # Basic cleaning
-                json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE) # Remove single line comments
-                json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL) # Remove multiline comments
-
-                try:
-                    return json.loads(json_str)
-                except json.JSONDecodeError:
-                    # Attempt a more aggressive clean for trailing commas
+                json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
+                json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
+                try: return json.loads(json_str)
+                except:
                     cleaned = re.sub(r',\s*\}', '}', json_str)
                     cleaned = re.sub(r',\s*\]', ']', cleaned)
                     return json.loads(cleaned)
             return {}
-        except Exception as e:
-            print(f"❌ JSON extraction failed: {e}")
-            return {}
+        except: return {}
 
 def main():
     parser = argparse.ArgumentParser()
@@ -310,6 +304,10 @@ def main():
     parser.set_defaults(headless=True)
     args = parser.parse_args()
     if not os.path.exists(args.story_file): exit(1)
+
+    # Pre-clean output to avoid stale manifests
+    if os.path.exists(args.output): os.remove(args.output)
+
     with open(args.story_file, 'r', encoding='utf-8') as f: story = f.read()
     maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, headless=args.headless)
     guidelines = maker.load_guidelines("../guideline.md", "../guideline_prompt.txt", args.drive_prompt)
@@ -318,22 +316,19 @@ def main():
         if args.timestamp_output:
             ts_content = maker.generate_word_timestamps(story)
             if not ts_content or len(ts_content) < 50:
-                 print("⚠️ Word timestamps generated are suspiciously short. Retrying once...")
                  ts_content = maker.generate_word_timestamps(story)
             with open(args.timestamp_output, 'w', encoding='utf-8') as f: f.write(ts_content)
-
         render_json = maker.generate(story, guidelines, args.prompt_output, ts_content)
         maker.stop_browser()
-
         if not render_json or 'scenes' not in render_json:
              print("❌ ERROR: Gemini failed to produce a valid manifest.")
              exit(1)
-
         render_json = maker.finalize_json_durations(render_json)
         sfx_path = os.path.join(os.path.dirname(args.output), "../renders/audios/timestamp_audio.txt")
         if os.path.exists(sfx_path):
-            with open(sfx_path, 'r', encoding='utf-8') as sf: render_json['audio_sfx_manifest'] = json.load(sf)
-
+            try:
+                with open(sfx_path, 'r', encoding='utf-8') as sf: render_json['audio_sfx_manifest'] = json.load(sf)
+            except: pass
         with open(args.output, 'w', encoding='utf-8') as f: json.dump(render_json, f, indent=2, ensure_ascii=False)
         print(f"✅ Master JSON created: {args.output}")
     except Exception as e:
