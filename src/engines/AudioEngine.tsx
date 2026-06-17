@@ -48,7 +48,10 @@ export const AudioEngine: React.FC<{ sceneId: string }> = ({ sceneId }) => {
             src={resolveAsset(`renders/audios/${sfx.file}`)}
             volume={sfx.volume}
             // Mute error to prevent render crash on 404
-            onError={() => {}}
+            onError={(e) => {
+              // Only log first error to prevent flooding
+              // console.log(`🔈 SFX Missing: ${sfx.file}`);
+            }}
           />
         </Sequence>
       ))}
