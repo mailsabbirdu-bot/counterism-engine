@@ -5,6 +5,7 @@ import re
 import time
 import subprocess
 import shutil
+import math
 from typing import Dict, Any, List
 from playwright.sync_api import sync_playwright
 import playwright_stealth
@@ -41,111 +42,67 @@ class RemotionJsonMaker:
 
     def probe_video_duration_and_fps(self, video_path: str):
         try:
-            cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration,nb_frames,r_frame_rate", "-of", "json", video_path]
-            output = subprocess.check_output(cmd).decode("utf-8")
-            data = json.loads(output)
-            if not data.get('streams'):
-                cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", video_path]
-                output = subprocess.check_output(cmd).decode("utf-8")
-                data = json.loads(output)
-                return float(data['format'].get('duration', 0)), 30.0
-            stream = data['streams'][0]
-            duration = float(stream.get('duration', 0))
-            if duration == 0:
-                cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", video_path]
-                output = subprocess.check_output(cmd).decode("utf-8")
-                data = json.loads(output)
-                duration = float(data['format'].get('duration', 0))
-            return duration, 30.0
-        except Exception as e: return 0.0, 30.0
+            # Precise probe for 30fps target
+            cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path]
+            output = subprocess.check_output(cmd).decode("utf-8").strip()
+            duration_sec = float(output) if output else 0.0
+            return duration_sec, 30.0
+        except Exception as e:
+            print(f"⚠️ Error probing video: {e}")
+            return 0.0, 30.0
 
     def adjust_durations_in_text(self, text: str, public_dir: str = "../public") -> str:
         def replacement_logic(match):
             block = match.group(0)
             vpath_match = re.search(r'"video_path":\s*"([^"]+)"', block)
-            duration_match = re.search(r'"duration_in_frames"\s*:\s*(\d+)', block)
             if vpath_match:
                 rel_vpath = vpath_match.group(1)
                 abs_vpath = os.path.join(public_dir, rel_vpath)
                 if os.path.exists(abs_vpath):
                     duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
                     if duration_sec > 0:
-                        new_duration = int(round(duration_sec * 30))
-                        if duration_match:
-                            return re.sub(r'"duration_in_frames"\s*:\s*\d+', f'"duration_in_frames": {new_duration}', block)
+                        new_duration = int(math.ceil(duration_sec * 30))
+                        return re.sub(r'"duration_in_frames"\s*:\s*\d+', f'"duration_in_frames": {new_duration}', block)
             return block
         pattern1 = r'("video_path":\s*"[^"]+"(?:(?!"video_path"|"duration_in_frames").){0,300}?"duration_in_frames"\s*:\s*\d+)'
         text = re.sub(pattern1, replacement_logic, text, flags=re.DOTALL)
-        pattern2 = r'("duration_in_frames"\s*:\s*\d+(?:(?!"video_path"|"duration_in_frames").){0,300}?"video_path":\s*"[^"]+")'
-        text = re.sub(pattern2, replacement_logic, text, flags=re.DOTALL)
         return text
 
     def get_local_fonts(self, public_dir: str = "../public") -> str:
         fonts_dir = os.path.join(public_dir, "fonts")
-        potential_dirs = [fonts_dir, os.path.join(fonts_dir, "drive_fonts")]
         font_files = []
-        for d in potential_dirs:
-            if os.path.exists(d):
-                for file in os.listdir(d):
-                    if file.lower().endswith(('.ttf', '.otf', '.woff', '.woff2')):
-                        font_files.append(os.path.splitext(file)[0])
+        if os.path.exists(fonts_dir):
+            for file in os.listdir(fonts_dir):
+                if file.lower().endswith(('.ttf', '.otf', '.woff', '.woff2')):
+                    font_files.append(os.path.splitext(file)[0])
         return ", ".join(sorted(list(set(font_files))))
-
-    def load_guidelines(self, local_guideline_path: str, local_prompt_path: str, drive_prompt_path: str) -> str:
-        guidelines = ""
-        for path in [local_guideline_path, local_prompt_path, drive_prompt_path]:
-            if path and os.path.exists(path):
-                with open(path, 'r', encoding='utf-8') as f: guidelines += f"\n--- {os.path.basename(path)} ---\n{f.read()}\n"
-        return guidelines
 
     def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
         if not data or not data.get('scenes'): return data
         data['global_settings'] = { "width": 1920, "height": 1080, "fps": 30 }
 
-        # Professional sizes with higher safety margin
+        # Stricter sizes to ensure visibility of background
         TYPE_SIZES = {
-            'text': (1400, 400),
-            'chart': (1550, 900),
-            'ui_panel': (900, 750),
-            'data_indicator': (800, 650),
-            'media': (1000, 750),
-            'image': (1000, 750),
-            'video': (1000, 750)
+            'text': (1000, 250),
+            'chart': (1100, 600),
+            'ui_panel': (600, 500),
+            'data_indicator': (500, 400),
+            'media': (800, 600)
         }
 
-        # Logical layout slots (Safe Zones)
-        SLOTS = {
+        # Logical sectors (Safe Regions)
+        SECTORS = {
             "TOP_LEFT": {"x": 480, "y": 270},
             "TOP_RIGHT": {"x": 1440, "y": 270},
             "BOTTOM_LEFT": {"x": 480, "y": 810},
             "BOTTOM_RIGHT": {"x": 1440, "y": 810},
-            "CENTER_FOCAL": {"x": 960, "y": 540},
             "MID_LEFT": {"x": 480, "y": 540},
             "MID_RIGHT": {"x": 1440, "y": 540}
         }
 
-        # SFX Mapping - Be extremely robust with pathing
-        search_dirs = [
-            os.path.join(public_dir, "renders/audios"),
-            "/content/engine/public/renders/audios",
-            "/content/drive/MyDrive/Counterism_Studio_V4/renders/audios",
-            "/content/drive/MyDrive/Counterism_Studio_V4/render/audio"
-        ]
-
-        in_files, out_files = [], []
-        for audio_dir in search_dirs:
-            if os.path.exists(audio_dir):
-                print(f"📡 Scanning SFX in {audio_dir}...")
-                try:
-                    all_files = os.listdir(audio_dir)
-                    found_in = sorted([f for f in all_files if f.lower().startswith("in_") and (f.lower().endswith(".mp3") or f.lower().endswith(".wav") or f.lower().endswith(".m4a"))])
-                    found_out = sorted([f for f in all_files if f.lower().startswith("out_") and (f.lower().endswith(".mp3") or f.lower().endswith(".wav") or f.lower().endswith(".m4a"))])
-                    if found_in: in_files = found_in
-                    if found_out: out_files = found_out
-                    if in_files and out_files: break
-                except: pass
-
-        print(f"   Result: {len(in_files)} entrance and {len(out_files)} exit sounds available.")
+        audio_dir = os.path.join(public_dir, "renders/audios")
+        in_files = sorted([f for f in os.listdir(audio_dir) if f.startswith("in_") and f.endswith(".mp3")]) if os.path.exists(audio_dir) else []
+        out_files = sorted([f for f in os.listdir(audio_dir) if f.startswith("out_") and f.endswith(".mp3")]) if os.path.exists(audio_dir) else []
 
         sfx_manifest = []
         in_ptr, out_ptr = 0, 0
@@ -157,72 +114,58 @@ class RemotionJsonMaker:
                 if os.path.exists(abs_vpath):
                     duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
                     if duration_sec > 0:
-                        scene_duration = int(round(duration_sec * 30))
+                        scene_duration = int(math.ceil(duration_sec * 30))
                         scene['duration_in_frames'] = scene_duration
 
             placed_overlays = []
             if scene.get('overlays'):
                 for i, ov in enumerate(scene['overlays']):
                     ov_type = ov.get('type', 'text')
-                    w, h = TYPE_SIZES.get(ov_type, (800, 800))
-                    if ov_type == 'chart':
-                        w = ov.get('width', 1000) + 300
-                        h = ov.get('height', 650) + 300
+                    w, h = TYPE_SIZES.get(ov_type, (600, 600))
 
-                    # 1. Slot Assignment (Mapping slot names to coordinates)
-                    slot_name = ov.get('slot', '')
-                    if slot_name in SLOTS:
-                        ov['position'] = {"x": SLOTS[slot_name]["x"], "y": SLOTS[slot_name]["y"]}
+                    # 1. Professional Slot Alignment
+                    slot = ov.get('slot', '')
+                    if slot in SECTORS:
+                        ov['position'] = {"x": SECTORS[slot]["x"], "y": SECTORS[slot]["y"]}
                     elif not ov.get('position'):
-                         # Intelligent default: Use index-based sector fallback
-                         keys = list(SLOTS.keys())
-                         selected = keys[i % len(keys)]
-                         ov['position'] = {"x": SLOTS[selected]["x"], "y": SLOTS[selected]["y"]}
+                         keys = list(SECTORS.keys())
+                         ov['position'] = {"x": SECTORS[keys[i % len(keys)]]["x"], "y": SECTORS[keys[i % len(keys)]]["y"]}
 
-                    # 2. Collision Nudging
+                    # 2. Collision & Overlap Prevention
                     for prev_ov, prev_w, prev_h in placed_overlays:
-                        start1, end1 = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', 60)
-                        start2, end2 = prev_ov.get('start', 0), prev_ov.get('start', 0) + prev_ov.get('duration', 60)
+                        if abs(ov['position']['x'] - prev_ov['position']['x']) < (w + prev_w) / 2.2 and \
+                           abs(ov['position']['y'] - prev_ov['position']['y']) < (h + prev_h) / 2.2:
+                            ov['position']['y'] += 300 # Heavy nudge
 
-                        if max(start1, start2) < min(end1, end2):
-                            x1, y1 = ov['position']['x'], ov['position']['y']
-                            x2, y2 = prev_ov['position']['x'], prev_ov['position']['y']
-                            if abs(x1 - x2) < (w + prev_w) / 2 and abs(y1 - y2) < (h + prev_h) / 2:
-                                if y1 <= y2: ov['position']['y'] = y2 - (h + prev_h) / 2 - 100
-                                else: ov['position']['y'] = y2 + (h + prev_h) / 2 + 100
-
-                    # 3. Final Margin Clamping
+                    # 3. Final Screen Clamping
                     margin = 150
-                    x_min, x_max = w/2 + margin, 1920 - w/2 - margin
-                    y_min, y_max = h/2 + margin, 1080 - h/2 - margin
-                    if x_min > x_max: x_min, x_max = 960, 960
-                    if y_min > y_max: y_min, y_max = 540, 540
+                    ov['position']['x'] = max(margin + w/2, min(1920 - margin - w/2, int(ov['position'].get('x', 960))))
+                    ov['position']['y'] = max(margin + h/2, min(1080 - margin - h/2, int(ov['position'].get('y', 540))))
 
-                    ov['position']['x'] = max(x_min, min(x_max, int(ov['position'].get('x', 960))))
-                    ov['position']['y'] = max(y_min, min(y_max, int(ov['position'].get('y', 540))))
+                    # Timing Normalization
+                    if ov.get('start', 0) >= scene_duration: ov['start'] = max(0, scene_duration - 60)
+                    if ov.get('duration', 0) < 60: ov['duration'] = 60
+                    if ov.get('start') + ov.get('duration') > scene_duration:
+                        ov['duration'] = scene_duration - ov['start']
 
                     placed_overlays.append((ov, w, h))
 
-                    if ov.get('start', 0) >= scene_duration: ov['start'] = max(0, scene_duration - 60)
-                    if ov.get('start', 0) + ov.get('duration', 60) > scene_duration: ov['duration'] = scene_duration - ov.get('start', 0)
-                    if ov.get('duration', 0) < 60: ov['duration'] = 60
-
-                    # Assign local SFX
+                    # Subtle SFX
                     if in_files:
-                        sfx_manifest.append({ "scene_id": scene['scene_id'], "file": in_files[in_ptr % len(in_files)], "start": ov['start'], "end": ov['start'] + 30, "volume": 0.25 })
+                        sfx_manifest.append({ "scene_id": scene['scene_id'], "file": in_files[in_ptr % len(in_files)], "start": ov['start'], "end": ov['start'] + 20, "volume": 0.12 })
                         in_ptr += 1
                     if out_files:
-                        sfx_manifest.append({ "scene_id": scene['scene_id'], "file": out_files[out_ptr % len(out_files)], "start": ov['start'] + ov['duration'] - 15, "end": ov['start'] + ov['duration'], "volume": 0.25 })
+                        sfx_manifest.append({ "scene_id": scene['scene_id'], "file": out_files[out_ptr % len(out_files)], "start": ov['start'] + ov['duration'] - 10, "end": ov['start'] + ov['duration'], "volume": 0.12 })
                         out_ptr += 1
 
         data['audio_sfx_manifest'] = sfx_manifest
         return data
 
     def generate_word_timestamps(self, story: str, public_dir: str = "../public") -> str:
-        print("🎙️  Generating precise word-level timestamps (30fps)...")
+        print("🎙️  Generating precise word-level timestamps (30fps baseline)...")
         scenes = re.split(r'দৃশ্য\s+[0-9০-৯]+', story)
         scene_texts = [s.strip() for s in scenes if s.strip()]
-        full_ts_prompt = "You are a Voiceover Alignment Expert. Generate EXACT word-level timestamps in FRAMES for a 30fps project.\n\n"
+        full_ts_prompt = "You are a Voiceover Alignment Expert. Generate word-level timestamps in FRAMES for a 30fps project.\n\n"
         for i, scene_text in enumerate(scene_texts):
             scene_num = i + 1
             vpath = f"renders/scene_SC_{scene_num:02d}.mp4"
@@ -230,9 +173,9 @@ class RemotionJsonMaker:
             abs_vpath = os.path.join(public_dir, vpath)
             if os.path.exists(abs_vpath):
                 duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
-            total_frames = int(round(duration_sec * 30))
-            full_ts_prompt += f"--- SCENE {scene_num:02d} (Duration: {total_frames} frames / {duration_sec}s) ---\nVOICEOVER: {scene_text}\n\n"
-        full_ts_prompt += "INSTRUCTIONS: Format: SCENE_XX: [Frame Start - Frame End] \"Word\". Return ONLY timestamps.\n"
+            total_frames = int(math.ceil(duration_sec * 30))
+            full_ts_prompt += f"--- SCENE {scene_num:02d} (Target Duration: {total_frames} frames) ---\nVOICEOVER: {scene_text}\n\n"
+        full_ts_prompt += "INSTRUCTIONS: Format: SCENE_XX: [Frame Start - Frame End] \"Word\". Ensure 30fps mapping. Return ONLY timestamps.\n"
         return self._interact_with_gemini(full_ts_prompt)
 
     def _interact_with_gemini(self, prompt: str, retry_count: int = 2) -> str:
@@ -313,21 +256,19 @@ class RemotionJsonMaker:
         local_fonts = self.get_local_fonts()
         full_prompt = (
             "You are a world-class Motion Graphics Director. Generate an ULTRA MODERN cinematic JSON manifest.\n\n"
-            "STYLE: Sci-fi interface aesthetic. Minimalist but high-tech. Balanced Quadrant Layout.\n\n"
+            "STYLE: Sci-fi interface. Professional Balanced Layout. Don't block the background video.\n\n"
             "CRITICAL RULES:\n"
-            "1. AUDIO SYNC: Every focal overlay (Text, Chart, KPI) MUST start and end EXACTLY with the word-level timestamps provided. Sync visual entrance/exit to narrative pacing.\n"
-            "2. PROFESSIONAL LAYOUT (SLOT-BASED): Elements must be assigned to one of these SLOTS: 'TOP_LEFT', 'TOP_RIGHT', 'BOTTOM_LEFT', 'BOTTOM_RIGHT', 'CENTER_FOCAL', 'MID_LEFT', 'MID_RIGHT'.\n"
-            "   - If a Chart is in 'TOP_RIGHT', place Text in 'BOTTOM_LEFT'. Use opposing quadrants to balance the visual weight.\n"
-            "3. OVERLAP PREVENTION: Assign different SLOTS to overlays that are visible at the same time.\n"
-            "4. CANVAS SAFETY: All slots are already safe. Do not place elements randomly. Stay within the 150px safety margin.\n"
-            "5. CINEMATOGRAPHY: Use 'slow_push' or 'ken_burns'. 45-60 frames of resting time per focus.\n"
-            "6. TEXT CONCISION: 'text' content MUST BE STRICTLY 2-3 words maximum. Captures feelings only.\n"
+            "1. AUDIO SYNC: Every focal overlay MUST start/end EXACTLY with the word-level timestamps provided.\n"
+            "2. CINEMATIC PACING (RESTING): Every layer must have Intro (15f), RESTING (minimum 90-120f), and Outro (15f). RESTING IS MOVRELESS.\n"
+            "3. PROFESSIONAL SLOTS: Assign 'slot' to: 'TOP_LEFT', 'TOP_RIGHT', 'BOTTOM_LEFT', 'BOTTOM_RIGHT', 'CENTER_FOCAL', 'MID_LEFT', 'MID_RIGHT'.\n"
+            "4. NO OVERLAP: Use opposing quadrants (e.g. Chart: TOP_RIGHT, Text: BOTTOM_LEFT).\n"
+            "5. CANVAS SAFETY: Elements must stay within 150px margin. Text content MUST BE 2-3 words max.\n"
+            "6. FONTS: If text is Bengali, use the detected Bangla font. If English, use the English font from detected fonts.\n"
             "7. MANDATORY: 'background_type': 'video', 'audio_enabled': true, 'camera.shake.enabled': false.\n"
-            "8. SCRIPTS: For Bengali, ALWAYS use 'splitMode': 'word'.\n"
-            f"9. DETECTED FONTS: {local_fonts}\n\n"
+            f"8. DETECTED FONTS: {local_fonts}\n\n"
             f"SYSTEM GUIDELINES:\n{guidelines}\n\n"
             f"STORY REQUIREMENTS:\n{story}\n\n"
-            f"PRECISE WORD TIMESTAMPS (USE THESE FOR SYNC):\n{timestamp_context or 'No timestamps.'}\n\n"
+            f"WORD TIMESTAMPS (USE FOR SYNC):\n{timestamp_context or 'No timestamps.'}\n\n"
             "TASK: Generate complete JSON manifest. Return ONLY raw JSON."
         )
         if prompt_output_path:
@@ -378,14 +319,11 @@ def main():
              exit(1)
         render_json = maker.finalize_json_durations(render_json)
 
-        # FINAL DRIVE PERSISTENCE FIX
         output_dir = os.path.dirname(args.output)
         if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
 
         with open(args.output, 'w', encoding='utf-8') as f: json.dump(render_json, f, indent=2, ensure_ascii=False)
         print(f"✅ Master JSON created: {args.output} ({os.path.getsize(args.output)} bytes)")
-
-        # Redundant copy to content root for insurance
         try: shutil.copy(args.output, "/content/remotion_render.json")
         except: pass
 
