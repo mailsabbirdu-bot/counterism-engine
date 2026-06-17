@@ -17,29 +17,19 @@ def print_banner(text):
     print("="*80)
 
 # 1. Configuration
-# Fixed absolute path to prevent nested repositories
 PROJECT_PATH = "/content/engine"
-
-# Input/Output Drive Path: /content/drive/MyDrive/Counterism_Studio_V4/
 DRIVE_BASE_PATH = "/content/drive/MyDrive/Counterism_Studio_V4"
 STORY_FILE = f"{DRIVE_BASE_PATH}/audio/story.txt"
-
-# Manifest and Prompt Output Path: /content/drive/MyDrive/Counterism_Studio_V4/manifests/
 OUTPUT_JSON = f"{DRIVE_BASE_PATH}/manifests/remotion_render.json"
 PROMPT_FILE = f"{DRIVE_BASE_PATH}/manifests/remotion_prompt.txt"
 TIMESTAMP_FILE = f"{DRIVE_BASE_PATH}/manifests/timestamp.txt"
-
-# Path for persistent browser session (optional)
-# This can still be kept in a separate folder or same base
 USER_DATA_DIR = f"{DRIVE_BASE_PATH}/browser_session"
 
 # 2. Setup
 print_banner("📂 MOUNTING GOOGLE DRIVE")
 drive.mount('/content/drive')
 
-# Ensure we are in the right base directory
 %cd /content
-
 if not os.path.exists(PROJECT_PATH):
     print("🚀 Cloning engine...")
     !git clone https://github.com/mailsabbirdu-bot/counterism-engine {PROJECT_PATH}
@@ -53,54 +43,42 @@ print_banner("🔗 LINKING DRIVE ASSETS")
 # Ensure public directories exist
 !mkdir -p public/renders
 !mkdir -p public/fonts
+!rm -rf public/renders/audios
 !mkdir -p public/renders/audios
 
-# Use robust symlinking for directories
-!ln -sfn {DRIVE_BASE_PATH}/renders public/renders/drive_renders
-!ln -sfn {DRIVE_BASE_PATH}/fonts public/fonts/drive_fonts
-!ln -sfn {DRIVE_BASE_PATH}/renders/audios public/renders/audios/drive_audios
-
-# Deep link all files to ensure visibility during bundling
-print("Linking individual font files...")
-!find {DRIVE_BASE_PATH}/fonts -maxdepth 2 -type f -exec ln -sf '{}' public/fonts/ ';' 2>/dev/null
-print("Linking individual render files...")
-# Exclude audios folder from direct render linking to preserve structure
-!find {DRIVE_BASE_PATH}/renders -maxdepth 1 -type f -exec ln -sf '{}' public/renders/ ';' 2>/dev/null
+# Deep link SFX files (Search multiple possible Drive locations)
 print("Linking audio SFX files...")
-# Check if user used 'render/audio' or 'renders/audios' and link correctly
-!find {DRIVE_BASE_PATH}/renders/audios -maxdepth 2 -type f -exec ln -sf '{}' public/renders/audios/ ';' 2>/dev/null
-!find {DRIVE_BASE_PATH}/render/audio -maxdepth 2 -type f -exec ln -sf '{}' public/renders/audios/ ';' 2>/dev/null
+for drive_sfx in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/render/audio"]:
+    if os.path.exists(drive_sfx):
+        print(f"📦 Found SFX folder: {drive_sfx}")
+        !find {drive_sfx} -maxdepth 2 -type f -exec ln -sf '{}' public/renders/audios/ ';' 2>/dev/null
+
+# Sync background videos and fonts
+!find {DRIVE_BASE_PATH}/renders -maxdepth 1 -name "*.mp4" -exec ln -sf '{}' public/renders/ ';' 2>/dev/null
+!find {DRIVE_BASE_PATH}/fonts -maxdepth 2 -type f -exec ln -sf '{}' public/fonts/ ';' 2>/dev/null
 
 print("✅ Drive assets linked to public folder.")
 
 %cd remotion_jsonMaker
 
 print_banner("🛠️ INSTALLING PROJECT DEPENDENCIES")
-# System tools
 !apt-get update -y && apt-get install -y ffmpeg build-essential
-# Python stack
 !pip install -r requirements.txt
-!pip install yt-dlp
 !playwright install chromium
 !playwright install-deps chromium
 
 # 3. Context Verification
 print_banner("📝 CONTEXT VERIFICATION")
-
 if os.path.exists(STORY_FILE):
     print(f"✅ Found story file at: {STORY_FILE}")
 else:
     print(f"❌ FATAL: Story file NOT FOUND: {STORY_FILE}")
-    print(f"Please ensure your story and durations are in 'story.txt' inside: {DRIVE_BASE_PATH}/audio/")
     sys.exit("Input story file missing.")
 
 # 4. Generate Master JSON
 print_banner("🧠 GEMINI BROWSER AUTOMATION")
-print("🚀 Using Playwright to interact with Gemini. This may take a few minutes.")
+print("🚀 Using Playwright to interact with Gemini.")
 
-# We use xvfb-run to provide a virtual display for Playwright
-# The command below correctly maps input and output paths as requested
-# Using --user-data-dir allows you to reuse an authenticated session from your Drive
 !xvfb-run python generator.py \
     --story-file="{STORY_FILE}" \
     --output="{OUTPUT_JSON}" \
@@ -112,9 +90,6 @@ print("🚀 Using Playwright to interact with Gemini. This may take a few minute
 print_banner("🏁 PROCESS FINISHED")
 if os.path.exists(OUTPUT_JSON):
     print(f"✅ Master manifest saved to: {OUTPUT_JSON}")
-    print(f"🎙️ Word-level timestamps saved to: {TIMESTAMP_FILE}")
-    print(f"📄 Full prompt saved to: {PROMPT_FILE}")
-    print(f"🎵 SFX manifest embedded in JSON based on local files.")
 else:
-    print(f"❌ ERROR: Output JSON was not created. Check the logs above.")
+    print(f"❌ ERROR: Output JSON was not created.")
 ```
