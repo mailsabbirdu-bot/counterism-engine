@@ -112,12 +112,30 @@ class RemotionJsonMaker:
             'video': (1000, 750)
         }
 
-        # SFX Mapping
-        audio_dir = os.path.join(public_dir, "renders/audios")
-        print(f"📡 Scanning SFX in {audio_dir}...")
-        in_files = sorted([f for f in os.listdir(audio_dir) if f.startswith("in_") and (f.endswith(".mp3") or f.endswith(".wav"))]) if os.path.exists(audio_dir) else []
-        out_files = sorted([f for f in os.listdir(audio_dir) if f.startswith("out_") and (f.endswith(".mp3") or f.endswith(".wav"))]) if os.path.exists(audio_dir) else []
-        print(f"   Found {len(in_files)} entrance and {len(out_files)} exit sounds.")
+        # SFX Mapping - Be extremely robust with pathing
+        # Check multiple potential SFX locations
+        search_dirs = [
+            os.path.join(public_dir, "renders/audios"),
+            "/content/engine/public/renders/audios",
+            "/content/drive/MyDrive/Counterism_Studio_V4/renders/audios",
+            "/content/drive/MyDrive/Counterism_Studio_V4/render/audio"
+        ]
+
+        in_files, out_files = [], []
+        for audio_dir in search_dirs:
+            if os.path.exists(audio_dir):
+                print(f"📡 Scanning SFX in {audio_dir}...")
+                try:
+                    all_files = os.listdir(audio_dir)
+                    found_in = sorted([f for f in all_files if f.lower().startswith("in_") and (f.lower().endswith(".mp3") or f.lower().endswith(".wav") or f.lower().endswith(".m4a"))])
+                    found_out = sorted([f for f in all_files if f.lower().startswith("out_") and (f.lower().endswith(".mp3") or f.lower().endswith(".wav") or f.lower().endswith(".m4a"))])
+                    if found_in: in_files = found_in
+                    if found_out: out_files = found_out
+                    if in_files and out_files: break
+                except Exception as e:
+                    print(f"   ⚠️ Error listing SFX dir: {e}")
+
+        print(f"   Result: {len(in_files)} entrance and {len(out_files)} exit sounds available.")
 
         sfx_manifest = []
         in_ptr, out_ptr = 0, 0
@@ -155,7 +173,7 @@ class RemotionJsonMaker:
                     ov['position']['x'] = max(x_min, min(x_max, int(ov['position'].get('x', 960))))
                     ov['position']['y'] = max(y_min, min(y_max, int(ov['position'].get('y', 540))))
 
-                    # 2. Quadrant-Aware Nudging
+                    # 2. Collision Detection & Nudging
                     for prev_ov, prev_w, prev_h in placed_overlays:
                         start1, end1 = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', 60)
                         start2, end2 = prev_ov.get('start', 0), prev_ov.get('start', 0) + prev_ov.get('duration', 60)
@@ -165,7 +183,6 @@ class RemotionJsonMaker:
                             x2, y2 = prev_ov['position']['x'], prev_ov['position']['y']
 
                             if abs(x1 - x2) < (w + prev_w) / 2 and abs(y1 - y2) < (h + prev_h) / 2:
-                                # Collision! Force push to opposite quadrants
                                 if y1 <= y2: ov['position']['y'] = max(y_min, y2 - (h + prev_h) / 2 - 120)
                                 else: ov['position']['y'] = min(y_max, y2 + (h + prev_h) / 2 + 120)
 
@@ -179,7 +196,7 @@ class RemotionJsonMaker:
                     if ov.get('start', 0) + ov.get('duration', 60) > scene_duration: ov['duration'] = scene_duration - ov.get('start', 0)
                     if ov.get('duration', 0) < 60: ov['duration'] = 60
 
-                    # SFX Attribution
+                    # Assign in and out SFX
                     if in_files:
                         sfx_manifest.append({ "scene_id": scene['scene_id'], "file": in_files[in_ptr % len(in_files)], "start": ov['start'], "end": ov['start'] + 30, "volume": 0.4 })
                         in_ptr += 1
@@ -203,7 +220,7 @@ class RemotionJsonMaker:
             if os.path.exists(abs_vpath):
                 duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
             total_frames = int(round(duration_sec * 30))
-            full_ts_prompt += f"--- SCENE {scene_num:02d} (Duration: {total_frames} frames / {duration_sec}s) ---\nVOICEOVER: {scene_text}\n\n"
+            full_ts_prompt += f"--- SCENE {scene_num:02d} (Target Duration: {total_frames} frames / {duration_sec}s) ---\nVOICEOVER: {scene_text}\n\n"
         full_ts_prompt += "INSTRUCTIONS: Format: SCENE_XX: [Frame Start - Frame End] \"Word\". Return ONLY timestamps.\n"
         return self._interact_with_gemini(full_ts_prompt)
 
