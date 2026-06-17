@@ -101,21 +101,23 @@ class RemotionJsonMaker:
         if not data or not data.get('scenes'): return data
         data['global_settings'] = { "width": 1920, "height": 1080, "fps": 30 }
 
-        # Super conservative sizes to prevent any bleed
+        # Professional sizes with higher safety margin
         TYPE_SIZES = {
-            'text': (1200, 350),
-            'chart': (1400, 800),
-            'ui_panel': (800, 700),
-            'data_indicator': (700, 600),
-            'media': (900, 700),
-            'image': (900, 700),
-            'video': (900, 700)
+            'text': (1400, 400),
+            'chart': (1550, 900),
+            'ui_panel': (900, 750),
+            'data_indicator': (800, 650),
+            'media': (1000, 750),
+            'image': (1000, 750),
+            'video': (1000, 750)
         }
 
-        # Count in and out audio files
+        # SFX Mapping
         audio_dir = os.path.join(public_dir, "renders/audios")
+        print(f"📡 Scanning SFX in {audio_dir}...")
         in_files = sorted([f for f in os.listdir(audio_dir) if f.startswith("in_") and (f.endswith(".mp3") or f.endswith(".wav"))]) if os.path.exists(audio_dir) else []
         out_files = sorted([f for f in os.listdir(audio_dir) if f.startswith("out_") and (f.endswith(".mp3") or f.endswith(".wav"))]) if os.path.exists(audio_dir) else []
+        print(f"   Found {len(in_files)} entrance and {len(out_files)} exit sounds.")
 
         sfx_manifest = []
         in_ptr, out_ptr = 0, 0
@@ -137,12 +139,12 @@ class RemotionJsonMaker:
                          ov['position'] = {"x": 960, "y": 540}
 
                     ov_type = ov.get('type', 'text')
-                    w, h = TYPE_SIZES.get(ov_type, (700, 700))
+                    w, h = TYPE_SIZES.get(ov_type, (800, 800))
                     if ov_type == 'chart':
-                        w = ov.get('width', 1000) + 200
-                        h = ov.get('height', 650) + 200
+                        w = ov.get('width', 1000) + 300
+                        h = ov.get('height', 650) + 300
 
-                    # 1. Enforce Screen Boundary Clamping (Inner Safe Zone)
+                    # 1. Screen Boundary Clamping (Heavy 150px safety zone)
                     margin = 150
                     x_min, x_max = w/2 + margin, 1920 - w/2 - margin
                     y_min, y_max = h/2 + margin, 1080 - h/2 - margin
@@ -153,7 +155,7 @@ class RemotionJsonMaker:
                     ov['position']['x'] = max(x_min, min(x_max, int(ov['position'].get('x', 960))))
                     ov['position']['y'] = max(y_min, min(y_max, int(ov['position'].get('y', 540))))
 
-                    # 2. Collision Detection & Nudging
+                    # 2. Quadrant-Aware Nudging
                     for prev_ov, prev_w, prev_h in placed_overlays:
                         start1, end1 = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', 60)
                         start2, end2 = prev_ov.get('start', 0), prev_ov.get('start', 0) + prev_ov.get('duration', 60)
@@ -163,16 +165,13 @@ class RemotionJsonMaker:
                             x2, y2 = prev_ov['position']['x'], prev_ov['position']['y']
 
                             if abs(x1 - x2) < (w + prev_w) / 2 and abs(y1 - y2) < (h + prev_h) / 2:
-                                if y1 <= y2:
-                                    ov['position']['y'] = max(y_min, y2 - (h + prev_h) / 2 - 100)
-                                else:
-                                    ov['position']['y'] = min(y_max, y2 + (h + prev_h) / 2 + 100)
+                                # Collision! Force push to opposite quadrants
+                                if y1 <= y2: ov['position']['y'] = max(y_min, y2 - (h + prev_h) / 2 - 120)
+                                else: ov['position']['y'] = min(y_max, y2 + (h + prev_h) / 2 + 120)
 
                                 if abs(ov['position']['y'] - y2) < (h + prev_h) / 2:
-                                    if x1 <= x2:
-                                        ov['position']['x'] = max(x_min, x2 - (w + prev_w) / 2 - 100)
-                                    else:
-                                        ov['position']['x'] = min(x_max, x2 + (w + prev_w) / 2 + 100)
+                                    if x1 <= x2: ov['position']['x'] = max(x_min, x2 - (w + prev_w) / 2 - 120)
+                                    else: ov['position']['x'] = min(x_max, x2 + (w + prev_w) / 2 + 120)
 
                     placed_overlays.append((ov, w, h))
 
@@ -180,7 +179,7 @@ class RemotionJsonMaker:
                     if ov.get('start', 0) + ov.get('duration', 60) > scene_duration: ov['duration'] = scene_duration - ov.get('start', 0)
                     if ov.get('duration', 0) < 60: ov['duration'] = 60
 
-                    # Assign in and out SFX from local folder
+                    # SFX Attribution
                     if in_files:
                         sfx_manifest.append({ "scene_id": scene['scene_id'], "file": in_files[in_ptr % len(in_files)], "start": ov['start'], "end": ov['start'] + 30, "volume": 0.4 })
                         in_ptr += 1
@@ -204,7 +203,7 @@ class RemotionJsonMaker:
             if os.path.exists(abs_vpath):
                 duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
             total_frames = int(round(duration_sec * 30))
-            full_ts_prompt += f"--- SCENE {scene_num:02d} (Target Duration: {total_frames} frames / {duration_sec}s) ---\nVOICEOVER: {scene_text}\n\n"
+            full_ts_prompt += f"--- SCENE {scene_num:02d} (Duration: {total_frames} frames / {duration_sec}s) ---\nVOICEOVER: {scene_text}\n\n"
         full_ts_prompt += "INSTRUCTIONS: Format: SCENE_XX: [Frame Start - Frame End] \"Word\". Return ONLY timestamps.\n"
         return self._interact_with_gemini(full_ts_prompt)
 
@@ -228,13 +227,11 @@ class RemotionJsonMaker:
                     try:
                         elements = page.query_selector_all(selector)
                         for el in elements:
-                            if el.is_visible():
-                                el.click(force=True)
-                                time.sleep(1)
+                            if el.is_visible(): el.click(force=True); time.sleep(1)
                     except: pass
 
                 page.evaluate("""() => {
-                    const blockers = ['cdk-overlay-container', 'consent-dialog', 'cookie-banner'];
+                    const blockers = ['cdk-overlay-container', 'consent-dialog', 'cookie-banner', 'google-consent-banner'];
                     blockers.forEach(id => {
                         const elements = document.querySelectorAll('.' + id + ', #' + id);
                         elements.forEach(el => el.style.display = 'none');
@@ -261,16 +258,13 @@ class RemotionJsonMaker:
                 stable_count = 0
                 for i in range(250):
                     time.sleep(2)
-                    current_count = get_msg_count()
-                    if current_count <= initial_count: continue
-
+                    if get_msg_count() <= initial_count: continue
                     current_text = ""
                     for sel in response_selectors:
                         msgs = page.query_selector_all(sel)
                         if msgs:
                             current_text = msgs[-1].inner_text()
                             break
-
                     if current_text and current_text == last_text:
                         stable_count += 1
                         if stable_count >= 8:
@@ -297,15 +291,15 @@ class RemotionJsonMaker:
         local_fonts = self.get_local_fonts()
         full_prompt = (
             "You are a world-class Motion Graphics Director. Generate an ULTRA MODERN cinematic JSON manifest.\n\n"
-            "STYLE: Sci-fi interface aesthetic. Minimalist but high-tech. Professional Balanced Layout.\n\n"
+            "STYLE: Sci-fi interface aesthetic. Minimalist but high-tech. Balanced Quadrant Layout.\n\n"
             "CRITICAL RULES:\n"
-            "1. AUDIO SYNC: Every focal overlay (Text, Chart, KPI) MUST start and end EXACTLY with the word-level timestamps provided. Sync with narrative flow.\n"
-            "2. PROFESSIONAL LAYOUT: Elements must be well-placed and well-planned. Use a balanced, symmetrical or rule-of-thirds layout. "
-            "If a Chart is in the Top-Right, place Text in Bottom-Left. Use all 4 quadrants effectively. Avoid clustering in one corner.\n"
-            "3. OVERLAP PREVENTION: Focal layers MUST NEVER overlap spatially. Space them out significantly. Use the entire 1920x1080 canvas.\n"
-            "4. CANVAS SAFETY: Elements must stay within the safe zone (150px margin). No text at the absolute edges. Account for text block width.\n"
+            "1. AUDIO SYNC: Every focal overlay (Text, Chart, KPI) MUST start and end EXACTLY with the word-level timestamps provided. Sync with narrative pacing.\n"
+            "2. PROFESSIONAL LAYOUT: Elements must be well-placed and well-planned. Use quadrants (Top-Left, Top-Right, etc.). "
+            "If a Chart is in Top-Right, place Text in Bottom-Left. Never cluster elements randomly.\n"
+            "3. OVERLAP PREVENTION: Focal layers MUST NEVER overlap spatially. Space them out significantly using the 1920x1080 canvas.\n"
+            "4. CANVAS SAFETY: Elements must stay within the safe zone (150px margin). Account for text block width and chart size.\n"
             "5. CINEMATOGRAPHY: Use 'slow_push' or 'ken_burns'. 45-60 frames of resting time per focal element.\n"
-            "6. TEXT CONCISION: 'text' content MUST BE STRICTLY 2-3 words maximum. Captures vibes only.\n"
+            "6. TEXT CONCISION: 'text' content MUST BE STRICTLY 2-3 words maximum. Capture feelings.\n"
             "7. MANDATORY: 'background_type': 'video', 'audio_enabled': true, 'camera.shake.enabled': false.\n"
             "8. SCRIPTS: For Bengali, ALWAYS use 'splitMode': 'word'.\n"
             f"9. DETECTED FONTS: {local_fonts}\n\n"

@@ -18,19 +18,6 @@ def print_banner(text):
     print(f" {text}")
     print("="*80)
 
-def get_video_duration(path):
-    """Probes video duration using ffprobe."""
-    try:
-        cmd = [
-            'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
-            '-of', 'default=noprint_wrappers=1:nokey=1', path
-        ]
-        output = subprocess.check_output(cmd).decode('utf-8').strip()
-        return float(output)
-    except Exception as e:
-        print(f"⚠️  Error probing {path}: {e}")
-        return None
-
 # 1. Mount Google Drive
 print_banner("📂 MOUNTING GOOGLE DRIVE")
 from google.colab import drive
@@ -41,6 +28,7 @@ PROJECT_NAME = "counterism-engine"
 DRIVE_BASE_PATH = "/content/drive/MyDrive/Counterism_Studio_V4"
 REPO_URL = "https://github.com/mailsabbirdu-bot/counterism-engine"
 
+%cd /content
 if not os.path.exists(PROJECT_NAME):
     print(f"🚀 Cloning repository: {REPO_URL}")
     !git clone {REPO_URL}
@@ -54,27 +42,22 @@ print_banner("🔍 ASSET VERIFICATION & COPYING")
 
 # Crucial: Clean and create directories in the correct order
 !rm -rf public/renders
-os.makedirs("public/renders/audios", exist_ok=True)
-os.makedirs("public/audio", exist_ok=True)
-os.makedirs("public/fonts", exist_ok=True)
+!mkdir -p public/renders/audios
+!mkdir -p public/audio
+!mkdir -p public/fonts
 
 # Sync Background Videos
 drive_renders = f"{DRIVE_BASE_PATH}/renders"
 if os.path.exists(drive_renders):
     print(f"📡 Syncing renders from: {drive_renders}")
-    # Copy all mp4 files from the renders root, but ignore the audios subfolder which we sync separately
     !find {drive_renders} -maxdepth 1 -name "*.mp4" -exec cp -t public/renders/ {{}} +
-    print(f"✅ Synced background videos.")
 else:
     print(f"❌ FATAL: 'renders' folder NOT FOUND in Drive: {drive_renders}")
 
 # Sync Voiceovers
 drive_audio = f"{DRIVE_BASE_PATH}/audio"
 if os.path.exists(drive_audio):
-    print(f"📡 Syncing voiceovers from: {drive_audio}")
-    !rm -rf public/audio/*
     !cp -r {drive_audio}/* public/audio/
-    print(f"✅ Synced voiceover files.")
 
 # Sync SFX (from multiple possible locations)
 print("📡 Searching for SFX assets...")
@@ -83,30 +66,18 @@ for sfx_path in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/render
         print(f"📦 Syncing SFX from: {sfx_path}")
         !cp -ru {sfx_path}/* public/renders/audios/ 2>/dev/null || true
 
-sfx_count = len(os.listdir("public/renders/audios"))
-print(f"✅ Synced {sfx_count} SFX assets.")
-
 # Sync Fonts
 drive_fonts = f"{DRIVE_BASE_PATH}/fonts"
 if os.path.exists(drive_fonts):
-    print(f"📡 Syncing fonts from: {drive_fonts}")
-    !rm -rf public/fonts/*
     !cp -r {drive_fonts}/* public/fonts/
-    print(f"✅ Synced font assets.")
-else:
-    print(f"⚠️  Drive fonts folder NOT FOUND: {drive_fonts}")
 
 # 4. Manifest Verification
 print_banner("📜 MANIFEST VERIFICATION")
-
-MANIFEST_DIR = f"{DRIVE_BASE_PATH}/manifests"
-DRIVE_JSON = f"{MANIFEST_DIR}/remotion_render.json"
-
+DRIVE_JSON = f"{DRIVE_BASE_PATH}/manifests/remotion_render.json"
 if os.path.exists(DRIVE_JSON):
     print(f"✅ Found Drive manifest: {DRIVE_JSON}")
 else:
     print(f"❌ FATAL: Manifest NOT FOUND in Drive: {DRIVE_JSON}")
-    print("Please place your 'remotion_render.json' in the manifests folder on Google Drive.")
 
 # 5. Install Dependencies
 print_banner("🛠️ INSTALLING DEPENDENCIES")
@@ -115,32 +86,15 @@ print_banner("🛠️ INSTALLING DEPENDENCIES")
 
 # 6. Render Pipeline
 print_banner("🎬 STARTING RENDERING PIPELINE")
-# The pipeline will automatically use remotion_render.json from Google Drive by default
 !npm run render -- --concurrency=1
 
 # 7. Automatic Drive Upload
 print_banner("💾 SAVING RESULTS TO GOOGLE DRIVE")
-
 LOCAL_RENDER_DIR = "renders/overlays/remotion"
 DRIVE_RENDER_DIR = f"{DRIVE_BASE_PATH}/renders/overlays/remotion"
-
-# Check both local and drive locations (since render.ts might output to Drive directly)
-if os.path.exists(LOCAL_RENDER_DIR) or os.path.exists(DRIVE_RENDER_DIR):
-    # Ensure Drive destination exists
-    print(f"📡 Verifying Drive directory: {DRIVE_RENDER_DIR}")
+if os.path.exists(LOCAL_RENDER_DIR):
     os.makedirs(DRIVE_RENDER_DIR, exist_ok=True)
-
-    if os.path.exists(LOCAL_RENDER_DIR):
-        print("📦 Syncing local renders to Drive...")
-        !cp -rvu {LOCAL_RENDER_DIR}/* {DRIVE_RENDER_DIR}/
-    else:
-        print("ℹ️  Renders already produced in Drive directory.")
-
-    # Final verification of upload
-    drive_count = len(os.listdir(DRIVE_RENDER_DIR))
-    print(f"✅ Process complete. {drive_count} files currently in Drive render folder.")
-else:
-    print("❌ FATAL: Render directory NOT FOUND in local or Drive. Rendering may have failed.")
+    !cp -rvu {LOCAL_RENDER_DIR}/* {DRIVE_RENDER_DIR}/
 
 print_banner("🏁 PROCESS COMPLETE")
 ```
