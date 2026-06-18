@@ -113,17 +113,31 @@ class VideoProcessor:
             if detected_lang:
                 print(f"📝 Language context: {detected_lang}")
 
-            # Transcribe with stable-whisper for precise word-level timestamps
-            # Stable whisper is much more reliable on CPU and for various languages
-            result = model.transcribe(video_path, language=detected_lang, regroup=True)
+            # Perform alignment with story.txt content for exact word matching
+            # We use the ground truth text from story.txt and let whisper find the timings
+            print(f"🎬 Aligning script with audio for {filename}...")
+
+            # Use detected language to help alignment
+            # Stable Whisper's align method works best when providing the exact script
+            try:
+                # We prioritize the provided script text for alignment
+                if scene_text:
+                    result = model.align(video_path, scene_text, language=detected_lang)
+                else:
+                    # Fallback to transcription if scene text is missing
+                    result = model.transcribe(video_path, language=detected_lang, regroup=True)
+            except Exception as e:
+                print(f"⚠️ Alignment failed: {e}. Falling back to transcription.")
+                result = model.transcribe(video_path, language=detected_lang, regroup=True)
 
             scene_label = f"SCENE_{i+1:02d}"
             for segment in result.segments:
                 for word_info in segment.words:
-                    start_frame = int(round(word_info.start * 30))
-                    end_frame = int(round(word_info.end * 30))
+                    s_sec, e_sec = word_info.start, word_info.end
+                    s_f, e_f = int(round(s_sec * 30)), int(round(e_sec * 30))
                     word = word_info.word.strip()
-                    all_timestamps.append(f"{scene_label}: [{start_frame} - {end_frame}] \"{word}\"")
+                    # Format: SCENE_XX: [Original: 0.12s - 0.50s] -> [30fps: 4f - 15f] "Word"
+                    all_timestamps.append(f"{scene_label}: [Original: {s_sec:.2f}s - {e_sec:.2f}s] -> [30fps: {s_f}f - {e_f}f] \"{word}\"")
 
             print(f"✅ Timestamps generated for {filename}")
 
