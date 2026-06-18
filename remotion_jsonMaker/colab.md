@@ -46,30 +46,42 @@ print_banner("🔗 LINKING DRIVE ASSETS")
 !rm -rf public/renders/audios
 !mkdir -p public/renders/audios
 
-# Deep link SFX files (Search multiple possible Drive locations)
-print("Linking audio SFX files...")
-for drive_sfx in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/render/audio"]:
+# 1. SFX Assets
+print("\n🎵 --- SYNCING SFX ASSETS ---")
+for drive_sfx in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/render/audio", f"{DRIVE_BASE_PATH}/audio"]:
     if os.path.exists(drive_sfx):
-        print(f"📦 Found SFX folder: {drive_sfx}")
-        !find {drive_sfx} -maxdepth 2 -type f -exec ln -sf '{}' public/renders/audios/ ';' 2>/dev/null
+        print(f"🔍 Searching for SFX in: {drive_sfx}")
+        !find {drive_sfx} -maxdepth 2 -type f \( -iname "*.mp3" -o -iname "*.wav" -o -iname "*.m4a" \) -exec ln -sf '{}' public/renders/audios/ ';' 2>/dev/null
+        s_count = !ls public/renders/audios/ | wc -l
+        print(f"📦 Found and linked {s_count[0]} SFX files.")
+        break
+else:
+    print("⚠️ WARNING: No SFX folder found in common Drive locations.")
 
-# Sync background videos and fonts
-print("Linking background videos...")
+# 2. Background Videos
+print("\n🎬 --- SYNCING BACKGROUND VIDEOS ---")
+print(f"🔍 Searching for videos in: {DRIVE_BASE_PATH}/renders")
 !find {DRIVE_BASE_PATH}/renders -maxdepth 1 -name "*.mp4" -exec ln -sf '{}' public/renders/ ';' 2>/dev/null
 v_count = !ls public/renders/*.mp4 | wc -l
-print(f"✅ Linked {v_count[0]} background videos.")
+print(f"✅ Linked {v_count[0]} background videos into public/renders/")
+if int(v_count[0]) > 0:
+    !ls -lh public/renders/*.mp4
 
-print("Linking fonts...")
+# 3. Fonts
+print("\n✍️ --- SYNCING FONTS ---")
+print(f"🔍 Searching for fonts in base path: {DRIVE_BASE_PATH}")
 # Try both the direct fonts folder and a recursive search
 if os.path.exists(f"{DRIVE_BASE_PATH}/fonts"):
     !ln -sf {DRIVE_BASE_PATH}/fonts/* public/fonts/ 2>/dev/null
 # Direct recursive search for all supported font files in the base Drive path to be thorough
-!find {DRIVE_BASE_PATH} -maxdepth 4 -type f \( -iname "*.ttf" -o -iname "*.otf" -o -iname "*.woff" -o -iname "*.woff2" \) -exec ln -sf '{}' public/fonts/ ';' 2>/dev/null
+!find {DRIVE_BASE_PATH} -maxdepth 5 -type f \( -iname "*.ttf" -o -iname "*.otf" -o -iname "*.woff" -o -iname "*.woff2" \) -exec ln -sf '{}' public/fonts/ ';' 2>/dev/null
 
 f_count = !ls public/fonts/ | wc -l
 print(f"✅ Linked {f_count[0]} fonts into public/fonts/")
+if int(f_count[0]) > 0:
+    !ls public/fonts/
 
-print("✅ Drive assets linked to public folder.")
+print("\n✨ All Drive assets successfully linked to local public folder.")
 
 %cd remotion_jsonMaker
 
