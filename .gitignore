@@ -4,3 +4,5 @@ renders/overlays/remotion/*.mp4
 .remotion
 dist
 build
+__pycache__
+*.pyc
