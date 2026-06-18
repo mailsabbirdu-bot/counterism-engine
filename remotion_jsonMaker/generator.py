@@ -18,6 +18,7 @@ class RemotionJsonMaker:
         self.browser = None
         self.context = None
         self.page = None
+        self.probe_cache = {} # Cache for video metadata to prevent terminal clutter
 
     def start_browser(self):
         if self.page: return
@@ -47,14 +48,22 @@ class RemotionJsonMaker:
                 with open(path, 'r', encoding='utf-8') as f: guidelines += f"\n--- {os.path.basename(path)} ---\n{f.read()}\n"
         return guidelines
 
-    def probe_video_duration_and_fps(self, video_path: str):
+    def probe_video_duration_and_fps(self, video_path: str, verbose: bool = True):
+        # Use cache to avoid redundant terminal spam
+        if video_path in self.probe_cache:
+            return self.probe_cache[video_path]
+
         try:
             # High-precision JSON probe (matches user manual verification script)
             cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate,avg_frame_rate,nb_frames,duration", "-of", "json", video_path]
             output = subprocess.check_output(cmd).decode("utf-8")
             data = json.loads(output)
-            stream = data.get('streams', [{}])[0]
+            streams = data.get('streams', [])
+            if not streams:
+                 print(f"   ⚠️ FFprobe: No streams found in {video_path}")
+                 return 0.0, 30.0
 
+            stream = streams[0]
             duration_sec = float(stream.get("duration", 0))
 
             # Original FPS
@@ -67,20 +76,23 @@ class RemotionJsonMaker:
             if nb_frames is not None:
                 total_frames = int(nb_frames)
             else:
-                total_frames = round(duration_sec * native_fps)
+                total_frames = int(round(duration_sec * native_fps))
 
             # Target is always 30.0 for our rendering engine
             frames_at_30fps = int(round(duration_sec * 30))
 
-            print("\n" + "="*70)
-            print(f"📹 {os.path.basename(video_path)}")
-            print(f"Duration          : {duration_sec:.3f} sec")
-            print(f"Original FPS      : {native_fps:.3f}")
-            print(f"Total Frames      : {total_frames}")
-            print(f"Frames @ 30 FPS   : {frames_at_30fps}")
-            print("="*70)
+            if verbose:
+                print("\n" + "="*70)
+                print(f"📹 {os.path.basename(video_path)}")
+                print(f"Duration          : {duration_sec:.3f} sec")
+                print(f"Original FPS      : {native_fps:.3f}")
+                print(f"Total Frames      : {total_frames}")
+                print(f"Frames @ 30 FPS   : {frames_at_30fps}")
+                print("="*70)
 
-            return duration_sec, 30.0
+            res = (duration_sec, 30.0)
+            self.probe_cache[video_path] = res
+            return res
         except Exception as e:
             print(f"⚠️ Error probing video {video_path}: {e}")
             return 0.0, 30.0
@@ -139,12 +151,13 @@ class RemotionJsonMaker:
         if not data.get('scenes'): return data
         data['global_settings'] = { "width": 1920, "height": 1080, "fps": 30 }
 
-        # Calibrated base sizes for center-anchored overlays
+        # Baseline sizes for center-anchored overlays (Width, Height)
+        # These are used as starting points for collision detection
         TYPE_SIZES = {
             'text': (600, 120),
             'chart': (1000, 600),
-            'ui_panel': (700, 500),
-            'data_indicator': (450, 400),
+            'ui_panel': (800, 550),
+            'data_indicator': (500, 450),
             'media': (900, 700),
             'image': (900, 700),
             'video': (900, 700)
@@ -199,20 +212,27 @@ class RemotionJsonMaker:
                     w, h = TYPE_SIZES.get(ov_type, (800, 800))
 
                     if ov_type == 'text':
-                        # Dynamic Text Footprint Estimation
+                        # Advanced Text Footprint Detection
                         content = ov.get('content') or ov.get('text', '')
-                        lines = content.count('\n') + 1
+                        lines = content.split('\n')
+                        line_count = len(lines)
+                        max_line_len = len(max(lines, key=len)) if lines else 0
+
                         fs_match = re.search(r'(\d+)', ov.get('fontSize', '64'))
                         fs = int(fs_match.group(1)) if fs_match else 64
 
-                        # Bangla characters are wider/taller; scale box accordingly
-                        is_bangla = any(ord(c) > 127 for c in content)
-                        w = min(1600, len(max(content.split('\n'), key=len)) * (fs * (0.8 if is_bangla else 0.6)))
-                        h = lines * (fs * (1.5 if is_bangla else 1.3))
+                        # Scale based on script and density
+                        is_indic = any(ord(c) > 127 for c in content)
+                        char_w = fs * (0.9 if is_indic else 0.65)
+                        line_h = fs * (1.6 if is_indic else 1.4)
+
+                        w = min(1650, max_line_len * char_w + 100)
+                        h = line_count * line_h + 80
 
                     elif ov_type == 'chart':
-                        w = ov.get('width', 1000) + 100
-                        h = ov.get('height', 600) + 100
+                        # Charts have generous padding for labels/legends
+                        w = int(ov.get('width', 1000)) + 150
+                        h = int(ov.get('height', 600)) + 120
 
                     # 1. Professional Slot Alignment & De-confliction
                     slot_name = ov.get('slot', '')
@@ -250,13 +270,12 @@ class RemotionJsonMaker:
                                     collision_found = True
 
                                     # Nudge logic: try vertical first, then horizontal
-                                    if abs(y1 - y2) < (h + prev_h) / 2:
-                                        # Resolve vertically
-                                        if y1 <= y2: ov['position']['y'] = y2 - (h + prev_h) / 2 - 60
-                                        else: ov['position']['y'] = y2 + (h + prev_h) / 2 + 60
+                                    # Resolve vertically
+                                    if y1 <= y2: ov['position']['y'] = y2 - (h + prev_h) / 2 - 60
+                                    else: ov['position']['y'] = y2 + (h + prev_h) / 2 + 60
 
-                                    # Secondary check: if vertical nudge pushed it off-screen, try horizontal
-                                    if ov['position']['y'] < 200 or ov['position']['y'] > 880:
+                                    # Boundary protection: if vertical nudge pushed it off-screen, resolve horizontally instead
+                                    if ov['position']['y'] < 150 + h/2 or ov['position']['y'] > 930 - h/2:
                                         ov['position']['y'] = y1 # reset y
                                         if x1 <= x2: ov['position']['x'] = x2 - (w + prev_w) / 2 - 80
                                         else: ov['position']['x'] = x2 + (w + prev_w) / 2 + 80
@@ -281,26 +300,37 @@ class RemotionJsonMaker:
 
                     # Timing Safety & Cinematic Pacing
                     min_duration = 120 if ov_type in ['chart', 'ui_panel', 'data_indicator'] else 60
-                    if ov.get('start', 0) >= scene_duration:
-                        ov['start'] = max(0, scene_duration - min_duration)
+                    ov_start = ov.get('start', 0)
+                    ov_duration = ov.get('duration', 60)
 
-                    if ov.get('duration', 0) < min_duration:
-                        ov['duration'] = min_duration
+                    if ov_start >= scene_duration:
+                        ov_start = max(0, scene_duration - min_duration)
 
-                    if ov.get('start') + ov.get('duration') > scene_duration:
+                    if ov_duration < min_duration:
+                        ov_duration = min_duration
+
+                    if ov_start + ov_duration > scene_duration:
                         # Try to shift start back if possible, otherwise truncate
-                        if scene_duration >= min_duration:
-                            ov['start'] = max(0, scene_duration - ov['duration'])
-                            ov['duration'] = scene_duration - ov['start']
+                        if scene_duration >= ov_duration:
+                            ov_start = max(0, scene_duration - ov_duration)
+                            ov_duration = scene_duration - ov_start
                         else:
-                            ov['duration'] = scene_duration - ov['start']
+                            ov_duration = scene_duration - ov_start
+
+                    # Update keys with sanitized values
+                    ov['start'] = ov_start
+                    ov['duration'] = ov_duration
+
+                    # Defensive timing for SFX
+                    ov_start = ov.get('start', 0)
+                    ov_duration = ov.get('duration', 60)
 
                     # Subtle local SFX (Volume 0.04) - Attached to each overlay
                     if in_files:
-                        sfx_manifest.append({ "scene_id": scene['scene_id'], "file": in_files[in_ptr % len(in_files)], "start": ov['start'], "end": ov['start'] + 20, "volume": 0.04 })
+                        sfx_manifest.append({ "scene_id": scene['scene_id'], "file": in_files[in_ptr % len(in_files)], "start": ov_start, "end": ov_start + 20, "volume": 0.04 })
                         in_ptr += 1
                     if out_files:
-                        sfx_manifest.append({ "scene_id": scene['scene_id'], "file": out_files[out_ptr % len(out_files)], "start": ov['start'] + ov['duration'] - 10, "end": ov['start'] + ov['duration'], "volume": 0.04 })
+                        sfx_manifest.append({ "scene_id": scene['scene_id'], "file": out_files[out_ptr % len(out_files)], "start": ov_start + ov_duration - 10, "end": ov_start + ov_duration, "volume": 0.04 })
                         out_ptr += 1
 
             # 4. Camera Shot Normalization (Resting Time)
@@ -632,6 +662,18 @@ def main():
     with open(args.story_file, 'r', encoding='utf-8') as f: story = f.read()
     maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, headless=args.headless)
     guidelines = maker.load_guidelines("../guideline.md", "../guideline_prompt.txt", args.drive_prompt)
+
+    # Pre-probe all videos early for transparency and caching
+    print("\n🔍 Initializing Asset Audit...")
+    public_dir = "../public"
+    renders_dir = os.path.join(public_dir, "renders")
+    if os.path.exists(renders_dir):
+        v_files = sorted([f for f in os.listdir(renders_dir) if f.lower().endswith('.mp4')])
+        for v in v_files:
+            maker.probe_video_duration_and_fps(os.path.join(renders_dir, v))
+    else:
+        print(f"   ⚠️ Renders directory not found: {renders_dir}")
+
     try:
         ts_content = None
         scene_durations = None

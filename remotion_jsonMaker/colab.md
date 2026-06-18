@@ -63,14 +63,23 @@ for drive_sfx in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/rende
 else:
     print("⚠️ WARNING: No SFX folder found in common Drive locations.")
 
-# 2. Background Videos
-print("\n🎬 --- SYNCING BACKGROUND VIDEOS ---")
+# 2. Background Videos & 30FPS Normalization
+print("\n🎬 --- SYNCING & NORMALIZING VIDEOS ---")
 print(f"🔍 Searching for videos in: {DRIVE_BASE_PATH}/renders")
-!find {DRIVE_BASE_PATH}/renders -maxdepth 1 -name "*.mp4" -exec ln -sf '{}' public/renders/ ';' 2>/dev/null
+!mkdir -p public/renders_raw
+!find {DRIVE_BASE_PATH}/renders -maxdepth 1 -name "*.mp4" -exec ln -sf '{}' public/renders_raw/ ';' 2>/dev/null
+
+v_files = !ls public/renders_raw/*.mp4
+print(f"📦 Found {len(v_files)} videos. Forcing 30FPS normalization...")
+
+for v in v_files:
+    fname = os.path.basename(v)
+    target = f"public/renders/{fname}"
+    print(f"   ⚡ Normalizing {fname} to constant 30fps...")
+    !ffmpeg -y -i {v} -filter:v fps=30 -c:v libx264 -preset superfast -crf 20 -c:a copy {target} -hide_banner -loglevel error
+
 v_count = !ls public/renders/*.mp4 | wc -l
-print(f"✅ Successfully linked {v_count[0]} background videos to public/renders/")
-if int(v_count[0]) > 0:
-    !ls -lh public/renders/*.mp4
+print(f"✅ Successfully normalized {v_count[0]} background videos to public/renders/")
 
 # 3. Fonts
 print("\n✍️ --- SYNCING FONTS ---")
