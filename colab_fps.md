@@ -25,7 +25,18 @@ def print_banner(text):
 # 1. Configuration
 DRIVE_BASE_PATH = "/content/drive/MyDrive/Counterism_Studio_V4"
 
-# 2. Setup
+# 2. Setup & Environment Cleanup
+print_banner("🧹 CLEANING ENVIRONMENT")
+site_pkgs = "/usr/local/lib/python3.12/dist-packages"
+if os.path.exists(site_pkgs):
+    cleaned = False
+    for d in os.listdir(site_pkgs):
+        if d.startswith("~"):
+            print(f"🗑️ Removing invalid distribution: {d}")
+            shutil.rmtree(os.path.join(site_pkgs, d), ignore_errors=True)
+            cleaned = True
+    if not cleaned: print("✅ No invalid distributions found.")
+
 print_banner("📂 MOUNTING GOOGLE DRIVE")
 if not os.path.exists("/content/drive"):
     drive.mount('/content/drive')
@@ -35,7 +46,6 @@ else:
 print_banner("🛠️ INSTALLING DEPENDENCIES")
 
 # Optimized installation for Colab default environment
-# We install stable-ts which is much more robust than whisperx for this environment
 print("🎬 Installing Stable Whisper and requirements...")
 !pip install --quiet stable-ts
 
@@ -100,14 +110,14 @@ class VideoProcessor:
         print(f"\n📂 Saved to {output_file}")
 
     def task2_timestamps(self):
-        print_banner("🎙️ Task 2: Word-level Timestamps (Stable Whisper)")
+        print_banner("🎙️ Task 2: Word-level Timestamps (Ground-Truth Alignment)")
         story_file = os.path.join(self.audio_dir, "story.txt")
         if not os.path.exists(story_file):
             print(f"⚠️ Story file not found at {story_file}"); return
 
         with open(story_file, "r", encoding="utf-8") as f: story_content = f.read()
         scenes_text = [s.strip() for s in re.split(r'দৃশ্য\s+[0-9০-৯]+', story_content) if s.strip()]
-        print(f"📖 Loaded {len(scenes_text)} scenes.")
+        print(f"📖 Loaded {len(scenes_text)} scenes from story.txt")
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"🖥️ Device: {device}")
@@ -123,13 +133,23 @@ class VideoProcessor:
             lang = self._detect_language_from_text(scene_text)
             if lang: print(f"📝 Language: {lang}")
 
-            result = model.transcribe(video_path, language=lang, regroup=True)
+            print(f"🎬 Aligning script with audio for {filename}...")
+            try:
+                if scene_text:
+                    result = model.align(video_path, scene_text, language=lang)
+                else:
+                    result = model.transcribe(video_path, language=lang, regroup=True)
+            except Exception as e:
+                print(f"⚠️ Alignment failed: {e}. Falling back to transcription.")
+                result = model.transcribe(video_path, language=lang, regroup=True)
+
             scene_label = f"SCENE_{i+1:02d}"
             for segment in result.segments:
                 for word in segment.words:
-                    s_f, e_f = int(round(word.start * 30)), int(round(word.end * 30))
-                    all_timestamps.append(f"{scene_label}: [{s_f} - {e_f}] \"{word.word.strip()}\"")
-            print(f"✅ Done {filename}")
+                    s_sec, e_sec = word.start, word.end
+                    s_f, e_f = int(round(s_sec * 30)), int(round(e_sec * 30))
+                    all_timestamps.append(f"{scene_label}: [Original: {s_sec:.2f}s - {e_sec:.2f}s] -> [30fps: {s_f}f - {e_f}f] \"{word.word.strip()}\"")
+            print(f"✅ Timestamps generated for {filename}")
 
         output_file = os.path.join(self.manifests_dir, "timestamp.txt")
         with open(output_file, "w", encoding="utf-8") as f: f.write("\n".join(all_timestamps))
@@ -145,5 +165,5 @@ fps_file = os.path.join(DRIVE_BASE_PATH, "manifests/fps_update.txt")
 ts_file = os.path.join(DRIVE_BASE_PATH, "manifests/timestamp.txt")
 if os.path.exists(fps_file): print(f"✅ FPS Manifest: {fps_file}")
 if os.path.exists(ts_file): print(f"✅ Timestamp Manifest: {ts_file}")
-print("\n✨ Success.")
+print("\n✨ Process completed successfully.")
 ```
