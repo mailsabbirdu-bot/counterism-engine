@@ -49,35 +49,36 @@ class RemotionJsonMaker:
 
     def probe_video_duration_and_fps(self, video_path: str):
         try:
-            # High-precision JSON probe
-            cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration,avg_frame_rate,nb_frames:format=duration", "-of", "json", video_path]
+            # High-precision JSON probe (matches user manual verification script)
+            cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate,avg_frame_rate,nb_frames,duration", "-of", "json", video_path]
             output = subprocess.check_output(cmd).decode("utf-8")
             data = json.loads(output)
             stream = data.get('streams', [{}])[0]
-            fmt = data.get('format', {})
 
-            # Get duration from stream or format
-            duration_sec = float(stream.get('duration') or fmt.get('duration') or 0)
+            duration_sec = float(stream.get("duration", 0))
 
-            # Parse Native FPS
-            fps_raw = stream.get('avg_frame_rate', '30/1')
-            if '/' in fps_raw:
-                num, den = map(int, fps_raw.split('/'))
-                native_fps = num / den if den != 0 else 30.0
+            # Original FPS
+            fps_raw = stream.get("avg_frame_rate", "0/1")
+            num, den = map(int, fps_raw.split("/"))
+            native_fps = num / den if den else 0
+
+            # Total frames calculation
+            nb_frames = stream.get("nb_frames")
+            if nb_frames is not None:
+                total_frames = int(nb_frames)
             else:
-                native_fps = float(fps_raw)
-
-            # Fallback for duration if missing but frames are present
-            if duration_sec == 0 and stream.get('nb_frames'):
-                duration_sec = int(stream['nb_frames']) / native_fps
+                total_frames = round(duration_sec * native_fps)
 
             # Target is always 30.0 for our rendering engine
-            # We use round() to match user's manual verification results
             frames_at_30fps = int(round(duration_sec * 30))
 
-            print(f"   🎥 Probed {os.path.basename(video_path)}:")
-            print(f"      Duration: {duration_sec:.3f}s | Native: {native_fps:.2f}fps")
-            print(f"      Target: 30fps | Total: {frames_at_30fps} frames")
+            print("\n" + "="*70)
+            print(f"📹 {os.path.basename(video_path)}")
+            print(f"Duration          : {duration_sec:.3f} sec")
+            print(f"Original FPS      : {native_fps:.3f}")
+            print(f"Total Frames      : {total_frames}")
+            print(f"Frames @ 30 FPS   : {frames_at_30fps}")
+            print("="*70)
 
             return duration_sec, 30.0
         except Exception as e:
@@ -138,15 +139,15 @@ class RemotionJsonMaker:
         if not data.get('scenes'): return data
         data['global_settings'] = { "width": 1920, "height": 1080, "fps": 30 }
 
-        # Professional sizes with higher safety margin
+        # Calibrated base sizes for center-anchored overlays
         TYPE_SIZES = {
-            'text': (1200, 300),
-            'chart': (1300, 750),
-            'ui_panel': (750, 600),
-            'data_indicator': (600, 500),
-            'media': (1000, 800),
-            'image': (1000, 800),
-            'video': (1000, 800)
+            'text': (600, 120),
+            'chart': (1000, 600),
+            'ui_panel': (700, 500),
+            'data_indicator': (450, 400),
+            'media': (900, 700),
+            'image': (900, 700),
+            'video': (900, 700)
         }
 
         # Logical sectors (Safe Zones)
@@ -196,9 +197,22 @@ class RemotionJsonMaker:
                 for i, ov in enumerate(scene['overlays']):
                     ov_type = ov.get('type', 'text')
                     w, h = TYPE_SIZES.get(ov_type, (800, 800))
-                    if ov_type == 'chart':
-                        w = ov.get('width', 1000) + 300
-                        h = ov.get('height', 650) + 300
+
+                    if ov_type == 'text':
+                        # Dynamic Text Footprint Estimation
+                        content = ov.get('content') or ov.get('text', '')
+                        lines = content.count('\n') + 1
+                        fs_match = re.search(r'(\d+)', ov.get('fontSize', '64'))
+                        fs = int(fs_match.group(1)) if fs_match else 64
+
+                        # Bangla characters are wider/taller; scale box accordingly
+                        is_bangla = any(ord(c) > 127 for c in content)
+                        w = min(1600, len(max(content.split('\n'), key=len)) * (fs * (0.8 if is_bangla else 0.6)))
+                        h = lines * (fs * (1.5 if is_bangla else 1.3))
+
+                    elif ov_type == 'chart':
+                        w = ov.get('width', 1000) + 100
+                        h = ov.get('height', 600) + 100
 
                     # 1. Professional Slot Alignment & De-confliction
                     slot_name = ov.get('slot', '')
@@ -220,28 +234,34 @@ class RemotionJsonMaker:
                          selected = keys[i % len(keys)]
                          ov['position'] = {"x": SECTORS[selected]["x"], "y": SECTORS[selected]["y"]}
 
-                    # 2. Collision Nudging (AABB - Axis-Aligned Bounding Box)
-                    for attempt in range(5): # Multiple nudges if needed
+                    # 2. Multi-Directional Collision Nudging (AABB Multi-Pass)
+                    for attempt in range(15):
                         collision_found = False
                         for prev_ov, prev_w, prev_h in placed_overlays:
-                            start1, end1 = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', 60)
-                            start2, end2 = prev_ov.get('start', 0), prev_ov.get('start', 0) + prev_ov.get('duration', 60)
+                            s1, e1 = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', 60)
+                            s2, e2 = prev_ov.get('start', 0), prev_ov.get('start', 0) + prev_ov.get('duration', 60)
 
-                            if max(start1, start2) < min(end1, end2):
+                            if max(s1, s2) < min(e1, e2):
                                 x1, y1 = ov['position']['x'], ov['position']['y']
                                 x2, y2 = prev_ov['position']['x'], prev_ov['position']['y']
 
-                                # Check for AABB overlap
+                                # Overlap check with 50px comfort buffer
                                 if abs(x1 - x2) < (w + prev_w) / 2 + 50 and abs(y1 - y2) < (h + prev_h) / 2 + 50:
                                     collision_found = True
-                                    # Nudge vertically
-                                    if y1 <= y2: ov['position']['y'] = y2 - (h + prev_h) / 2 - 80
-                                    else: ov['position']['y'] = y2 + (h + prev_h) / 2 + 80
 
-                                    # If still overlapping, nudge horizontally
-                                    if abs(ov['position']['y'] - y2) < (h + prev_h) / 2 + 20:
-                                         if x1 <= x2: ov['position']['x'] = x2 - (w + prev_w) / 2 - 80
-                                         else: ov['position']['x'] = x2 + (w + prev_w) / 2 + 80
+                                    # Nudge logic: try vertical first, then horizontal
+                                    if abs(y1 - y2) < (h + prev_h) / 2:
+                                        # Resolve vertically
+                                        if y1 <= y2: ov['position']['y'] = y2 - (h + prev_h) / 2 - 60
+                                        else: ov['position']['y'] = y2 + (h + prev_h) / 2 + 60
+
+                                    # Secondary check: if vertical nudge pushed it off-screen, try horizontal
+                                    if ov['position']['y'] < 200 or ov['position']['y'] > 880:
+                                        ov['position']['y'] = y1 # reset y
+                                        if x1 <= x2: ov['position']['x'] = x2 - (w + prev_w) / 2 - 80
+                                        else: ov['position']['x'] = x2 + (w + prev_w) / 2 + 80
+
+                                    print(f"   🔧 Nudging {ov['id']} to resolve overlap with {prev_ov['id']} -> New Pos: ({int(ov['position']['x'])}, {int(ov['position']['y'])})")
                         if not collision_found: break
 
                     # 3. Final Rigid Canvas Safety Clamping (150px safety zone)
@@ -370,7 +390,8 @@ class RemotionJsonMaker:
                     if get_msg_count() <= initial_count: continue
 
                     # Speed Optimization: If 'Stop generating' button is gone, the response is likely done.
-                    is_generating = page.is_visible(stop_btn, timeout=500)
+                    try: is_generating = page.locator(stop_btn).is_visible()
+                    except: is_generating = False
 
                     current_text = ""
                     for sel in response_selectors:
