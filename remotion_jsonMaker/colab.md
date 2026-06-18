@@ -48,12 +48,17 @@ print_banner("🔗 LINKING DRIVE ASSETS")
 
 # 1. SFX Assets
 print("\n🎵 --- SYNCING SFX ASSETS ---")
-for drive_sfx in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/render/audio", f"{DRIVE_BASE_PATH}/audio"]:
+for drive_sfx in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/renders/audio", f"{DRIVE_BASE_PATH}/render/audio", f"{DRIVE_BASE_PATH}/audio"]:
     if os.path.exists(drive_sfx):
         print(f"🔍 Searching for SFX in: {drive_sfx}")
-        !find {drive_sfx} -maxdepth 2 -type f \( -iname "*.mp3" -o -iname "*.wav" -o -iname "*.m4a" \) -exec ln -sf '{}' public/renders/audios/ ';' 2>/dev/null
+        # Be extremely inclusive: Link everything in the audio folder
+        !ln -sf {drive_sfx}/* public/renders/audios/ 2>/dev/null
+        # Also try a recursive find for safety
+        !find {drive_sfx} -maxdepth 2 -type f \( -iname "*.mp3" -o -iname "*.wav" -o -iname "*.m4a" -o -iname "*.aac" -o -iname "*.ogg" \) -exec ln -sf '{}' public/renders/audios/ ';' 2>/dev/null
         s_count = !ls public/renders/audios/ | wc -l
         print(f"📦 Found and linked {s_count[0]} SFX files.")
+        if int(s_count[0]) > 0:
+            !ls public/renders/audios/
         break
 else:
     print("⚠️ WARNING: No SFX folder found in common Drive locations.")

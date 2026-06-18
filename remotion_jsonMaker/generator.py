@@ -157,10 +157,12 @@ class RemotionJsonMaker:
         print(f"📂 Searching for SFX materials in: {os.path.abspath(audio_dir)}")
         if os.path.exists(audio_dir):
             all_files = os.listdir(audio_dir)
-            in_files = sorted([f for f in all_files if f.lower().startswith("in_") and f.lower().endswith(('.mp3', '.wav', '.m4a'))])
-            out_files = sorted([f for f in all_files if f.lower().startswith("out_") and f.lower().endswith(('.mp3', '.wav', '.m4a'))])
-            print(f"   🎵 Found {len(in_files)} entrance sounds: {in_files[:5]}...")
-            print(f"   🎵 Found {len(out_files)} exit sounds: {out_files[:5]}...")
+            # More flexible detection: "in_1", "in1", "intro", etc.
+            in_files = sorted([f for f in all_files if re.match(r'^(in[_\-]?\d*|intro)', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
+            out_files = sorted([f for f in all_files if re.match(r'^(out[_\-]?\d*|outro|exit)', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
+            print(f"   🎵 Scanned {len(all_files)} total files in SFX folder.")
+            print(f"   🎵 Detected {len(in_files)} entrance sounds: {in_files[:5]}...")
+            print(f"   🎵 Detected {len(out_files)} exit sounds: {out_files[:5]}...")
         else:
             print(f"   ⚠️ SFX directory not found: {audio_dir}")
 
@@ -446,6 +448,9 @@ class RemotionJsonMaker:
             # Cleanup comments and common syntax issues
             json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
             json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
+
+            # Remove trailing commas that often appear before the closing brace in LLM responses
+            json_str = re.sub(r',\s*([\]}])', r'\1', json_str)
 
             def repair_json(s):
                 s = s.strip()
