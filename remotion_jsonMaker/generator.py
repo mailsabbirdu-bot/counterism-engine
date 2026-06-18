@@ -49,26 +49,24 @@ class RemotionJsonMaker:
 
     def probe_video_duration_and_fps(self, video_path: str):
         try:
-            # Precise probe for duration and native fps
-            cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration,avg_frame_rate", "-of", "default=noprint_wrappers=1:nokey=1", video_path]
-            output = subprocess.check_output(cmd).decode("utf-8").strip().split('\n')
+            # Reliable JSON-based probe
+            cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration,avg_frame_rate", "-of", "json", video_path]
+            output = subprocess.check_output(cmd).decode("utf-8")
+            data = json.loads(output)
+            streams = data.get('streams', [])
+            stream = streams[0] if streams else {}
 
-            duration_sec = 0.0
-            native_fps = 30.0
+            # Duration can be in stream or format
+            duration_sec = float(stream.get('duration', data.get('format', {}).get('duration', 0)))
 
-            if len(output) >= 1:
-                duration_sec = float(output[0])
+            fps_raw = stream.get('avg_frame_rate', '30/1')
+            if '/' in fps_raw:
+                num, den = fps_raw.split('/')
+                native_fps = float(num) / float(den) if float(den) != 0 else 30.0
+            else:
+                native_fps = float(fps_raw)
 
-            if len(output) >= 2:
-                # avg_frame_rate is usually in "num/den" format
-                fps_raw = output[1]
-                if '/' in fps_raw:
-                    num, den = fps_raw.split('/')
-                    if float(den) != 0: native_fps = float(num) / float(den)
-                else:
-                    native_fps = float(fps_raw)
-
-            # We always return 30.0 as the target FPS for our engine
+            # Target is always 30.0 for our rendering engine
             return duration_sec, 30.0
         except Exception as e:
             print(f"⚠️ Error probing video {video_path}: {e}")
@@ -101,7 +99,7 @@ class RemotionJsonMaker:
         print(f"📂 Scanning for fonts in: {fonts_dir}")
 
         # Categorization keywords
-        BANGLA_KEYWORDS = ['solaiman', 'kalpurush', 'nikosh', 'hind', 'siliguri', 'adorsho', 'sutonny', 'shonar', 'vrinda', 'bangla', 'liyakats', 'anshu', 'charukola', 'galada', 'mina', 'mukti', 'atreyee', 'benisen', 'bengali']
+        BANGLA_KEYWORDS = ['solaiman', 'kalpurush', 'nikosh', 'hind', 'siliguri', 'adorsho', 'sutonny', 'shonar', 'vrinda', 'bangla', 'liyakats', 'anshu', 'charukola', 'galada', 'mina', 'mukti', 'atreyee', 'benisen', 'bengali', 'shishir', 'shorif', 'maharaj']
 
         if os.path.exists(fonts_dir):
             for root, dirs, files in os.walk(fonts_dir, followlinks=True):
