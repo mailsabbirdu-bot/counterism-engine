@@ -47,10 +47,16 @@ class RemotionJsonMaker:
                 with open(path, 'r', encoding='utf-8') as f: guidelines += f"\n--- {os.path.basename(path)} ---\n{f.read()}\n"
         return guidelines
 
+    def _get_ff_tool(self, tool: str) -> List[str]:
+        if shutil.which(tool):
+            return [tool]
+        # Fallback for environments where ffmpeg/ffprobe is bundled with Remotion
+        return ["npx", "remotion", tool]
+
     def probe_video_duration_and_fps(self, video_path: str):
         try:
             # High-precision JSON probe (matches user manual verification script)
-            cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate,avg_frame_rate,nb_frames,duration", "-of", "json", video_path]
+            cmd = self._get_ff_tool("ffprobe") + ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate,avg_frame_rate,nb_frames,duration", "-of", "json", video_path]
             output = subprocess.check_output(cmd).decode("utf-8")
             data = json.loads(output)
             stream = data.get('streams', [{}])[0]
@@ -70,7 +76,11 @@ class RemotionJsonMaker:
                 total_frames = round(duration_sec * native_fps)
 
             # Target is always 30.0 for our rendering engine
-            frames_at_30fps = int(round(duration_sec * 30))
+            # NEW: Use frames to calculate, not seconds, for 100% precision
+            if native_fps > 0:
+                frames_at_30fps = int(round(total_frames * 30 / native_fps))
+            else:
+                frames_at_30fps = int(round(duration_sec * 30))
 
             print("\n" + "="*70)
             print(f"📹 {os.path.basename(video_path)}")
@@ -80,7 +90,8 @@ class RemotionJsonMaker:
             print(f"Frames @ 30 FPS   : {frames_at_30fps}")
             print("="*70)
 
-            return duration_sec, 30.0
+            # Return frames instead of seconds for the first parameter to satisfy the new requirement
+            return float(frames_at_30fps), 30.0
         except Exception as e:
             print(f"⚠️ Error probing video {video_path}: {e}")
             return 0.0, 30.0
@@ -93,9 +104,9 @@ class RemotionJsonMaker:
                 rel_vpath = vpath_match.group(1)
                 abs_vpath = os.path.join(public_dir, rel_vpath)
                 if os.path.exists(abs_vpath):
-                    duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
-                    if duration_sec > 0:
-                        new_duration = int(round(duration_sec * 30))
+                    frames_at_30fps, _ = self.probe_video_duration_and_fps(abs_vpath)
+                    if frames_at_30fps > 0:
+                        new_duration = int(frames_at_30fps)
                         return re.sub(r'"duration_in_frames"\s*:\s*\d+', f'"duration_in_frames": {new_duration}', block)
             return block
         pattern1 = r'("video_path":\s*"[^"]+"(?:(?!"video_path"|"duration_in_frames").){0,300}?"duration_in_frames"\s*:\s*\d+)'
@@ -187,9 +198,9 @@ class RemotionJsonMaker:
             if scene.get('background_type') == 'video' and scene.get('video_path'):
                 abs_vpath = os.path.join(public_dir, scene['video_path'])
                 if os.path.exists(abs_vpath):
-                    duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
-                    if duration_sec > 0:
-                        scene_duration = int(round(duration_sec * 30))
+                    frames_at_30fps, _ = self.probe_video_duration_and_fps(abs_vpath)
+                    if frames_at_30fps > 0:
+                        scene_duration = int(frames_at_30fps)
                         scene['duration_in_frames'] = scene_duration
 
             placed_overlays = []
@@ -328,11 +339,12 @@ class RemotionJsonMaker:
         for i, scene_text in enumerate(scene_texts):
             scene_num = i + 1
             vpath = f"renders/scene_SC_{scene_num:02d}.mp4"
-            duration_sec = 6.0
             abs_vpath = os.path.join(public_dir, vpath)
             if os.path.exists(abs_vpath):
-                duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
-            total_frames = int(round(duration_sec * 30))
+                frames_at_30fps, _ = self.probe_video_duration_and_fps(abs_vpath)
+                total_frames = int(frames_at_30fps)
+            else:
+                total_frames = 180 # Fallback
             scene_durations.append(total_frames)
             print(f"   ⏱️ Syncing SCENE {scene_num:02d}: Mapping voiceover to {total_frames} frames (30fps)")
             full_ts_prompt += f"--- SCENE {scene_num:02d} (Duration: {total_frames} frames) ---\nVOICEOVER: {scene_text}\n\n"

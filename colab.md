@@ -51,6 +51,10 @@ drive_renders = f"{DRIVE_BASE_PATH}/renders"
 if os.path.exists(drive_renders):
     print(f"📡 Syncing renders from: {drive_renders}")
     !find {drive_renders} -maxdepth 1 -name "*.mp4" -exec cp -t public/renders/ {{}} +
+
+    # NEW: Ensure all background videos are consistent with 30fps
+    print("🎬 Converting background videos to 30fps for engine consistency...")
+    !bash scripts/convert_to_30fps.sh public/renders/
 else:
     print(f"❌ FATAL: 'renders' folder NOT FOUND in Drive: {drive_renders}")
 
