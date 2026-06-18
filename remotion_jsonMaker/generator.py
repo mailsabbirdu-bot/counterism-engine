@@ -55,40 +55,39 @@ class RemotionJsonMaker:
 
     def probe_video_duration_and_fps(self, video_path: str):
         try:
-            # 1. Get FPS (den/num) and nb_frames (if available)
-            cmd = self._get_ff_tool("ffprobe") + ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=avg_frame_rate,nb_frames", "-of", "json", video_path]
+            # High-precision JSON probe (matches user requested approach)
+            cmd = self._get_ff_tool("ffprobe") + [
+                "-v", "error",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=r_frame_rate,avg_frame_rate,nb_frames,duration",
+                "-of", "json",
+                video_path
+            ]
             output = subprocess.check_output(cmd).decode("utf-8")
             data = json.loads(output)
             stream = data.get('streams', [{}])[0]
 
-            # Parse FPS: avg_frame_rate is usually "num/den"
-            fps_raw = stream.get("avg_frame_rate", "0/1")
-            if "/" in fps_raw:
-                num, den = map(int, fps_raw.split("/"))
-            else:
-                num, den = int(fps_raw), 1
+            duration = float(stream.get("duration", 0))
 
-            native_fps = num / den if den else 0
+            # Original FPS
+            fps_str = stream.get("avg_frame_rate", "0/1")
+            num, den = map(int, fps_str.split("/"))
+            fps = num / den if den else 0
 
-            # 2. Get TOTAL FRAMES (nb_frames is not always reliable, count them if needed)
+            # Total frames
             nb_frames = stream.get("nb_frames")
-            if nb_frames and nb_frames != "N/A" and int(nb_frames) > 0:
+            if nb_frames is not None:
                 total_frames = int(nb_frames)
             else:
-                # Fallback: Count exact frames (slow but 100% accurate)
-                count_cmd = self._get_ff_tool("ffprobe") + ["-v", "error", "-select_streams", "v:0", "-count_frames", "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", video_path]
-                total_frames = int(subprocess.check_output(count_cmd).decode("utf-8").strip())
+                total_frames = int(round(duration * fps))
 
-            # 3. Calculate frames at 30fps using exact integer math to avoid float drift
-            # Formula: (total_frames / native_fps) * 30 => (total_frames / (num/den)) * 30 => (total_frames * den * 30) / num
-            if num > 0:
-                frames_at_30fps = (total_frames * den * 30) // num
-            else:
-                frames_at_30fps = 180 # Default fallback
+            # Frames after converting to 30 FPS (User approach: round(duration * 30))
+            frames_at_30fps = int(round(duration * 30))
 
             print("\n" + "="*70)
             print(f"📹 {os.path.basename(video_path)}")
-            print(f"Original FPS      : {native_fps:.3f} ({num}/{den})")
+            print(f"Duration          : {duration:.3f} sec")
+            print(f"Original FPS      : {fps:.3f}")
             print(f"Total Frames      : {total_frames}")
             print(f"Frames @ 30 FPS   : {frames_at_30fps}")
             print("="*70)
