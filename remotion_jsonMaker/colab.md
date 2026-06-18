@@ -72,6 +72,10 @@ print(f"✅ Successfully linked {v_count[0]} background videos to public/renders
 if int(v_count[0]) > 0:
     !ls -lh public/renders/*.mp4
 
+    # NEW: Ensure all background videos are consistent with 30fps
+    print("🎬 Converting background videos to 30fps for engine consistency...")
+    !bash ../scripts/convert_to_30fps.sh public/renders/
+
 # 3. Fonts
 print("\n✍️ --- SYNCING FONTS ---")
 print(f"🔍 Searching for fonts in base path: {DRIVE_BASE_PATH}")
