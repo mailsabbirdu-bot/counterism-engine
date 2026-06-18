@@ -49,10 +49,15 @@ else:
 
 print("🎙️ Checking WhisperX...")
 if not is_installed("whisperx"):
-    print("📥 Installing WhisperX from source...")
+    print("📥 Installing WhisperX and compatible transformers...")
+    # Pinning transformers to 4.48.0 to avoid GenerationMixin ImportError in newer versions
+    !pip install transformers==4.48.0
     !pip install git+https://github.com/m-bain/whisperX.git
 else:
-    print("✅ WhisperX is already installed.")
+    # Even if installed, ensure transformers is at a compatible version
+    print("🎬 Ensuring compatible transformers version...")
+    !pip install transformers==4.48.0
+    print("✅ WhisperX environment verified.")
 
 import whisperx
 
