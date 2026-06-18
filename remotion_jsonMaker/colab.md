@@ -72,10 +72,6 @@ print(f"✅ Successfully linked {v_count[0]} background videos to public/renders
 if int(v_count[0]) > 0:
     !ls -lh public/renders/*.mp4
 
-    # NEW: Ensure all background videos are consistent with 30fps
-    print("🎬 Converting background videos to 30fps for engine consistency...")
-    !bash scripts/convert_to_30fps.sh public/renders/
-
 # 3. Fonts
 print("\n✍️ --- SYNCING FONTS ---")
 print(f"🔍 Searching for fonts in base path: {DRIVE_BASE_PATH}")
@@ -118,6 +114,11 @@ print("🚀 Using Playwright to interact with Gemini.")
     --drive-prompt="{PROJECT_PATH}/guideline_prompt.txt" \
     --user-data-dir="{USER_DATA_DIR}" \
     --public-dir="/content/engine/public"
+
+# 5. Asset Normalization (Run AFTER generation to match probed durations)
+print_banner("🎬 ASSET NORMALIZATION")
+print("🎬 Converting background videos to 30fps for engine consistency...")
+!bash ../scripts/convert_to_30fps.sh ../public/renders/
 
 print_banner("🏁 PROCESS FINISHED")
 if os.path.exists(OUTPUT_JSON):
