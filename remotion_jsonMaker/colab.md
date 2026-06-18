@@ -116,7 +116,8 @@ print("🚀 Using Playwright to interact with Gemini.")
     --timestamp-output="{TIMESTAMP_FILE}" \
     --prompt-output="{PROMPT_FILE}" \
     --drive-prompt="{PROJECT_PATH}/guideline_prompt.txt" \
-    --user-data-dir="{USER_DATA_DIR}"
+    --user-data-dir="{USER_DATA_DIR}" \
+    --public-dir="/content/engine/public"
 
 print_banner("🏁 PROCESS FINISHED")
 if os.path.exists(OUTPUT_JSON):
