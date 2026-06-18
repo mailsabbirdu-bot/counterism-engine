@@ -369,11 +369,14 @@ class RemotionJsonMaker:
 
                     if current_text and current_text == last_text:
                         stable_count += 1
-                        # If stable and not generating, we can exit much faster
-                        if not is_generating and stable_count >= 2:
-                             print(f"✨ Gemini response finished ({len(current_text)} chars).")
-                             return current_text
-                        if stable_count >= 5:
+                        # Speed Optimization with Integrity Check
+                        # We only exit early if the text is stable, not generating, and looks like a valid response (length and start char)
+                        if not is_generating and stable_count >= 3:
+                             if len(current_text) > 100 or "{" in current_text:
+                                 print(f"✨ Gemini response finished ({len(current_text)} chars).")
+                                 return current_text
+
+                        if stable_count >= 10: # Safety backup stability
                              print(f"✨ Gemini response stabilized ({len(current_text)} chars).")
                              return current_text
                     else:
@@ -411,7 +414,7 @@ class RemotionJsonMaker:
             "5. FONT ACCURACY (STRICT): For Bengali content, you MUST select a font from the BANGLA FONTS list provided. For English content, you MUST select from the ENGLISH FONTS list. DO NOT use generic font names like 'Inter' or 'Arial' unless they are in the detected list.\n"
             "6. MANDATORY AUDIO & VIDEO: EVERY scene MUST have 'background_type': 'video', 'video_path': 'renders/scene_SC_XX.mp4', and 'audio_enabled': true. This ensures the background video audio is preserved.\n"
             "7. CAMERA WORK: Use 'shots' for every focal overlay. Movements must be professional (slow_push, slow_pull, or dramatic_reveal). Ensure 'inDuration' allows for the required resting time.\n"
-            "8. JSON CONSTRAINTS: Be extremely concise. Avoid deep nesting or excessive decorative elements. Keep data arrays short. Ensure NO control characters are present in the text content. **OUTPUT RAW MINIFIED JSON ONLY. DO NOT USE NEWLINES OR INDENTATION.** PRIORITIZE COMPLETING THE JSON STRUCTURE OVER ADDING EXTRA SCENES IF SPACE IS LIMITED.\n\n"
+            "8. JSON CONSTRAINTS: **OUTPUT RAW MINIFIED JSON ONLY (NO NEWLINES/INDENTATION).** START WITH '{' AND END WITH '}'. Be extremely concise. Avoid deep nesting or excessive decorative elements. Keep data arrays short (5 points max). Ensure NO control characters are present in the text content. PRIORITIZE COMPLETING THE JSON STRUCTURE OVER ADDING EXTRA SCENES IF SPACE IS LIMITED.\n\n"
             f"DETECTED LOCAL FONTS (Categorized): {local_fonts}\n\n"
             f"SYSTEM GUIDELINES (V4 Schema):\n{guidelines}\n\n"
             f"STORY NARRATIVE:\n{story}\n\n"
@@ -550,7 +553,11 @@ class RemotionJsonMaker:
                 # Use strict=False to handle unescaped control characters in strings
                 return json.loads(json_str, strict=False)
             except json.JSONDecodeError as e:
-                print(f"⚠️ JSON primary parse failed: {e}. Attempting repair...")
+                print(f"⚠️ JSON primary parse failed at pos {e.pos}: {e.msg}. Attempting repair...")
+
+                # Check for structural issues or truncation
+                # If we have a lot of content after the error pos, it might just be a comma issue
+                # If we are near the end, it's likely truncation.
 
                 # Try simple trailing comma cleanup
                 cleaned = re.sub(r',\s*\}', '}', json_str)
@@ -560,12 +567,16 @@ class RemotionJsonMaker:
                     return json.loads(cleaned, strict=False)
                 except:
                     # Final attempt: full structural repair
-                    repaired = repair_json(cleaned)
+                    repaired = repair_json(json_str) # Pass original for full analysis
                     try:
                         return json.loads(repaired, strict=False)
                     except Exception as final_e:
                         print(f"❌ JSON repair failed: {final_e}")
-                        print(f"--- FAILED JSON START ---\n{json_str[:800]}\n--- FAILED JSON END ---")
+                        # Verbose debugging: show the area around the failure
+                        snippet_start = max(0, e.pos - 50)
+                        snippet_end = min(len(json_str), e.pos + 150)
+                        print(f"   Context near error: ...{json_str[snippet_start:snippet_end]}...")
+                        print(f"--- FAILED JSON (REPAIRED) START ---\n{repaired[:800]}\n--- FAILED JSON (REPAIRED) END ---")
                         return {}
         except Exception as e:
             print(f"❌ Fatal error during JSON extraction: {e}")
