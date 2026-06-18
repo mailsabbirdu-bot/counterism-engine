@@ -77,12 +77,28 @@ class RemotionJsonMaker:
 
     def get_local_fonts(self, public_dir: str = "../public") -> str:
         fonts_dir = os.path.join(public_dir, "fonts")
-        font_files = []
+        bangla_fonts = []
+        english_fonts = []
+
+        # Categorization keywords
+        BANGLA_KEYWORDS = ['solaiman', 'kalpurush', 'nikosh', 'hind', 'siliguri', 'adorsho', 'sutonny', 'shonar', 'vrinda', 'bangla']
+
         if os.path.exists(fonts_dir):
-            for file in os.listdir(fonts_dir):
-                if file.lower().endswith(('.ttf', '.otf', '.woff', '.woff2')):
-                    font_files.append(os.path.splitext(file)[0])
-        return ", ".join(sorted(list(set(font_files))))
+            for root, dirs, files in os.walk(fonts_dir):
+                for file in files:
+                    if file.lower().endswith(('.ttf', '.otf', '.woff', '.woff2')):
+                        name = os.path.splitext(file)[0]
+                        if any(kw in name.lower() for kw in BANGLA_KEYWORDS):
+                            bangla_fonts.append(name)
+                        else:
+                            english_fonts.append(name)
+
+        bangla_str = ", ".join(sorted(list(set(bangla_fonts))))
+        english_str = ", ".join(sorted(list(set(english_fonts))))
+
+        print(f"🔍 Font Detection: Found {len(bangla_fonts)} Bangla fonts: {bangla_fonts[:5]}...")
+        print(f"🔍 Font Detection: Found {len(english_fonts)} English fonts: {english_fonts[:5]}...")
+        return f"BANGLA FONTS: [{bangla_str}] | ENGLISH FONTS: [{english_str}]"
 
     def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
         if not data or not data.get('scenes'): return data
@@ -111,8 +127,16 @@ class RemotionJsonMaker:
         }
 
         audio_dir = os.path.join(public_dir, "renders/audios")
-        in_files = sorted([f for f in os.listdir(audio_dir) if f.startswith("in_") and (f.endswith(".mp3") or f.endswith(".wav") or f.endswith(".m4a"))]) if os.path.exists(audio_dir) else []
-        out_files = sorted([f for f in os.listdir(audio_dir) if f.startswith("out_") and (f.endswith(".mp3") or f.endswith(".wav") or f.endswith(".m4a"))]) if os.path.exists(audio_dir) else []
+        in_files = []
+        out_files = []
+
+        if os.path.exists(audio_dir):
+            all_files = os.listdir(audio_dir)
+            in_files = sorted([f for f in all_files if f.lower().startswith("in_") and f.lower().endswith(('.mp3', '.wav', '.m4a'))])
+            out_files = sorted([f for f in all_files if f.lower().startswith("out_") and f.lower().endswith(('.mp3', '.wav', '.m4a'))])
+
+        print(f"🎵 Audio Detection: Found {len(in_files)} entrance sounds: {in_files[:5]}...")
+        print(f"🎵 Audio Detection: Found {len(out_files)} exit sounds: {out_files[:5]}...")
 
         sfx_manifest = []
         in_ptr, out_ptr = 0, 0
@@ -136,8 +160,19 @@ class RemotionJsonMaker:
                         w = ov.get('width', 1000) + 300
                         h = ov.get('height', 650) + 300
 
-                    # 1. Professional Slot Alignment
+                    # 1. Professional Slot Alignment & De-confliction
                     slot_name = ov.get('slot', '')
+
+                    # Force Text and Charts into opposing quadrants if they overlap in time
+                    if ov_type == 'chart':
+                        # Charts prefer mid/right slots for better data visibility
+                        if not slot_name or slot_name not in ["TOP_RIGHT", "BOTTOM_RIGHT", "MID_RIGHT"]:
+                             slot_name = ["TOP_RIGHT", "BOTTOM_RIGHT", "MID_RIGHT"][i % 3]
+                    elif ov_type == 'text':
+                        # Text prefers left slots to avoid blocking chart data
+                        if not slot_name or slot_name not in ["TOP_LEFT", "BOTTOM_LEFT", "MID_LEFT"]:
+                             slot_name = ["TOP_LEFT", "BOTTOM_LEFT", "MID_LEFT"][i % 3]
+
                     if slot_name in SECTORS:
                         ov['position'] = {"x": SECTORS[slot_name]["x"], "y": SECTORS[slot_name]["y"]}
                     elif not ov.get('position'):
@@ -169,13 +204,23 @@ class RemotionJsonMaker:
 
                     placed_overlays.append((ov, w, h))
 
-                    # Timing Safety
-                    if ov.get('start', 0) >= scene_duration: ov['start'] = max(0, scene_duration - 60)
-                    if ov.get('duration', 0) < 60: ov['duration'] = 60
-                    if ov.get('start') + ov.get('duration') > scene_duration:
-                        ov['duration'] = scene_duration - ov.get('start')
+                    # Timing Safety & Cinematic Pacing
+                    min_duration = 120 if ov_type in ['chart', 'ui_panel', 'data_indicator'] else 60
+                    if ov.get('start', 0) >= scene_duration:
+                        ov['start'] = max(0, scene_duration - min_duration)
 
-                    # Subtle local SFX (Volume 0.1)
+                    if ov.get('duration', 0) < min_duration:
+                        ov['duration'] = min_duration
+
+                    if ov.get('start') + ov.get('duration') > scene_duration:
+                        # Try to shift start back if possible, otherwise truncate
+                        if scene_duration >= min_duration:
+                            ov['start'] = max(0, scene_duration - ov['duration'])
+                            ov['duration'] = scene_duration - ov['start']
+                        else:
+                            ov['duration'] = scene_duration - ov['start']
+
+                    # Subtle local SFX (Volume 0.1) - Attached to each overlay
                     if in_files:
                         sfx_manifest.append({ "scene_id": scene['scene_id'], "file": in_files[in_ptr % len(in_files)], "start": ov['start'], "end": ov['start'] + 20, "volume": 0.1 })
                         in_ptr += 1
@@ -183,7 +228,19 @@ class RemotionJsonMaker:
                         sfx_manifest.append({ "scene_id": scene['scene_id'], "file": out_files[out_ptr % len(out_files)], "start": ov['start'] + ov['duration'] - 10, "end": ov['start'] + ov['duration'], "volume": 0.1 })
                         out_ptr += 1
 
+            # 4. Camera Shot Normalization (Resting Time)
+            if scene.get('camera') and scene['camera'].get('shots'):
+                for shot in scene['camera']['shots']:
+                    # Enforce MOVLESS RESTING (duration - inDuration >= 90)
+                    target_resting = 90
+                    if shot.get('duration', 0) < target_resting + 15:
+                        shot['duration'] = max(shot.get('duration', 0), target_resting + 15)
+
+                    max_in = max(15, shot['duration'] - target_resting)
+                    shot['inDuration'] = min(shot.get('inDuration', 30), max_in)
+
         data['audio_sfx_manifest'] = sfx_manifest
+        print(f"✅ Finalization: Processed {len(data['scenes'])} scenes, {len(sfx_manifest)} SFX triggers mapped.")
         return data
 
     def generate_word_timestamps(self, story: str, public_dir: str = "../public") -> str:
@@ -280,21 +337,21 @@ class RemotionJsonMaker:
         guidelines = self.adjust_durations_in_text(guidelines)
         local_fonts = self.get_local_fonts()
         full_prompt = (
-            "You are a world-class Motion Graphics Director. Generate an ULTRA MODERN cinematic JSON manifest.\n\n"
-            "STYLE: Sci-fi interface. Professional Balanced Layout. Don't block background video detail.\n\n"
-            "CRITICAL RULES:\n"
-            "1. AUDIO SYNC: Every focal overlay MUST start and end EXACTLY with the word-level timestamps provided. Sync with narrative pacing.\n"
-            "2. CINEMATIC PACING (RESTING): Every layer must have Intro (15f), MOVELESS RESTING (minimum 90-120f), and Outro (15f).\n"
-            "3. PROFESSIONAL SLOTS: Assign 'slot' to: 'TOP_LEFT', 'TOP_RIGHT', 'BOTTOM_LEFT', 'BOTTOM_RIGHT', 'CENTER_FOCAL', 'MID_LEFT', 'MID_RIGHT'.\n"
-            "4. NO OVERLAP: Text and Nivo charts MUST occupy opposing quadrants. Never block elements.\n"
-            "5. CANVAS SAFETY: Elements must stay within the 150px margin zone. Text content MUST BE STRICTLY 2-3 words max.\n"
-            "6. FONTS: If text is Bengali, use the identified Bangla font. If English, use the English font from detected fonts list.\n"
-            "7. MANDATORY: 'background_type': 'video', 'audio_enabled': true, 'camera.shake.enabled': false.\n"
-            f"8. DETECTED LOCAL FONTS (ID Bangla vs English): {local_fonts}\n\n"
-            f"SYSTEM GUIDELINES:\n{guidelines}\n\n"
-            f"STORY REQUIREMENTS:\n{story}\n\n"
-            f"PRECISE WORD TIMESTAMPS (USE THESE FOR SYNC):\n{timestamp_context or 'No timestamps.'}\n\n"
-            "TASK: Generate complete JSON manifest. Return ONLY raw JSON."
+            "You are a world-class Cinematic Motion Graphics Director. Your mission is to generate an ULTRA MODERN, TOP-NOTCH, high-fidelity JSON manifest.\n\n"
+            "STYLE: High-end sci-fi documentary interface. Think 'Minority Report' meets modern data journalism. Use sleek glassmorphism (ui_panel variant: glass), vibrant technical accents (shape/graph), and high-contrast typography.\n\n"
+            "CRITICAL CINEMATIC RULES:\n"
+            "1. PROFESSIONAL BALANCED LAYOUT: All overlays MUST use the 'slot' property. Never cluster elements. If a chart is in TOP_RIGHT, text must be in BOTTOM_LEFT or MID_LEFT.\n"
+            "2. CINEMATIC PACING (MOVLESS RESTING): This is non-negotiable. Every focal element must have 15f intro, 15f outro, and at least 90-120f of COMPLETELY STATIC RESTING time (no camera zoom/pan, no element movement) to ensure viewer focus.\n"
+            "3. AUDIO-VISUAL SYNC: Use the PRECISE word-level timestamps provided. Overlays must appear and disappear EXACTLY with the spoken narrative.\n"
+            "4. NO VISUAL CLUTTER: Text content MUST be concise (2-3 words max per overlay). Do not block background video details.\n"
+            "5. FONT ACCURACY: For Bengali content, you MUST select a font from the BANGLA FONTS list. For English, use an ENGLISH FONT. Never mix inappropriately.\n"
+            "6. MANDATORY VIDEO: All scenes must use 'background_type': 'video' with 'audio_enabled': true. Camera shake must be false.\n"
+            "7. CAMERA WORK: Use 'shots' for every focal overlay. Movements must be professional (slow_push, slow_pull, or dramatic_reveal). Ensure 'inDuration' allows for the required resting time.\n\n"
+            f"DETECTED LOCAL FONTS (Categorized): {local_fonts}\n\n"
+            f"SYSTEM GUIDELINES (V4 Schema):\n{guidelines}\n\n"
+            f"STORY NARRATIVE:\n{story}\n\n"
+            f"PRECISE WORD TIMESTAMPS (FOR SYNCING):\n{timestamp_context or 'No timestamps provided. Estimate based on 30fps.'}\n\n"
+            "TASK: Create the complete master blueprint in raw JSON. Ensure all IDs are unique and targeted correctly by the camera."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
