@@ -152,6 +152,9 @@ class RemotionJsonMaker:
         if not data.get('scenes'): return data
         data['global_settings'] = { "width": 1920, "height": 1080, "fps": 30 }
 
+        abs_public = os.path.abspath(public_dir)
+        print(f"🛠️ Finalizing durations using public dir: {abs_public}")
+
         # Calibrated base sizes for center-anchored overlays
         TYPE_SIZES = {
             'text': (600, 120),
@@ -198,12 +201,19 @@ class RemotionJsonMaker:
         for scene in data['scenes']:
             scene_duration = scene.get('duration_in_frames', 180)
             if scene.get('background_type') == 'video' and scene.get('video_path'):
-                abs_vpath = os.path.join(public_dir, scene['video_path'])
+                # Handle potential leading slash in video_path
+                vpath = scene['video_path'].lstrip('/')
+                abs_vpath = os.path.join(abs_public, vpath)
+
                 if os.path.exists(abs_vpath):
+                    print(f"🎬 Found background video: {vpath}")
                     frames_at_30fps, _ = self.probe_video_duration_and_fps(abs_vpath)
                     if frames_at_30fps > 0:
                         scene_duration = int(frames_at_30fps)
+                        print(f"   ⏱️ Updating scene {scene.get('scene_id')} duration to {scene_duration} frames.")
                         scene['duration_in_frames'] = scene_duration
+                else:
+                    print(f"⚠️ Background video NOT found at: {abs_vpath}")
 
             placed_overlays = []
             if scene.get('overlays'):
@@ -639,28 +649,37 @@ def main():
     parser.add_argument("--user-data-dir")
     parser.add_argument("--no-headless", action="store_false", dest="headless")
     parser.add_argument("--drive-prompt")
+    parser.add_argument("--public-dir", default="../public")
     parser.set_defaults(headless=True)
     args = parser.parse_args()
     if not os.path.exists(args.story_file): exit(1)
     if os.path.exists(args.output): os.remove(args.output)
     with open(args.story_file, 'r', encoding='utf-8') as f: story = f.read()
     maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, headless=args.headless)
-    guidelines = maker.load_guidelines("../guideline.md", "../guideline_prompt.txt", args.drive_prompt)
+
+    # Use absolute paths where possible
+    abs_public = os.path.abspath(args.public_dir)
+    guidelines = maker.load_guidelines(
+        os.path.join(os.path.dirname(abs_public), "guideline.md"),
+        os.path.join(os.path.dirname(abs_public), "guideline_prompt.txt"),
+        args.drive_prompt
+    )
+
     try:
         ts_content = None
         scene_durations = None
         if args.timestamp_output:
             if os.path.exists(args.timestamp_output): os.remove(args.timestamp_output)
-            ts_content, scene_durations = maker.generate_word_timestamps(story)
+            ts_content, scene_durations = maker.generate_word_timestamps(story, public_dir=abs_public)
             if not ts_content or len(ts_content) < 50:
-                 ts_content, scene_durations = maker.generate_word_timestamps(story)
+                 ts_content, scene_durations = maker.generate_word_timestamps(story, public_dir=abs_public)
             with open(args.timestamp_output, 'w', encoding='utf-8') as f: f.write(ts_content)
         render_json = maker.generate(story, guidelines, args.prompt_output, ts_content, scene_durations)
         maker.stop_browser()
         if not render_json or 'scenes' not in render_json:
              print("❌ ERROR: Gemini failed to produce a valid manifest.")
              exit(1)
-        render_json = maker.finalize_json_durations(render_json)
+        render_json = maker.finalize_json_durations(render_json, public_dir=abs_public)
         output_dir = os.path.dirname(args.output)
         if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
         with open(args.output, 'w', encoding='utf-8') as f: json.dump(render_json, f, indent=2, ensure_ascii=False)
