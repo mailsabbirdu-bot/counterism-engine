@@ -72,6 +72,14 @@ class VideoProcessor:
             f.write("\n".join(results))
         print(f"📂 Results saved to {output_file}")
 
+    def _detect_language_from_text(self, text: str) -> str:
+        if not text:
+            return None
+        # Simple heuristic: if any Bengali characters are present, it's Bengali
+        if any(ord(c) >= 0x0980 and ord(c) <= 0x09FF for c in text):
+            return "bn"
+        return "en"
+
     def task2_timestamps(self):
         print("🎙️ Starting Task 2: Word-level Timestamps using WhisperX")
 
@@ -91,7 +99,7 @@ class VideoProcessor:
         print(f"📖 Loaded {len(scenes_text)} scenes from story.txt")
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        batch_size = 16 # adjust as needed
+        batch_size = 16
         compute_type = "float16" if device == "cuda" else "int8"
 
         print(f"🖥️ Using device: {device} ({compute_type})")
@@ -106,26 +114,31 @@ class VideoProcessor:
             video_path = os.path.join(self.renders_dir, filename)
             scene_text = scenes_text[i] if i < len(scenes_text) else None
 
-            print(f"🔍 Processing timestamps for {filename}...")
-            if scene_text:
-                print(f"📝 Scene Text: {scene_text[:50]}...")
+            print(f"\n🔍 Processing timestamps for {filename}...")
+
+            # Detect language from text context
+            detected_lang = self._detect_language_from_text(scene_text)
+            if detected_lang:
+                print(f"📝 Language (from text): {detected_lang}")
 
             # 1. Transcribe
             audio = whisperx.load_audio(video_path)
 
-            # Transcribe audio using WhisperX
-            # Note: whisperx.FasterWhisperPipeline.transcribe doesn't always support initial_prompt
-            result = model.transcribe(audio, batch_size=batch_size)
+            transcribe_args = {"batch_size": batch_size}
+            if detected_lang:
+                transcribe_args["language"] = detected_lang
+
+            result = model.transcribe(audio, **transcribe_args)
 
             # 2. Align
-            # We try to detect language if not specified, but for Bangla/English mix,
-            # whisperx alignment needs a model for that language.
             language_code = result["language"]
+            print(f"🌍 Aligning language: {language_code}")
             try:
+                # We try to use alignment for better word-level timestamps
                 model_a, metadata = whisperx.load_align_model(language_code=language_code, device=device)
                 result = whisperx.align(result["segments"], model_a, metadata, audio, device, return_char_alignments=False)
             except Exception as e:
-                print(f"⚠️ Alignment failed for {language_code}: {e}. Using transcription timestamps.")
+                print(f"⚠️ Alignment failed for {language_code}: {e}. Proceeding with transcription segments.")
 
             # 3. Process segments and words
             scene_label = f"SCENE_{i+1:02d}"
