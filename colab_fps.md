@@ -49,14 +49,19 @@ else:
 
 print("🎙️ Checking WhisperX...")
 if not is_installed("whisperx"):
-    print("📥 Installing WhisperX and compatible transformers...")
-    # Pinning transformers to 4.48.0 to avoid GenerationMixin ImportError in newer versions
+    print("📥 Installing WhisperX and compatible environment (CPU optimized)...")
+    # 1. Force stable CPU-only torch versions to avoid operator mismatch errors
+    !pip install torch==2.5.1+cpu torchvision==0.20.1+cpu torchaudio==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
+    # 2. Pin transformers to avoid GenerationMixin error
     !pip install transformers==4.48.0
-    !pip install git+https://github.com/m-bain/whisperX.git
+    # 3. Install whisperx from source
+    !pip install git+https://github.com/m-bain/whisperX.git --no-deps
+    # 4. Install missing deps for whisperx manually to avoid breaking torch
+    !pip install faster-whisper ctranslate2>=4.4.0 nltk pandas soundfile pyannote.audio>=3.1.1
 else:
-    # Even if installed, ensure transformers is at a compatible version
-    print("🎬 Ensuring compatible transformers version...")
-    !pip install transformers==4.48.0
+    # Ensure transformers is at a compatible version
+    print("🎬 Ensuring compatible transformers and torch versions...")
+    !pip install transformers==4.48.0 torch==2.5.1+cpu torchvision==0.20.1+cpu torchaudio==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
     print("✅ WhisperX environment verified.")
 
 import whisperx
