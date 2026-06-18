@@ -60,9 +60,11 @@ v_count = !ls public/renders/*.mp4 | wc -l
 print(f"✅ Linked {v_count[0]} background videos.")
 
 print("Linking fonts...")
-!find {DRIVE_BASE_PATH}/fonts -maxdepth 3 -type f -exec ln -sf '{}' public/fonts/ ';' 2>/dev/null
+# Direct recursive search for all supported font files in the base Drive path
+!find {DRIVE_BASE_PATH} -maxdepth 4 -type f \( -iname "*.ttf" -o -iname "*.otf" -o -iname "*.woff" -o -iname "*.woff2" \) -exec ln -sf '{}' public/fonts/ ';' 2>/dev/null
+
 f_count = !ls public/fonts/ | wc -l
-print(f"✅ Linked {f_count[0]} fonts (including subdirs).")
+print(f"✅ Linked {f_count[0]} fonts into public/fonts/")
 
 print("✅ Drive assets linked to public folder.")
 
