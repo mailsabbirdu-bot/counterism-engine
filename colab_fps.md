@@ -14,6 +14,7 @@ import subprocess
 import argparse
 import re
 import torch
+import shutil
 from google.colab import drive
 
 def print_banner(text):
@@ -24,7 +25,18 @@ def print_banner(text):
 # 1. Configuration
 DRIVE_BASE_PATH = "/content/drive/MyDrive/Counterism_Studio_V4"
 
-# 2. Setup
+# 2. Setup & Environment Cleanup
+print_banner("🧹 CLEANING ENVIRONMENT")
+site_pkgs = "/usr/local/lib/python3.12/dist-packages"
+if os.path.exists(site_pkgs):
+    cleaned = False
+    for d in os.listdir(site_pkgs):
+        if d.startswith("~"):
+            print(f"🗑️ Removing invalid distribution: {d}")
+            shutil.rmtree(os.path.join(site_pkgs, d), ignore_errors=True)
+            cleaned = True
+    if not cleaned: print("✅ No invalid distributions found.")
+
 print_banner("📂 MOUNTING GOOGLE DRIVE")
 if not os.path.exists("/content/drive"):
     drive.mount('/content/drive')
@@ -37,8 +49,14 @@ def is_installed(package):
     try:
         subprocess.check_output([sys.executable, "-m", "pip", "show", package])
         return True
-    except subprocess.CalledProcessError:
+    except:
         return False
+
+# 1. Force stable CPU-only torch and specific transformers/accelerate stack
+print("🎬 Setting up stable CPU environment...")
+# Pinning to a very stable combination for WhisperX + Colab CPU
+!pip install --quiet --no-cache-dir torch==2.4.0+cpu torchvision==0.19.0+cpu torchaudio==2.4.0+cpu --index-url https://download.pytorch.org/whl/cpu
+!pip install --quiet --no-cache-dir transformers==4.44.2 accelerate==0.33.0
 
 print("🎬 Checking FFmpeg...")
 if subprocess.run(["which", "ffmpeg"], capture_output=True).returncode != 0:
@@ -49,19 +67,13 @@ else:
 
 print("🎙️ Checking WhisperX...")
 if not is_installed("whisperx"):
-    print("📥 Installing WhisperX and compatible environment (CPU optimized)...")
-    # 1. Force stable CPU-only torch versions to avoid operator mismatch errors
-    !pip install torch==2.5.1+cpu torchvision==0.20.1+cpu torchaudio==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
-    # 2. Pin transformers to avoid GenerationMixin error
-    !pip install transformers==4.48.0
-    # 3. Install whisperx from source
-    !pip install git+https://github.com/m-bain/whisperX.git --no-deps
-    # 4. Install missing deps for whisperx manually to avoid breaking torch
-    !pip install faster-whisper ctranslate2>=4.4.0 nltk pandas soundfile pyannote.audio>=3.1.1
+    print("📥 Installing WhisperX from source...")
+    # Using --no-deps to prevent it from pulling in unwanted torch/transformers versions
+    !pip install --quiet git+https://github.com/m-bain/whisperX.git --no-deps
+    # Manually install required deps to keep environment stable
+    !pip install --quiet faster-whisper ctranslate2>=4.4.0 nltk pandas soundfile pyannote.audio>=3.1.1
+    print("✅ WhisperX installed.")
 else:
-    # Ensure transformers is at a compatible version
-    print("🎬 Ensuring compatible transformers and torch versions...")
-    !pip install transformers==4.48.0 torch==2.5.1+cpu torchvision==0.20.1+cpu torchaudio==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
     print("✅ WhisperX environment verified.")
 
 import whisperx
@@ -91,6 +103,12 @@ class VideoProcessor:
             return {}
         return data['streams'][0]
 
+    def _detect_language_from_text(self, text: str) -> str:
+        if not text: return None
+        if any(ord(c) >= 0x0980 and ord(c) <= 0x09FF for c in text):
+            return "bn"
+        return "en"
+
     def task1_fps_update(self):
         print_banner("🚀 Starting Task 1: FPS and Frame Count Calculation")
         if not os.path.exists(self.renders_dir):
@@ -103,24 +121,15 @@ class VideoProcessor:
         for filename in video_files:
             video_path = os.path.join(self.renders_dir, filename)
             info = self._get_ffprobe_info(video_path)
-            if not info:
-                continue
+            if not info: continue
 
             duration = float(info.get("duration", 0))
-
-            # Original FPS
             fps_str = info.get("avg_frame_rate", "0/1")
             num, den = map(int, fps_str.split("/"))
             fps = num / den if den else 0
 
-            # Total frames
             nb_frames = info.get("nb_frames")
-            if nb_frames is not None and nb_frames != "N/A":
-                total_frames = int(nb_frames)
-            else:
-                total_frames = int(round(duration * fps))
-
-            # Frames at 30 FPS
+            total_frames = int(nb_frames) if nb_frames is not None and nb_frames != "N/A" else int(round(duration * fps))
             frames_at_30fps = int(round(duration * 30))
 
             result_line = f"{filename} | Original FPS: {fps:.3f} | Total Frames: {total_frames} | 30fps Frames: {frames_at_30fps}"
@@ -143,20 +152,15 @@ class VideoProcessor:
         with open(story_file, "r", encoding="utf-8") as f:
             story_content = f.read()
 
-        # Split story into scenes using the marker "দৃশ্য <number>"
-        # Supporting both English and Bengali digits
         scenes_text = re.split(r'দৃশ্য\s+[0-9০-৯]+', story_content)
         scenes_text = [s.strip() for s in scenes_text if s.strip()]
-
         print(f"📖 Loaded {len(scenes_text)} scenes from story.txt")
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
         batch_size = 16
         compute_type = "float16" if device == "cuda" else "int8"
-
         print(f"🖥️ Using device: {device} ({compute_type})")
 
-        # Load whisper model
         model = whisperx.load_model("large-v3", device, compute_type=compute_type)
 
         all_timestamps = []
@@ -167,22 +171,22 @@ class VideoProcessor:
             scene_text = scenes_text[i] if i < len(scenes_text) else None
 
             print(f"\n🔍 Processing timestamps for {filename}...")
-            if scene_text:
-                print(f"📝 Scene Text: {scene_text[:100]}...")
+            detected_lang = self._detect_language_from_text(scene_text)
+            if detected_lang: print(f"📝 Language (from script): {detected_lang}")
 
-            # 1. Transcribe
             audio = whisperx.load_audio(video_path)
-            result = model.transcribe(audio, batch_size=batch_size)
+            transcribe_args = {"batch_size": batch_size}
+            if detected_lang: transcribe_args["language"] = detected_lang
 
-            # 2. Align
+            result = model.transcribe(audio, **transcribe_args)
             language_code = result["language"]
+            print(f"🌍 Aligning language: {language_code}")
             try:
                 model_a, metadata = whisperx.load_align_model(language_code=language_code, device=device)
                 result = whisperx.align(result["segments"], model_a, metadata, audio, device, return_char_alignments=False)
             except Exception as e:
-                print(f"⚠️ Alignment failed for {language_code}: {e}. Using transcription timestamps.")
+                print(f"⚠️ Alignment failed for {language_code}: {e}. Proceeding with transcription segments.")
 
-            # 3. Process segments and words
             scene_label = f"SCENE_{i+1:02d}"
             for segment in result["segments"]:
                 if "words" in segment:
@@ -190,13 +194,11 @@ class VideoProcessor:
                         if "start" in word_info and "end" in word_info:
                             start_frame = int(round(word_info["start"] * 30))
                             end_frame = int(round(word_info["end"] * 30))
-                            word = word_info["word"]
-                            all_timestamps.append(f"{scene_label}: [{start_frame} - {end_frame}] \"{word}\"")
+                            all_timestamps.append(f"{scene_label}: [{start_frame} - {end_frame}] \"{word_info['word']}\"")
                 else:
                     start_frame = int(round(segment["start"] * 30))
                     end_frame = int(round(segment["end"] * 30))
-                    text = segment["text"].strip()
-                    all_timestamps.append(f"{scene_label}: [{start_frame} - {end_frame}] \"{text}\"")
+                    all_timestamps.append(f"{scene_label}: [{start_frame} - {end_frame}] \"{segment['text'].strip()}\"")
             print(f"✅ Timestamps generated for {filename}")
 
         output_file = os.path.join(self.manifests_dir, "timestamp.txt")
@@ -212,16 +214,7 @@ processor.task2_timestamps()
 print_banner("🏁 ALL PROCESSES FINISHED")
 fps_file = os.path.join(DRIVE_BASE_PATH, "manifests/fps_update.txt")
 ts_file = os.path.join(DRIVE_BASE_PATH, "manifests/timestamp.txt")
-
-if os.path.exists(fps_file):
-    print(f"✅ FPS Manifest: {fps_file}")
-    with open(fps_file, 'r') as f:
-        print(f"   (Entries: {len(f.readlines())})")
-
-if os.path.exists(ts_file):
-    print(f"✅ Timestamp Manifest: {ts_file}")
-    with open(ts_file, 'r') as f:
-        print(f"   (Entries: {len(f.readlines())})")
-
+if os.path.exists(fps_file): print(f"✅ FPS Manifest: {fps_file}")
+if os.path.exists(ts_file): print(f"✅ Timestamp Manifest: {ts_file}")
 print("\n✨ Process completed successfully.")
 ```
