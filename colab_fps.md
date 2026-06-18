@@ -1,12 +1,62 @@
+# 🚀 Counterism Studio V4 FPS & Timestamp Master Tool
+
+Run this cell in Google Colab to automate FPS calculation and word-level timestamp generation.
+
+```python
+# ==============================================================================
+# COUNTERISM STUDIO V4 — FPS & WHISPERX TIMESTAMP MASTER
+# ==============================================================================
+
 import os
+import sys
 import json
 import subprocess
 import argparse
 import re
-import whisperx
 import torch
-from typing import List, Dict, Any
+from google.colab import drive
 
+def print_banner(text):
+    print("\n" + "="*80)
+    print(f" {text}")
+    print("="*80)
+
+# 1. Configuration
+DRIVE_BASE_PATH = "/content/drive/MyDrive/Counterism_Studio_V4"
+
+# 2. Setup
+print_banner("📂 MOUNTING GOOGLE DRIVE")
+if not os.path.exists("/content/drive"):
+    drive.mount('/content/drive')
+else:
+    print("✅ Google Drive already mounted.")
+
+print_banner("🛠️ INSTALLING DEPENDENCIES")
+
+def is_installed(package):
+    try:
+        subprocess.check_output([sys.executable, "-m", "pip", "show", package])
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+print("🎬 Checking FFmpeg...")
+if subprocess.run(["which", "ffmpeg"], capture_output=True).returncode != 0:
+    print("📥 Installing FFmpeg...")
+    !apt-get update -y && apt-get install -y ffmpeg
+else:
+    print("✅ FFmpeg is already installed.")
+
+print("🎙️ Checking WhisperX...")
+if not is_installed("whisperx"):
+    print("📥 Installing WhisperX from source...")
+    !pip install git+https://github.com/m-bain/whisperX.git
+else:
+    print("✅ WhisperX is already installed.")
+
+import whisperx
+
+# 3. Define Processor Logic
 class VideoProcessor:
     def __init__(self, base_dir: str):
         self.base_dir = base_dir
@@ -17,7 +67,7 @@ class VideoProcessor:
         # Ensure directories exist
         os.makedirs(self.manifests_dir, exist_ok=True)
 
-    def _get_ffprobe_info(self, video_path: str) -> Dict[str, Any]:
+    def _get_ffprobe_info(self, video_path: str) -> dict:
         cmd = [
             "ffprobe", "-v", "error",
             "-select_streams", "v:0",
@@ -32,7 +82,7 @@ class VideoProcessor:
         return data['streams'][0]
 
     def task1_fps_update(self):
-        print("🚀 Starting Task 1: FPS and Frame Count Calculation")
+        print_banner("🚀 Starting Task 1: FPS and Frame Count Calculation")
         if not os.path.exists(self.renders_dir):
             print(f"⚠️ Renders directory not found at {self.renders_dir}")
             return
@@ -65,15 +115,15 @@ class VideoProcessor:
 
             result_line = f"{filename} | Original FPS: {fps:.3f} | Total Frames: {total_frames} | 30fps Frames: {frames_at_30fps}"
             results.append(result_line)
-            print(f"✅ Processed {filename}")
+            print(f"✅ Processed {filename} -> {frames_at_30fps} frames @ 30fps")
 
         output_file = os.path.join(self.manifests_dir, "fps_update.txt")
         with open(output_file, "w", encoding="utf-8") as f:
             f.write("\n".join(results))
-        print(f"📂 Results saved to {output_file}")
+        print(f"\n📂 Results saved to {output_file}")
 
     def task2_timestamps(self):
-        print("🎙️ Starting Task 2: Word-level Timestamps using WhisperX")
+        print_banner("🎙️ Starting Task 2: Word-level Timestamps using WhisperX")
 
         story_file = os.path.join(self.audio_dir, "story.txt")
         if not os.path.exists(story_file):
@@ -91,7 +141,7 @@ class VideoProcessor:
         print(f"📖 Loaded {len(scenes_text)} scenes from story.txt")
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        batch_size = 16 # adjust as needed
+        batch_size = 16
         compute_type = "float16" if device == "cuda" else "int8"
 
         print(f"🖥️ Using device: {device} ({compute_type})")
@@ -106,20 +156,15 @@ class VideoProcessor:
             video_path = os.path.join(self.renders_dir, filename)
             scene_text = scenes_text[i] if i < len(scenes_text) else None
 
-            print(f"🔍 Processing timestamps for {filename}...")
+            print(f"\n🔍 Processing timestamps for {filename}...")
             if scene_text:
-                print(f"📝 Scene Text: {scene_text[:50]}...")
+                print(f"📝 Scene Text: {scene_text[:100]}...")
 
             # 1. Transcribe
             audio = whisperx.load_audio(video_path)
-
-            # Transcribe audio using WhisperX
-            # Note: whisperx.FasterWhisperPipeline.transcribe doesn't always support initial_prompt
             result = model.transcribe(audio, batch_size=batch_size)
 
             # 2. Align
-            # We try to detect language if not specified, but for Bangla/English mix,
-            # whisperx alignment needs a model for that language.
             language_code = result["language"]
             try:
                 model_a, metadata = whisperx.load_align_model(language_code=language_code, device=device)
@@ -138,25 +183,35 @@ class VideoProcessor:
                             word = word_info["word"]
                             all_timestamps.append(f"{scene_label}: [{start_frame} - {end_frame}] \"{word}\"")
                 else:
-                    # Fallback if alignment didn't provide word-level
                     start_frame = int(round(segment["start"] * 30))
                     end_frame = int(round(segment["end"] * 30))
                     text = segment["text"].strip()
                     all_timestamps.append(f"{scene_label}: [{start_frame} - {end_frame}] \"{text}\"")
+            print(f"✅ Timestamps generated for {filename}")
 
         output_file = os.path.join(self.manifests_dir, "timestamp.txt")
         with open(output_file, "w", encoding="utf-8") as f:
             f.write("\n".join(all_timestamps))
-        print(f"📂 Timestamps saved to {output_file}")
+        print(f"\n📂 Timestamps saved to {output_file}")
 
-def main():
-    parser = argparse.ArgumentParser(description="Counterism Studio V4 Video Processor")
-    parser.add_argument("--base-dir", default="/content/drive/MyDrive/Counterism_Studio_V4", help="Base directory in Google Drive")
-    args = parser.parse_args()
+# 4. Execution
+processor = VideoProcessor(DRIVE_BASE_PATH)
+processor.task1_fps_update()
+processor.task2_timestamps()
 
-    processor = VideoProcessor(args.base_dir)
-    processor.task1_fps_update()
-    processor.task2_timestamps()
+print_banner("🏁 ALL PROCESSES FINISHED")
+fps_file = os.path.join(DRIVE_BASE_PATH, "manifests/fps_update.txt")
+ts_file = os.path.join(DRIVE_BASE_PATH, "manifests/timestamp.txt")
 
-if __name__ == "__main__":
-    main()
+if os.path.exists(fps_file):
+    print(f"✅ FPS Manifest: {fps_file}")
+    with open(fps_file, 'r') as f:
+        print(f"   (Entries: {len(f.readlines())})")
+
+if os.path.exists(ts_file):
+    print(f"✅ Timestamp Manifest: {ts_file}")
+    with open(ts_file, 'r') as f:
+        print(f"   (Entries: {len(f.readlines())})")
+
+print("\n✨ Process completed successfully.")
+```
