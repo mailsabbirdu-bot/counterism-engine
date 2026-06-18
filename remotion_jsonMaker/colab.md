@@ -23,6 +23,7 @@ STORY_FILE = f"{DRIVE_BASE_PATH}/audio/story.txt"
 OUTPUT_JSON = f"{DRIVE_BASE_PATH}/manifests/remotion_render.json"
 PROMPT_FILE = f"{DRIVE_BASE_PATH}/manifests/remotion_prompt.txt"
 TIMESTAMP_FILE = f"{DRIVE_BASE_PATH}/manifests/timestamp.txt"
+FPS_UPDATE_FILE = f"{DRIVE_BASE_PATH}/manifests/fps_update.txt"
 USER_DATA_DIR = f"{DRIVE_BASE_PATH}/browser_session"
 
 # 2. Setup
@@ -109,7 +110,8 @@ print("🚀 Using Playwright to interact with Gemini.")
 !xvfb-run python generator.py \
     --story-file="{STORY_FILE}" \
     --output="{OUTPUT_JSON}" \
-    --timestamp-output="{TIMESTAMP_FILE}" \
+    --timestamp-file="{TIMESTAMP_FILE}" \
+    --fps-update-file="{FPS_UPDATE_FILE}" \
     --prompt-output="{PROMPT_FILE}" \
     --drive-prompt="{PROJECT_PATH}/guideline_prompt.txt" \
     --user-data-dir="{USER_DATA_DIR}" \

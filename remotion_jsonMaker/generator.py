@@ -47,6 +47,55 @@ class RemotionJsonMaker:
                 with open(path, 'r', encoding='utf-8') as f: guidelines += f"\n--- {os.path.basename(path)} ---\n{f.read()}\n"
         return guidelines
 
+    def parse_fps_update(self, file_path: str) -> Dict[str, int]:
+        """Parses the external fps_update.txt file for scene frame counts."""
+        durations = {}
+        if not file_path or not os.path.exists(file_path):
+            return durations
+
+        print(f"📖 Parsing external FPS update file: {file_path}")
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                # Format: scene_SC_01.mp4 | Original FPS: 24.000 | Total Frames: 128 | 30fps Frames: 160
+                match = re.search(r'scene_SC_(\d+)\.mp4.*\| 30fps Frames:\s*(\d+)', line)
+                if match:
+                    scene_num = match.group(1)
+                    scene_id = f"SCENE_{scene_num}"
+                    frame_count = int(match.group(2))
+                    durations[scene_id] = frame_count
+                    print(f"   ⏱️ Extracted {scene_id}: {frame_count} frames")
+        return durations
+
+    def parse_timestamp_file(self, file_path: str) -> Dict[str, List[Dict[str, Any]]]:
+        """Parses the external timestamp.txt file for word-level frame ranges."""
+        timestamps = {}
+        if not file_path or not os.path.exists(file_path):
+            return timestamps
+
+        print(f"🎙️ Parsing external timestamp file: {file_path}")
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                # Format: SCENE_01: [Original: 0.00s - 0.98s] -> [30fps: 0f - 29f] "ঢাকা।"
+                match = re.search(r'(SCENE_\d+):.*\[30fps:\s*(\d+)f\s*-\s*(\d+)f\]\s*"(.*)"', line)
+                if match:
+                    scene_id = match.group(1)
+                    start_f = int(match.group(2))
+                    end_f = int(match.group(3))
+                    word = match.group(4)
+
+                    if scene_id not in timestamps:
+                        timestamps[scene_id] = []
+
+                    timestamps[scene_id].append({
+                        "word": word,
+                        "start": start_f,
+                        "end": end_f
+                    })
+
+        for sid, words in timestamps.items():
+            print(f"   🎙️ Mapped {len(words)} word-level timestamps for {sid}")
+        return timestamps
+
     def _get_ff_tool(self, tool: str) -> List[str]:
         if shutil.which(tool):
             return [tool]
@@ -54,54 +103,21 @@ class RemotionJsonMaker:
         return ["npx", "remotion", tool]
 
     def probe_video_duration_and_fps(self, video_path: str):
+        """Standard probe, but now primarily used as a fallback if external fps_update is missing."""
         try:
-            # Get video info (exact logic from user request)
             cmd = self._get_ff_tool("ffprobe") + [
-                "-v", "error",
-                "-select_streams", "v:0",
+                "-v", "error", "-select_streams", "v:0",
                 "-show_entries", "stream=r_frame_rate,avg_frame_rate,nb_frames,duration",
-                "-of", "json",
-                video_path
+                "-of", "json", video_path
             ]
             output = subprocess.check_output(cmd).decode("utf-8")
             data = json.loads(output)
-
-            if not data.get('streams'):
-                print(f"⚠️ No streams found in {video_path}")
-                return 0.0, 30.0
-
+            if not data.get('streams'): return 0.0, 30.0
             stream = data['streams'][0]
-
             duration = float(stream.get("duration", 0))
-
-            # Original FPS
-            fps_str = stream.get("avg_frame_rate", "0/1")
-            num, den = map(int, fps_str.split("/"))
-            fps = num / den if den else 0
-
-            # Total frames
-            nb_frames = stream.get("nb_frames")
-            if nb_frames is not None:
-                total_frames = int(nb_frames)
-            else:
-                total_frames = int(round(duration * fps))
-
-            # Frames after converting to 30 FPS (User formula: round(duration * 30))
             frames_at_30fps = int(round(duration * 30))
-
-            print("\n" + "="*70)
-            print(f"📹 {os.path.basename(video_path)}")
-            print(f"Duration          : {duration:.3f} sec")
-            print(f"Original FPS      : {fps:.3f}")
-            print(f"Total Frames      : {total_frames}")
-            print(f"Frames @ 30 FPS   : {frames_at_30fps}")
-            print("="*70)
-
-            # Return frames instead of seconds for the first parameter to satisfy the engine requirement
             return float(frames_at_30fps), 30.0
-        except Exception as e:
-            print(f"⚠️ Error probing video {video_path}: {e}")
-            return 0.0, 30.0
+        except: return 0.0, 30.0
 
     def adjust_durations_in_text(self, text: str, public_dir: str = "../public") -> str:
         def replacement_logic(match):
@@ -151,7 +167,7 @@ class RemotionJsonMaker:
         print(f"🔍 Font Detection: Found {len(english_fonts)} English fonts: {english_fonts[:5]}...")
         return f"BANGLA FONTS: [{bangla_str}] | ENGLISH FONTS: [{english_str}]"
 
-    def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
+    def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public", external_durations: Dict[str, int] = None) -> Dict[str, Any]:
         if not data: return data
         if 'audio_sfx_manifest' not in data: data['audio_sfx_manifest'] = []
         if not data.get('scenes'): return data
@@ -204,21 +220,22 @@ class RemotionJsonMaker:
         in_ptr, out_ptr = 0, 0
 
         for scene in data['scenes']:
+            scene_id = scene.get('scene_id', '').upper()
             scene_duration = scene.get('duration_in_frames', 180)
-            if scene.get('background_type') == 'video' and scene.get('video_path'):
-                # Handle potential leading slash in video_path
+
+            # Prioritize external duration from fps_update.txt
+            if external_durations and scene_id in external_durations:
+                scene_duration = external_durations[scene_id]
+                print(f"   ⏱️ Using external duration for {scene_id}: {scene_duration} frames.")
+                scene['duration_in_frames'] = scene_duration
+            elif scene.get('background_type') == 'video' and scene.get('video_path'):
                 vpath = scene['video_path'].lstrip('/')
                 abs_vpath = os.path.join(abs_public, vpath)
-
                 if os.path.exists(abs_vpath):
-                    print(f"🎬 Found background video: {vpath}")
                     frames_at_30fps, _ = self.probe_video_duration_and_fps(abs_vpath)
                     if frames_at_30fps > 0:
                         scene_duration = int(frames_at_30fps)
-                        print(f"   ⏱️ Updating scene {scene.get('scene_id')} duration to {scene_duration} frames.")
                         scene['duration_in_frames'] = scene_duration
-                else:
-                    print(f"⚠️ Background video NOT found at: {abs_vpath}")
 
             placed_overlays = []
             if scene.get('overlays'):
@@ -455,7 +472,7 @@ class RemotionJsonMaker:
                 time.sleep(5)
         return ""
 
-    def generate(self, story: str, guidelines: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None) -> Dict[str, Any]:
+    def generate(self, story: str, guidelines: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None, external_timestamps: Dict[str, List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         story = self.adjust_durations_in_text(story)
         guidelines = self.adjust_durations_in_text(guidelines)
         local_fonts = self.get_local_fonts()
@@ -471,8 +488,8 @@ class RemotionJsonMaker:
             "STYLE: High-end sci-fi documentary interface. Think 'Minority Report' meets modern data journalism. Use sleek glassmorphism (ui_panel variant: glass), vibrant technical accents (shape/graph), and high-contrast typography.\n\n"
             "CRITICAL CINEMATIC RULES:\n"
             "1. PROFESSIONAL BALANCED LAYOUT: All overlays MUST use the 'slot' property. Never cluster elements. If a chart is in TOP_RIGHT, text must be in BOTTOM_LEFT or MID_LEFT.\n"
-            "2. CINEMATIC PACING (MOVLESS RESTING): This is non-negotiable. Every focal element must have 15f intro, 15f outro, and at least 90-120f of COMPLETELY STATIC RESTING time (no camera zoom/pan, no element movement) to ensure viewer focus.\n"
-            "3. AUDIO-VISUAL SYNC: Use the PRECISE word-level timestamps provided. Overlays must appear and disappear EXACTLY with the spoken narrative.\n"
+            "2. CINEMATIC PACING (MOVLESS RESTING): This is non-negotiable. Every focal element (Charts, UI Panels) must have 15f intro, 15f outro, and at least 90-120f of COMPLETELY STATIC RESTING time.\n"
+            "3. AUDIO-VISUAL SYNC (STRICT): Use the PRECISE [30fps: Startf - Endf] timestamps provided below for every word. The 'start' and 'duration' of your 'text' overlays MUST match these ranges exactly. DO NOT estimate or hallucinate new timings.\n"
             "4. NO VISUAL CLUTTER: Text content MUST be concise (2-3 words max per overlay). For charts, limit data to a MAXIMUM of 5 points. Do not block background video details.\n"
             "5. FONT ACCURACY (STRICT): For Bengali content, you MUST select a font from the BANGLA FONTS list provided. For English content, you MUST select from the ENGLISH FONTS list. DO NOT use generic font names like 'Inter' or 'Arial' unless they are in the detected list.\n"
             "6. MANDATORY AUDIO & VIDEO: EVERY scene MUST have 'background_type': 'video', 'video_path': 'renders/scene_SC_XX.mp4', and 'audio_enabled': true. This ensures the background video audio is preserved.\n"
@@ -482,7 +499,7 @@ class RemotionJsonMaker:
             f"SYSTEM GUIDELINES (V4 Schema):\n{guidelines}\n\n"
             f"STORY NARRATIVE:\n{story}\n\n"
             f"{duration_context}\n"
-            f"PRECISE WORD TIMESTAMPS (FOR SYNCING):\n{timestamp_context or 'No timestamps provided. Estimate based on 30fps.'}\n\n"
+            f"PRECISE WORD TIMESTAMPS (FOR SYNCING):\n{timestamp_context or 'No timestamps provided. Please design overlays following the narrative pace.'}\n\n"
             "TASK: Create the complete master blueprint in raw JSON. Ensure all IDs are unique and targeted correctly by the camera."
         )
         if prompt_output_path:
@@ -655,6 +672,8 @@ def main():
     parser.add_argument("--no-headless", action="store_false", dest="headless")
     parser.add_argument("--drive-prompt")
     parser.add_argument("--public-dir", default="../public")
+    parser.add_argument("--fps-update-file")
+    parser.add_argument("--timestamp-file")
     parser.set_defaults(headless=True)
     args = parser.parse_args()
     if not os.path.exists(args.story_file): exit(1)
@@ -671,20 +690,34 @@ def main():
     )
 
     try:
+        ext_durations = maker.parse_fps_update(args.fps_update_file)
+        ext_timestamps = maker.parse_timestamp_file(args.timestamp_file)
+
         ts_content = None
         scene_durations = None
-        if args.timestamp_output:
+
+        if ext_timestamps:
+            # Construct ts_content from external timestamps to pass into generate prompt
+            ts_lines = []
+            for sid, words in ext_timestamps.items():
+                for w in words:
+                    ts_lines.append(f"{sid}: [{w['start']}f - {w['end']}f] \"{w['word']}\"")
+            ts_content = "\n".join(ts_lines)
+
+            # Map ext_durations to scene_durations list for prompt context
+            if ext_durations:
+                scene_durations = [ext_durations.get(f"SCENE_{i+1:02d}", 180) for i in range(len(ext_durations))]
+        elif args.timestamp_output:
             if os.path.exists(args.timestamp_output): os.remove(args.timestamp_output)
             ts_content, scene_durations = maker.generate_word_timestamps(story, public_dir=abs_public)
-            if not ts_content or len(ts_content) < 50:
-                 ts_content, scene_durations = maker.generate_word_timestamps(story, public_dir=abs_public)
             with open(args.timestamp_output, 'w', encoding='utf-8') as f: f.write(ts_content)
-        render_json = maker.generate(story, guidelines, args.prompt_output, ts_content, scene_durations)
+
+        render_json = maker.generate(story, guidelines, args.prompt_output, ts_content, scene_durations, external_timestamps=ext_timestamps)
         maker.stop_browser()
         if not render_json or 'scenes' not in render_json:
              print("❌ ERROR: Gemini failed to produce a valid manifest.")
              exit(1)
-        render_json = maker.finalize_json_durations(render_json, public_dir=abs_public)
+        render_json = maker.finalize_json_durations(render_json, public_dir=abs_public, external_durations=ext_durations)
         output_dir = os.path.dirname(args.output)
         if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
         with open(args.output, 'w', encoding='utf-8') as f: json.dump(render_json, f, indent=2, ensure_ascii=False)
