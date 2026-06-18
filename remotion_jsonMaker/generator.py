@@ -99,7 +99,7 @@ class RemotionJsonMaker:
         print(f"📂 Scanning for fonts in: {fonts_dir}")
 
         # Categorization keywords
-        BANGLA_KEYWORDS = ['solaiman', 'kalpurush', 'nikosh', 'hind', 'siliguri', 'adorsho', 'sutonny', 'shonar', 'vrinda', 'bangla', 'liyakats', 'anshu', 'charukola', 'galada', 'mina', 'mukti', 'atreyee', 'benisen', 'bengali', 'shishir', 'shorif', 'maharaj']
+        BANGLA_KEYWORDS = ['solaiman', 'kalpurush', 'nikosh', 'hind', 'siliguri', 'adorsho', 'sutonny', 'shonar', 'vrinda', 'bangla', 'liyakats', 'anshu', 'charukola', 'galada', 'mina', 'mukti', 'atreyee', 'benisen', 'bengali', 'shishir', 'shorif', 'maharaj', '_bangla']
 
         if os.path.exists(fonts_dir):
             for root, dirs, files in os.walk(fonts_dir, followlinks=True):
@@ -404,7 +404,7 @@ class RemotionJsonMaker:
             "5. FONT ACCURACY (STRICT): For Bengali content, you MUST select a font from the BANGLA FONTS list provided. For English content, you MUST select from the ENGLISH FONTS list. DO NOT use generic font names like 'Inter' or 'Arial' unless they are in the detected list.\n"
             "6. MANDATORY AUDIO & VIDEO: EVERY scene MUST have 'background_type': 'video', 'video_path': 'renders/scene_SC_XX.mp4', and 'audio_enabled': true. This ensures the background video audio is preserved.\n"
             "7. CAMERA WORK: Use 'shots' for every focal overlay. Movements must be professional (slow_push, slow_pull, or dramatic_reveal). Ensure 'inDuration' allows for the required resting time.\n"
-            "8. JSON CONSTRAINTS: Be extremely concise. Avoid deep nesting or excessive decorative elements. Keep data arrays short. Ensure NO control characters are present in the text content. **OUTPUT RAW MINIFIED JSON ONLY. DO NOT USE NEWLINES OR INDENTATION.**\n\n"
+            "8. JSON CONSTRAINTS: Be extremely concise. Avoid deep nesting or excessive decorative elements. Keep data arrays short. Ensure NO control characters are present in the text content. **OUTPUT RAW MINIFIED JSON ONLY. DO NOT USE NEWLINES OR INDENTATION.** PRIORITIZE COMPLETING THE JSON STRUCTURE OVER ADDING EXTRA SCENES IF SPACE IS LIMITED.\n\n"
             f"DETECTED LOCAL FONTS (Categorized): {local_fonts}\n\n"
             f"SYSTEM GUIDELINES (V4 Schema):\n{guidelines}\n\n"
             f"STORY NARRATIVE:\n{story}\n\n"
@@ -444,11 +444,20 @@ class RemotionJsonMaker:
 
             def repair_json(s):
                 s = s.strip()
+                # 1. Truncation repair: remove trailing garbage
+                # If it's truncated, it often ends with a partial key like "duration
+                # or a partial value like 150 or "renders/scene
+
+                # Remove everything after the last valid value terminator
+                # Valid terminators: } ] " (if it ends a string) or a number
+                # This is tricky, let's try a different approach.
+
                 stack = []
                 in_string = False
                 escaped = False
+                last_valid_pos = 0
 
-                for char in s:
+                for i, char in enumerate(s):
                     if char == '"' and not escaped:
                         in_string = not in_string
                     if in_string:
@@ -456,52 +465,76 @@ class RemotionJsonMaker:
                         else: escaped = False
                         continue
 
-                    if char == '{': stack.append('}')
-                    elif char == '[': stack.append(']')
-                    elif char == '}':
-                        if stack and stack[-1] == '}': stack.pop()
-                    elif char == ']':
-                        if stack and stack[-1] == ']': stack.pop()
+                    if char in '{[':
+                        stack.append('}' if char == '{' else ']')
+                    elif char in '}]':
+                        if stack and stack[-1] == char:
+                            stack.pop()
+                            last_valid_pos = i + 1
+                    elif char == ',':
+                        # A comma is only valid if something follows it eventually
+                        pass
+                    elif char.isprintable():
+                         # Potential end of a value (digit, boolean, null, or string closure)
+                         # We'll consider the position after any non-structural character as potentially valid
+                         # if we can successfully close the stack.
+                         pass
 
-                # If we're inside a string at the end, close it
+                # If we're inside a string, close it
                 if in_string:
-                    s += '"'
+                    s = s[:s.rfind('"')] + '"'
 
+                # Try to find a logical breaking point if the stack is not empty
                 if stack:
-                    s = s.rstrip()
-                    # Remove trailing partial key/values
-                    # A valid value ends with " or digit or boolean or null or closure
-                    while s and s[-1] not in '"0123456789truefalsenull}]':
-                        s = s[:-1].rstrip()
+                    # Remove trailing partials: ..., "key": or ..., "key": "val
+                    # Backtrack to the last comma or brace that isn't inside a string
 
-                    # If we ended up with a partial key like "key", remove it too
-                    if s.endswith('"'):
-                         # Find the start of this possible partial key
-                         parts = s.rsplit('"', 2)
-                         if len(parts) >= 2:
-                              # If there's no colon after the second-to-last quote, it's a partial key
-                              # But checking this reliably is hard without a full parser.
-                              # Just ensure we don't end with a comma.
-                              pass
+                    # Simple heuristic: remove trailing chars until we hit a "safe" ending
+                    # then try to append the closing markers.
 
-                    if s.endswith(','):
-                        s = s[:-1].rstrip()
+                    temp_s = s.rstrip()
+                    while temp_s and temp_s[-1] not in '}"0123456789truefalsenull]':
+                        temp_s = temp_s[:-1].rstrip()
 
-                    # One more pass to ensure we don't have a partial key at the end
-                    # If the last character is a quote, and the one before the previous quote was a comma or brace
-                    # it means we have something like ..., "partial_key"
-                    if s.endswith('"'):
-                        last_quote = s.rfind('"', 0, -1)
-                        if last_quote != -1:
-                            before_quote = s[:last_quote].rstrip()
-                            if not before_quote or before_quote.endswith(',') or before_quote.endswith('{'):
-                                s = before_quote
+                    # If we ended with a quote, check if it's a key or value
+                    # If there's a colon after it (in the original string), it was a key.
+                    # This is getting complex. Let's use a simpler but more robust backtracking.
 
-                    if s.endswith(','):
-                        s = s[:-1].rstrip()
+                    # Backtrack to last successful structural point
+                    # We'll try to truncate the string at every comma, brace, or bracket from the end
+                    # and see if we can close it.
 
-                    s += "".join(reversed(stack))
-                return s
+                    for i in range(len(s) - 1, -1, -1):
+                        if s[i] in ',{[ ':
+                            sub = s[:i].rstrip()
+                            # If we truncate at a comma, we need to close the stack
+                            # Re-evaluate stack for 'sub'
+                            sub_stack = []
+                            sub_in_string = False
+                            sub_escaped = False
+                            for c in sub:
+                                if c == '"' and not sub_escaped: sub_in_string = not sub_in_string
+                                if sub_in_string:
+                                    if c == '\\': sub_escaped = not sub_escaped
+                                    else: sub_escaped = False
+                                    continue
+                                if c == '{': sub_stack.append('}')
+                                elif c == '[': sub_stack.append(']')
+                                elif c == '}':
+                                    if sub_stack and sub_stack[-1] == '}': sub_stack.pop()
+                                elif c == ']':
+                                    if sub_stack and sub_stack[-1] == ']': sub_stack.pop()
+
+                            if not sub_in_string:
+                                repaired = sub + "".join(reversed(sub_stack))
+                                try:
+                                    json.loads(repaired)
+                                    return repaired
+                                except:
+                                    continue
+
+                # Final fallback
+                return s + "".join(reversed(stack))
 
             try:
                 # Use strict=False to handle unescaped control characters in strings
