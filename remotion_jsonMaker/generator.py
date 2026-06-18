@@ -82,6 +82,8 @@ class RemotionJsonMaker:
         bangla_fonts = []
         english_fonts = []
 
+        print(f"📂 Scanning for fonts in: {fonts_dir}")
+
         # Categorization keywords
         BANGLA_KEYWORDS = ['solaiman', 'kalpurush', 'nikosh', 'hind', 'siliguri', 'adorsho', 'sutonny', 'shonar', 'vrinda', 'bangla']
 
@@ -103,7 +105,9 @@ class RemotionJsonMaker:
         return f"BANGLA FONTS: [{bangla_str}] | ENGLISH FONTS: [{english_str}]"
 
     def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
-        if not data or not data.get('scenes'): return data
+        if not data: return data
+        if 'audio_sfx_manifest' not in data: data['audio_sfx_manifest'] = []
+        if not data.get('scenes'): return data
         data['global_settings'] = { "width": 1920, "height": 1080, "fps": 30 }
 
         # Professional sizes with higher safety margin
@@ -345,10 +349,11 @@ class RemotionJsonMaker:
             "1. PROFESSIONAL BALANCED LAYOUT: All overlays MUST use the 'slot' property. Never cluster elements. If a chart is in TOP_RIGHT, text must be in BOTTOM_LEFT or MID_LEFT.\n"
             "2. CINEMATIC PACING (MOVLESS RESTING): This is non-negotiable. Every focal element must have 15f intro, 15f outro, and at least 90-120f of COMPLETELY STATIC RESTING time (no camera zoom/pan, no element movement) to ensure viewer focus.\n"
             "3. AUDIO-VISUAL SYNC: Use the PRECISE word-level timestamps provided. Overlays must appear and disappear EXACTLY with the spoken narrative.\n"
-            "4. NO VISUAL CLUTTER: Text content MUST be concise (2-3 words max per overlay). Do not block background video details.\n"
+            "4. NO VISUAL CLUTTER: Text content MUST be concise (2-3 words max per overlay). For charts, limit data to a MAXIMUM of 5 points. Do not block background video details.\n"
             "5. FONT ACCURACY: For Bengali content, you MUST select a font from the BANGLA FONTS list. For English, use an ENGLISH FONT. Never mix inappropriately.\n"
-            "6. MANDATORY AUDIO & VIDEO: All scenes must use 'background_type': 'video' with 'audio_enabled': true. This ensures the background video audio is preserved. Camera shake must be false.\n"
-            "7. CAMERA WORK: Use 'shots' for every focal overlay. Movements must be professional (slow_push, slow_pull, or dramatic_reveal). Ensure 'inDuration' allows for the required resting time.\n\n"
+            "6. MANDATORY AUDIO & VIDEO: EVERY scene MUST have 'background_type': 'video', 'video_path': 'renders/scene_SC_XX.mp4', and 'audio_enabled': true. This ensures the background video audio is preserved.\n"
+            "7. CAMERA WORK: Use 'shots' for every focal overlay. Movements must be professional (slow_push, slow_pull, or dramatic_reveal). Ensure 'inDuration' allows for the required resting time.\n"
+            "8. JSON CONSTRAINTS: Be extremely concise. Avoid deep nesting or excessive decorative elements. Keep data arrays short. Ensure NO control characters are present in the text content. **OUTPUT RAW MINIFIED JSON ONLY. DO NOT USE NEWLINES OR INDENTATION.**\n\n"
             f"DETECTED LOCAL FONTS (Categorized): {local_fonts}\n\n"
             f"SYSTEM GUIDELINES (V4 Schema):\n{guidelines}\n\n"
             f"STORY NARRATIVE:\n{story}\n\n"
@@ -370,26 +375,103 @@ class RemotionJsonMaker:
                 if start_idx != -1 and end_idx != -1:
                     json_str = raw_output[start_idx:end_idx+1]
                 else:
-                    print("❌ Could not find any JSON-like structures in Gemini response.")
-                    return {}
+                    # Try to find a partial JSON if it was truncated
+                    start_idx = raw_output.find('{')
+                    if start_idx != -1:
+                        json_str = raw_output[start_idx:]
+                    else:
+                        print("❌ Could not find any JSON-like structures in Gemini response.")
+                        return {}
+
+            # Pre-cleanup: Remove control characters except for standard whitespace
+            json_str = "".join(ch for ch in json_str if ch.isprintable() or ch in "\n\r\t")
 
             # Cleanup comments and common syntax issues
             json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
             json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
 
+            def repair_json(s):
+                s = s.strip()
+                stack = []
+                in_string = False
+                escaped = False
+
+                for char in s:
+                    if char == '"' and not escaped:
+                        in_string = not in_string
+                    if in_string:
+                        if char == '\\': escaped = not escaped
+                        else: escaped = False
+                        continue
+
+                    if char == '{': stack.append('}')
+                    elif char == '[': stack.append(']')
+                    elif char == '}':
+                        if stack and stack[-1] == '}': stack.pop()
+                    elif char == ']':
+                        if stack and stack[-1] == ']': stack.pop()
+
+                # If we're inside a string at the end, close it
+                if in_string:
+                    s += '"'
+
+                if stack:
+                    s = s.rstrip()
+                    # Remove trailing partial key/values
+                    # A valid value ends with " or digit or boolean or null or closure
+                    while s and s[-1] not in '"0123456789truefalsenull}]':
+                        s = s[:-1].rstrip()
+
+                    # If we ended up with a partial key like "key", remove it too
+                    if s.endswith('"'):
+                         # Find the start of this possible partial key
+                         parts = s.rsplit('"', 2)
+                         if len(parts) >= 2:
+                              # If there's no colon after the second-to-last quote, it's a partial key
+                              # But checking this reliably is hard without a full parser.
+                              # Just ensure we don't end with a comma.
+                              pass
+
+                    if s.endswith(','):
+                        s = s[:-1].rstrip()
+
+                    # One more pass to ensure we don't have a partial key at the end
+                    # If the last character is a quote, and the one before the previous quote was a comma or brace
+                    # it means we have something like ..., "partial_key"
+                    if s.endswith('"'):
+                        last_quote = s.rfind('"', 0, -1)
+                        if last_quote != -1:
+                            before_quote = s[:last_quote].rstrip()
+                            if not before_quote or before_quote.endswith(',') or before_quote.endswith('{'):
+                                s = before_quote
+
+                    if s.endswith(','):
+                        s = s[:-1].rstrip()
+
+                    s += "".join(reversed(stack))
+                return s
+
             try:
-                return json.loads(json_str)
+                # Use strict=False to handle unescaped control characters in strings
+                return json.loads(json_str, strict=False)
             except json.JSONDecodeError as e:
-                print(f"⚠️ JSON primary parse failed: {e}. Attempting cleanup...")
+                print(f"⚠️ JSON primary parse failed: {e}. Attempting repair...")
+
+                # Try simple trailing comma cleanup
                 cleaned = re.sub(r',\s*\}', '}', json_str)
                 cleaned = re.sub(r',\s*\]', ']', cleaned)
-                # Fix common LLM truncation if needed (optional)
+
                 try:
-                    return json.loads(cleaned)
-                except Exception as final_e:
-                    print(f"❌ JSON cleanup failed: {final_e}")
-                    print(f"--- FAILED JSON START ---\n{json_str[:500]}\n--- FAILED JSON END ---")
-                    return {}
+                    return json.loads(cleaned, strict=False)
+                except:
+                    # Final attempt: full structural repair
+                    repaired = repair_json(cleaned)
+                    try:
+                        return json.loads(repaired, strict=False)
+                    except Exception as final_e:
+                        print(f"❌ JSON repair failed: {final_e}")
+                        print(f"--- FAILED JSON START ---\n{json_str[:800]}\n--- FAILED JSON END ---")
+                        return {}
         except Exception as e:
             print(f"❌ Fatal error during JSON extraction: {e}")
             return {}
