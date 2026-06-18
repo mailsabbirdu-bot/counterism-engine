@@ -49,26 +49,36 @@ class RemotionJsonMaker:
 
     def probe_video_duration_and_fps(self, video_path: str):
         try:
-            # Reliable JSON-based probe
-            cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration,avg_frame_rate", "-of", "json", video_path]
+            # High-precision JSON probe
+            cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration,avg_frame_rate,nb_frames:format=duration", "-of", "json", video_path]
             output = subprocess.check_output(cmd).decode("utf-8")
             data = json.loads(output)
-            streams = data.get('streams', [])
-            stream = streams[0] if streams else {}
+            stream = data.get('streams', [{}])[0]
+            fmt = data.get('format', {})
 
-            # Duration can be in stream or format
-            duration_sec = float(stream.get('duration', data.get('format', {}).get('duration', 0)))
+            # Get duration from stream or format
+            duration_sec = float(stream.get('duration') or fmt.get('duration') or 0)
 
+            # Parse Native FPS
             fps_raw = stream.get('avg_frame_rate', '30/1')
             if '/' in fps_raw:
-                num, den = fps_raw.split('/')
-                native_fps = float(num) / float(den) if float(den) != 0 else 30.0
+                num, den = map(int, fps_raw.split('/'))
+                native_fps = num / den if den != 0 else 30.0
             else:
                 native_fps = float(fps_raw)
 
+            # Fallback for duration if missing but frames are present
+            if duration_sec == 0 and stream.get('nb_frames'):
+                duration_sec = int(stream['nb_frames']) / native_fps
+
             # Target is always 30.0 for our rendering engine
-            frames_at_30fps = int(math.ceil(duration_sec * 30))
-            print(f"   🎥 Probed {os.path.basename(video_path)}: {duration_sec:.2f}s | Native: {native_fps:.2f}fps -> Target: 30fps ({frames_at_30fps} frames)")
+            # We use round() to match user's manual verification results
+            frames_at_30fps = int(round(duration_sec * 30))
+
+            print(f"   🎥 Probed {os.path.basename(video_path)}:")
+            print(f"      Duration: {duration_sec:.3f}s | Native: {native_fps:.2f}fps")
+            print(f"      Target: 30fps | Total: {frames_at_30fps} frames")
+
             return duration_sec, 30.0
         except Exception as e:
             print(f"⚠️ Error probing video {video_path}: {e}")
@@ -84,7 +94,7 @@ class RemotionJsonMaker:
                 if os.path.exists(abs_vpath):
                     duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
                     if duration_sec > 0:
-                        new_duration = int(math.ceil(duration_sec * 30))
+                        new_duration = int(round(duration_sec * 30))
                         return re.sub(r'"duration_in_frames"\s*:\s*\d+', f'"duration_in_frames": {new_duration}', block)
             return block
         pattern1 = r'("video_path":\s*"[^"]+"(?:(?!"video_path"|"duration_in_frames").){0,300}?"duration_in_frames"\s*:\s*\d+)'
@@ -150,21 +160,23 @@ class RemotionJsonMaker:
             "MID_RIGHT": {"x": 1440, "y": 540}
         }
 
-        audio_dir = os.path.join(public_dir, "renders/audios")
+        audio_dir = os.path.abspath(os.path.join(public_dir, "renders/audios"))
         in_files = []
         out_files = []
 
-        print(f"📂 Searching for SFX materials in: {os.path.abspath(audio_dir)}")
+        print(f"📂 Searching for SFX materials in: {audio_dir}")
         if os.path.exists(audio_dir):
             all_files = os.listdir(audio_dir)
-            # More flexible detection: "in_1", "in1", "intro", etc.
-            in_files = sorted([f for f in all_files if re.match(r'^(in[_\-]?\d*|intro)', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
+            # More flexible detection: "in_1", "in1", "intro", "enter", etc.
+            in_files = sorted([f for f in all_files if re.match(r'^(in[_\-]?\d*|intro|enter)', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
             out_files = sorted([f for f in all_files if re.match(r'^(out[_\-]?\d*|outro|exit)', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
             print(f"   🎵 Scanned {len(all_files)} total files in SFX folder.")
             print(f"   🎵 Detected {len(in_files)} entrance sounds: {in_files[:5]}...")
             print(f"   🎵 Detected {len(out_files)} exit sounds: {out_files[:5]}...")
+            if not in_files and not out_files:
+                print(f"   ⚠️ Diagnostic: All files in SFX folder: {all_files[:10]}...")
         else:
-            print(f"   ⚠️ SFX directory not found: {audio_dir}")
+            print(f"   ⚠️ SFX directory not found at resolved path: {audio_dir}")
 
         sfx_manifest = []
         in_ptr, out_ptr = 0, 0
@@ -176,7 +188,7 @@ class RemotionJsonMaker:
                 if os.path.exists(abs_vpath):
                     duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
                     if duration_sec > 0:
-                        scene_duration = int(math.ceil(duration_sec * 30))
+                        scene_duration = int(round(duration_sec * 30))
                         scene['duration_in_frames'] = scene_duration
 
             placed_overlays = []
@@ -300,7 +312,7 @@ class RemotionJsonMaker:
             abs_vpath = os.path.join(public_dir, vpath)
             if os.path.exists(abs_vpath):
                 duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
-            total_frames = int(math.ceil(duration_sec * 30))
+            total_frames = int(round(duration_sec * 30))
             scene_durations.append(total_frames)
             print(f"   ⏱️ Syncing SCENE {scene_num:02d}: Mapping voiceover to {total_frames} frames (30fps)")
             full_ts_prompt += f"--- SCENE {scene_num:02d} (Duration: {total_frames} frames) ---\nVOICEOVER: {scene_text}\n\n"
@@ -370,13 +382,14 @@ class RemotionJsonMaker:
                     if current_text and current_text == last_text:
                         stable_count += 1
                         # Speed Optimization with Integrity Check
-                        # We only exit early if the text is stable, not generating, and looks like a valid response (length and start char)
-                        if not is_generating and stable_count >= 3:
-                             if len(current_text) > 100 or "{" in current_text:
+                        # We only exit early if the text is stable, not generating, and looks like a valid response
+                        if not is_generating and stable_count >= 4:
+                             # Must be reasonably long and contain structural JSON markers
+                             if len(current_text) > 200 and "{" in current_text and "scenes" in current_text:
                                  print(f"✨ Gemini response finished ({len(current_text)} chars).")
                                  return current_text
 
-                        if stable_count >= 10: # Safety backup stability
+                        if stable_count >= 12: # Safety backup stability
                              print(f"✨ Gemini response stabilized ({len(current_text)} chars).")
                              return current_text
                     else:
