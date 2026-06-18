@@ -67,6 +67,8 @@ class RemotionJsonMaker:
                 native_fps = float(fps_raw)
 
             # Target is always 30.0 for our rendering engine
+            frames_at_30fps = int(math.ceil(duration_sec * 30))
+            print(f"   🎥 Probed {os.path.basename(video_path)}: {duration_sec:.2f}s | Native: {native_fps:.2f}fps -> Target: 30fps ({frames_at_30fps} frames)")
             return duration_sec, 30.0
         except Exception as e:
             print(f"⚠️ Error probing video {video_path}: {e}")
@@ -152,13 +154,15 @@ class RemotionJsonMaker:
         in_files = []
         out_files = []
 
+        print(f"📂 Searching for SFX materials in: {os.path.abspath(audio_dir)}")
         if os.path.exists(audio_dir):
             all_files = os.listdir(audio_dir)
             in_files = sorted([f for f in all_files if f.lower().startswith("in_") and f.lower().endswith(('.mp3', '.wav', '.m4a'))])
             out_files = sorted([f for f in all_files if f.lower().startswith("out_") and f.lower().endswith(('.mp3', '.wav', '.m4a'))])
-
-        print(f"🎵 Audio Detection: Found {len(in_files)} entrance sounds: {in_files[:5]}...")
-        print(f"🎵 Audio Detection: Found {len(out_files)} exit sounds: {out_files[:5]}...")
+            print(f"   🎵 Found {len(in_files)} entrance sounds: {in_files[:5]}...")
+            print(f"   🎵 Found {len(out_files)} exit sounds: {out_files[:5]}...")
+        else:
+            print(f"   ⚠️ SFX directory not found: {audio_dir}")
 
         sfx_manifest = []
         in_ptr, out_ptr = 0, 0
@@ -296,6 +300,7 @@ class RemotionJsonMaker:
                 duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
             total_frames = int(math.ceil(duration_sec * 30))
             scene_durations.append(total_frames)
+            print(f"   ⏱️ Syncing SCENE {scene_num:02d}: Mapping voiceover to {total_frames} frames (30fps)")
             full_ts_prompt += f"--- SCENE {scene_num:02d} (Duration: {total_frames} frames) ---\nVOICEOVER: {scene_text}\n\n"
 
         full_ts_prompt += "INSTRUCTIONS: Format: SCENE_XX: [Frame Start - Frame End] \"Word\". Ensure 30fps mapping. ALL timestamps MUST be within the [0, Duration] range for each scene. Return ONLY timestamps.\n"
