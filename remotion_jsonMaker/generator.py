@@ -49,13 +49,29 @@ class RemotionJsonMaker:
 
     def probe_video_duration_and_fps(self, video_path: str):
         try:
-            # Precise probe for 30fps target
-            cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path]
-            output = subprocess.check_output(cmd).decode("utf-8").strip()
-            duration_sec = float(output) if output else 0.0
+            # Precise probe for duration and native fps
+            cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration,avg_frame_rate", "-of", "default=noprint_wrappers=1:nokey=1", video_path]
+            output = subprocess.check_output(cmd).decode("utf-8").strip().split('\n')
+
+            duration_sec = 0.0
+            native_fps = 30.0
+
+            if len(output) >= 1:
+                duration_sec = float(output[0])
+
+            if len(output) >= 2:
+                # avg_frame_rate is usually in "num/den" format
+                fps_raw = output[1]
+                if '/' in fps_raw:
+                    num, den = fps_raw.split('/')
+                    if float(den) != 0: native_fps = float(num) / float(den)
+                else:
+                    native_fps = float(fps_raw)
+
+            # We always return 30.0 as the target FPS for our engine
             return duration_sec, 30.0
         except Exception as e:
-            print(f"⚠️ Error probing video: {e}")
+            print(f"⚠️ Error probing video {video_path}: {e}")
             return 0.0, 30.0
 
     def adjust_durations_in_text(self, text: str, public_dir: str = "../public") -> str:
@@ -85,17 +101,19 @@ class RemotionJsonMaker:
         print(f"📂 Scanning for fonts in: {fonts_dir}")
 
         # Categorization keywords
-        BANGLA_KEYWORDS = ['solaiman', 'kalpurush', 'nikosh', 'hind', 'siliguri', 'adorsho', 'sutonny', 'shonar', 'vrinda', 'bangla']
+        BANGLA_KEYWORDS = ['solaiman', 'kalpurush', 'nikosh', 'hind', 'siliguri', 'adorsho', 'sutonny', 'shonar', 'vrinda', 'bangla', 'liyakats', 'anshu', 'charukola', 'galada', 'mina', 'mukti', 'atreyee', 'benisen', 'bengali']
 
         if os.path.exists(fonts_dir):
             for root, dirs, files in os.walk(fonts_dir, followlinks=True):
                 for file in files:
                     if file.lower().endswith(('.ttf', '.otf', '.woff', '.woff2')):
                         name = os.path.splitext(file)[0]
-                        if any(kw in name.lower() for kw in BANGLA_KEYWORDS):
-                            bangla_fonts.append(name)
+                        # Remove common weight/style suffixes for cleaner names in prompt
+                        clean_name = re.sub(r'-(Regular|Bold|Italic|Light|Medium|Thin|SemiBold|ExtraBold|Black)$', '', name, flags=re.IGNORECASE)
+                        if any(kw in clean_name.lower() for kw in BANGLA_KEYWORDS):
+                            bangla_fonts.append(clean_name)
                         else:
-                            english_fonts.append(name)
+                            english_fonts.append(clean_name)
 
         bangla_str = ", ".join(sorted(list(set(bangla_fonts))))
         english_str = ", ".join(sorted(list(set(english_fonts))))
@@ -112,13 +130,13 @@ class RemotionJsonMaker:
 
         # Professional sizes with higher safety margin
         TYPE_SIZES = {
-            'text': (1000, 250),
-            'chart': (1100, 600),
-            'ui_panel': (600, 500),
-            'data_indicator': (500, 400),
-            'media': (900, 700),
-            'image': (900, 700),
-            'video': (900, 700)
+            'text': (1200, 300),
+            'chart': (1300, 750),
+            'ui_panel': (750, 600),
+            'data_indicator': (600, 500),
+            'media': (1000, 800),
+            'image': (1000, 800),
+            'video': (1000, 800)
         }
 
         # Logical sectors (Safe Zones)
@@ -186,24 +204,39 @@ class RemotionJsonMaker:
                          selected = keys[i % len(keys)]
                          ov['position'] = {"x": SECTORS[selected]["x"], "y": SECTORS[selected]["y"]}
 
-                    # 2. Collision Nudging
-                    for prev_ov, prev_w, prev_h in placed_overlays:
-                        start1, end1 = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', 60)
-                        start2, end2 = prev_ov.get('start', 0), prev_ov.get('start', 0) + prev_ov.get('duration', 60)
+                    # 2. Collision Nudging (AABB - Axis-Aligned Bounding Box)
+                    for attempt in range(5): # Multiple nudges if needed
+                        collision_found = False
+                        for prev_ov, prev_w, prev_h in placed_overlays:
+                            start1, end1 = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', 60)
+                            start2, end2 = prev_ov.get('start', 0), prev_ov.get('start', 0) + prev_ov.get('duration', 60)
 
-                        if max(start1, start2) < min(end1, end2):
-                            x1, y1 = ov['position']['x'], ov['position']['y']
-                            x2, y2 = prev_ov['position']['x'], prev_ov['position']['y']
-                            if abs(x1 - x2) < (w + prev_w) / 2 and abs(y1 - y2) < (h + prev_h) / 2:
-                                if y1 <= y2: ov['position']['y'] = y2 - (h + prev_h) / 2 - 120
-                                else: ov['position']['y'] = y2 + (h + prev_h) / 2 + 120
+                            if max(start1, start2) < min(end1, end2):
+                                x1, y1 = ov['position']['x'], ov['position']['y']
+                                x2, y2 = prev_ov['position']['x'], prev_ov['position']['y']
 
-                    # 3. Final Margin Clamping (150px)
+                                # Check for AABB overlap
+                                if abs(x1 - x2) < (w + prev_w) / 2 + 50 and abs(y1 - y2) < (h + prev_h) / 2 + 50:
+                                    collision_found = True
+                                    # Nudge vertically
+                                    if y1 <= y2: ov['position']['y'] = y2 - (h + prev_h) / 2 - 80
+                                    else: ov['position']['y'] = y2 + (h + prev_h) / 2 + 80
+
+                                    # If still overlapping, nudge horizontally
+                                    if abs(ov['position']['y'] - y2) < (h + prev_h) / 2 + 20:
+                                         if x1 <= x2: ov['position']['x'] = x2 - (w + prev_w) / 2 - 80
+                                         else: ov['position']['x'] = x2 + (w + prev_w) / 2 + 80
+                        if not collision_found: break
+
+                    # 3. Final Rigid Canvas Safety Clamping (150px safety zone)
                     margin = 150
+                    # For center-anchored: center must be between (margin + width/2) and (1920 - margin - width/2)
                     x_min, x_max = margin + w/2, 1920 - margin - w/2
                     y_min, y_max = margin + h/2, 1080 - margin - h/2
-                    if x_min > x_max: x_min, x_max = 960, 960
-                    if y_min > y_max: y_min, y_max = 540, 540
+
+                    # If component is somehow larger than the safe zone, center it
+                    if x_min > x_max: x_min = x_max = 960
+                    if y_min > y_max: y_min = y_max = 540
 
                     ov['position']['x'] = max(x_min, min(x_max, int(ov['position'].get('x', 960))))
                     ov['position']['y'] = max(y_min, min(y_max, int(ov['position'].get('y', 540))))
@@ -226,12 +259,12 @@ class RemotionJsonMaker:
                         else:
                             ov['duration'] = scene_duration - ov['start']
 
-                    # Subtle local SFX (Volume 0.1) - Attached to each overlay
+                    # Subtle local SFX (Volume 0.04) - Attached to each overlay
                     if in_files:
-                        sfx_manifest.append({ "scene_id": scene['scene_id'], "file": in_files[in_ptr % len(in_files)], "start": ov['start'], "end": ov['start'] + 20, "volume": 0.1 })
+                        sfx_manifest.append({ "scene_id": scene['scene_id'], "file": in_files[in_ptr % len(in_files)], "start": ov['start'], "end": ov['start'] + 20, "volume": 0.04 })
                         in_ptr += 1
                     if out_files:
-                        sfx_manifest.append({ "scene_id": scene['scene_id'], "file": out_files[out_ptr % len(out_files)], "start": ov['start'] + ov['duration'] - 10, "end": ov['start'] + ov['duration'], "volume": 0.1 })
+                        sfx_manifest.append({ "scene_id": scene['scene_id'], "file": out_files[out_ptr % len(out_files)], "start": ov['start'] + ov['duration'] - 10, "end": ov['start'] + ov['duration'], "volume": 0.04 })
                         out_ptr += 1
 
             # 4. Camera Shot Normalization (Resting Time)
@@ -254,6 +287,8 @@ class RemotionJsonMaker:
         scenes = re.split(r'দৃশ্য\s+[0-9০-৯]+', story)
         scene_texts = [s.strip() for s in scenes if s.strip()]
         full_ts_prompt = "You are a Voiceover Alignment Expert. Generate EXACT word-level timestamps in FRAMES for a 30fps project.\n\n"
+
+        scene_durations = []
         for i, scene_text in enumerate(scene_texts):
             scene_num = i + 1
             vpath = f"renders/scene_SC_{scene_num:02d}.mp4"
@@ -262,9 +297,11 @@ class RemotionJsonMaker:
             if os.path.exists(abs_vpath):
                 duration_sec, _ = self.probe_video_duration_and_fps(abs_vpath)
             total_frames = int(math.ceil(duration_sec * 30))
+            scene_durations.append(total_frames)
             full_ts_prompt += f"--- SCENE {scene_num:02d} (Duration: {total_frames} frames) ---\nVOICEOVER: {scene_text}\n\n"
-        full_ts_prompt += "INSTRUCTIONS: Format: SCENE_XX: [Frame Start - Frame End] \"Word\". Ensure 30fps mapping. Return ONLY timestamps.\n"
-        return self._interact_with_gemini(full_ts_prompt)
+
+        full_ts_prompt += "INSTRUCTIONS: Format: SCENE_XX: [Frame Start - Frame End] \"Word\". Ensure 30fps mapping. ALL timestamps MUST be within the [0, Duration] range for each scene. Return ONLY timestamps.\n"
+        return self._interact_with_gemini(full_ts_prompt), scene_durations
 
     def _interact_with_gemini(self, prompt: str, retry_count: int = 2) -> str:
         for attempt in range(retry_count + 1):
@@ -309,22 +346,31 @@ class RemotionJsonMaker:
                 print("⏳  Waiting for new message to appear...")
                 last_text = ""
                 stable_count = 0
-                for i in range(250):
-                    time.sleep(2)
+                stop_btn = "button[aria-label*='Stop generating']"
+
+                for i in range(300):
+                    time.sleep(1.5)
                     if get_msg_count() <= initial_count: continue
+
+                    # Speed Optimization: If 'Stop generating' button is gone, the response is likely done.
+                    is_generating = page.is_visible(stop_btn, timeout=500)
+
                     current_text = ""
                     for sel in response_selectors:
                         msgs = page.query_selector_all(sel)
                         if msgs:
                             current_text = msgs[-1].inner_text()
                             break
+
                     if current_text and current_text == last_text:
                         stable_count += 1
-                        if stable_count >= 8:
-                            if len(current_text) > 100:
-                                 print(f"✨ Gemini response received ({len(current_text)} chars).")
-                                 return current_text
-                            break
+                        # If stable and not generating, we can exit much faster
+                        if not is_generating and stable_count >= 2:
+                             print(f"✨ Gemini response finished ({len(current_text)} chars).")
+                             return current_text
+                        if stable_count >= 5:
+                             print(f"✨ Gemini response stabilized ({len(current_text)} chars).")
+                             return current_text
                     else:
                         stable_count = 0
                         last_text = current_text
@@ -338,10 +384,17 @@ class RemotionJsonMaker:
                 time.sleep(5)
         return ""
 
-    def generate(self, story: str, guidelines: str, prompt_output_path: str = None, timestamp_context: str = None) -> Dict[str, Any]:
+    def generate(self, story: str, guidelines: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None) -> Dict[str, Any]:
         story = self.adjust_durations_in_text(story)
         guidelines = self.adjust_durations_in_text(guidelines)
         local_fonts = self.get_local_fonts()
+
+        duration_context = ""
+        if scene_durations:
+             duration_context = "SCENE DURATION LIMITS (30fps Frames):\n"
+             for i, d in enumerate(scene_durations):
+                  duration_context += f"SCENE {i+1:02d}: {d} frames\n"
+
         full_prompt = (
             "You are a world-class Cinematic Motion Graphics Director. Your mission is to generate an ULTRA MODERN, TOP-NOTCH, high-fidelity JSON manifest.\n\n"
             "STYLE: High-end sci-fi documentary interface. Think 'Minority Report' meets modern data journalism. Use sleek glassmorphism (ui_panel variant: glass), vibrant technical accents (shape/graph), and high-contrast typography.\n\n"
@@ -350,13 +403,14 @@ class RemotionJsonMaker:
             "2. CINEMATIC PACING (MOVLESS RESTING): This is non-negotiable. Every focal element must have 15f intro, 15f outro, and at least 90-120f of COMPLETELY STATIC RESTING time (no camera zoom/pan, no element movement) to ensure viewer focus.\n"
             "3. AUDIO-VISUAL SYNC: Use the PRECISE word-level timestamps provided. Overlays must appear and disappear EXACTLY with the spoken narrative.\n"
             "4. NO VISUAL CLUTTER: Text content MUST be concise (2-3 words max per overlay). For charts, limit data to a MAXIMUM of 5 points. Do not block background video details.\n"
-            "5. FONT ACCURACY: For Bengali content, you MUST select a font from the BANGLA FONTS list. For English, use an ENGLISH FONT. Never mix inappropriately.\n"
+            "5. FONT ACCURACY (STRICT): For Bengali content, you MUST select a font from the BANGLA FONTS list provided. For English content, you MUST select from the ENGLISH FONTS list. DO NOT use generic font names like 'Inter' or 'Arial' unless they are in the detected list.\n"
             "6. MANDATORY AUDIO & VIDEO: EVERY scene MUST have 'background_type': 'video', 'video_path': 'renders/scene_SC_XX.mp4', and 'audio_enabled': true. This ensures the background video audio is preserved.\n"
             "7. CAMERA WORK: Use 'shots' for every focal overlay. Movements must be professional (slow_push, slow_pull, or dramatic_reveal). Ensure 'inDuration' allows for the required resting time.\n"
             "8. JSON CONSTRAINTS: Be extremely concise. Avoid deep nesting or excessive decorative elements. Keep data arrays short. Ensure NO control characters are present in the text content. **OUTPUT RAW MINIFIED JSON ONLY. DO NOT USE NEWLINES OR INDENTATION.**\n\n"
             f"DETECTED LOCAL FONTS (Categorized): {local_fonts}\n\n"
             f"SYSTEM GUIDELINES (V4 Schema):\n{guidelines}\n\n"
             f"STORY NARRATIVE:\n{story}\n\n"
+            f"{duration_context}\n"
             f"PRECISE WORD TIMESTAMPS (FOR SYNCING):\n{timestamp_context or 'No timestamps provided. Estimate based on 30fps.'}\n\n"
             "TASK: Create the complete master blueprint in raw JSON. Ensure all IDs are unique and targeted correctly by the camera."
         )
@@ -494,13 +548,14 @@ def main():
     guidelines = maker.load_guidelines("../guideline.md", "../guideline_prompt.txt", args.drive_prompt)
     try:
         ts_content = None
+        scene_durations = None
         if args.timestamp_output:
             if os.path.exists(args.timestamp_output): os.remove(args.timestamp_output)
-            ts_content = maker.generate_word_timestamps(story)
+            ts_content, scene_durations = maker.generate_word_timestamps(story)
             if not ts_content or len(ts_content) < 50:
-                 ts_content = maker.generate_word_timestamps(story)
+                 ts_content, scene_durations = maker.generate_word_timestamps(story)
             with open(args.timestamp_output, 'w', encoding='utf-8') as f: f.write(ts_content)
-        render_json = maker.generate(story, guidelines, args.prompt_output, ts_content)
+        render_json = maker.generate(story, guidelines, args.prompt_output, ts_content, scene_durations)
         maker.stop_browser()
         if not render_json or 'scenes' not in render_json:
              print("❌ ERROR: Gemini failed to produce a valid manifest.")
