@@ -54,8 +54,15 @@ for drive_sfx in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/rende
         !find {drive_sfx} -maxdepth 2 -type f -exec ln -sf '{}' public/renders/audios/ ';' 2>/dev/null
 
 # Sync background videos and fonts
+print("Linking background videos...")
 !find {DRIVE_BASE_PATH}/renders -maxdepth 1 -name "*.mp4" -exec ln -sf '{}' public/renders/ ';' 2>/dev/null
-!find {DRIVE_BASE_PATH}/fonts -maxdepth 2 -type f -exec ln -sf '{}' public/fonts/ ';' 2>/dev/null
+v_count = !ls public/renders/*.mp4 | wc -l
+print(f"✅ Linked {v_count[0]} background videos.")
+
+print("Linking fonts...")
+!find {DRIVE_BASE_PATH}/fonts -maxdepth 3 -type f -exec ln -sf '{}' public/fonts/ ';' 2>/dev/null
+f_count = !ls public/fonts/ | wc -l
+print(f"✅ Linked {f_count[0]} fonts (including subdirs).")
 
 print("✅ Drive assets linked to public folder.")
 

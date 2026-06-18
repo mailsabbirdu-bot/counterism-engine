@@ -76,7 +76,9 @@ class RemotionJsonMaker:
         return text
 
     def get_local_fonts(self, public_dir: str = "../public") -> str:
-        fonts_dir = os.path.join(public_dir, "fonts")
+        # Use absolute path to ensure accuracy
+        abs_public = os.path.abspath(public_dir)
+        fonts_dir = os.path.join(abs_public, "fonts")
         bangla_fonts = []
         english_fonts = []
 
@@ -84,7 +86,7 @@ class RemotionJsonMaker:
         BANGLA_KEYWORDS = ['solaiman', 'kalpurush', 'nikosh', 'hind', 'siliguri', 'adorsho', 'sutonny', 'shonar', 'vrinda', 'bangla']
 
         if os.path.exists(fonts_dir):
-            for root, dirs, files in os.walk(fonts_dir):
+            for root, dirs, files in os.walk(fonts_dir, followlinks=True):
                 for file in files:
                     if file.lower().endswith(('.ttf', '.otf', '.woff', '.woff2')):
                         name = os.path.splitext(file)[0]
@@ -345,7 +347,7 @@ class RemotionJsonMaker:
             "3. AUDIO-VISUAL SYNC: Use the PRECISE word-level timestamps provided. Overlays must appear and disappear EXACTLY with the spoken narrative.\n"
             "4. NO VISUAL CLUTTER: Text content MUST be concise (2-3 words max per overlay). Do not block background video details.\n"
             "5. FONT ACCURACY: For Bengali content, you MUST select a font from the BANGLA FONTS list. For English, use an ENGLISH FONT. Never mix inappropriately.\n"
-            "6. MANDATORY VIDEO: All scenes must use 'background_type': 'video' with 'audio_enabled': true. Camera shake must be false.\n"
+            "6. MANDATORY AUDIO & VIDEO: All scenes must use 'background_type': 'video' with 'audio_enabled': true. This ensures the background video audio is preserved. Camera shake must be false.\n"
             "7. CAMERA WORK: Use 'shots' for every focal overlay. Movements must be professional (slow_push, slow_pull, or dramatic_reveal). Ensure 'inDuration' allows for the required resting time.\n\n"
             f"DETECTED LOCAL FONTS (Categorized): {local_fonts}\n\n"
             f"SYSTEM GUIDELINES (V4 Schema):\n{guidelines}\n\n"
@@ -356,19 +358,41 @@ class RemotionJsonMaker:
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
         raw_output = self._interact_with_gemini(full_prompt)
+        print(f"📊 Raw Gemini output length: {len(raw_output)} chars.")
         try:
-            start_idx, end_idx = raw_output.find('{'), raw_output.rfind('}')
-            if start_idx != -1 and end_idx != -1:
-                json_str = raw_output[start_idx:end_idx+1]
-                json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
-                json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
-                try: return json.loads(json_str)
-                except:
-                    cleaned = re.sub(r',\s*\}', '}', json_str)
-                    cleaned = re.sub(r',\s*\]', ']', cleaned)
+            # 1. Look for markdown code blocks first
+            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_output, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # 2. Fallback to finding first { and last }
+                start_idx, end_idx = raw_output.find('{'), raw_output.rfind('}')
+                if start_idx != -1 and end_idx != -1:
+                    json_str = raw_output[start_idx:end_idx+1]
+                else:
+                    print("❌ Could not find any JSON-like structures in Gemini response.")
+                    return {}
+
+            # Cleanup comments and common syntax issues
+            json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
+            json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
+
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError as e:
+                print(f"⚠️ JSON primary parse failed: {e}. Attempting cleanup...")
+                cleaned = re.sub(r',\s*\}', '}', json_str)
+                cleaned = re.sub(r',\s*\]', ']', cleaned)
+                # Fix common LLM truncation if needed (optional)
+                try:
                     return json.loads(cleaned)
+                except Exception as final_e:
+                    print(f"❌ JSON cleanup failed: {final_e}")
+                    print(f"--- FAILED JSON START ---\n{json_str[:500]}\n--- FAILED JSON END ---")
+                    return {}
+        except Exception as e:
+            print(f"❌ Fatal error during JSON extraction: {e}")
             return {}
-        except: return {}
 
 def main():
     parser = argparse.ArgumentParser()
