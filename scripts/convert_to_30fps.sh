@@ -26,7 +26,7 @@ for file in "$TARGET_DIR"/*.mp4; do
         temp_file="${file%.mp4}_30fps.mp4"
 
         # Convert to 30fps
-        # Using -r 30 for better compatibility with Remotion's ffmpeg build
+        # Using -r 30 for maximum compatibility and to match simple user math
         $FFMPEG -i "$file" -r 30 -y "$temp_file" -hide_banner -loglevel error
 
         if [ $? -eq 0 ]; then

@@ -55,7 +55,7 @@ class RemotionJsonMaker:
 
     def probe_video_duration_and_fps(self, video_path: str):
         try:
-            # High-precision JSON probe (matches user requested approach)
+            # Get video info (exact logic from user request)
             cmd = self._get_ff_tool("ffprobe") + [
                 "-v", "error",
                 "-select_streams", "v:0",
@@ -76,20 +76,17 @@ class RemotionJsonMaker:
 
             # Original FPS
             fps_str = stream.get("avg_frame_rate", "0/1")
-            if "/" in fps_str:
-                num, den = map(int, fps_str.split("/"))
-            else:
-                num, den = float(fps_str), 1
+            num, den = map(int, fps_str.split("/"))
             fps = num / den if den else 0
 
             # Total frames
             nb_frames = stream.get("nb_frames")
-            if nb_frames is not None and nb_frames != "N/A":
+            if nb_frames is not None:
                 total_frames = int(nb_frames)
             else:
                 total_frames = int(round(duration * fps))
 
-            # Frames after converting to 30 FPS (User approach: round(duration * 30))
+            # Frames after converting to 30 FPS (User formula: round(duration * 30))
             frames_at_30fps = int(round(duration * 30))
 
             print("\n" + "="*70)
@@ -100,7 +97,7 @@ class RemotionJsonMaker:
             print(f"Frames @ 30 FPS   : {frames_at_30fps}")
             print("="*70)
 
-            # Return frames instead of seconds for the first parameter to satisfy the new requirement
+            # Return frames instead of seconds for the first parameter to satisfy the engine requirement
             return float(frames_at_30fps), 30.0
         except Exception as e:
             print(f"⚠️ Error probing video {video_path}: {e}")
