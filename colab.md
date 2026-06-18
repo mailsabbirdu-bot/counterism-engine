@@ -50,7 +50,7 @@ print_banner("🔍 ASSET VERIFICATION & COPYING")
 drive_renders = f"{DRIVE_BASE_PATH}/renders"
 if os.path.exists(drive_renders):
     print(f"📡 Syncing renders from: {drive_renders}")
-    !find {drive_renders} -maxdepth 1 -name "*.mp4" -exec cp -t public/renders/ {{}} +
+    !find {drive_renders} -maxdepth 1 -name "*.mp4" -exec cp -t public/renders/ {} +
 
     # NEW: Ensure all background videos are consistent with 30fps
     print("🎬 Converting background videos to 30fps for engine consistency...")

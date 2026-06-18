@@ -74,7 +74,7 @@ if int(v_count[0]) > 0:
 
     # NEW: Ensure all background videos are consistent with 30fps
     print("🎬 Converting background videos to 30fps for engine consistency...")
-    !bash ../scripts/convert_to_30fps.sh public/renders/
+    !bash scripts/convert_to_30fps.sh public/renders/
 
 # 3. Fonts
 print("\n✍️ --- SYNCING FONTS ---")

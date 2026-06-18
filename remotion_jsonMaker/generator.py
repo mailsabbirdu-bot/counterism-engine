@@ -65,18 +65,26 @@ class RemotionJsonMaker:
             ]
             output = subprocess.check_output(cmd).decode("utf-8")
             data = json.loads(output)
-            stream = data.get('streams', [{}])[0]
+
+            if not data.get('streams'):
+                print(f"⚠️ No streams found in {video_path}")
+                return 0.0, 30.0
+
+            stream = data['streams'][0]
 
             duration = float(stream.get("duration", 0))
 
             # Original FPS
             fps_str = stream.get("avg_frame_rate", "0/1")
-            num, den = map(int, fps_str.split("/"))
+            if "/" in fps_str:
+                num, den = map(int, fps_str.split("/"))
+            else:
+                num, den = float(fps_str), 1
             fps = num / den if den else 0
 
             # Total frames
             nb_frames = stream.get("nb_frames")
-            if nb_frames is not None:
+            if nb_frames is not None and nb_frames != "N/A":
                 total_frames = int(nb_frames)
             else:
                 total_frames = int(round(duration * fps))
