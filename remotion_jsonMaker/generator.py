@@ -18,6 +18,26 @@ class RemotionJsonMaker:
         self.browser = None
         self.context = None
         self.page = None
+        self.fps_cache = {}
+
+    def load_fps_update(self, filepath: str):
+        if not filepath or not os.path.exists(filepath):
+            print(f"⚠️ FPS update file not found: {filepath}")
+            return
+
+        print(f"📂 Loading FPS data from: {filepath}")
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                for line in f:
+                    # Format: scene_SC_01.mp4 | Original FPS: 24.000 | Total Frames: 128 | 30fps Frames: 160
+                    match = re.search(r'(scene_SC_\d+\.mp4).*?30fps Frames:\s*(\d+)', line)
+                    if match:
+                        filename = match.group(1)
+                        frames = int(match.group(2))
+                        self.fps_cache[filename] = frames
+            print(f"✅ Cached durations for {len(self.fps_cache)} videos.")
+        except Exception as e:
+            print(f"⚠️ Error loading FPS update file: {e}")
 
     def start_browser(self):
         if self.page: return
@@ -54,6 +74,10 @@ class RemotionJsonMaker:
         return ["npx", "remotion", tool]
 
     def probe_video_duration_and_fps(self, video_path: str):
+        filename = os.path.basename(video_path)
+        if filename in self.fps_cache:
+            return float(self.fps_cache[filename]), 30.0
+
         try:
             # Get video info (exact logic from user request)
             cmd = self._get_ff_tool("ffprobe") + [
@@ -471,8 +495,8 @@ class RemotionJsonMaker:
             "STYLE: High-end sci-fi documentary interface. Think 'Minority Report' meets modern data journalism. Use sleek glassmorphism (ui_panel variant: glass), vibrant technical accents (shape/graph), and high-contrast typography.\n\n"
             "CRITICAL CINEMATIC RULES:\n"
             "1. PROFESSIONAL BALANCED LAYOUT: All overlays MUST use the 'slot' property. Never cluster elements. If a chart is in TOP_RIGHT, text must be in BOTTOM_LEFT or MID_LEFT.\n"
-            "2. CINEMATIC PACING (MOVLESS RESTING): This is non-negotiable. Every focal element must have 15f intro, 15f outro, and at least 90-120f of COMPLETELY STATIC RESTING time (no camera zoom/pan, no element movement) to ensure viewer focus.\n"
-            "3. AUDIO-VISUAL SYNC: Use the PRECISE word-level timestamps provided. Overlays must appear and disappear EXACTLY with the spoken narrative.\n"
+            "2. CINEMATIC PACING (MOVLESS RESTING): This is non-negotiable. Every focal element must have exactly 15f intro and exactly 15f outro. There MUST be a resting screen period (90-120 frames) where the element is completely static so viewers can read them properly. This resting period MUST be longer than the intro and outro.\n"
+            "3. AUDIO-VISUAL SYNC: Use the PRECISE word-level timestamps provided from the external timestamp.txt. Overlays must appear and disappear EXACTLY with the spoken narrative. Match the frame ranges [30fps: Xf - Yf] for start and end timings.\n"
             "4. NO VISUAL CLUTTER: Text content MUST be concise (2-3 words max per overlay). For charts, limit data to a MAXIMUM of 5 points. Do not block background video details.\n"
             "5. FONT ACCURACY (STRICT): For Bengali content, you MUST select a font from the BANGLA FONTS list provided. For English content, you MUST select from the ENGLISH FONTS list. DO NOT use generic font names like 'Inter' or 'Arial' unless they are in the detected list.\n"
             "6. MANDATORY AUDIO & VIDEO: EVERY scene MUST have 'background_type': 'video', 'video_path': 'renders/scene_SC_XX.mp4', and 'audio_enabled': true. This ensures the background video audio is preserved.\n"
@@ -649,7 +673,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--story-file", required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--timestamp-output")
+    parser.add_argument("--timestamp-output") # Deprecated in favor of --timestamp-file
+    parser.add_argument("--timestamp-file")
+    parser.add_argument("--fps-update-file")
     parser.add_argument("--prompt-output")
     parser.add_argument("--user-data-dir")
     parser.add_argument("--no-headless", action="store_false", dest="headless")
@@ -662,6 +688,9 @@ def main():
     with open(args.story_file, 'r', encoding='utf-8') as f: story = f.read()
     maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, headless=args.headless)
 
+    if args.fps_update_file:
+        maker.load_fps_update(args.fps_update_file)
+
     # Use absolute paths where possible
     abs_public = os.path.abspath(args.public_dir)
     guidelines = maker.load_guidelines(
@@ -672,13 +701,31 @@ def main():
 
     try:
         ts_content = None
-        scene_durations = None
-        if args.timestamp_output:
+        scene_durations = []
+
+        # 1. Handle Scene Durations from fps_update_file
+        if maker.fps_cache:
+            for i in range(1, 100): # Scan up to 99 scenes
+                vname = f"scene_SC_{i:02d}.mp4"
+                if vname in maker.fps_cache:
+                    scene_durations.append(maker.fps_cache[vname])
+                else:
+                    break
+
+        # 2. Handle Word Timestamps
+        if args.timestamp_file and os.path.exists(args.timestamp_file):
+            print(f"📂 Loading external timestamps from: {args.timestamp_file}")
+            with open(args.timestamp_file, 'r', encoding='utf-8') as f:
+                ts_content = f.read()
+        elif args.timestamp_output:
             if os.path.exists(args.timestamp_output): os.remove(args.timestamp_output)
-            ts_content, scene_durations = maker.generate_word_timestamps(story, public_dir=abs_public)
+            ts_content, gen_durations = maker.generate_word_timestamps(story, public_dir=abs_public)
             if not ts_content or len(ts_content) < 50:
-                 ts_content, scene_durations = maker.generate_word_timestamps(story, public_dir=abs_public)
+                 ts_content, gen_durations = maker.generate_word_timestamps(story, public_dir=abs_public)
+            if not scene_durations:
+                scene_durations = gen_durations
             with open(args.timestamp_output, 'w', encoding='utf-8') as f: f.write(ts_content)
+
         render_json = maker.generate(story, guidelines, args.prompt_output, ts_content, scene_durations)
         maker.stop_browser()
         if not render_json or 'scenes' not in render_json:

@@ -106,19 +106,18 @@ else:
 print_banner("🧠 GEMINI BROWSER AUTOMATION")
 print("🚀 Using Playwright to interact with Gemini.")
 
+# Using external manifests from Drive
+FPS_UPDATE_FILE = f"{DRIVE_BASE_PATH}/manifests/fps_update.txt"
+
 !xvfb-run python generator.py \
     --story-file="{STORY_FILE}" \
     --output="{OUTPUT_JSON}" \
-    --timestamp-output="{TIMESTAMP_FILE}" \
+    --timestamp-file="{TIMESTAMP_FILE}" \
+    --fps-update-file="{FPS_UPDATE_FILE}" \
     --prompt-output="{PROMPT_FILE}" \
     --drive-prompt="{PROJECT_PATH}/guideline_prompt.txt" \
     --user-data-dir="{USER_DATA_DIR}" \
     --public-dir="/content/engine/public"
-
-# 5. Asset Normalization (Run AFTER generation to match probed durations)
-print_banner("🎬 ASSET NORMALIZATION")
-print("🎬 Converting background videos to 30fps for engine consistency...")
-!bash ../scripts/convert_to_30fps.sh ../public/renders/
 
 print_banner("🏁 PROCESS FINISHED")
 if os.path.exists(OUTPUT_JSON):
