@@ -181,6 +181,10 @@ class RemotionJsonMaker:
         if not data: return data
         if 'audio_sfx_manifest' not in data: data['audio_sfx_manifest'] = []
         if not data.get('scenes'): return data
+
+        if 'project_name' not in data:
+            data['project_name'] = "Counterism_Studio_V4_Automated_Render"
+
         data['global_settings'] = { "width": 1920, "height": 1080, "fps": 30 }
 
         abs_public = os.path.abspath(public_dir)
@@ -227,25 +231,42 @@ class RemotionJsonMaker:
         sfx_manifest = []
         in_ptr, out_ptr = 0, 0
 
-        for scene in data['scenes']:
+        for scene_idx, scene in enumerate(data['scenes']):
+            # LLM Fix: Map 'duration' to 'duration_in_frames'
+            if 'duration' in scene and 'duration_in_frames' not in scene:
+                scene['duration_in_frames'] = scene['duration']
+
             scene_duration = scene.get('duration_in_frames', 180)
-            if scene.get('background_type') == 'video' and scene.get('video_path'):
-                # Handle potential leading slash in video_path
+
+            # Ensure background video path is correct
+            if scene.get('background_type') == 'video':
+                if not scene.get('video_path'):
+                    scene['video_path'] = f"renders/scene_SC_{scene_idx+1:02d}.mp4"
+
                 vpath = scene['video_path'].lstrip('/')
                 filename = os.path.basename(vpath)
 
-                # Priority 1: Cache from fps_update.txt
                 if filename in self.fps_cache:
                     scene_duration = self.fps_cache[filename]
-                    print(f"   ⏱️ Using CACHED duration for {filename}: {scene_duration} frames.")
                 else:
-                    print(f"   ⚠️ WARNING: {filename} not in FPS cache. Using default/Gemini duration.")
+                    print(f"   ⚠️ WARNING: {filename} not in FPS cache. Using {scene_duration} frames.")
 
             scene['duration_in_frames'] = scene_duration
+            scene['audio_enabled'] = True
 
             placed_overlays = []
+            focal_ids = []
+
             if scene.get('overlays'):
                 for i, ov in enumerate(scene['overlays']):
+                    # Ensure ID exists
+                    if not ov.get('id'):
+                        ov['id'] = f"OV_{scene_idx+1}_{i+1}_{ov.get('type', 'element').upper()}"
+
+                    ov_type = ov.get('type', 'text')
+                    if ov_type in ['text', 'chart', 'ui_panel', 'data_indicator']:
+                        focal_ids.append(ov['id'])
+
                     ov_type = ov.get('type', 'text')
                     w, h = TYPE_SIZES.get(ov_type, (800, 800))
 
@@ -350,6 +371,10 @@ class RemotionJsonMaker:
                     ov['start'] = start_f
                     ov['duration'] = duration_f
 
+                    # Cleanup hallucinated keys
+                    for k in ['intro', 'outro', 'resting']:
+                        if k in ov: del ov[k]
+
                     # Subtle local SFX (Volume 0.04) - Attached to each overlay
                     s_id = scene.get('scene_id', 'unknown')
                     if in_files:
@@ -359,11 +384,36 @@ class RemotionJsonMaker:
                         sfx_manifest.append({ "scene_id": s_id, "file": out_files[out_ptr % len(out_files)], "start": ov['start'] + ov['duration'] - 10, "end": ov['start'] + ov['duration'], "volume": 0.04 })
                         out_ptr += 1
 
-            # 4. Camera Shot Normalization (Resting Time)
-            if scene.get('camera') and scene['camera'].get('shots'):
+            # 4. Camera Shot Normalization & Auto-Generation
+            if not scene.get('camera'):
+                scene['camera'] = {
+                    "enabled": True,
+                    "motionBlur": { "enabled": True, "intensity": 1.0 },
+                    "shake": { "enabled": False, "intensity": 1.0 },
+                    "shots": []
+                }
+
+            if not scene['camera'].get('motionBlur'):
+                scene['camera']['motionBlur'] = { "enabled": True, "intensity": 1.0 }
+
+            if not scene['camera'].get('shots') and focal_ids:
+                # Auto-generate a basic shot sequence if Gemini missed it
+                total_focal = len(focal_ids)
+                shot_dur = scene_duration // total_focal
+                for i, fid in enumerate(focal_ids):
+                    scene['camera']['shots'].append({
+                        "targetId": fid,
+                        "startFrame": i * shot_dur,
+                        "duration": shot_dur,
+                        "zoom": 1.2,
+                        "style": "slow_push",
+                        "inDuration": 30
+                    })
+
+            if scene['camera'].get('shots'):
                 for shot in scene['camera']['shots']:
-                    # Enforce MOVLESS RESTING (duration - inDuration >= 90)
-                    target_resting = 90
+                    # Enforce MOVLESS RESTING (duration - inDuration >= 60)
+                    target_resting = 60
                     if shot.get('duration', 0) < target_resting + 15:
                         shot['duration'] = max(shot.get('duration', 0), target_resting + 15)
 
@@ -487,18 +537,21 @@ class RemotionJsonMaker:
 
         full_prompt = (
             "YOU ARE A REMOTION MASTER ENGINE. GENERATE RAW MINIFIED JSON ONLY. NO MARKDOWN. NO PREAMBLE. START '{' END '}'.\n"
-            "CONSTRAINTS:\n"
-            "1. PACING: Every overlay MUST have: 15f intro + 90f-120f RESTING TIME + 15f outro.\n"
-            "2. INTRO SYNC: Overlay 'start' MUST EXACTLY MATCH the '30fps StartFrame' from TIMESTAMPS below.\n"
-            "3. LAYOUT: Center-anchored. Use 'slot' (TOP_LEFT, TOP_RIGHT, etc). Professional spacing.\n"
-            "4. TEXT: Ultra-concise (2-3 words). Use appropriate Bangla/English fonts from list.\n"
-            "5. VIDEO: background_type: 'video', audio_enabled: true.\n"
+            "ROLE: Cinematic Technical Director. STYLE: Ultra-modern, high-end documentary, glassmorphism.\n"
+            "CRITICAL RULES:\n"
+            "1. CAMERA: Every scene MUST have 'camera' with 'shots' targeting every focal overlay. Use 'slow_push' (zoom: 1.2) for charts/panels.\n"
+            "2. LAYERING: Add background depth using 'graph' (nodes: 40) and 'shape' (circle/pulse) at low zIndex (10-20) with 'depth' (-200).\n"
+            "3. PACING: 15f intro + 90f-120f RESTING + 15f outro. 'duration' MUST be >= 120f. NO keys named 'intro'/'outro' in overlays.\n"
+            "4. SYNC: Overlay 'start' MUST EXACTLY MATCH the '30fps StartFrame' from TIMESTAMPS below for the chosen word.\n"
+            "5. LAYOUT: Use 'slot' (TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, MID_LEFT, MID_RIGHT). Professional quadrant balancing.\n"
+            "6. VISUALS: Use 'ui_panel' (variant: glass) for stats. Use 'chart' (Nivo style) for data. Use 'text' (splitMode: word, stagger: 2).\n"
+            "7. IDS: Unique 'id' required for ALL overlays. Camera 'shots.targetId' MUST match these IDs.\n"
             f"FONTS: {local_fonts}\n"
             f"DURATIONS: {duration_context}\n"
             f"TIMESTAMPS: {compact_ts}\n"
             f"STORY: {story}\n"
             f"SCHEMA: {condensed_guidelines}\n"
-            "TASK: Create a complete remotion_render.json for all scenes."
+            "TASK: Create a MASTER manifest leveraging all engine capabilities (Camera, Graphs, Charts, UI Panels)."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
