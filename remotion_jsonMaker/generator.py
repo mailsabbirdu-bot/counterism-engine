@@ -123,14 +123,6 @@ class RemotionJsonMaker:
             # Frames after converting to 30 FPS (User formula: round(duration * 30))
             frames_at_30fps = int(round(duration * 30))
 
-            print("\n" + "="*70)
-            print(f"📹 {os.path.basename(video_path)}")
-            print(f"Duration          : {duration:.3f} sec")
-            print(f"Original FPS      : {fps:.3f}")
-            print(f"Total Frames      : {total_frames}")
-            print(f"Frames @ 30 FPS   : {frames_at_30fps}")
-            print("="*70)
-
             # Return frames instead of seconds for the first parameter to satisfy the engine requirement
             return float(frames_at_30fps), 30.0
         except Exception as e:
@@ -143,12 +135,11 @@ class RemotionJsonMaker:
             vpath_match = re.search(r'"video_path":\s*"([^"]+)"', block)
             if vpath_match:
                 rel_vpath = vpath_match.group(1)
-                abs_vpath = os.path.join(public_dir, rel_vpath)
-                if os.path.exists(abs_vpath):
-                    frames_at_30fps, _ = self.probe_video_duration_and_fps(abs_vpath)
-                    if frames_at_30fps > 0:
-                        new_duration = int(frames_at_30fps)
-                        return re.sub(r'"duration_in_frames"\s*:\s*\d+', f'"duration_in_frames": {new_duration}', block)
+                filename = os.path.basename(rel_vpath)
+                if filename in self.fps_cache:
+                    new_duration = int(self.fps_cache[filename])
+                    return re.sub(r'"duration_in_frames"\s*:\s*\d+', f'"duration_in_frames": {new_duration}', block)
+
             return block
         pattern1 = r'("video_path":\s*"[^"]+"(?:(?!"video_path"|"duration_in_frames").){0,300}?"duration_in_frames"\s*:\s*\d+)'
         text = re.sub(pattern1, replacement_logic, text, flags=re.DOTALL)
@@ -247,14 +238,7 @@ class RemotionJsonMaker:
                     scene_duration = self.fps_cache[filename]
                     print(f"   ⏱️ Using CACHED duration for {filename}: {scene_duration} frames.")
                 else:
-                    abs_vpath = os.path.join(abs_public, vpath)
-                    if os.path.exists(abs_vpath):
-                        print(f"🎬 Probing background video: {vpath}")
-                        frames_at_30fps, _ = self.probe_video_duration_and_fps(abs_vpath)
-                        if frames_at_30fps > 0:
-                            scene_duration = int(frames_at_30fps)
-                    else:
-                        print(f"⚠️ Background video NOT found at: {abs_vpath}")
+                    print(f"   ⚠️ WARNING: {filename} not in FPS cache. Using default/Gemini duration.")
 
             scene['duration_in_frames'] = scene_duration
 
@@ -629,13 +613,6 @@ def main():
     if os.path.exists(args.output): os.remove(args.output)
     with open(args.story_file, 'r', encoding='utf-8') as f: story = f.read()
     maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, headless=args.headless)
-
-    # Asset Audit (Metadata caching)
-    print("\n🔍 --- ASSET AUDIT ---")
-    if os.path.exists(os.path.join(args.public_dir, "renders")):
-        for f in sorted(os.listdir(os.path.join(args.public_dir, "renders"))):
-            if f.endswith(".mp4"):
-                maker.probe_video_duration_and_fps(os.path.join(args.public_dir, "renders", f))
 
     if args.fps_update_file:
         maker.load_fps_update(args.fps_update_file)
