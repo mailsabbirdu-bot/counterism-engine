@@ -19,6 +19,8 @@ class RemotionJsonMaker:
         self.context = None
         self.page = None
         self.fps_cache = {}
+        self.bangla_fonts = []
+        self.english_fonts = []
 
     def load_fps_update(self, filepath: str):
         if not filepath or not os.path.exists(filepath):
@@ -150,8 +152,8 @@ class RemotionJsonMaker:
         # Use absolute path to ensure accuracy
         abs_public = os.path.abspath(public_dir)
         fonts_dir = os.path.join(abs_public, "fonts")
-        bangla_fonts = []
-        english_fonts = []
+        self.bangla_fonts = []
+        self.english_fonts = []
 
         print(f"📂 Scanning for fonts in: {fonts_dir}")
 
@@ -166,15 +168,18 @@ class RemotionJsonMaker:
                         # Remove common weight/style suffixes for cleaner names in prompt
                         clean_name = re.sub(r'-(Regular|Bold|Italic|Light|Medium|Thin|SemiBold|ExtraBold|Black)$', '', name, flags=re.IGNORECASE)
                         if any(kw in clean_name.lower() for kw in BANGLA_KEYWORDS):
-                            bangla_fonts.append(clean_name)
+                            self.bangla_fonts.append(clean_name)
                         else:
-                            english_fonts.append(clean_name)
+                            self.english_fonts.append(clean_name)
 
-        bangla_str = ", ".join(sorted(list(set(bangla_fonts))))
-        english_str = ", ".join(sorted(list(set(english_fonts))))
+        self.bangla_fonts = sorted(list(set(self.bangla_fonts)))
+        self.english_fonts = sorted(list(set(self.english_fonts)))
 
-        print(f"🔍 Font Detection: Found {len(bangla_fonts)} Bangla fonts: {bangla_fonts[:5]}...")
-        print(f"🔍 Font Detection: Found {len(english_fonts)} English fonts: {english_fonts[:5]}...")
+        bangla_str = ", ".join(self.bangla_fonts)
+        english_str = ", ".join(self.english_fonts)
+
+        print(f"🔍 Font Detection: Found {len(self.bangla_fonts)} Bangla fonts: {self.bangla_fonts[:5]}...")
+        print(f"🔍 Font Detection: Found {len(self.english_fonts)} English fonts: {self.english_fonts[:5]}...")
         return f"BANGLA FONTS: [{bangla_str}] | ENGLISH FONTS: [{english_str}]"
 
     def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
@@ -302,6 +307,15 @@ class RemotionJsonMaker:
                         # LLM Repair: text -> content
                         if 'text' in ov and 'content' not in ov:
                             ov['content'] = ov['text']
+
+                        # Font Fallback
+                        content = ov.get('content', '')
+                        is_bangla = any(ord(c) > 127 for c in content)
+                        if not ov.get('font'):
+                            if is_bangla and self.bangla_fonts:
+                                ov['font'] = self.bangla_fonts[0]
+                            elif not is_bangla and self.english_fonts:
+                                ov['font'] = self.english_fonts[0]
                     elif ov_type in ['chart', 'ui_panel', 'data_indicator']:
                         if focal_count >= MAX_FOCAL_PER_SCENE: continue
                         focal_count += 1
@@ -634,6 +648,7 @@ class RemotionJsonMaker:
             "CRITICAL SCHEMA RULES (NEVER BREAK THESE):\n"
             "- USE 'overlays' list. NEVER use 'elements' or 'text_overlay' objects.\n"
             "- USE 'content' for text strings. NEVER use 'text'.\n"
+            "- USE 'font' from the provided lists for every text overlay. MANDATORY.\n"
             "- USE 'chart_type' or 'indicator_type'. NEVER use 'kind'.\n"
             "- USE 'start' and 'duration' (integers). NEVER use 'start_frame' or 'end_frame'.\n"
             "- USE flat keys for background: 'background_type', 'video_path', 'audio_enabled'. NO 'background' object.\n"
