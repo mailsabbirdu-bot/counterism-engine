@@ -688,7 +688,7 @@ class RemotionJsonMaker:
             "- USE flat keys for background: 'background_type', 'video_path', 'audio_enabled'. NO 'background' object.\n"
             "DESIGN RULES:\n"
             "1. MINIMALISM: Max 1 text overlay + 1 focal element per scene. NEVER crowd the screen.\n"
-            "2. OPTIONAL NIVO: Use focal elements (charts, KPIs, timers) ONLY when they add narrative value. Some scenes only need text.\n"
+            "2. MANDATORY NIVO FOR NUMBERS: If a number is mentioned in the narration, you MUST include an appropriate Nivo layer (KPI, chart, graph, timer) to visualize it accurately.\n"
             "3. TEXT: 3-4 words max. NO terminal punctuation ('.' or '।'). Capture 'vibe', NOT subtitles. Sync 'start' to word's StartFrame.\n"
             "3. VIDEO: background_type: 'video' is MANDATORY. video_path must be 'renders/scene_SC_XX.mp4'.\n"
             "4. CAMERA: Every scene must have 'camera' with 'shots' targeting 'targetId'. Use 'style'.\n"
