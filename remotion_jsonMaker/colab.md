@@ -106,8 +106,13 @@ else:
 print_banner("🧠 GEMINI BROWSER AUTOMATION")
 print("🚀 Using Playwright to interact with Gemini.")
 
-# Using external manifests from Drive
+# Using external manifests from Drive (MANDATORY for Counterism Studio V4)
 FPS_UPDATE_FILE = f"{DRIVE_BASE_PATH}/manifests/fps_update.txt"
+
+# Ensure timestamp file is present
+if not os.path.exists(TIMESTAMP_FILE):
+    print(f"⚠️ WARNING: Timestamp file NOT FOUND at: {TIMESTAMP_FILE}")
+    print("Generation will proceed without precise sync, but it is highly recommended to provide it.")
 
 !xvfb-run python generator.py \
     --story-file="{STORY_FILE}" \
