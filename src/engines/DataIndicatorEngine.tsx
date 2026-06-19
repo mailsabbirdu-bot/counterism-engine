@@ -38,6 +38,7 @@ export const DataIndicatorEngine: React.FC<{ overlay: any }> = ({ overlay }) => 
         return <ComparisonKPI overlay={overlay} relativeFrame={relativeFrame} fps={fps} />;
       case 'deltaIndicator':
         return <DeltaIndicator overlay={overlay} relativeFrame={relativeFrame} fps={fps} />;
+      case 'timer':
       case 'countdown':
         return <Countdown overlay={overlay} relativeFrame={relativeFrame} fps={fps} />;
       case 'progressBar':

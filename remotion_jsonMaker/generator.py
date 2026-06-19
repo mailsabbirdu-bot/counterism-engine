@@ -295,13 +295,21 @@ class RemotionJsonMaker:
                         if 'end_frame' in ov: ov['duration'] = max(60, ov['end_frame'] - ov.get('start', 0))
                         elif 'end' in ov: ov['duration'] = max(60, ov['end'] - ov.get('start', 0))
 
+                    # Determine initial type for repair
+                    ov_type = ov.get('type', 'text')
+
                     # LLM Repair: ui -> ui_panel, text missing but key present
-                    if ov.get('type') == 'ui': ov['type'] = 'ui_panel'
+                    if ov_type == 'ui' or ov_type == 'ui_panel': ov['type'] = 'ui_panel'
+                    if ov_type == 'indicator' or ov_type == 'data_indicator': ov['type'] = 'data_indicator'
+
                     if not ov.get('type'):
                         if 'text' in ov or 'content' in ov: ov['type'] = 'text'
                         elif 'chart_type' in ov or 'kind' in ov: ov['type'] = 'chart'
+                        elif 'indicator_type' in ov: ov['type'] = 'data_indicator'
 
+                    # Re-resolve type after potential repair
                     ov_type = ov.get('type', 'text')
+
                     if ov_type == 'text':
                         if text_count >= MAX_TEXT_PER_SCENE: continue
                         text_count += 1
@@ -674,6 +682,7 @@ class RemotionJsonMaker:
             "- USE 'overlays' list. NEVER use 'elements' or 'text_overlay' objects.\n"
             "- USE 'content' for text strings. NEVER use 'text'.\n"
             "- USE 'font' from the provided lists for every text overlay. MANDATORY.\n"
+            "- USE type: 'data_indicator' for timers/KPIs/counters. indicator_type: 'countdown' for timers.\n"
             "- USE 'chart_type' or 'indicator_type'. NEVER use 'kind'.\n"
             "- USE 'start' and 'duration' (integers). NEVER use 'start_frame' or 'end_frame'.\n"
             "- USE flat keys for background: 'background_type', 'video_path', 'audio_enabled'. NO 'background' object.\n"
