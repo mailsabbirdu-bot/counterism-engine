@@ -812,16 +812,6 @@ def main():
             os.fsync(f.fileno())
         print(f"✅ Master JSON created: {args.output} ({os.path.getsize(args.output)} bytes)")
 
-        # Disclosure generation
-        disclosure_path = os.path.join(os.path.dirname(args.output), "gemini_disclosure.txt")
-        try:
-            # We copy the local disclosure to the output manifest directory
-            local_disclosure = os.path.join(os.path.dirname(__file__), "gemini_disclosure.txt")
-            if os.path.exists(local_disclosure):
-                shutil.copy(local_disclosure, disclosure_path)
-                print(f"📄 Full Disclosure created at: {disclosure_path}")
-        except Exception as de:
-            print(f"⚠️ Could not create disclosure file: {de}")
 
         try: shutil.copy(args.output, "/content/remotion_render.json")
         except: pass
