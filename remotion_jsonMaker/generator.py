@@ -240,6 +240,10 @@ class RemotionJsonMaker:
             if 'duration' in scene and 'duration_in_frames' not in scene:
                 scene['duration_in_frames'] = scene['duration']
 
+            # Root level Repair: elements -> overlays
+            if 'elements' in scene and not scene.get('overlays'):
+                scene['overlays'] = scene['elements']
+
             scene_duration = scene.get('duration_in_frames', 180)
 
             # Ensure background video path is correct
@@ -273,8 +277,11 @@ class RemotionJsonMaker:
                 # First Pass: Budgeting & Schema Alignment
                 valid_overlays = []
                 for ov in scene['overlays']:
-                    # LLM Repair: ui -> ui_panel
+                    # LLM Repair: ui -> ui_panel, text missing but key present
                     if ov.get('type') == 'ui': ov['type'] = 'ui_panel'
+                    if not ov.get('type'):
+                        if 'text' in ov or 'content' in ov: ov['type'] = 'text'
+                        elif 'chart_type' in ov or 'kind' in ov: ov['type'] = 'chart'
 
                     ov_type = ov.get('type', 'text')
                     if ov_type == 'text':
@@ -289,8 +296,9 @@ class RemotionJsonMaker:
 
                         # LLM Repair: kind -> indicator_type / chart_type
                         if 'kind' in ov:
-                            if ov_type == 'chart': ov['chart_type'] = ov['kind']
-                            if ov_type == 'ui_panel' or ov_type == 'data_indicator': ov['indicator_type'] = ov['kind']
+                            if ov_type == 'chart' and 'chart_type' not in ov: ov['chart_type'] = ov['kind']
+                            if (ov_type == 'ui_panel' or ov_type == 'data_indicator') and 'indicator_type' not in ov:
+                                ov['indicator_type'] = ov['kind']
 
                     # Ensure start/duration exists
                     if 'start' not in ov: ov['start'] = 0
@@ -330,24 +338,16 @@ class RemotionJsonMaker:
                         h = ov.get('height', 600) + 100
 
                     # 1. Professional Slot Alignment & De-confliction
-                    slot_name = ov.get('slot', '')
-
-                    # Force Text and Charts into opposing quadrants if they overlap in time
-                    if ov_type == 'chart':
-                        # Charts prefer mid/right slots for better data visibility
-                        if not slot_name or slot_name not in ["TOP_RIGHT", "BOTTOM_RIGHT", "MID_RIGHT"]:
-                             slot_name = ["TOP_RIGHT", "BOTTOM_RIGHT", "MID_RIGHT"][i % 3]
-                    elif ov_type == 'text':
-                        # Text prefers left slots to avoid blocking chart data
-                        if not slot_name or slot_name not in ["TOP_LEFT", "BOTTOM_LEFT", "MID_LEFT"]:
-                             slot_name = ["TOP_LEFT", "BOTTOM_LEFT", "MID_LEFT"][i % 3]
-
                     # Force Text and Charts into opposing quadrants for Minimalist Balance
-                    if ov_type == 'chart' or ov_type == 'ui_panel' or ov_type == 'data_indicator':
-                        if not slot_name or not slot_name.endswith("RIGHT"):
+                    slot_name = ov.get('slot', ov.get('layout', ''))
+                    if not isinstance(slot_name, str): slot_name = ''
+                    slot_name = slot_name.upper()
+
+                    if ov_type in ['chart', 'ui_panel', 'data_indicator']:
+                        if "RIGHT" not in slot_name:
                              slot_name = ["TOP_RIGHT", "BOTTOM_RIGHT", "MID_RIGHT"][i % 3]
                     elif ov_type == 'text':
-                        if not slot_name or not slot_name.endswith("LEFT"):
+                        if "LEFT" not in slot_name:
                              slot_name = ["TOP_LEFT", "BOTTOM_LEFT", "MID_LEFT"][i % 3]
 
                     if slot_name in SECTORS:
@@ -599,26 +599,24 @@ class RemotionJsonMaker:
 
         # Condense guidelines for speed while keeping schema
         condensed_guidelines = re.sub(r'\n\s*\n', '\n', guidelines)
-        condensed_guidelines = condensed_guidelines[:4000] # Cap to prevent token overflow
+        condensed_guidelines = condensed_guidelines[:3000] # Cap to prevent token overflow
 
         full_prompt = (
-            "YOU ARE A REMOTION MASTER ENGINE. GENERATE RAW MINIFIED JSON ONLY. NO MARKDOWN. NO PREAMBLE. START '{' END '}'.\n"
-            "ROLE: Cinematic Technical Director. STYLE: Ultra-modern, high-end documentary, MINIMALIST.\n"
-            "CRITICAL RULES:\n"
-            "1. SCHEMA: Use 'overlays' list (NOT 'elements'). Use 'chart_type' and 'indicator_type' (NOT 'kind'). Use 'content' (NOT 'text').\n"
-            "2. MINIMALISM: Max ONE focal element (chart/ui_panel) and ONE Text overlay per scene. NEVER crowd the screen.\n"
-            "3. TEXT: 3-4 words MAX. Focus on 'vibe/mood', NOT subtitles. Sync 'start' to TIMESTAMPS StartFrame.\n"
-            "4. VIDEO: ALL scenes MUST use 'background_type': 'video' with 'audio_enabled': true.\n"
-            "5. CAMERA: Every scene MUST have 'camera' with 'shots' targeting focal overlays. Use 'slow_push'.\n"
-            "6. LAYOUT: Professional Quadrant Balancing. Text on LEFT, Nivo/UI on RIGHT. Center-anchored.\n"
-            "7. PACING: 15f intro + 90f-120f RESTING + 15f outro. 'duration' MUST be >= 120f.\n"
-            "8. SYNC: Overlay 'start' MUST EXACTLY MATCH the '30fps StartFrame' from TIMESTAMPS below for the chosen word.\n"
+            "YOU ARE A REMOTION MASTER ENGINE. GENERATE RAW MINIFIED JSON ONLY. START '{' END '}'.\n"
+            "CRITICAL: USE 'overlays' (NOT 'elements'), 'content' (NOT 'text'), 'chart_type' (NOT 'kind').\n"
+            "RULES:\n"
+            "1. MINIMALISM: Max ONE focal element (chart/ui_panel) and ONE Text overlay per scene.\n"
+            "2. TEXT: 3-4 words MAX. Capture 'vibe', NOT subtitles. Sync 'start' to TIMESTAMPS StartFrame.\n"
+            "3. VIDEO: ALL scenes MUST use background_type: 'video', audio_enabled: true.\n"
+            "4. CAMERA: Every scene MUST have 'camera' with 'shots' targeting focal overlays.\n"
+            "5. LAYOUT: Text on LEFT, Nivo/UI on RIGHT. Professional spacing.\n"
+            "6. PACING: 15f intro + 90f RESTING + 15f outro. duration >= 120f.\n"
             f"FONTS: {local_fonts}\n"
             f"DURATIONS: {duration_context}\n"
             f"TIMESTAMPS: {compact_ts}\n"
             f"STORY: {story}\n"
             f"SCHEMA: {condensed_guidelines}\n"
-            "TASK: Create a professional, clean MASTER manifest. Ensure NO overlays bleed off-screen during resting period."
+            "TASK: Create a clean MASTER manifest. No overlays should bleed off-screen."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
