@@ -259,6 +259,10 @@ class RemotionJsonMaker:
             scene['audio_enabled'] = True
             scene['background_type'] = 'video' # User Mandate: Always video
 
+            # LLM Repair: elements -> overlays
+            if 'elements' in scene and not scene.get('overlays'):
+                scene['overlays'] = scene['elements']
+
             placed_overlays = []
             focal_ids = []
 
@@ -266,16 +270,32 @@ class RemotionJsonMaker:
             focal_count = 0
 
             if scene.get('overlays'):
-                # First Pass: Budgeting & Cleaning
+                # First Pass: Budgeting & Schema Alignment
                 valid_overlays = []
                 for ov in scene['overlays']:
+                    # LLM Repair: ui -> ui_panel
+                    if ov.get('type') == 'ui': ov['type'] = 'ui_panel'
+
                     ov_type = ov.get('type', 'text')
                     if ov_type == 'text':
                         if text_count >= MAX_TEXT_PER_SCENE: continue
                         text_count += 1
+                        # LLM Repair: text -> content
+                        if 'text' in ov and 'content' not in ov:
+                            ov['content'] = ov['text']
                     elif ov_type in ['chart', 'ui_panel', 'data_indicator']:
                         if focal_count >= MAX_FOCAL_PER_SCENE: continue
                         focal_count += 1
+
+                        # LLM Repair: kind -> indicator_type / chart_type
+                        if 'kind' in ov:
+                            if ov_type == 'chart': ov['chart_type'] = ov['kind']
+                            if ov_type == 'ui_panel' or ov_type == 'data_indicator': ov['indicator_type'] = ov['kind']
+
+                    # Ensure start/duration exists
+                    if 'start' not in ov: ov['start'] = 0
+                    if 'duration' not in ov: ov['duration'] = scene_duration - ov['start']
+
                     valid_overlays.append(ov)
 
                 scene['overlays'] = valid_overlays
@@ -332,9 +352,18 @@ class RemotionJsonMaker:
                     if slot_name in SECTORS:
                         ov['position'] = {"x": SECTORS[slot_name]["x"], "y": SECTORS[slot_name]["y"]}
 
-                    if not ov.get('position'):
-                         # Professional Default: Text Left, Others Right
+                    # LLM Repair: position: "left" or missing position
+                    pos = ov.get('position')
+                    if not pos or isinstance(pos, str):
                          selected = "MID_LEFT" if ov_type == 'text' else "MID_RIGHT"
+                         # Check if the string actually matches a slot or simple side
+                         if isinstance(pos, str):
+                             p_upper = pos.upper()
+                             if p_upper == "LEFT": selected = "MID_LEFT"
+                             elif p_upper == "RIGHT": selected = "MID_RIGHT"
+                             elif p_upper == "CENTER": selected = "CENTER_FOCAL"
+                             elif p_upper in SECTORS: selected = p_upper
+
                          ov['position'] = {"x": SECTORS[selected]["x"], "y": SECTORS[selected]["y"]}
 
                     # 2. Multi-Directional Collision Nudging (AABB Multi-Pass)
@@ -569,20 +598,20 @@ class RemotionJsonMaker:
             "YOU ARE A REMOTION MASTER ENGINE. GENERATE RAW MINIFIED JSON ONLY. NO MARKDOWN. NO PREAMBLE. START '{' END '}'.\n"
             "ROLE: Cinematic Technical Director. STYLE: Ultra-modern, high-end documentary, MINIMALIST.\n"
             "CRITICAL RULES:\n"
-            "1. MINIMALISM: NEVER crowd the screen. Max ONE focal element (Chart/UI) and ONE Text overlay per scene.\n"
-            "2. TEXT: 3-4 words MAX. Capture 'vibe/mood', NOT subtitles. Sync 'start' to TIMESTAMPS StartFrame.\n"
-            "3. VIDEO: ALL scenes MUST use 'background_type': 'video' with 'audio_enabled': true.\n"
-            "4. CAMERA: Every scene MUST have 'camera' with 'shots'. Use 'slow_push' (zoom: 1.2) for focal elements.\n"
-            "5. LAYOUT: Quadrant-balanced. Text on LEFT, Nivo/UI on RIGHT. Professional well-planned spacing.\n"
-            "6. PACING: 15f intro + 90f-120f RESTING + 15f outro. MANDATORY viewer comprehension time.\n"
-            "7. SYNC: Overlay 'start' MUST EXACTLY MATCH the word's '30fps StartFrame' for audio-sync.\n"
-            "8. LAYERING: Decorative 'graph' (nodes: 30) at zIndex 10 for depth. depth: -200.\n"
+            "1. SCHEMA: Use 'overlays' list (NOT 'elements'). Use 'chart_type' and 'indicator_type' (NOT 'kind'). Use 'content' (NOT 'text').\n"
+            "2. MINIMALISM: Max ONE focal element (chart/ui_panel) and ONE Text overlay per scene. NEVER crowd the screen.\n"
+            "3. TEXT: 3-4 words MAX. Focus on 'vibe/mood', NOT subtitles. Sync 'start' to TIMESTAMPS StartFrame.\n"
+            "4. VIDEO: ALL scenes MUST use 'background_type': 'video' with 'audio_enabled': true.\n"
+            "5. CAMERA: Every scene MUST have 'camera' with 'shots' targeting focal overlays. Use 'slow_push'.\n"
+            "6. LAYOUT: Professional Quadrant Balancing. Text on LEFT, Nivo/UI on RIGHT. Center-anchored.\n"
+            "7. PACING: 15f intro + 90f-120f RESTING + 15f outro. 'duration' MUST be >= 120f.\n"
+            "8. SYNC: Overlay 'start' MUST EXACTLY MATCH the '30fps StartFrame' from TIMESTAMPS below for the chosen word.\n"
             f"FONTS: {local_fonts}\n"
             f"DURATIONS: {duration_context}\n"
             f"TIMESTAMPS: {compact_ts}\n"
             f"STORY: {story}\n"
             f"SCHEMA: {condensed_guidelines}\n"
-            "TASK: Create a professional, clean MASTER manifest. Focus on visual clarity and impactful minimalism."
+            "TASK: Create a professional, clean MASTER manifest. Ensure NO overlays bleed off-screen during resting period."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
