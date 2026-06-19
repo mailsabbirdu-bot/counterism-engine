@@ -48,9 +48,14 @@ const start = async () => {
 
     console.log('🚚 Ensuring public assets are correctly placed in bundle root (Follow symlinks)...');
     try {
-      // Use -RL to follow symlinks (Google Drive assets) during copy.
-      // Using . instead of * to ensure all files (including hidden ones) are copied correctly.
+      // Create a public/ subdirectory in the bundle to match staticFile expectations
+      const bundlePublicDir = path.join(bundleLocation, 'public');
+      if (!fs.existsSync(bundlePublicDir)) fs.mkdirSync(bundlePublicDir, { recursive: true });
+
+      // Copy assets to both root and public/ to be safe
       execSync(`cp -RL ${publicDir}/. ${bundleLocation}/`);
+      execSync(`cp -RL ${publicDir}/. ${bundlePublicDir}/`);
+
       console.log('✅ Manual asset synchronization complete (Symlinks followed).');
     } catch (e) {
       console.warn('⚠️  Manual asset copy encountered an issue:', e instanceof Error ? e.message : String(e));
@@ -71,10 +76,11 @@ const start = async () => {
       // Verify background video
       if (scene.background_type === 'video' && scene.video_path) {
         const bgPath = path.join(process.cwd(), 'public', scene.video_path);
-        if (fs.existsSync(bgPath)) {
-          const stats = fs.statSync(bgPath);
+        try {
+          const realPath = fs.realpathSync(bgPath);
+          const stats = fs.statSync(realPath);
           console.log(`✅ Background Video FOUND: ${scene.video_path} (${(stats.size / (1024 * 1024)).toFixed(2)} MB)`);
-        } else {
+        } catch (e) {
           console.error(`❌ Background Video MISSING: ${bgPath}`);
           assetsMissing = true;
         }
