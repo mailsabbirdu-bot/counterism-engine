@@ -53,10 +53,6 @@ if os.path.exists(drive_renders):
     import glob
     for f in glob.glob(os.path.join(drive_renders, "*.mp4")):
         shutil.copy(f, "public/renders/")
-
-    # NEW: Ensure all background videos are consistent with 30fps
-    print("🎬 Converting background videos to 30fps for engine consistency...")
-    !bash scripts/convert_to_30fps.sh public/renders/
 else:
     print(f"❌ FATAL: 'renders' folder NOT FOUND in Drive: {drive_renders}")
 

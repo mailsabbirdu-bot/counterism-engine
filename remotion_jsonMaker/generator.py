@@ -282,11 +282,12 @@ class RemotionJsonMaker:
                 # First Pass: Budgeting & Schema Alignment
                 valid_overlays = []
                 for ov in scene['overlays']:
-                    # LLM Repair: Map start_frame/end_frame
+                    # LLM Repair: Map start_frame/end_frame/end
                     if 'start_frame' in ov and 'start' not in ov: ov['start'] = ov['start_frame']
-                    if 'end_frame' in ov and 'duration' not in ov:
-                        s = ov.get('start', 0)
-                        ov['duration'] = max(60, ov['end_frame'] - s)
+
+                    if 'duration' not in ov:
+                        if 'end_frame' in ov: ov['duration'] = max(60, ov['end_frame'] - ov.get('start', 0))
+                        elif 'end' in ov: ov['duration'] = max(60, ov['end'] - ov.get('start', 0))
 
                     # LLM Repair: ui -> ui_panel, text missing but key present
                     if ov.get('type') == 'ui': ov['type'] = 'ui_panel'
@@ -489,11 +490,13 @@ class RemotionJsonMaker:
                     if 'type' in shot and 'style' not in shot:
                         shot['style'] = shot['type']
 
-                    # LLM Repair: start_frame / end_frame in shots
+                    # LLM Repair: start_frame / start / end_frame / end in shots
                     if 'start_frame' in shot and 'startFrame' not in shot: shot['startFrame'] = shot['start_frame']
-                    if 'end_frame' in shot and 'duration' not in shot:
-                        s = shot.get('startFrame', 0)
-                        shot['duration'] = max(30, shot['end_frame'] - s)
+                    if 'start' in shot and 'startFrame' not in shot: shot['startFrame'] = shot['start']
+
+                    if 'duration' not in shot:
+                        if 'end_frame' in shot: shot['duration'] = max(30, shot['end_frame'] - shot.get('startFrame', 0))
+                        elif 'end' in shot: shot['duration'] = max(30, shot['end'] - shot.get('startFrame', 0))
 
                     # Enforce MOVLESS RESTING (duration - inDuration >= 60)
                     target_resting = 60
@@ -628,23 +631,24 @@ class RemotionJsonMaker:
 
         full_prompt = (
             "YOU ARE A REMOTION MASTER ENGINE. GENERATE RAW MINIFIED JSON ONLY. START '{' END '}'.\n"
-            "CRITICAL SCHEMA RULES:\n"
-            "- Use 'overlays' list (NEVER 'elements', NEVER 'text_overlay' object).\n"
-            "- Use 'content' for text (NEVER 'text').\n"
-            "- Use 'chart_type' for charts (NEVER 'kind').\n"
-            "- Use 'start' and 'duration' for timing (NEVER 'start_frame', NEVER 'end_frame').\n"
+            "CRITICAL SCHEMA RULES (NEVER BREAK THESE):\n"
+            "- USE 'overlays' list. NEVER use 'elements' or 'text_overlay' objects.\n"
+            "- USE 'content' for text strings. NEVER use 'text'.\n"
+            "- USE 'chart_type' or 'indicator_type'. NEVER use 'kind'.\n"
+            "- USE 'start' and 'duration' (integers). NEVER use 'start_frame' or 'end_frame'.\n"
+            "- USE flat keys for background: 'background_type', 'video_path', 'audio_enabled'. NO 'background' object.\n"
             "DESIGN RULES:\n"
-            "1. MINIMALISM: Max ONE focal element (chart/ui_panel) and ONE Text overlay per scene.\n"
-            "2. TEXT: 3-4 words MAX. Sync 'start' to StartFrame.\n"
-            "3. BACKGROUND: Flat keys 'background_type', 'video_path', 'audio_enabled' at root. NO 'background' object.\n"
-            "4. CAMERA: Use 'targetId' and 'style' in 'shots'.\n"
+            "1. MINIMALISM: Max 1 text overlay + 1 focal element per scene. NEVER crowd the screen.\n"
+            "2. TEXT: 3-4 words max. Capture 'vibe', NOT subtitles. Sync 'start' to the word's StartFrame from TIMESTAMPS.\n"
+            "3. VIDEO: background_type: 'video' is MANDATORY. video_path must be 'renders/scene_SC_XX.mp4'.\n"
+            "4. CAMERA: Every scene must have 'camera' with 'shots' targeting 'targetId'. Use 'style'.\n"
             f"REFERENCE_SCHEMA: {schema_ref}\n"
             f"FONTS: {local_fonts}\n"
             f"DURATIONS: {duration_context}\n"
             f"TIMESTAMPS: {compact_ts}\n"
             f"STORY: {story}\n"
             f"SCHEMA: {condensed_guidelines}\n"
-            "TASK: Create a MASTER manifest. Follow schema 100% strictly."
+            "TASK: Create a clean MASTER manifest. 100% strict schema adherence. Double-check all closing quotes."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
@@ -676,111 +680,58 @@ class RemotionJsonMaker:
             json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
             json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
 
-            # LLM Repair Pre-Pass: Fix structural garbage
-            # 1. Swallowed quote before comma (e.g., "id":"val,"next" -> "id":"val","next")
-            json_str = re.sub(r'(:[ ]*"[^",\n\r]+)(,[ ]*"[^"]+":)', r'\1"\2', json_str)
-            # 2. Swallowed quote before brace (e.g., "id":"val} -> "id":"val"})
-            json_str = re.sub(r'(:[ ]*"[^",\n\r]+)(\s*})', r'\1"\2', json_str)
-            # 3. Trailing commas before braces/brackets
-            json_str = re.sub(r',\s*([\]}])', r'\1', json_str)
-            # 4. Quotes after numbers or booleans (e.g., 214" or true")
-            json_str = re.sub(r'(\d+|true|false|null)"(\s*[,}\]])', r'\1\2', json_str)
-
             def repair_json(s):
-                s = s.strip()
-                # 1. Evaluate stack and string state
-                stack = []
-                in_string = False
-                escaped = False
-                for char in s:
-                    if char == '"' and not escaped: in_string = not in_string
-                    if in_string:
-                        if char == '\\': escaped = not escaped
-                        else: escaped = False
+                # Pass 1: Fix "swallowed quotes" like "id":"val,"next"
+                s = re.sub(r'":\s*"([^"]+),\s*"', r'":"\1","', s)
+                s = re.sub(r'":\s*"([^"]+)\s*\}', r'":"\1"}', s)
+                # Pass 2: Fix numeric artifacts in strings like "start": 30f
+                s = re.sub(r'":\s*(\d+)[fs]\b', r'": \1', s)
+                # Pass 3: Quotes after numbers or booleans (e.g., 214" or true")
+                s = re.sub(r'(:[ ]*(\d+|true|false|null))"(\s*[,}\]])', r'\1\3', s)
+
+                # Pass 4: Structural backtracking
+                for i in range(len(s), 0, -1):
+                    try:
+                        chunk = s[:i].strip()
+                        if not chunk: continue
+
+                        # Fix unbalanced string quotes
+                        if chunk.count('"') % 2 != 0: chunk += '"'
+
+                        # Re-calculate stack for current state
+                        stack = []
+                        in_string = False
+                        escaped = False
+                        for char in chunk:
+                            if char == '"' and not escaped: in_string = not in_string
+                            if in_string:
+                                if char == '\\': escaped = not escaped
+                                else: escaped = False
+                                continue
+                            if char == '{': stack.append('}')
+                            elif char == '[': stack.append(']')
+                            elif char == '}':
+                                if stack and stack[-1] == '}': stack.pop()
+                            elif char == ']':
+                                if stack and stack[-1] == ']': stack.pop()
+
+                        candidate = chunk + "".join(reversed(stack))
+                        candidate = re.sub(r',\s*([}\]])', r'\1', candidate)
+                        return json.loads(candidate, strict=False)
+                    except:
                         continue
-                    if char == '{': stack.append('}')
-                    elif char == '[': stack.append(']')
-                    elif char == '}':
-                        if stack and stack[-1] == '}': stack.pop()
-                    elif char == ']':
-                        if stack and stack[-1] == ']': stack.pop()
-
-                # 2. String closure pre-pass
-                if in_string:
-                    # Backtrack to start of partial string to be safe
-                    last_quote = s.rfind('"')
-                    if last_quote != -1:
-                        # If the partial is likely a key (followed by :) backtrack more
-                        # or if it's a value, just close it.
-                        s += '"'
-
-                # 3. Structural backtracking loop
-                # We try to truncate the string at logical points and close the JSON
-                for _ in range(25):
-                     try:
-                         # Re-calculate stack for current state of 's'
-                         temp_stack = []
-                         t_in_string = False
-                         t_escaped = False
-                         for c in s:
-                             if c == '"' and not t_escaped: t_in_string = not t_in_string
-                             if t_in_string:
-                                 if c == '\\': t_escaped = not t_escaped
-                                 else: t_escaped = False
-                                 continue
-                             if c == '{': temp_stack.append('}')
-                             elif c == '[': temp_stack.append(']')
-                             elif c == '}':
-                                 if temp_stack and temp_stack[-1] == '}': temp_stack.pop()
-                             elif c == ']':
-                                 if temp_stack and temp_stack[-1] == ']': temp_stack.pop()
-
-                         if t_in_string: candidate = s + '"' + "".join(reversed(temp_stack))
-                         else: candidate = s + "".join(reversed(temp_stack))
-
-                         json.loads(candidate, strict=False)
-                         return candidate
-                     except:
-                         # Backtrack to the previous structural delimiter
-                         if not s: break
-                         s = s[:-1].rstrip()
-                         # We look for the last structural character that could end a property
-                         # delimiters: comma, brace, bracket, or a quote (end of string)
-                         while s and s[-1] not in '}],"' and not s[-1].isdigit() and s[-1] not in 'eul': # 'eul' for true/false/null
-                             s = s[:-1].rstrip()
-                         if s.endswith(',') or s.endswith(':'): s = s[:-1].rstrip()
-
-                return s # Final fallback (likely still invalid but best effort)
+                return None
 
             try:
-                # Use strict=False to handle unescaped control characters in strings
+                # Use strict=False to handle unescaped control characters
                 return json.loads(json_str, strict=False)
-            except json.JSONDecodeError as e:
-                print(f"⚠️ JSON primary parse failed at pos {e.pos}: {e.msg}. Attempting repair...")
-
-                # Check for structural issues or truncation
-                # If we have a lot of content after the error pos, it might just be a comma issue
-                # If we are near the end, it's likely truncation.
-
-                # Try simple trailing comma cleanup
-                cleaned = re.sub(r',\s*\}', '}', json_str)
-                cleaned = re.sub(r',\s*\]', ']', cleaned)
-
-                try:
-                    return json.loads(cleaned, strict=False)
-                except:
-                    # Final attempt: full structural repair
-                    repaired = repair_json(json_str) # Pass original for full analysis
-                    try:
-                        return json.loads(repaired, strict=False)
-                    except Exception as final_e:
-                        print(f"❌ JSON repair failed: {final_e}")
-                        # Verbose debugging: show the area around the failure
-                        snippet_start = max(0, e.pos - 50)
-                        snippet_end = min(len(json_str), e.pos + 150)
-                        print(f"   Context near error: ...{json_str[snippet_start:snippet_end]}...")
-                        print(f"--- FAILED JSON (REPAIRED) START ---\n{repaired[:800]}\n--- FAILED JSON (REPAIRED) END ---")
-                        return {}
+            except Exception as e:
+                print(f"⚠️ JSON primary parse failed. Attempting repair...")
+                result = repair_json(json_str)
+                if result:
+                    return result
+                print(f"❌ JSON repair failed.")
+                return {}
         except Exception as e:
             print(f"❌ Fatal error during JSON extraction: {e}")
             return {}
