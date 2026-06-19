@@ -36,8 +36,9 @@ class RemotionJsonMaker:
                     filename = match.group(1)
                     frames = int(match.group(2))
                     self.fps_cache[filename] = frames
+                    print(f"   🎬 {filename} -> {frames} frames")
                     count += 1
-            print(f"✅ Cached durations for {count} videos.")
+            print(f"✅ Successfully cached {count} durations from manifest.")
         except Exception as e:
             print(f"⚠️ Error loading FPS update file: {e}")
 
@@ -350,11 +351,12 @@ class RemotionJsonMaker:
                     ov['duration'] = duration_f
 
                     # Subtle local SFX (Volume 0.04) - Attached to each overlay
+                    s_id = scene.get('scene_id', 'unknown')
                     if in_files:
-                        sfx_manifest.append({ "scene_id": scene['scene_id'], "file": in_files[in_ptr % len(in_files)], "start": ov['start'], "end": ov['start'] + 20, "volume": 0.04 })
+                        sfx_manifest.append({ "scene_id": s_id, "file": in_files[in_ptr % len(in_files)], "start": ov['start'], "end": ov['start'] + 20, "volume": 0.04 })
                         in_ptr += 1
                     if out_files:
-                        sfx_manifest.append({ "scene_id": scene['scene_id'], "file": out_files[out_ptr % len(out_files)], "start": ov['start'] + ov['duration'] - 10, "end": ov['start'] + ov['duration'], "volume": 0.04 })
+                        sfx_manifest.append({ "scene_id": s_id, "file": out_files[out_ptr % len(out_files)], "start": ov['start'] + ov['duration'] - 10, "end": ov['start'] + ov['duration'], "volume": 0.04 })
                         out_ptr += 1
 
             # 4. Camera Shot Normalization (Resting Time)
@@ -474,6 +476,10 @@ class RemotionJsonMaker:
         compact_ts = self._compact_timestamps(timestamp_context)
 
         duration_context = "DURATIONS (30fps): " + ", ".join([f"SCENE_{i+1:02d}:{d}f" for i, d in enumerate(scene_durations)]) if scene_durations else ""
+
+        print("\n📝 --- PROMPT CONTEXT ---")
+        print(f"   ⏱️ {duration_context}")
+        print(f"   🎙️ TIMESTAMPS: {compact_ts[:200]}..." if len(compact_ts) > 200 else f"   🎙️ TIMESTAMPS: {compact_ts}")
 
         # Condense guidelines for speed while keeping schema
         condensed_guidelines = re.sub(r'\n\s*\n', '\n', guidelines)
