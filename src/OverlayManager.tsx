@@ -26,6 +26,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays }) => {
               return <ShapesEngine overlay={overlay} />;
             case 'chart':
               return <ChartsEngine overlay={overlay} />;
+            case 'indicator':
             case 'data_indicator':
               return <DataIndicatorEngine overlay={overlay} />;
             case 'graph':
