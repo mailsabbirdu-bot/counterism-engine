@@ -30,6 +30,7 @@ export const DataIndicatorEngine: React.FC<{ overlay: any }> = ({ overlay }) => 
 
   const renderIndicator = () => {
     switch (overlay.indicator_type) {
+      case 'kpi':
       case 'kpiNumber':
         return <KPINumber overlay={overlay} relativeFrame={relativeFrame} fps={fps} />;
       case 'percentageCounter':
