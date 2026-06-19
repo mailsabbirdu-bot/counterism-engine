@@ -654,6 +654,10 @@ class RemotionJsonMaker:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
         raw_output = self._interact_with_gemini(full_prompt)
         print(f"📊 Raw Gemini output length: {len(raw_output)} chars.")
+        if len(raw_output.strip()) < 50:
+            print("❌ ERROR: Gemini returned an suspiciously short or empty response.")
+            return {}
+
         try:
             # 1. Look for markdown code blocks first
             json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_output, re.DOTALL)
@@ -789,13 +793,23 @@ def main():
 
         render_json = maker.generate(story, guidelines, args.prompt_output, ts_content, scene_durations)
         maker.stop_browser()
-        if not render_json or 'scenes' not in render_json:
-             print("❌ ERROR: Gemini failed to produce a valid manifest.")
+
+        if not render_json:
+             print("❌ ERROR: Gemini failed to produce any JSON.")
              exit(1)
+
+        if 'scenes' not in render_json or not render_json['scenes']:
+             print("❌ ERROR: Generated JSON contains no scenes. Manifest is invalid.")
+             print(f"DEBUG: Keys found in JSON: {list(render_json.keys())}")
+             exit(1)
+
         render_json = maker.finalize_json_durations(render_json, public_dir=abs_public)
         output_dir = os.path.dirname(args.output)
         if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
-        with open(args.output, 'w', encoding='utf-8') as f: json.dump(render_json, f, indent=2, ensure_ascii=False)
+        with open(args.output, 'w', encoding='utf-8') as f:
+            json.dump(render_json, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
         print(f"✅ Master JSON created: {args.output} ({os.path.getsize(args.output)} bytes)")
 
         # Disclosure generation
