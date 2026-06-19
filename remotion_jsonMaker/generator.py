@@ -243,6 +243,15 @@ class RemotionJsonMaker:
             if 'elements' in scene and not scene.get('overlays'):
                 scene['overlays'] = scene['elements']
 
+            # LLM Repair: text_overlay / focal_element object patterns
+            if not scene.get('overlays'):
+                scene['overlays'] = []
+                for k in ['text_overlay', 'focal_element', 'overlay']:
+                    if k in scene and isinstance(scene[k], dict):
+                        obj = scene[k]
+                        if k == 'text_overlay': obj['type'] = 'text'
+                        scene['overlays'].append(obj)
+
             if 'background' in scene and isinstance(scene['background'], dict):
                 bg = scene['background']
                 for k in ['background_type', 'video_path', 'audio_enabled']:
@@ -273,6 +282,12 @@ class RemotionJsonMaker:
                 # First Pass: Budgeting & Schema Alignment
                 valid_overlays = []
                 for ov in scene['overlays']:
+                    # LLM Repair: Map start_frame/end_frame
+                    if 'start_frame' in ov and 'start' not in ov: ov['start'] = ov['start_frame']
+                    if 'end_frame' in ov and 'duration' not in ov:
+                        s = ov.get('start', 0)
+                        ov['duration'] = max(60, ov['end_frame'] - s)
+
                     # LLM Repair: ui -> ui_panel, text missing but key present
                     if ov.get('type') == 'ui': ov['type'] = 'ui_panel'
                     if not ov.get('type'):
@@ -298,7 +313,7 @@ class RemotionJsonMaker:
 
                     # Ensure start/duration exists
                     if 'start' not in ov: ov['start'] = 0
-                    if 'duration' not in ov: ov['duration'] = scene_duration - ov['start']
+                    if 'duration' not in ov: ov['duration'] = max(120, scene_duration - ov['start'])
 
                     valid_overlays.append(ov)
 
@@ -474,6 +489,12 @@ class RemotionJsonMaker:
                     if 'type' in shot and 'style' not in shot:
                         shot['style'] = shot['type']
 
+                    # LLM Repair: start_frame / end_frame in shots
+                    if 'start_frame' in shot and 'startFrame' not in shot: shot['startFrame'] = shot['start_frame']
+                    if 'end_frame' in shot and 'duration' not in shot:
+                        s = shot.get('startFrame', 0)
+                        shot['duration'] = max(30, shot['end_frame'] - s)
+
                     # Enforce MOVLESS RESTING (duration - inDuration >= 60)
                     target_resting = 60
                     if shot.get('duration', 0) < target_resting + 15:
@@ -599,20 +620,23 @@ class RemotionJsonMaker:
 
         full_prompt = (
             "YOU ARE A REMOTION MASTER ENGINE. GENERATE RAW MINIFIED JSON ONLY. START '{' END '}'.\n"
-            "CRITICAL: USE 'overlays' (NOT 'elements'), 'content' (NOT 'text'), 'chart_type' (NOT 'kind').\n"
-            "RULES:\n"
+            "CRITICAL SCHEMA RULES:\n"
+            "- Use 'overlays' list (NEVER 'elements', NEVER objects like 'text_overlay').\n"
+            "- Use 'content' for text (NEVER 'text').\n"
+            "- Use 'chart_type' for charts (NEVER 'kind').\n"
+            "- Use 'start' and 'duration' for timing (NEVER 'start_frame', NEVER 'end_frame').\n"
+            "DESIGN RULES:\n"
             "1. MINIMALISM: Max ONE focal element (chart/ui_panel) and ONE Text overlay per scene.\n"
-            "2. TEXT: 3-4 words MAX. Capture 'vibe', NOT subtitles. Sync 'start' to TIMESTAMPS StartFrame.\n"
-            "3. BACKGROUND: Use flat keys 'background_type': 'video', 'video_path': 'renders/scene_SC_XX.mp4', 'audio_enabled': true. NO nesting.\n"
-            "4. CAMERA: Every scene MUST have 'camera' with 'shots' targeting focal overlays.\n"
-            "5. LAYOUT: Text on LEFT, Nivo/UI on RIGHT. Professional spacing.\n"
-            "6. PACING: 15f intro + 90f RESTING + 15f outro. duration >= 120f.\n"
+            "2. TEXT: 3-4 words MAX. Capture 'vibe', NOT subtitles. Sync 'start' to StartFrame.\n"
+            "3. BACKGROUND: Use flat keys 'background_type': 'video', 'video_path': 'renders/scene_SC_XX.mp4', 'audio_enabled': true.\n"
+            "4. CAMERA: Every scene MUST have 'camera' with 'shots' targeting focal overlays. Use 'targetId' and 'style'.\n"
+            "5. LAYOUT: Professional Quadrant Balancing. Center-anchored.\n"
             f"FONTS: {local_fonts}\n"
             f"DURATIONS: {duration_context}\n"
             f"TIMESTAMPS: {compact_ts}\n"
             f"STORY: {story}\n"
             f"SCHEMA: {condensed_guidelines}\n"
-            "TASK: Create a clean MASTER manifest. No overlays should bleed off-screen."
+            "TASK: Create a MASTER manifest. Follow schema 100% strictly."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
@@ -644,11 +668,16 @@ class RemotionJsonMaker:
             json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
             json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
 
-            # Remove trailing commas that often appear before the closing brace in LLM responses
+            # LLM Repair Pre-Pass: Fix structural garbage
+            # 1. Trailing commas before braces/brackets
             json_str = re.sub(r',\s*([\]}])', r'\1', json_str)
+            # 2. Quotes after numbers (e.g., 214" -> 214)
+            json_str = re.sub(r'(\d+)"(\s*[,}\]])', r'\1\2', json_str)
+            # 3. Missing quotes around keys if any (less common but happens)
 
             def repair_json(s):
                 s = s.strip()
+                # 1. Evaluate stack and string state
                 stack = []
                 in_string = False
                 escaped = False
@@ -664,23 +693,53 @@ class RemotionJsonMaker:
                         if stack and stack[-1] == '}': stack.pop()
                     elif char == ']':
                         if stack and stack[-1] == ']': stack.pop()
-                if in_string: s += '"'
-                if stack:
-                    s = s.rstrip()
-                    while s and s[-1] not in '"0123456789truefalsenull}]':
-                        s = s[:-1].rstrip()
-                    if s.endswith(','): s = s[:-1].rstrip()
-                    for _ in range(5):
-                         try:
-                             temp = s + "".join(reversed(stack))
-                             json.loads(temp, strict=False)
-                             return temp
-                         except:
+
+                # 2. String closure pre-pass
+                if in_string:
+                    # Backtrack to start of partial string to be safe
+                    last_quote = s.rfind('"')
+                    if last_quote != -1:
+                        # If the partial is likely a key (followed by :) backtrack more
+                        # or if it's a value, just close it.
+                        s += '"'
+
+                # 3. Structural backtracking loop
+                # We try to truncate the string at logical points and close the JSON
+                for _ in range(15):
+                     try:
+                         # Re-calculate stack for current state of 's'
+                         temp_stack = []
+                         t_in_string = False
+                         t_escaped = False
+                         for c in s:
+                             if c == '"' and not t_escaped: t_in_string = not t_in_string
+                             if t_in_string:
+                                 if c == '\\': t_escaped = not t_escaped
+                                 else: t_escaped = False
+                                 continue
+                             if c == '{': temp_stack.append('}')
+                             elif c == '[': temp_stack.append(']')
+                             elif c == '}':
+                                 if temp_stack and temp_stack[-1] == '}': temp_stack.pop()
+                             elif c == ']':
+                                 if temp_stack and temp_stack[-1] == ']': temp_stack.pop()
+
+                         if t_in_string:
+                             candidate = s + '"' + "".join(reversed(temp_stack))
+                         else:
+                             candidate = s + "".join(reversed(temp_stack))
+
+                         json.loads(candidate, strict=False)
+                         return candidate
+                     except:
+                         # Backtrack to the previous structural delimiter or quote
+                         if not s: break
+                         s = s[:-1].rstrip()
+                         while s and s[-1] not in '"0123456789truefalsenull}],:':
                              s = s[:-1].rstrip()
-                             while s and s[-1] not in '"0123456789truefalsenull}]':
-                                 s = s[:-1].rstrip()
-                             if s.endswith(','): s = s[:-1].rstrip()
-                return s + "".join(reversed(stack))
+                         if s.endswith(',') or s.endswith(':'): s = s[:-1].rstrip()
+
+                return s # Final fallback (likely still invalid but best effort)
 
             try:
                 # Use strict=False to handle unescaped control characters in strings
