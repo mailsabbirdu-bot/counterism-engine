@@ -334,6 +334,17 @@ class RemotionJsonMaker:
                             if (ov_type == 'ui_panel' or ov_type == 'data_indicator') and 'indicator_type' not in ov:
                                 ov['indicator_type'] = ov['kind']
 
+                        # Mandatory Field Repair for Nivo/Indicators
+                        if ov_type == 'data_indicator':
+                            if not ov.get('label'): ov['label'] = "Metric"
+                            if 'value' not in ov:
+                                 # Try to extract number from related text if available
+                                 num_match = re.search(r'(\d+)', text_ov.get('content', '') if text_ov else '')
+                                 ov['value'] = int(num_match.group(1)) if num_match else 0
+                        elif ov_type == 'chart':
+                            if not ov.get('data'): ov['data'] = [{"id": "A", "value": 10}, {"id": "B", "value": 20}]
+                            if not ov.get('title'): ov['title'] = "Data Overview"
+
                     # Ensure start/duration exists
                     if 'start' not in ov: ov['start'] = 0
                     if 'duration' not in ov: ov['duration'] = max(120, scene_duration - ov['start'])
@@ -485,9 +496,9 @@ class RemotionJsonMaker:
 
                     # Subtle local SFX (Volume 0.04)
                     s_id = scene.get('scene_id', 'unknown')
-                    if in_files:
+                    if self.in_files:
                         scene_sfx.append({ "scene_id": s_id, "type": "in", "start": ov['start'], "end": ov['start'] + 20 })
-                    if out_files:
+                    if self.out_files:
                         scene_sfx.append({ "scene_id": s_id, "type": "out", "start": ov['start'] + ov['duration'] - 10, "end": ov['start'] + ov['duration'] })
 
             # 4. Camera Shot Normalization & Auto-Generation
