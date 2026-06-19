@@ -678,13 +678,13 @@ class RemotionJsonMaker:
 
             # LLM Repair Pre-Pass: Fix structural garbage
             # 1. Swallowed quote before comma (e.g., "id":"val,"next" -> "id":"val","next")
-            # This happens when LLM forgets to close the quote before the next property.
-            json_str = re.sub(r'(:[ ]*"[^",]+)(,[ ]*"[^"]+":)', r'\1"\2', json_str)
-            # Re-repairing: the previous regex was correct but my test case had a bug (missing comma in original)
-            # 2. Trailing commas before braces/brackets
+            json_str = re.sub(r'(:[ ]*"[^",\n\r]+)(,[ ]*"[^"]+":)', r'\1"\2', json_str)
+            # 2. Swallowed quote before brace (e.g., "id":"val} -> "id":"val"})
+            json_str = re.sub(r'(:[ ]*"[^",\n\r]+)(\s*})', r'\1"\2', json_str)
+            # 3. Trailing commas before braces/brackets
             json_str = re.sub(r',\s*([\]}])', r'\1', json_str)
-            # 3. Quotes after numbers (e.g., 214" -> 214)
-            json_str = re.sub(r'(\d+)"(\s*[,}\]])', r'\1\2', json_str)
+            # 4. Quotes after numbers or booleans (e.g., 214" or true")
+            json_str = re.sub(r'(\d+|true|false|null)"(\s*[,}\]])', r'\1\2', json_str)
 
             def repair_json(s):
                 s = s.strip()
@@ -716,7 +716,7 @@ class RemotionJsonMaker:
 
                 # 3. Structural backtracking loop
                 # We try to truncate the string at logical points and close the JSON
-                for _ in range(15):
+                for _ in range(25):
                      try:
                          # Re-calculate stack for current state of 's'
                          temp_stack = []
@@ -735,18 +735,18 @@ class RemotionJsonMaker:
                              elif c == ']':
                                  if temp_stack and temp_stack[-1] == ']': temp_stack.pop()
 
-                         if t_in_string:
-                             candidate = s + '"' + "".join(reversed(temp_stack))
-                         else:
-                             candidate = s + "".join(reversed(temp_stack))
+                         if t_in_string: candidate = s + '"' + "".join(reversed(temp_stack))
+                         else: candidate = s + "".join(reversed(temp_stack))
 
                          json.loads(candidate, strict=False)
                          return candidate
                      except:
-                         # Backtrack to the previous structural delimiter or quote
+                         # Backtrack to the previous structural delimiter
                          if not s: break
                          s = s[:-1].rstrip()
-                         while s and s[-1] not in '"0123456789truefalsenull}],:':
+                         # We look for the last structural character that could end a property
+                         # delimiters: comma, brace, bracket, or a quote (end of string)
+                         while s and s[-1] not in '}],"' and not s[-1].isdigit() and s[-1] not in 'eul': # 'eul' for true/false/null
                              s = s[:-1].rstrip()
                          if s.endswith(',') or s.endswith(':'): s = s[:-1].rstrip()
 
