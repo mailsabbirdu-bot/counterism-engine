@@ -236,36 +236,32 @@ class RemotionJsonMaker:
         in_ptr, out_ptr = 0, 0
 
         for scene_idx, scene in enumerate(data['scenes']):
-            # LLM Fix: Map 'duration' to 'duration_in_frames'
+            # 1. LLM Fix: Root Level Schema Alignment
             if 'duration' in scene and 'duration_in_frames' not in scene:
                 scene['duration_in_frames'] = scene['duration']
 
-            # Root level Repair: elements -> overlays
             if 'elements' in scene and not scene.get('overlays'):
                 scene['overlays'] = scene['elements']
 
+            if 'background' in scene and isinstance(scene['background'], dict):
+                bg = scene['background']
+                for k in ['background_type', 'video_path', 'audio_enabled']:
+                    if k in bg and k not in scene: scene[k] = bg[k]
+
+            # 2. Strict Background Enforcement
+            scene['background_type'] = 'video'
+            scene['audio_enabled'] = True
+            if not scene.get('video_path'):
+                scene['video_path'] = f"renders/scene_SC_{scene_idx+1:02d}.mp4"
+
+            # 3. Authoritative Duration Resolution
             scene_duration = scene.get('duration_in_frames', 180)
-
-            # Ensure background video path is correct
-            if scene.get('background_type') == 'video':
-                if not scene.get('video_path'):
-                    scene['video_path'] = f"renders/scene_SC_{scene_idx+1:02d}.mp4"
-
-                vpath = scene['video_path'].lstrip('/')
-                filename = os.path.basename(vpath)
-
-                if filename in self.fps_cache:
-                    scene_duration = self.fps_cache[filename]
-                else:
-                    print(f"   ⚠️ WARNING: {filename} not in FPS cache. Using {scene_duration} frames.")
+            vpath = scene['video_path'].lstrip('/')
+            filename = os.path.basename(vpath)
+            if filename in self.fps_cache:
+                scene_duration = self.fps_cache[filename]
 
             scene['duration_in_frames'] = scene_duration
-            scene['audio_enabled'] = True
-            scene['background_type'] = 'video' # User Mandate: Always video
-
-            # LLM Repair: elements -> overlays
-            if 'elements' in scene and not scene.get('overlays'):
-                scene['overlays'] = scene['elements']
 
             placed_overlays = []
             focal_ids = []
@@ -607,7 +603,7 @@ class RemotionJsonMaker:
             "RULES:\n"
             "1. MINIMALISM: Max ONE focal element (chart/ui_panel) and ONE Text overlay per scene.\n"
             "2. TEXT: 3-4 words MAX. Capture 'vibe', NOT subtitles. Sync 'start' to TIMESTAMPS StartFrame.\n"
-            "3. VIDEO: ALL scenes MUST use background_type: 'video', audio_enabled: true.\n"
+            "3. BACKGROUND: Use flat keys 'background_type': 'video', 'video_path': 'renders/scene_SC_XX.mp4', 'audio_enabled': true. NO nesting.\n"
             "4. CAMERA: Every scene MUST have 'camera' with 'shots' targeting focal overlays.\n"
             "5. LAYOUT: Text on LEFT, Nivo/UI on RIGHT. Professional spacing.\n"
             "6. PACING: 15f intro + 90f RESTING + 15f outro. duration >= 120f.\n"
