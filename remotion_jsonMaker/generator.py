@@ -43,7 +43,15 @@ class RemotionJsonMaker:
         if self.page: return
         self.playwright = sync_playwright().start()
         print("🚀 Launching persistent browser...")
-        args = ["--disable-blink-features=AutomationControlled", "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+        args = [
+            "--disable-blink-features=AutomationControlled",
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--single-process",
+            "--disable-extensions"
+        ]
         if self.user_data_dir:
             self.context = self.playwright.chromium.launch_persistent_context(self.user_data_dir, headless=self.headless, args=args)
         else:
@@ -401,12 +409,13 @@ class RemotionJsonMaker:
                 response_selectors = ["message-content", ".markdown.message-content", ".model-response-text", "[data-message-author-role='assistant']"]
                 def get_msg_count():
                     for sel in response_selectors:
-                        msgs = page.query_selector_all(sel)
-                        if msgs: return len(msgs)
+                        try:
+                            msgs = page.query_selector_all(sel)
+                            if msgs: return len(msgs)
+                        except: pass
                     return 0
 
                 initial_count = get_msg_count()
-                print(f"   ...initial message count: {initial_count}")
 
                 page.evaluate("""() => {
                     const selectors = ['button[aria-label="Accept all"]', 'button:has-text("Accept")', 'button:has-text("I agree")', '.cdk-overlay-container'];
@@ -423,26 +432,23 @@ class RemotionJsonMaker:
 
                 print(f"⌨️  Sending prompt to Gemini (Attempt {attempt+1})...")
                 page.click(input_selector, force=True)
-                time.sleep(1)
-                page.fill(input_selector, prompt)
-                time.sleep(1)
+                page.keyboard.type(prompt, delay=0) # delay=0 for speed
                 page.keyboard.press("Enter")
 
                 try:
                     btn = "button[aria-label*='Send message'], button[aria-label*='Submit']"
-                    if page.is_visible(btn, timeout=2000): page.click(btn, force=True)
+                    if page.is_visible(btn, timeout=1000): page.click(btn, force=True)
                 except: pass
 
-                print("⏳  Waiting for new message to appear...")
+                print("⏳  Waiting for Gemini JSON response...")
                 last_text = ""
                 stable_count = 0
                 stop_btn = "button[aria-label*='Stop generating']"
 
-                for i in range(300):
-                    time.sleep(1.5)
+                for i in range(400):
+                    time.sleep(1.0) # Faster polling
                     if get_msg_count() <= initial_count: continue
 
-                    # Speed Optimization: If 'Stop generating' button is gone, the response is likely done.
                     try: is_generating = page.locator(stop_btn).is_visible()
                     except: is_generating = False
 
@@ -455,15 +461,14 @@ class RemotionJsonMaker:
 
                     if current_text and current_text == last_text:
                         stable_count += 1
-                        # Speed Optimization with Integrity Check
-                        # We only exit early if the text is stable, not generating, and looks like a valid response
-                        if not is_generating and stable_count >= 4:
-                             # Must be reasonably long and contain structural JSON markers
-                             if len(current_text) > 200 and "{" in current_text and "scenes" in current_text:
+                        # Aggressive early exit if we see the JSON closing brace and it's stable
+                        if not is_generating and stable_count >= 2:
+                             stripped = current_text.strip()
+                             if stripped.endswith("}") or stripped.endswith("```"):
                                  print(f"✨ Gemini response finished ({len(current_text)} chars).")
                                  return current_text
 
-                        if stable_count >= 12: # Safety backup stability
+                        if stable_count >= 10:
                              print(f"✨ Gemini response stabilized ({len(current_text)} chars).")
                              return current_text
                     else:
@@ -472,42 +477,52 @@ class RemotionJsonMaker:
 
                 print("🔄  Reloading Gemini...")
                 page.reload(wait_until="domcontentloaded")
-                time.sleep(5)
+                time.sleep(3)
             except Exception as e:
                 print(f"⚠️ Error in Gemini interaction: {e}")
-                page.reload(wait_until="domcontentloaded")
-                time.sleep(5)
+                try: page.reload(wait_until="domcontentloaded")
+                except: pass
+                time.sleep(3)
         return ""
+
+    def _compact_timestamps(self, ts_content: str) -> str:
+        if not ts_content: return ""
+        compacted = []
+        # SCENE_01: [Original: 0.00s - 0.98s] -> [30fps: 0f - 29f] "ঢাকা।"
+        pattern = r'(SCENE_\d+):.*?\[30fps:\s*(\d+)f\s*-\s*\d+f\]\s*"(.*?)"'
+        for line in ts_content.split('\n'):
+            match = re.search(pattern, line)
+            if match:
+                compacted.append(f"{match.group(1)}:{match.group(2)}f \"{match.group(3)}\"")
+        return " | ".join(compacted)
 
     def generate(self, story: str, guidelines: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None) -> Dict[str, Any]:
         story = self.adjust_durations_in_text(story)
-        guidelines = self.adjust_durations_in_text(guidelines)
         local_fonts = self.get_local_fonts()
+        compact_ts = self._compact_timestamps(timestamp_context)
 
-        duration_context = ""
-        if scene_durations:
-             duration_context = "SCENE DURATION LIMITS (30fps Frames):\n"
-             for i, d in enumerate(scene_durations):
-                  duration_context += f"SCENE {i+1:02d}: {d} frames\n"
+        duration_context = "DURATIONS: " + ", ".join([f"S{i+1}:{d}f" for i, d in enumerate(scene_durations)]) if scene_durations else ""
+
+        # Condense guidelines for speed while keeping schema
+        condensed_guidelines = re.sub(r'\n\s*\n', '\n', guidelines)
+        condensed_guidelines = condensed_guidelines[:3000] # Cap to prevent token overflow
 
         full_prompt = (
-            "You are a world-class Cinematic Motion Graphics Director. Your mission is to generate an ULTRA MODERN, TOP-NOTCH, high-fidelity JSON manifest.\n\n"
-            "STYLE: High-end sci-fi documentary interface. Think 'Minority Report' meets modern data journalism. Use sleek glassmorphism (ui_panel variant: glass), vibrant technical accents (shape/graph), and high-contrast typography.\n\n"
-            "CRITICAL CINEMATIC RULES:\n"
-            "1. PROFESSIONAL BALANCED LAYOUT: All overlays MUST use the 'slot' property. Never cluster elements. If a chart is in TOP_RIGHT, text must be in BOTTOM_LEFT or MID_LEFT.\n"
-            "2. CINEMATIC PACING (MOVLESS RESTING): This is non-negotiable. Every focal element must have exactly 15f intro and exactly 15f outro. There MUST be a resting screen period (90-120 frames) where the element is completely static so viewers can read them properly. This resting period MUST be longer than the intro and outro.\n"
-            "3. AUDIO-VISUAL SYNC: Use the PRECISE word-level timestamps provided from the external timestamp.txt. Overlays must appear and disappear EXACTLY with the spoken narrative. Match the frame ranges [30fps: Xf - Yf] for start and end timings.\n"
-            "4. NO VISUAL CLUTTER: Text content MUST be concise (2-3 words max per overlay). For charts, limit data to a MAXIMUM of 5 points. Do not block background video details.\n"
-            "5. FONT ACCURACY (STRICT): For Bengali content, you MUST select a font from the BANGLA FONTS list provided. For English content, you MUST select from the ENGLISH FONTS list. DO NOT use generic font names like 'Inter' or 'Arial' unless they are in the detected list.\n"
-            "6. MANDATORY AUDIO & VIDEO: EVERY scene MUST have 'background_type': 'video', 'video_path': 'renders/scene_SC_XX.mp4', and 'audio_enabled': true. This ensures the background video audio is preserved.\n"
-            "7. CAMERA WORK: Use 'shots' for every focal overlay. Movements must be professional (slow_push, slow_pull, or dramatic_reveal). Ensure 'inDuration' allows for the required resting time.\n"
-            "8. JSON CONSTRAINTS: **OUTPUT RAW MINIFIED JSON ONLY (NO NEWLINES/INDENTATION).** START WITH '{' AND END WITH '}'. Be extremely concise. Avoid deep nesting or excessive decorative elements. Keep data arrays short (5 points max). Ensure NO control characters are present in the text content. PRIORITIZE COMPLETING THE JSON STRUCTURE OVER ADDING EXTRA SCENES IF SPACE IS LIMITED.\n\n"
-            f"DETECTED LOCAL FONTS (Categorized): {local_fonts}\n\n"
-            f"SYSTEM GUIDELINES (V4 Schema):\n{guidelines}\n\n"
-            f"STORY NARRATIVE:\n{story}\n\n"
+            "GENERATE RAW MINIFIED JSON ONLY. NO PREAMBLE. NO MARKDOWN. START '{' END '}'.\n"
+            "ROLE: Cinematic Director. STYLE: Modern glassmorphism, high-contrast.\n"
+            "RULES:\n"
+            "1. LAYOUT: Use 'slot'. Balanced quadrants. Never cluster.\n"
+            "2. PACING: 15f intro, 15f outro. 90-120f STATIC RESTING screen (MANDATORY). Total duration ~120-150f.\n"
+            "3. INTRO SYNC: USE START FRAMES BELOW. Overlay 'start' MUST EXACTLY match the Word's StartFrame for audio sync.\n"
+            "4. CONCISE: 2-3 words per overlay. Max 5 data points for charts.\n"
+            "5. FONTS: Use ONLY from provided list.\n"
+            "6. VIDEO: background_type:video, audio_enabled:true.\n"
+            f"SCHEMA/GUIDELINES: {condensed_guidelines}\n"
+            f"FONTS: {local_fonts}\n"
+            f"STORY: {story}\n"
             f"{duration_context}\n"
-            f"PRECISE WORD TIMESTAMPS (FOR SYNCING):\n{timestamp_context or 'No timestamps provided. Estimate based on 30fps.'}\n\n"
-            "TASK: Create the complete master blueprint in raw JSON. Ensure all IDs are unique and targeted correctly by the camera."
+            f"TIMESTAMPS: {compact_ts}\n"
+            "TASK: Master JSON. Unique IDs. Camera shots for focal elements."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
@@ -687,6 +702,13 @@ def main():
     if os.path.exists(args.output): os.remove(args.output)
     with open(args.story_file, 'r', encoding='utf-8') as f: story = f.read()
     maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, headless=args.headless)
+
+    # Asset Audit (Metadata caching)
+    print("\n🔍 --- ASSET AUDIT ---")
+    if os.path.exists(os.path.join(args.public_dir, "renders")):
+        for f in sorted(os.listdir(os.path.join(args.public_dir, "renders"))):
+            if f.endswith(".mp4"):
+                maker.probe_video_duration_and_fps(os.path.join(args.public_dir, "renders", f))
 
     if args.fps_update_file:
         maker.load_fps_update(args.fps_update_file)
