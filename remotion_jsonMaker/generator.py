@@ -241,6 +241,7 @@ class RemotionJsonMaker:
         in_ptr, out_ptr = 0, 0
 
         for scene_idx, scene in enumerate(data['scenes']):
+            scene_sfx = [] # Local collection to allow de-duplication
             # 1. LLM Fix: Root Level Schema Alignment
             if 'duration' in scene and 'duration_in_frames' not in scene:
                 scene['duration_in_frames'] = scene['duration']
@@ -307,6 +308,10 @@ class RemotionJsonMaker:
                         # LLM Repair: text -> content
                         if 'text' in ov and 'content' not in ov:
                             ov['content'] = ov['text']
+
+                        # Strip trailing punctuation
+                        if ov.get('content'):
+                            ov['content'] = ov['content'].rstrip('.। ')
 
                         # Font Fallback
                         content = ov.get('content', '')
@@ -454,6 +459,13 @@ class RemotionJsonMaker:
                     if start_f + duration_f > scene_duration:
                         duration_f = scene_duration - start_f
 
+                    # 4b. Audio Sync Logic: If duration is too short for resting, start earlier
+                    if duration_f < target_total and start_f > 0:
+                        needed = target_total - duration_f
+                        shift = min(start_f, needed)
+                        start_f -= shift
+                        duration_f += shift
+
                     ov['start'] = start_f
                     ov['duration'] = duration_f
 
@@ -461,14 +473,12 @@ class RemotionJsonMaker:
                     for k in ['intro', 'outro', 'resting']:
                         if k in ov: del ov[k]
 
-                    # Subtle local SFX (Volume 0.04) - Attached to each overlay
+                    # Subtle local SFX (Volume 0.04)
                     s_id = scene.get('scene_id', 'unknown')
                     if in_files:
-                        sfx_manifest.append({ "scene_id": s_id, "file": in_files[in_ptr % len(in_files)], "start": ov['start'], "end": ov['start'] + 20, "volume": 0.04 })
-                        in_ptr += 1
+                        scene_sfx.append({ "scene_id": s_id, "type": "in", "start": ov['start'], "end": ov['start'] + 20 })
                     if out_files:
-                        sfx_manifest.append({ "scene_id": s_id, "file": out_files[out_ptr % len(out_files)], "start": ov['start'] + ov['duration'] - 10, "end": ov['start'] + ov['duration'], "volume": 0.04 })
-                        out_ptr += 1
+                        scene_sfx.append({ "scene_id": s_id, "type": "out", "start": ov['start'] + ov['duration'] - 10, "end": ov['start'] + ov['duration'] })
 
             # 4. Camera Shot Normalization & Auto-Generation
             if not scene.get('camera'):
@@ -495,6 +505,21 @@ class RemotionJsonMaker:
                         "style": "slow_push",
                         "inDuration": 30
                     })
+
+            # 5. SFX De-duplication (Scene Level)
+            seen_in = set()
+            seen_out = set()
+            for sfx in scene_sfx:
+                if sfx['type'] == 'in':
+                    if sfx['start'] not in seen_in:
+                        sfx_manifest.append({ "scene_id": sfx['scene_id'], "file": in_files[in_ptr % len(in_files)], "start": sfx['start'], "end": sfx['end'], "volume": 0.04 })
+                        in_ptr += 1
+                        seen_in.add(sfx['start'])
+                else:
+                    if sfx['start'] not in seen_out:
+                        sfx_manifest.append({ "scene_id": sfx['scene_id'], "file": out_files[out_ptr % len(out_files)], "start": sfx['start'], "end": sfx['end'], "volume": 0.04 })
+                        out_ptr += 1
+                        seen_out.add(sfx['start'])
 
             if scene['camera'].get('shots'):
                 for shot in scene['camera']['shots']:
@@ -654,7 +679,8 @@ class RemotionJsonMaker:
             "- USE flat keys for background: 'background_type', 'video_path', 'audio_enabled'. NO 'background' object.\n"
             "DESIGN RULES:\n"
             "1. MINIMALISM: Max 1 text overlay + 1 focal element per scene. NEVER crowd the screen.\n"
-            "2. TEXT: 3-4 words max. Capture 'vibe', NOT subtitles. Sync 'start' to the word's StartFrame from TIMESTAMPS.\n"
+            "2. OPTIONAL NIVO: Use focal elements (charts, KPIs, timers) ONLY when they add narrative value. Some scenes only need text.\n"
+            "3. TEXT: 3-4 words max. NO terminal punctuation ('.' or '।'). Capture 'vibe', NOT subtitles. Sync 'start' to word's StartFrame.\n"
             "3. VIDEO: background_type: 'video' is MANDATORY. video_path must be 'renders/scene_SC_XX.mp4'.\n"
             "4. CAMERA: Every scene must have 'camera' with 'shots' targeting 'targetId'. Use 'style'.\n"
             f"REFERENCE_SCHEMA: {schema_ref}\n"
