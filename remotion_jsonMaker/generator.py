@@ -28,14 +28,16 @@ class RemotionJsonMaker:
         print(f"📂 Loading FPS data from: {filepath}")
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
-                for line in f:
-                    # Format: scene_SC_01.mp4 | Original FPS: 24.000 | Total Frames: 128 | 30fps Frames: 160
-                    match = re.search(r'(scene_SC_\d+\.mp4).*?30fps Frames:\s*(\d+)', line)
-                    if match:
-                        filename = match.group(1)
-                        frames = int(match.group(2))
-                        self.fps_cache[filename] = frames
-            print(f"✅ Cached durations for {len(self.fps_cache)} videos.")
+                content = f.read()
+                # Format: scene_SC_01.mp4 | Original FPS: 24.000 | Total Frames: 128 | 30fps Frames: 160
+                matches = re.finditer(r'(scene_SC_\d+\.mp4).*?30fps Frames:\s*(\d+)', content)
+                count = 0
+                for match in matches:
+                    filename = match.group(1)
+                    frames = int(match.group(2))
+                    self.fps_cache[filename] = frames
+                    count += 1
+            print(f"✅ Cached durations for {count} videos.")
         except Exception as e:
             print(f"⚠️ Error loading FPS update file: {e}")
 
@@ -227,8 +229,6 @@ class RemotionJsonMaker:
             print(f"   🎵 Scanned {len(all_files)} total files in SFX folder.")
             print(f"   🎵 Detected {len(in_files)} entrance sounds: {in_files[:5]}...")
             print(f"   🎵 Detected {len(out_files)} exit sounds: {out_files[:5]}...")
-            if not in_files and not out_files:
-                print(f"   ⚠️ Diagnostic: All files in SFX folder: {all_files[:10]}...")
         else:
             print(f"   ⚠️ SFX directory not found at resolved path: {audio_dir}")
 
@@ -240,17 +240,23 @@ class RemotionJsonMaker:
             if scene.get('background_type') == 'video' and scene.get('video_path'):
                 # Handle potential leading slash in video_path
                 vpath = scene['video_path'].lstrip('/')
-                abs_vpath = os.path.join(abs_public, vpath)
+                filename = os.path.basename(vpath)
 
-                if os.path.exists(abs_vpath):
-                    print(f"🎬 Found background video: {vpath}")
-                    frames_at_30fps, _ = self.probe_video_duration_and_fps(abs_vpath)
-                    if frames_at_30fps > 0:
-                        scene_duration = int(frames_at_30fps)
-                        print(f"   ⏱️ Updating scene {scene.get('scene_id')} duration to {scene_duration} frames.")
-                        scene['duration_in_frames'] = scene_duration
+                # Priority 1: Cache from fps_update.txt
+                if filename in self.fps_cache:
+                    scene_duration = self.fps_cache[filename]
+                    print(f"   ⏱️ Using CACHED duration for {filename}: {scene_duration} frames.")
                 else:
-                    print(f"⚠️ Background video NOT found at: {abs_vpath}")
+                    abs_vpath = os.path.join(abs_public, vpath)
+                    if os.path.exists(abs_vpath):
+                        print(f"🎬 Probing background video: {vpath}")
+                        frames_at_30fps, _ = self.probe_video_duration_and_fps(abs_vpath)
+                        if frames_at_30fps > 0:
+                            scene_duration = int(frames_at_30fps)
+                    else:
+                        print(f"⚠️ Background video NOT found at: {abs_vpath}")
+
+            scene['duration_in_frames'] = scene_duration
 
             placed_overlays = []
             if scene.get('overlays'):
@@ -289,7 +295,8 @@ class RemotionJsonMaker:
 
                     if slot_name in SECTORS:
                         ov['position'] = {"x": SECTORS[slot_name]["x"], "y": SECTORS[slot_name]["y"]}
-                    elif not ov.get('position'):
+
+                    if not ov.get('position'):
                          keys = list(SECTORS.keys())
                          selected = keys[i % len(keys)]
                          ov['position'] = {"x": SECTORS[selected]["x"], "y": SECTORS[selected]["y"]}
@@ -326,34 +333,37 @@ class RemotionJsonMaker:
 
                     # 3. Final Rigid Canvas Safety Clamping (150px safety zone)
                     margin = 150
-                    # For center-anchored: center must be between (margin + width/2) and (1920 - margin - width/2)
                     x_min, x_max = margin + w/2, 1920 - margin - w/2
                     y_min, y_max = margin + h/2, 1080 - margin - h/2
 
-                    # If component is somehow larger than the safe zone, center it
                     if x_min > x_max: x_min = x_max = 960
                     if y_min > y_max: y_min = y_max = 540
 
-                    ov['position']['x'] = max(x_min, min(x_max, int(ov['position'].get('x', 960))))
-                    ov['position']['y'] = max(y_min, min(y_max, int(ov['position'].get('y', 540))))
+                    ov['position']['x'] = max(x_min, min(x_max, int(ov.get('position', {}).get('x', 960))))
+                    ov['position']['y'] = max(y_min, min(y_max, int(ov.get('position', {}).get('y', 540))))
 
                     placed_overlays.append((ov, w, h))
 
-                    # Timing Safety & Cinematic Pacing
-                    min_duration = 120 if ov_type in ['chart', 'ui_panel', 'data_indicator'] else 60
-                    if ov.get('start', 0) >= scene_duration:
-                        ov['start'] = max(0, scene_duration - min_duration)
+                    # 4. Cinematic Pacing (User Mandate)
+                    # 15f intro, 15f outro, 90-120f resting
+                    intro_frames = 15
+                    outro_frames = 15
+                    resting_frames = 90 # Min resting
 
-                    if ov.get('duration', 0) < min_duration:
-                        ov['duration'] = min_duration
+                    target_total = intro_frames + resting_frames + outro_frames # 120f
 
-                    if ov.get('start') + ov.get('duration') > scene_duration:
-                        # Try to shift start back if possible, otherwise truncate
-                        if scene_duration >= min_duration:
-                            ov['start'] = max(0, scene_duration - ov['duration'])
-                            ov['duration'] = scene_duration - ov['start']
-                        else:
-                            ov['duration'] = scene_duration - ov['start']
+                    start_f = ov.get('start', 0)
+                    if start_f >= scene_duration - 30:
+                        start_f = max(0, scene_duration - target_total)
+
+                    # Ensure duration is at least enough for intro+resting+outro
+                    duration_f = max(target_total, ov.get('duration', target_total))
+
+                    if start_f + duration_f > scene_duration:
+                        duration_f = scene_duration - start_f
+
+                    ov['start'] = start_f
+                    ov['duration'] = duration_f
 
                     # Subtle local SFX (Volume 0.04) - Attached to each overlay
                     if in_files:
@@ -378,28 +388,6 @@ class RemotionJsonMaker:
         print(f"✅ Finalization: Processed {len(data['scenes'])} scenes, {len(sfx_manifest)} SFX triggers mapped.")
         return data
 
-    def generate_word_timestamps(self, story: str, public_dir: str = "../public") -> str:
-        print("🎙️  Generating precise word-level timestamps (30fps normalization)...")
-        scenes = re.split(r'দৃশ্য\s+[0-9০-৯]+', story)
-        scene_texts = [s.strip() for s in scenes if s.strip()]
-        full_ts_prompt = "You are a Voiceover Alignment Expert. Generate EXACT word-level timestamps in FRAMES for a 30fps project.\n\n"
-
-        scene_durations = []
-        for i, scene_text in enumerate(scene_texts):
-            scene_num = i + 1
-            vpath = f"renders/scene_SC_{scene_num:02d}.mp4"
-            abs_vpath = os.path.join(public_dir, vpath)
-            if os.path.exists(abs_vpath):
-                frames_at_30fps, _ = self.probe_video_duration_and_fps(abs_vpath)
-                total_frames = int(frames_at_30fps)
-            else:
-                total_frames = 180 # Fallback
-            scene_durations.append(total_frames)
-            print(f"   ⏱️ Syncing SCENE {scene_num:02d}: Mapping voiceover to {total_frames} frames (30fps)")
-            full_ts_prompt += f"--- SCENE {scene_num:02d} (Duration: {total_frames} frames) ---\nVOICEOVER: {scene_text}\n\n"
-
-        full_ts_prompt += "INSTRUCTIONS: Format: SCENE_XX: [Frame Start - Frame End] \"Word\". Ensure 30fps mapping. ALL timestamps MUST be within the [0, Duration] range for each scene. Return ONLY timestamps.\n"
-        return self._interact_with_gemini(full_ts_prompt), scene_durations
 
     def _interact_with_gemini(self, prompt: str, retry_count: int = 2) -> str:
         for attempt in range(retry_count + 1):
@@ -445,8 +433,8 @@ class RemotionJsonMaker:
                 stable_count = 0
                 stop_btn = "button[aria-label*='Stop generating']"
 
-                for i in range(400):
-                    time.sleep(1.0) # Faster polling
+                for i in range(600):
+                    time.sleep(0.5) # Even faster polling
                     if get_msg_count() <= initial_count: continue
 
                     try: is_generating = page.locator(stop_btn).is_visible()
@@ -462,13 +450,13 @@ class RemotionJsonMaker:
                     if current_text and current_text == last_text:
                         stable_count += 1
                         # Aggressive early exit if we see the JSON closing brace and it's stable
-                        if not is_generating and stable_count >= 2:
+                        if not is_generating and stable_count >= 3:
                              stripped = current_text.strip()
-                             if stripped.endswith("}") or stripped.endswith("```"):
+                             if stripped.endswith("}") or (stripped.endswith("```") and "{" in stripped):
                                  print(f"✨ Gemini response finished ({len(current_text)} chars).")
                                  return current_text
 
-                        if stable_count >= 10:
+                        if stable_count >= 15:
                              print(f"✨ Gemini response stabilized ({len(current_text)} chars).")
                              return current_text
                     else:
@@ -501,28 +489,26 @@ class RemotionJsonMaker:
         local_fonts = self.get_local_fonts()
         compact_ts = self._compact_timestamps(timestamp_context)
 
-        duration_context = "DURATIONS: " + ", ".join([f"S{i+1}:{d}f" for i, d in enumerate(scene_durations)]) if scene_durations else ""
+        duration_context = "DURATIONS (30fps): " + ", ".join([f"SCENE_{i+1:02d}:{d}f" for i, d in enumerate(scene_durations)]) if scene_durations else ""
 
         # Condense guidelines for speed while keeping schema
         condensed_guidelines = re.sub(r'\n\s*\n', '\n', guidelines)
-        condensed_guidelines = condensed_guidelines[:3000] # Cap to prevent token overflow
+        condensed_guidelines = condensed_guidelines[:4000] # Cap to prevent token overflow
 
         full_prompt = (
-            "GENERATE RAW MINIFIED JSON ONLY. NO PREAMBLE. NO MARKDOWN. START '{' END '}'.\n"
-            "ROLE: Cinematic Director. STYLE: Modern glassmorphism, high-contrast.\n"
-            "RULES:\n"
-            "1. LAYOUT: Use 'slot'. Balanced quadrants. Never cluster.\n"
-            "2. PACING: 15f intro, 15f outro. 90-120f STATIC RESTING screen (MANDATORY). Total duration ~120-150f.\n"
-            "3. INTRO SYNC: USE START FRAMES BELOW. Overlay 'start' MUST EXACTLY match the Word's StartFrame for audio sync.\n"
-            "4. CONCISE: 2-3 words per overlay. Max 5 data points for charts.\n"
-            "5. FONTS: Use ONLY from provided list.\n"
-            "6. VIDEO: background_type:video, audio_enabled:true.\n"
-            f"SCHEMA/GUIDELINES: {condensed_guidelines}\n"
+            "YOU ARE A REMOTION MASTER ENGINE. GENERATE RAW MINIFIED JSON ONLY. NO MARKDOWN. NO PREAMBLE. START '{' END '}'.\n"
+            "CONSTRAINTS:\n"
+            "1. PACING: Every overlay MUST have: 15f intro + 90f-120f RESTING TIME + 15f outro.\n"
+            "2. INTRO SYNC: Overlay 'start' MUST EXACTLY MATCH the '30fps StartFrame' from TIMESTAMPS below.\n"
+            "3. LAYOUT: Center-anchored. Use 'slot' (TOP_LEFT, TOP_RIGHT, etc). Professional spacing.\n"
+            "4. TEXT: Ultra-concise (2-3 words). Use appropriate Bangla/English fonts from list.\n"
+            "5. VIDEO: background_type: 'video', audio_enabled: true.\n"
             f"FONTS: {local_fonts}\n"
-            f"STORY: {story}\n"
-            f"{duration_context}\n"
+            f"DURATIONS: {duration_context}\n"
             f"TIMESTAMPS: {compact_ts}\n"
-            "TASK: Master JSON. Unique IDs. Camera shots for focal elements."
+            f"STORY: {story}\n"
+            f"SCHEMA: {condensed_guidelines}\n"
+            "TASK: Create a complete remotion_render.json for all scenes."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
@@ -559,96 +545,37 @@ class RemotionJsonMaker:
 
             def repair_json(s):
                 s = s.strip()
-                # 1. Truncation repair: remove trailing garbage
-                # If it's truncated, it often ends with a partial key like "duration
-                # or a partial value like 150 or "renders/scene
-
-                # Remove everything after the last valid value terminator
-                # Valid terminators: } ] " (if it ends a string) or a number
-                # This is tricky, let's try a different approach.
-
                 stack = []
                 in_string = False
                 escaped = False
-                last_valid_pos = 0
-
-                for i, char in enumerate(s):
-                    if char == '"' and not escaped:
-                        in_string = not in_string
+                for char in s:
+                    if char == '"' and not escaped: in_string = not in_string
                     if in_string:
                         if char == '\\': escaped = not escaped
                         else: escaped = False
                         continue
-
-                    if char in '{[':
-                        stack.append('}' if char == '{' else ']')
-                    elif char in '}]':
-                        if stack and stack[-1] == char:
-                            stack.pop()
-                            last_valid_pos = i + 1
-                    elif char == ',':
-                        # A comma is only valid if something follows it eventually
-                        pass
-                    elif char.isprintable():
-                         # Potential end of a value (digit, boolean, null, or string closure)
-                         # We'll consider the position after any non-structural character as potentially valid
-                         # if we can successfully close the stack.
-                         pass
-
-                # If we're inside a string, close it
-                if in_string:
-                    s = s[:s.rfind('"')] + '"'
-
-                # Try to find a logical breaking point if the stack is not empty
+                    if char == '{': stack.append('}')
+                    elif char == '[': stack.append(']')
+                    elif char == '}':
+                        if stack and stack[-1] == '}': stack.pop()
+                    elif char == ']':
+                        if stack and stack[-1] == ']': stack.pop()
+                if in_string: s += '"'
                 if stack:
-                    # Remove trailing partials: ..., "key": or ..., "key": "val
-                    # Backtrack to the last comma or brace that isn't inside a string
-
-                    # Simple heuristic: remove trailing chars until we hit a "safe" ending
-                    # then try to append the closing markers.
-
-                    temp_s = s.rstrip()
-                    while temp_s and temp_s[-1] not in '}"0123456789truefalsenull]':
-                        temp_s = temp_s[:-1].rstrip()
-
-                    # If we ended with a quote, check if it's a key or value
-                    # If there's a colon after it (in the original string), it was a key.
-                    # This is getting complex. Let's use a simpler but more robust backtracking.
-
-                    # Backtrack to last successful structural point
-                    # We'll try to truncate the string at every comma, brace, or bracket from the end
-                    # and see if we can close it.
-
-                    for i in range(len(s) - 1, -1, -1):
-                        if s[i] in ',{[ ':
-                            sub = s[:i].rstrip()
-                            # If we truncate at a comma, we need to close the stack
-                            # Re-evaluate stack for 'sub'
-                            sub_stack = []
-                            sub_in_string = False
-                            sub_escaped = False
-                            for c in sub:
-                                if c == '"' and not sub_escaped: sub_in_string = not sub_in_string
-                                if sub_in_string:
-                                    if c == '\\': sub_escaped = not sub_escaped
-                                    else: sub_escaped = False
-                                    continue
-                                if c == '{': sub_stack.append('}')
-                                elif c == '[': sub_stack.append(']')
-                                elif c == '}':
-                                    if sub_stack and sub_stack[-1] == '}': sub_stack.pop()
-                                elif c == ']':
-                                    if sub_stack and sub_stack[-1] == ']': sub_stack.pop()
-
-                            if not sub_in_string:
-                                repaired = sub + "".join(reversed(sub_stack))
-                                try:
-                                    json.loads(repaired)
-                                    return repaired
-                                except:
-                                    continue
-
-                # Final fallback
+                    s = s.rstrip()
+                    while s and s[-1] not in '"0123456789truefalsenull}]':
+                        s = s[:-1].rstrip()
+                    if s.endswith(','): s = s[:-1].rstrip()
+                    for _ in range(5):
+                         try:
+                             temp = s + "".join(reversed(stack))
+                             json.loads(temp, strict=False)
+                             return temp
+                         except:
+                             s = s[:-1].rstrip()
+                             while s and s[-1] not in '"0123456789truefalsenull}]':
+                                 s = s[:-1].rstrip()
+                             if s.endswith(','): s = s[:-1].rstrip()
                 return s + "".join(reversed(stack))
 
             try:
@@ -740,13 +667,7 @@ def main():
             with open(args.timestamp_file, 'r', encoding='utf-8') as f:
                 ts_content = f.read()
         elif args.timestamp_output:
-            if os.path.exists(args.timestamp_output): os.remove(args.timestamp_output)
-            ts_content, gen_durations = maker.generate_word_timestamps(story, public_dir=abs_public)
-            if not ts_content or len(ts_content) < 50:
-                 ts_content, gen_durations = maker.generate_word_timestamps(story, public_dir=abs_public)
-            if not scene_durations:
-                scene_durations = gen_durations
-            with open(args.timestamp_output, 'w', encoding='utf-8') as f: f.write(ts_content)
+             print("⚠️ Warning: --timestamp-output is deprecated. Please provide --timestamp-file.")
 
         render_json = maker.generate(story, guidelines, args.prompt_output, ts_content, scene_durations)
         maker.stop_browser()
