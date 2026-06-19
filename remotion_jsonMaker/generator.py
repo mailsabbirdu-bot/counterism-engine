@@ -224,6 +224,7 @@ class RemotionJsonMaker:
         audio_dir = os.path.abspath(os.path.join(public_dir, "renders/audios"))
         in_files = []
         out_files = []
+        camera_files = []
 
         print(f"📂 Searching for SFX materials in: {audio_dir}")
         if os.path.exists(audio_dir):
@@ -231,14 +232,17 @@ class RemotionJsonMaker:
             # More flexible detection: "in_1", "in1", "intro", "enter", etc.
             in_files = sorted([f for f in all_files if re.match(r'^(in[_\-]?\d*|intro|enter)', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
             out_files = sorted([f for f in all_files if re.match(r'^(out[_\-]?\d*|outro|exit)', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
+            camera_files = sorted([f for f in all_files if re.match(r'^camera[_\-]?\d*', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
+
             print(f"   🎵 Scanned {len(all_files)} total files in SFX folder.")
             print(f"   🎵 Detected {len(in_files)} entrance sounds: {in_files[:5]}...")
             print(f"   🎵 Detected {len(out_files)} exit sounds: {out_files[:5]}...")
+            print(f"   🎵 Detected {len(camera_files)} camera sounds: {camera_files[:5]}...")
         else:
             print(f"   ⚠️ SFX directory not found at resolved path: {audio_dir}")
 
         sfx_manifest = []
-        in_ptr, out_ptr = 0, 0
+        in_ptr, out_ptr, cam_ptr = 0, 0, 0
 
         for scene_idx, scene in enumerate(data['scenes']):
             scene_sfx = [] # Local collection to allow de-duplication
@@ -285,6 +289,11 @@ class RemotionJsonMaker:
             focal_count = 0
 
             if scene.get('overlays'):
+                # Pass 0: Detect Title+Content relation
+                text_ov = next((o for o in scene['overlays'] if o.get('type') == 'text' or 'text' in o or 'content' in o), None)
+                focal_ov = next((o for o in scene['overlays'] if o.get('type') in ['chart', 'ui_panel', 'data_indicator', 'indicator'] or 'chart_type' in o or 'kind' in o), None)
+                has_relation = text_ov and focal_ov
+
                 # First Pass: Budgeting & Schema Alignment
                 valid_overlays = []
                 for ov in scene['overlays']:
@@ -382,14 +391,21 @@ class RemotionJsonMaker:
                     if not isinstance(slot_name, str): slot_name = ''
                     slot_name = slot_name.upper()
 
-                    if ov_type in ['chart', 'ui_panel', 'data_indicator']:
-                        if "RIGHT" not in slot_name:
-                             slot_name = ["TOP_RIGHT", "BOTTOM_RIGHT", "MID_RIGHT"][i % 3]
-                    elif ov_type == 'text':
-                        if "LEFT" not in slot_name:
-                             slot_name = ["TOP_LEFT", "BOTTOM_LEFT", "MID_LEFT"][i % 3]
+                    if has_relation:
+                        # Stack TITLE (Text) above CONTENT (Focal)
+                        if ov_type == 'text':
+                             ov['position'] = {"x": 960, "y": 300}
+                        else:
+                             ov['position'] = {"x": 960, "y": 700}
+                    else:
+                        if ov_type in ['chart', 'ui_panel', 'data_indicator']:
+                            if "RIGHT" not in slot_name:
+                                 slot_name = ["TOP_RIGHT", "BOTTOM_RIGHT", "MID_RIGHT"][i % 3]
+                        elif ov_type == 'text':
+                            if "LEFT" not in slot_name:
+                                 slot_name = ["TOP_LEFT", "BOTTOM_LEFT", "MID_LEFT"][i % 3]
 
-                    if slot_name in SECTORS:
+                    if not has_relation and slot_name in SECTORS:
                         ov['position'] = {"x": SECTORS[slot_name]["x"], "y": SECTORS[slot_name]["y"]}
 
                     # LLM Repair: position: "left" or missing position
@@ -530,12 +546,29 @@ class RemotionJsonMaker:
                         seen_out.add(sfx['start'])
 
             if scene['camera'].get('shots'):
-                for shot in scene['camera']['shots']:
-                    # LLM Repair: target -> targetId, type -> style
+                camera_styles = ["slow_push", "zoom_in", "pan_left", "pan_right", "orbit"]
+                for shot_idx, shot in enumerate(scene['camera']['shots']):
+                    # 1. Assign Camera SFX
+                    if camera_files:
+                        sfx_manifest.append({
+                            "scene_id": s_id,
+                            "file": camera_files[cam_ptr % len(camera_files)],
+                            "start": shot.get('startFrame', 0) or shot.get('start', 0),
+                            "end": (shot.get('startFrame', 0) or shot.get('start', 0)) + 30,
+                            "volume": 0.06
+                        })
+                        cam_ptr += 1
+
+                    # 2. LLM Repair: target -> targetId, type -> style
                     if 'target' in shot and 'targetId' not in shot:
                         shot['targetId'] = shot['target']
-                    if 'type' in shot and 'style' not in shot:
-                        shot['style'] = shot['type']
+                    if ('type' in shot or not shot.get('style')) and 'style' not in shot:
+                        shot['style'] = shot.get('type', camera_styles[shot_idx % len(camera_styles)])
+
+                    # 3. Title+Content Safety: Target screen center for stacked layouts
+                    if has_relation:
+                        shot['targetId'] = None # Forces center zoom
+                        shot['zoom'] = min(shot.get('zoom', 1.25), 1.35)
 
                     # LLM Repair: start_frame / start / end_frame / end in shots
                     if 'start_frame' in shot and 'startFrame' not in shot: shot['startFrame'] = shot['start_frame']
@@ -688,12 +721,14 @@ class RemotionJsonMaker:
             "- USE flat keys for background: 'background_type', 'video_path', 'audio_enabled'. NO 'background' object.\n"
             "DESIGN RULES:\n"
             "1. MINIMALISM: Max 1 text overlay + 1 focal element per scene. NEVER crowd the screen.\n"
-            "2. MANDATORY NIVO FOR NUMBERS: If a number is mentioned in the narration, you MUST include an appropriate Nivo layer (KPI, chart, graph, timer) to visualize it accurately.\n"
-            "3. TEXT: 3-4 words max. NO terminal punctuation ('.' or '।'). Capture 'vibe', NOT subtitles. Sync 'start' to word's StartFrame.\n"
-            "3. VIDEO: background_type: 'video' is MANDATORY. video_path must be 'renders/scene_SC_XX.mp4'.\n"
-            "4. CAMERA: Every scene must have 'camera' with 'shots' targeting 'targetId'. Use 'style'.\n"
+            "2. MANDATORY NIVO FOR NUMBERS: If a number is mentioned in the narration (e.g., '10 million', '50%'), you MUST include an appropriate Nivo layer (KPI, chart, graph, timer) to visualize it accurately. NO EXCEPTIONS.\n"
+            "3. TITLE+CONTENT LAYOUT: If text and Nivo layers are related, treat Text as TITLE and Nivo as CONTENT. Place TITLE above CONTENT.\n"
+            "4. TEXT: 3-4 words max. NO terminal punctuation ('.' or '।'). Capture 'vibe', NOT subtitles. If a number is in narration, prioritize showing that number in text. Sync 'start' to word's StartFrame.\n"
+            "5. VIDEO: background_type: 'video' is MANDATORY. video_path must be 'renders/scene_SC_XX.mp4'.\n"
+            "6. CAMERA: Every scene must have 'camera' with 'shots' targeting 'targetId'. AVOID MONOTONY: rotate styles (slow_push, zoom_in, pan_left, pan_right, orbit). Ensure targets stay on-screen. Max zoom 1.6x.\n"
             f"REFERENCE_SCHEMA: {schema_ref}\n"
             f"FONTS: {local_fonts}\n"
+            f"CAMERA_SFX: {camera_files}\n"
             f"DURATIONS: {duration_context}\n"
             f"TIMESTAMPS: {compact_ts}\n"
             f"STORY: {story}\n"
