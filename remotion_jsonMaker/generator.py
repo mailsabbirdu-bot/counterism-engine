@@ -618,19 +618,27 @@ class RemotionJsonMaker:
         condensed_guidelines = re.sub(r'\n\s*\n', '\n', guidelines)
         condensed_guidelines = condensed_guidelines[:3000] # Cap to prevent token overflow
 
+        # Single-scene reference to ground the LLM
+        schema_ref = (
+            '{"scenes":[{"scene_id":"SCENE_01","duration":150,"background_type":"video","video_path":"renders/scene_SC_01.mp4","audio_enabled":true,'
+            '"overlays":[{"id":"txt_1","type":"text","content":"MINDSET","start":15,"duration":120,"position":{"x":480,"y":540}},'
+            '{"id":"chart_1","type":"chart","chart_type":"bar","start":30,"duration":100,"position":{"x":1440,"y":540}}],'
+            '"camera":{"enabled":true,"shots":[{"targetId":"chart_1","style":"slow_push","startFrame":30,"duration":100}]}}]}'
+        )
+
         full_prompt = (
             "YOU ARE A REMOTION MASTER ENGINE. GENERATE RAW MINIFIED JSON ONLY. START '{' END '}'.\n"
             "CRITICAL SCHEMA RULES:\n"
-            "- Use 'overlays' list (NEVER 'elements', NEVER objects like 'text_overlay').\n"
+            "- Use 'overlays' list (NEVER 'elements', NEVER 'text_overlay' object).\n"
             "- Use 'content' for text (NEVER 'text').\n"
             "- Use 'chart_type' for charts (NEVER 'kind').\n"
             "- Use 'start' and 'duration' for timing (NEVER 'start_frame', NEVER 'end_frame').\n"
             "DESIGN RULES:\n"
             "1. MINIMALISM: Max ONE focal element (chart/ui_panel) and ONE Text overlay per scene.\n"
-            "2. TEXT: 3-4 words MAX. Capture 'vibe', NOT subtitles. Sync 'start' to StartFrame.\n"
-            "3. BACKGROUND: Use flat keys 'background_type': 'video', 'video_path': 'renders/scene_SC_XX.mp4', 'audio_enabled': true.\n"
-            "4. CAMERA: Every scene MUST have 'camera' with 'shots' targeting focal overlays. Use 'targetId' and 'style'.\n"
-            "5. LAYOUT: Professional Quadrant Balancing. Center-anchored.\n"
+            "2. TEXT: 3-4 words MAX. Sync 'start' to StartFrame.\n"
+            "3. BACKGROUND: Flat keys 'background_type', 'video_path', 'audio_enabled' at root. NO 'background' object.\n"
+            "4. CAMERA: Use 'targetId' and 'style' in 'shots'.\n"
+            f"REFERENCE_SCHEMA: {schema_ref}\n"
             f"FONTS: {local_fonts}\n"
             f"DURATIONS: {duration_context}\n"
             f"TIMESTAMPS: {compact_ts}\n"
@@ -669,11 +677,14 @@ class RemotionJsonMaker:
             json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
 
             # LLM Repair Pre-Pass: Fix structural garbage
-            # 1. Trailing commas before braces/brackets
+            # 1. Swallowed quote before comma (e.g., "id":"val,"next" -> "id":"val","next")
+            json_str = re.sub(r'(:[ ]*"[^",\n\r]+)(,[ ]*"[^"]+":)', r'\1"\2', json_str)
+            # 2. Swallowed quote before brace (e.g., "id":"val} -> "id":"val"})
+            json_str = re.sub(r'(:[ ]*"[^",\n\r]+)(\s*})', r'\1"\2', json_str)
+            # 3. Trailing commas before braces/brackets
             json_str = re.sub(r',\s*([\]}])', r'\1', json_str)
-            # 2. Quotes after numbers (e.g., 214" -> 214)
-            json_str = re.sub(r'(\d+)"(\s*[,}\]])', r'\1\2', json_str)
-            # 3. Missing quotes around keys if any (less common but happens)
+            # 4. Quotes after numbers or booleans (e.g., 214" or true")
+            json_str = re.sub(r'(\d+|true|false|null)"(\s*[,}\]])', r'\1\2', json_str)
 
             def repair_json(s):
                 s = s.strip()
@@ -705,7 +716,7 @@ class RemotionJsonMaker:
 
                 # 3. Structural backtracking loop
                 # We try to truncate the string at logical points and close the JSON
-                for _ in range(15):
+                for _ in range(25):
                      try:
                          # Re-calculate stack for current state of 's'
                          temp_stack = []
@@ -724,18 +735,18 @@ class RemotionJsonMaker:
                              elif c == ']':
                                  if temp_stack and temp_stack[-1] == ']': temp_stack.pop()
 
-                         if t_in_string:
-                             candidate = s + '"' + "".join(reversed(temp_stack))
-                         else:
-                             candidate = s + "".join(reversed(temp_stack))
+                         if t_in_string: candidate = s + '"' + "".join(reversed(temp_stack))
+                         else: candidate = s + "".join(reversed(temp_stack))
 
                          json.loads(candidate, strict=False)
                          return candidate
                      except:
-                         # Backtrack to the previous structural delimiter or quote
+                         # Backtrack to the previous structural delimiter
                          if not s: break
                          s = s[:-1].rstrip()
-                         while s and s[-1] not in '"0123456789truefalsenull}],:':
+                         # We look for the last structural character that could end a property
+                         # delimiters: comma, brace, bracket, or a quote (end of string)
+                         while s and s[-1] not in '}],"' and not s[-1].isdigit() and s[-1] not in 'eul': # 'eul' for true/false/null
                              s = s[:-1].rstrip()
                          if s.endswith(',') or s.endswith(':'): s = s[:-1].rstrip()
 
