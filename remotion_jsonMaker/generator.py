@@ -201,6 +201,10 @@ class RemotionJsonMaker:
             'video': (900, 700)
         }
 
+        # Rigid Minimalist Overlay Budget per Scene
+        MAX_TEXT_PER_SCENE = 1
+        MAX_FOCAL_PER_SCENE = 1 # Chart/UI/KPI
+
         # Logical sectors (Safe Zones)
         SECTORS = {
             "TOP_LEFT": {"x": 480, "y": 270},
@@ -253,11 +257,29 @@ class RemotionJsonMaker:
 
             scene['duration_in_frames'] = scene_duration
             scene['audio_enabled'] = True
+            scene['background_type'] = 'video' # User Mandate: Always video
 
             placed_overlays = []
             focal_ids = []
 
+            text_count = 0
+            focal_count = 0
+
             if scene.get('overlays'):
+                # First Pass: Budgeting & Cleaning
+                valid_overlays = []
+                for ov in scene['overlays']:
+                    ov_type = ov.get('type', 'text')
+                    if ov_type == 'text':
+                        if text_count >= MAX_TEXT_PER_SCENE: continue
+                        text_count += 1
+                    elif ov_type in ['chart', 'ui_panel', 'data_indicator']:
+                        if focal_count >= MAX_FOCAL_PER_SCENE: continue
+                        focal_count += 1
+                    valid_overlays.append(ov)
+
+                scene['overlays'] = valid_overlays
+
                 for i, ov in enumerate(scene['overlays']):
                     # Ensure ID exists
                     if not ov.get('id'):
@@ -299,12 +321,20 @@ class RemotionJsonMaker:
                         if not slot_name or slot_name not in ["TOP_LEFT", "BOTTOM_LEFT", "MID_LEFT"]:
                              slot_name = ["TOP_LEFT", "BOTTOM_LEFT", "MID_LEFT"][i % 3]
 
+                    # Force Text and Charts into opposing quadrants for Minimalist Balance
+                    if ov_type == 'chart' or ov_type == 'ui_panel' or ov_type == 'data_indicator':
+                        if not slot_name or not slot_name.endswith("RIGHT"):
+                             slot_name = ["TOP_RIGHT", "BOTTOM_RIGHT", "MID_RIGHT"][i % 3]
+                    elif ov_type == 'text':
+                        if not slot_name or not slot_name.endswith("LEFT"):
+                             slot_name = ["TOP_LEFT", "BOTTOM_LEFT", "MID_LEFT"][i % 3]
+
                     if slot_name in SECTORS:
                         ov['position'] = {"x": SECTORS[slot_name]["x"], "y": SECTORS[slot_name]["y"]}
 
                     if not ov.get('position'):
-                         keys = list(SECTORS.keys())
-                         selected = keys[i % len(keys)]
+                         # Professional Default: Text Left, Others Right
+                         selected = "MID_LEFT" if ov_type == 'text' else "MID_RIGHT"
                          ov['position'] = {"x": SECTORS[selected]["x"], "y": SECTORS[selected]["y"]}
 
                     # 2. Multi-Directional Collision Nudging (AABB Multi-Pass)
@@ -537,21 +567,22 @@ class RemotionJsonMaker:
 
         full_prompt = (
             "YOU ARE A REMOTION MASTER ENGINE. GENERATE RAW MINIFIED JSON ONLY. NO MARKDOWN. NO PREAMBLE. START '{' END '}'.\n"
-            "ROLE: Cinematic Technical Director. STYLE: Ultra-modern, high-end documentary, glassmorphism.\n"
+            "ROLE: Cinematic Technical Director. STYLE: Ultra-modern, high-end documentary, MINIMALIST.\n"
             "CRITICAL RULES:\n"
-            "1. CAMERA: Every scene MUST have 'camera' with 'shots' targeting every focal overlay. Use 'slow_push' (zoom: 1.2) for charts/panels.\n"
-            "2. LAYERING: Add background depth using 'graph' (nodes: 40) and 'shape' (circle/pulse) at low zIndex (10-20) with 'depth' (-200).\n"
-            "3. PACING: 15f intro + 90f-120f RESTING + 15f outro. 'duration' MUST be >= 120f. NO keys named 'intro'/'outro' in overlays.\n"
-            "4. SYNC: Overlay 'start' MUST EXACTLY MATCH the '30fps StartFrame' from TIMESTAMPS below for the chosen word.\n"
-            "5. LAYOUT: Use 'slot' (TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, MID_LEFT, MID_RIGHT). Professional quadrant balancing.\n"
-            "6. VISUALS: Use 'ui_panel' (variant: glass) for stats. Use 'chart' (Nivo style) for data. Use 'text' (splitMode: word, stagger: 2).\n"
-            "7. IDS: Unique 'id' required for ALL overlays. Camera 'shots.targetId' MUST match these IDs.\n"
+            "1. MINIMALISM: NEVER crowd the screen. Max ONE focal element (Chart/UI) and ONE Text overlay per scene.\n"
+            "2. TEXT: 3-4 words MAX. Capture 'vibe/mood', NOT subtitles. Sync 'start' to TIMESTAMPS StartFrame.\n"
+            "3. VIDEO: ALL scenes MUST use 'background_type': 'video' with 'audio_enabled': true.\n"
+            "4. CAMERA: Every scene MUST have 'camera' with 'shots'. Use 'slow_push' (zoom: 1.2) for focal elements.\n"
+            "5. LAYOUT: Quadrant-balanced. Text on LEFT, Nivo/UI on RIGHT. Professional well-planned spacing.\n"
+            "6. PACING: 15f intro + 90f-120f RESTING + 15f outro. MANDATORY viewer comprehension time.\n"
+            "7. SYNC: Overlay 'start' MUST EXACTLY MATCH the word's '30fps StartFrame' for audio-sync.\n"
+            "8. LAYERING: Decorative 'graph' (nodes: 30) at zIndex 10 for depth. depth: -200.\n"
             f"FONTS: {local_fonts}\n"
             f"DURATIONS: {duration_context}\n"
             f"TIMESTAMPS: {compact_ts}\n"
             f"STORY: {story}\n"
             f"SCHEMA: {condensed_guidelines}\n"
-            "TASK: Create a MASTER manifest leveraging all engine capabilities (Camera, Graphs, Charts, UI Panels)."
+            "TASK: Create a professional, clean MASTER manifest. Focus on visual clarity and impactful minimalism."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
