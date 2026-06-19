@@ -66,7 +66,12 @@ else:
 # 2. Background Videos
 print("\n🎬 --- SYNCING BACKGROUND VIDEOS ---")
 print(f"🔍 Searching for videos in: {DRIVE_BASE_PATH}/renders")
-!find {DRIVE_BASE_PATH}/renders -maxdepth 1 -name "*.mp4" -exec ln -sf '{}' public/renders/ ';' 2>/dev/null
+# Use Python for robust syncing to avoid shell expansion issues
+import glob
+drive_renders = f"{DRIVE_BASE_PATH}/renders"
+if os.path.exists(drive_renders):
+    for f in glob.glob(os.path.join(drive_renders, "*.mp4")):
+        !ln -sf "{f}" public/renders/
 v_count = !ls public/renders/*.mp4 | wc -l
 print(f"✅ Successfully linked {v_count[0]} background videos to public/renders/")
 if int(v_count[0]) > 0:

@@ -313,7 +313,7 @@ class RemotionJsonMaker:
                     w, h = TYPE_SIZES.get(ov_type, (800, 800))
 
                     if ov_type == 'text':
-                        # Dynamic Text Footprint Estimation
+                        # Dynamic Text Footprint Estimation (Viewer Safety Buffers)
                         content = ov.get('content') or ov.get('text', '')
                         lines = content.count('\n') + 1
                         fs_match = re.search(r'(\d+)', ov.get('fontSize', '64'))
@@ -321,8 +321,9 @@ class RemotionJsonMaker:
 
                         # Bangla characters are wider/taller; scale box accordingly
                         is_bangla = any(ord(c) > 127 for c in content)
-                        w = min(1600, len(max(content.split('\n'), key=len)) * (fs * (0.8 if is_bangla else 0.6)))
-                        h = lines * (fs * (1.5 if is_bangla else 1.3))
+                        # Minimalist constraint often results in single lines; use safer width
+                        w = min(1500, len(max(content.split('\n'), key=len)) * (fs * (1.0 if is_bangla else 0.8)))
+                        h = lines * (fs * (1.8 if is_bangla else 1.5))
 
                     elif ov_type == 'chart':
                         w = ov.get('width', 1000) + 100
@@ -471,6 +472,12 @@ class RemotionJsonMaker:
 
             if scene['camera'].get('shots'):
                 for shot in scene['camera']['shots']:
+                    # LLM Repair: target -> targetId, type -> style
+                    if 'target' in shot and 'targetId' not in shot:
+                        shot['targetId'] = shot['target']
+                    if 'type' in shot and 'style' not in shot:
+                        shot['style'] = shot['type']
+
                     # Enforce MOVLESS RESTING (duration - inDuration >= 60)
                     target_resting = 60
                     if shot.get('duration', 0) < target_resting + 15:
