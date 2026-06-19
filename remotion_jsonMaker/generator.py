@@ -21,6 +21,9 @@ class RemotionJsonMaker:
         self.fps_cache = {}
         self.bangla_fonts = []
         self.english_fonts = []
+        self.in_files = []
+        self.out_files = []
+        self.camera_files = []
 
     def load_fps_update(self, filepath: str):
         if not filepath or not os.path.exists(filepath):
@@ -148,16 +151,13 @@ class RemotionJsonMaker:
         text = re.sub(pattern1, replacement_logic, text, flags=re.DOTALL)
         return text
 
-    def get_local_fonts(self, public_dir: str = "../public") -> str:
-        # Use absolute path to ensure accuracy
+    def scan_assets(self, public_dir: str = "../public"):
         abs_public = os.path.abspath(public_dir)
+
+        # 1. Fonts
         fonts_dir = os.path.join(abs_public, "fonts")
         self.bangla_fonts = []
         self.english_fonts = []
-
-        print(f"📂 Scanning for fonts in: {fonts_dir}")
-
-        # Categorization keywords
         BANGLA_KEYWORDS = ['solaiman', 'kalpurush', 'nikosh', 'hind', 'siliguri', 'adorsho', 'sutonny', 'shonar', 'vrinda', 'bangla', 'liyakats', 'anshu', 'charukola', 'galada', 'mina', 'mukti', 'atreyee', 'benisen', 'bengali', 'shishir', 'shorif', 'maharaj', '_bangla']
 
         if os.path.exists(fonts_dir):
@@ -165,22 +165,28 @@ class RemotionJsonMaker:
                 for file in files:
                     if file.lower().endswith(('.ttf', '.otf', '.woff', '.woff2')):
                         name = os.path.splitext(file)[0]
-                        # Remove common weight/style suffixes for cleaner names in prompt
                         clean_name = re.sub(r'-(Regular|Bold|Italic|Light|Medium|Thin|SemiBold|ExtraBold|Black)$', '', name, flags=re.IGNORECASE)
                         if any(kw in clean_name.lower() for kw in BANGLA_KEYWORDS):
                             self.bangla_fonts.append(clean_name)
                         else:
                             self.english_fonts.append(clean_name)
-
         self.bangla_fonts = sorted(list(set(self.bangla_fonts)))
         self.english_fonts = sorted(list(set(self.english_fonts)))
+        print(f"🔍 Font Detection: Found {len(self.bangla_fonts)} Bangla fonts, {len(self.english_fonts)} English fonts.")
 
-        bangla_str = ", ".join(self.bangla_fonts)
-        english_str = ", ".join(self.english_fonts)
-
-        print(f"🔍 Font Detection: Found {len(self.bangla_fonts)} Bangla fonts: {self.bangla_fonts[:5]}...")
-        print(f"🔍 Font Detection: Found {len(self.english_fonts)} English fonts: {self.english_fonts[:5]}...")
-        return f"BANGLA FONTS: [{bangla_str}] | ENGLISH FONTS: [{english_str}]"
+        # 2. SFX
+        audio_dir = os.path.join(abs_public, "renders/audios")
+        self.in_files = []
+        self.out_files = []
+        self.camera_files = []
+        if os.path.exists(audio_dir):
+            all_files = os.listdir(audio_dir)
+            self.in_files = sorted([f for f in all_files if re.match(r'^(in[_\-]?\d*|intro|enter)', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
+            self.out_files = sorted([f for f in all_files if re.match(r'^(out[_\-]?\d*|outro|exit)', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
+            self.camera_files = sorted([f for f in all_files if re.match(r'^camera[_\-]?\d*', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
+            print(f"🎵 SFX Detection: {len(self.in_files)} intro, {len(self.out_files)} outro, {len(self.camera_files)} camera sounds.")
+        else:
+            print(f"⚠️ SFX directory not found: {audio_dir}")
 
     def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
         if not data: return data
@@ -220,26 +226,6 @@ class RemotionJsonMaker:
             "MID_LEFT": {"x": 480, "y": 540},
             "MID_RIGHT": {"x": 1440, "y": 540}
         }
-
-        audio_dir = os.path.abspath(os.path.join(public_dir, "renders/audios"))
-        in_files = []
-        out_files = []
-        camera_files = []
-
-        print(f"📂 Searching for SFX materials in: {audio_dir}")
-        if os.path.exists(audio_dir):
-            all_files = os.listdir(audio_dir)
-            # More flexible detection: "in_1", "in1", "intro", "enter", etc.
-            in_files = sorted([f for f in all_files if re.match(r'^(in[_\-]?\d*|intro|enter)', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
-            out_files = sorted([f for f in all_files if re.match(r'^(out[_\-]?\d*|outro|exit)', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
-            camera_files = sorted([f for f in all_files if re.match(r'^camera[_\-]?\d*', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
-
-            print(f"   🎵 Scanned {len(all_files)} total files in SFX folder.")
-            print(f"   🎵 Detected {len(in_files)} entrance sounds: {in_files[:5]}...")
-            print(f"   🎵 Detected {len(out_files)} exit sounds: {out_files[:5]}...")
-            print(f"   🎵 Detected {len(camera_files)} camera sounds: {camera_files[:5]}...")
-        else:
-            print(f"   ⚠️ SFX directory not found at resolved path: {audio_dir}")
 
         sfx_manifest = []
         in_ptr, out_ptr, cam_ptr = 0, 0, 0
@@ -536,12 +522,14 @@ class RemotionJsonMaker:
             for sfx in scene_sfx:
                 if sfx['type'] == 'in':
                     if sfx['start'] not in seen_in:
-                        sfx_manifest.append({ "scene_id": sfx['scene_id'], "file": in_files[in_ptr % len(in_files)], "start": sfx['start'], "end": sfx['end'], "volume": 0.04 })
+                        sfx_file = self.in_files[in_ptr % len(self.in_files)] if self.in_files else "in_1.mp3"
+                        sfx_manifest.append({ "scene_id": sfx['scene_id'], "file": sfx_file, "start": sfx['start'], "end": sfx['end'], "volume": 0.04 })
                         in_ptr += 1
                         seen_in.add(sfx['start'])
                 else:
                     if sfx['start'] not in seen_out:
-                        sfx_manifest.append({ "scene_id": sfx['scene_id'], "file": out_files[out_ptr % len(out_files)], "start": sfx['start'], "end": sfx['end'], "volume": 0.04 })
+                        sfx_file = self.out_files[out_ptr % len(self.out_files)] if self.out_files else "out_1.mp3"
+                        sfx_manifest.append({ "scene_id": sfx['scene_id'], "file": sfx_file, "start": sfx['start'], "end": sfx['end'], "volume": 0.04 })
                         out_ptr += 1
                         seen_out.add(sfx['start'])
 
@@ -549,10 +537,10 @@ class RemotionJsonMaker:
                 camera_styles = ["slow_push", "zoom_in", "pan_left", "pan_right", "orbit"]
                 for shot_idx, shot in enumerate(scene['camera']['shots']):
                     # 1. Assign Camera SFX
-                    if camera_files:
+                    if self.camera_files:
                         sfx_manifest.append({
                             "scene_id": s_id,
-                            "file": camera_files[cam_ptr % len(camera_files)],
+                            "file": self.camera_files[cam_ptr % len(self.camera_files)],
                             "start": shot.get('startFrame', 0) or shot.get('start', 0),
                             "end": (shot.get('startFrame', 0) or shot.get('start', 0)) + 30,
                             "volume": 0.06
@@ -688,7 +676,7 @@ class RemotionJsonMaker:
 
     def generate(self, story: str, guidelines: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None) -> Dict[str, Any]:
         story = self.adjust_durations_in_text(story)
-        local_fonts = self.get_local_fonts()
+        local_fonts = f"BANGLA FONTS: {self.bangla_fonts} | ENGLISH FONTS: {self.english_fonts}"
         compact_ts = self._compact_timestamps(timestamp_context)
 
         duration_context = "DURATIONS (30fps): " + ", ".join([f"SCENE_{i+1:02d}:{d}f" for i, d in enumerate(scene_durations)]) if scene_durations else ""
@@ -717,18 +705,19 @@ class RemotionJsonMaker:
             "- USE 'font' from the provided lists for every text overlay. MANDATORY.\n"
             "- USE type: 'data_indicator' for timers/KPIs/counters. indicator_type: 'countdown' for timers.\n"
             "- USE 'chart_type' or 'indicator_type'. NEVER use 'kind'.\n"
+            "- REQUIRED FIELDS for Nivo: 'label', 'value', 'suffix', 'prefix'. For charts: 'data', 'title', 'colors'.\n"
             "- USE 'start' and 'duration' (integers). NEVER use 'start_frame' or 'end_frame'.\n"
             "- USE flat keys for background: 'background_type', 'video_path', 'audio_enabled'. NO 'background' object.\n"
             "DESIGN RULES:\n"
             "1. MINIMALISM: Max 1 text overlay + 1 focal element per scene. NEVER crowd the screen.\n"
-            "2. MANDATORY NIVO FOR NUMBERS: If a number is mentioned in the narration (e.g., '10 million', '50%'), you MUST include an appropriate Nivo layer (KPI, chart, graph, timer) to visualize it accurately. NO EXCEPTIONS.\n"
+            "2. MANDATORY NIVO FOR NUMBERS: If a number or numerical word is mentioned in the narration (e.g., 'two', '10M', '৫০%', 'দশ'), you MUST include an appropriate Nivo layer (KPI, chart, graph, timer) to visualize it. Ensure all fields like 'value' and 'label' are populated accurately. NO EXCEPTIONS.\n"
             "3. TITLE+CONTENT LAYOUT: If text and Nivo layers are related, treat Text as TITLE and Nivo as CONTENT. Place TITLE above CONTENT.\n"
             "4. TEXT: 3-4 words max. NO terminal punctuation ('.' or '।'). Capture 'vibe', NOT subtitles. If a number is in narration, prioritize showing that number in text. Sync 'start' to word's StartFrame.\n"
             "5. VIDEO: background_type: 'video' is MANDATORY. video_path must be 'renders/scene_SC_XX.mp4'.\n"
             "6. CAMERA: Every scene must have 'camera' with 'shots' targeting 'targetId'. AVOID MONOTONY: rotate styles (slow_push, zoom_in, pan_left, pan_right, orbit). Ensure targets stay on-screen. Max zoom 1.6x.\n"
             f"REFERENCE_SCHEMA: {schema_ref}\n"
             f"FONTS: {local_fonts}\n"
-            f"CAMERA_SFX: {camera_files}\n"
+            f"CAMERA_SFX: {self.camera_files}\n"
             f"DURATIONS: {duration_context}\n"
             f"TIMESTAMPS: {compact_ts}\n"
             f"STORY: {story}\n"
@@ -849,6 +838,7 @@ def main():
 
     # Use absolute paths where possible
     abs_public = os.path.abspath(args.public_dir)
+    maker.scan_assets(abs_public)
     guidelines = maker.load_guidelines(
         os.path.join(os.path.dirname(abs_public), "guideline.md"),
         os.path.join(os.path.dirname(abs_public), "guideline_prompt.txt"),
