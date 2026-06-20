@@ -279,7 +279,7 @@ const KPINumber = ({ overlay, relativeFrame, fps }: any) => {
   return (
     <div className="flex flex-col items-center justify-center bg-zinc-900/80 backdrop-blur-xl p-12 rounded-[2.5rem] border border-white/20 shadow-2xl min-w-[400px]" style={{ fontFamily: overlay.font || 'Inter' }}>
       <span className="text-white/50 text-xl uppercase tracking-[0.3em] mb-4 font-bold">{overlay.label}</span>
-      <div className="text-white text-8xl font-black tracking-tighter tabular-nums">
+      <div className="text-8xl font-black tracking-tighter tabular-nums" style={{ color: overlay.color || 'white' }}>
         {Math.round(value).toLocaleString()}
         {overlay.suffix}
       </div>
@@ -293,7 +293,7 @@ const PercentageCounter = ({ overlay, relativeFrame, fps }: any) => {
   });
 
   return (
-    <div className="flex items-center justify-center bg-blue-600 p-16 rounded-full shadow-[0_0_80px_rgba(37,99,235,0.4)] border-4 border-white/30" style={{ fontFamily: overlay.font || 'Inter' }}>
+    <div className="flex items-center justify-center bg-blue-600 p-16 rounded-full shadow-[0_0_80px_rgba(37,99,235,0.4)] border-4 border-white/30" style={{ fontFamily: overlay.font || 'Inter', backgroundColor: overlay.color || '#2563eb' }}>
        <div className="text-white text-9xl font-black tabular-nums">
          {Math.round(value)}%
        </div>
