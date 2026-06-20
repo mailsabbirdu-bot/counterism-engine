@@ -67,8 +67,11 @@ class RemotionJsonMaker:
             self.context = self.browser.new_context()
         self.page = self.context.new_page()
         playwright_stealth.Stealth().apply_stealth_sync(self.page)
-        print("🌐 Navigating to Gemini...")
-        self.page.goto("https://gemini.google.com/app", wait_until="networkidle", timeout=60000)
+        print("🌐 Navigating to Gemini (90s timeout)...")
+        try:
+            self.page.goto("https://gemini.google.com/app", wait_until="domcontentloaded", timeout=90000)
+        except Exception as e:
+            print(f"⚠️ Navigation timeout/error: {e}. Attempting to proceed anyway...")
 
     def stop_browser(self):
         if self.context: self.context.close()
