@@ -262,7 +262,7 @@ class RemotionJsonMaker:
             # 2. Strict Background Enforcement
             scene['background_type'] = 'video'
             scene['audio_enabled'] = True
-            if not scene.get('video_path'):
+            if not scene.get('video_path') or not scene['video_path'].startswith('renders/'):
                 scene['video_path'] = f"renders/scene_SC_{scene_idx+1:02d}.mp4"
 
             # 3. Authoritative Duration Resolution
@@ -652,8 +652,8 @@ class RemotionJsonMaker:
 
         # Camera Style Rotation Pool
         camera_styles = ["slow_push", "zoom_in", "pan_left", "pan_right", "orbit"]
-        # ULTRA MODERN - EYE SOOTHING - VIBRANT PALETTE
-        modern_colors = ["#4ade80", "#22d3ee", "#60a5fa", "#fb7185", "#a78bfa", "#fbbf24"] # Soft Emerald, Cyber Cyan, Sky Blue, Soft Rose, Lavender, Soft Amber
+        # ULTRA MODERN - EYE SOOTHING - ATTENTION GRABBING PALETTE
+        modern_colors = ["#00F5FF", "#FF3E6C", "#00FFAB", "#ADFF2F", "#FFD700", "#FF69B4", "#7B68EE"] # Cyan Glow, Rose, Neon Mint, Lime, Gold, Pink, Iris
 
         for idx, scene in enumerate(data['scenes']):
             scene_id = scene.get('scene_id', f"SCENE_{idx+1}")
