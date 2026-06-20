@@ -97,19 +97,21 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
 
           if (isHero && heroActive) {
              if (heroConfig.animation === 'glow_pulse') {
-                 const glow = interpolate(heroEntrance, [0, 1], [0, 40]);
+                 const glow = interpolate(heroEntrance, [0, 1], [0, 25]);
                  style.textShadow = `0 0 ${glow}px ${heroConfig.color}`;
-                 style.transform = `scale(${1 + heroEntrance * 0.2})`;
+                 style.transform = `scale(${1 + heroEntrance * 0.15})`;
              } else if (heroConfig.animation === 'isolate_zoom') {
-                 style.transform = `scale(${1 + heroEntrance * 0.5})`;
+                 style.transform = `scale(${1 + heroEntrance * 0.35})`;
                  style.zIndex = 100;
              } else if (heroConfig.animation === 'bounce_pop') {
-                 const jump = Math.sin(heroEntrance * Math.PI) * -30;
+                 const jump = Math.sin(heroEntrance * Math.PI) * -25;
                  style.transform = `translateY(${jump}px) scale(${1 + heroEntrance * 0.1})`;
              }
+             // Add horizontal buffer for scaling elements to prevent word overlap
+             style.margin = `0 ${heroEntrance * 15}px`;
           } else if (heroActive && heroConfig.animation === 'isolate_zoom') {
-             style.opacity = progress * (1 - heroEntrance * 0.8);
-             style.filter = `blur(${heroEntrance * 10}px)`;
+             style.opacity = progress * (1 - heroEntrance * 0.7);
+             style.filter = `blur(${heroEntrance * 8}px)`;
           }
 
           if (overlay.animation === 'cinematicGlow') {
