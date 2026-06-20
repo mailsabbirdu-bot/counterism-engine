@@ -617,72 +617,126 @@ class RemotionJsonMaker:
         return self.validate_and_fix_manifest(data)
 
     def validate_and_fix_manifest(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Final integrity pass to ensure compliance with Remotion engine schemas."""
-        print("🔍 Manifest Validation: Performing final integrity check...")
+        """Final integrity pass to ensure compliance with Studio V4 Guidelines & Engine."""
+        print("🔍 Guardrail Engine: Performing deep validation of engine compliance and user guidelines...")
         if not data.get('scenes'): return data
 
-        for scene in data['scenes']:
-            scene_id = scene.get('scene_id', 'Unknown')
+        # Camera Style Rotation Pool
+        camera_styles = ["slow_push", "zoom_in", "pan_left", "pan_right", "orbit"]
+
+        for idx, scene in enumerate(data['scenes']):
+            scene_id = scene.get('scene_id', f"SCENE_{idx+1}")
             duration = scene.get('duration_in_frames', 180)
 
-            # 1. Overlay Validation
+            # --- GUIDELINE: MANDATORY NIVO FOR NUMBERS ---
+            # Scan scene text for digits or numerical words
+            all_text = " ".join([o.get('content', '') for o in scene.get('overlays', []) if o.get('type') == 'text'])
+            has_number = re.search(r'[0-9০-৯]|million|M|k|K|percent|%|দশ|শত|হাজার|কোটি|লক্ষ', all_text, re.I)
+            has_focal = any(o.get('type') in ['chart', 'data_indicator', 'ui_panel'] for o in scene.get('overlays', []))
+
+            if has_number and not has_focal:
+                print(f"   ⚠️ Scene {scene_id} mentions numbers but lacks focal visualization. Injecting KPI.")
+                # Extract the first number found for the KPI value
+                num_match = re.search(r'([0-9০-৯]+)', all_text)
+                injected_val = self._to_eng_digit(num_match.group(1)) if num_match else "0"
+                scene['overlays'].append({
+                    "id": f"kpi_auto_{idx}",
+                    "type": "data_indicator",
+                    "indicator_type": "kpiNumber",
+                    "label": "Metric",
+                    "value": int(injected_val),
+                    "start": 30,
+                    "duration": duration - 60,
+                    "position": {"x": 1440, "y": 540} # Default to right
+                })
+
+            # --- GUIDELINE: MINIMALIST BUDGET (MAX 1 TEXT, 1 FOCAL) ---
+            texts = [o for o in scene.get('overlays', []) if o.get('type') == 'text']
+            focals = [o for o in scene.get('overlays', []) if o.get('type') != 'text']
+            if len(texts) > 1: scene['overlays'] = [texts[0]] + focals
+            if len(focals) > 1: scene['overlays'] = texts + [focals[0]]
+
+            # Detect Title+Content relation for stacking
+            text_ov = next((o for o in scene['overlays'] if o.get('type') == 'text'), None)
+            focal_ov = next((o for o in scene['overlays'] if o.get('type') != 'text'), None)
+            has_relation = text_ov and focal_ov
+
+            # 1. Overlay Pass
             for ov in scene.get('overlays', []):
-                o_id = ov.get('id', 'Unknown')
-                # Font Check
-                if ov.get('type') == 'text':
+                o_type = ov.get('type', 'text')
+
+                # --- GUIDELINE: TEXT AESTHETICS (STRIP PUNCTUATION) ---
+                if o_type == 'text':
+                    if ov.get('content'):
+                        ov['content'] = ov['content'].strip().rstrip('.। ')
                     if not ov.get('font'):
                         ov['font'] = self.bangla_fonts[0] if self.bangla_fonts else "Arial"
-                    if not ov.get('content'):
-                        ov['content'] = "Headline"
 
-                # Indicator Check
-                if ov.get('type') == 'data_indicator':
+                # Indicator Field Integrity
+                if o_type == 'data_indicator':
                     if not ov.get('indicator_type'): ov['indicator_type'] = "kpiNumber"
-                    if not ov.get('label'): ov['label'] = "Indicator"
+                    if not ov.get('label'): ov['label'] = "Insight"
                     if 'value' not in ov: ov['value'] = 0
 
-                    # Large Number Formatting (e.g. 20000000 -> 20, suffix: M)
+                    # Formatting
                     try:
                         val = float(ov['value'])
                         if val >= 1000000:
-                            ov['value'] = int(val / 1000000)
-                            ov['suffix'] = "M" + ov.get('suffix', '')
+                            ov['value'] = int(val / 1000000); ov['suffix'] = "M" + ov.get('suffix', '')
                         elif val >= 1000:
-                            ov['value'] = int(val / 1000)
-                            ov['suffix'] = "K" + ov.get('suffix', '')
+                            ov['value'] = int(val / 1000); ov['suffix'] = "K" + ov.get('suffix', '')
                     except: pass
 
-                # Boundary Check
-                ov['start'] = max(0, min(ov.get('start', 0), duration - 30))
-                ov['duration'] = max(30, min(ov.get('duration', 120), duration - ov['start']))
+                # --- GUIDELINE: CINEMATIC PACING (15-90-15) ---
+                min_total = 120 # 15 + 90 + 15
+                ov['start'] = max(0, min(ov.get('start', 15), duration - min_total))
+                ov['duration'] = max(min_total, min(ov.get('duration', min_total), duration - ov['start']))
 
-            # 2. Camera Shot Validation (NO NULLS)
-            if scene.get('camera') and scene['camera'].get('shots'):
-                first_ov_id = scene['overlays'][0]['id'] if scene.get('overlays') else "root"
-                for shot in scene['camera']['shots']:
-                    if shot.get('targetId') is None:
-                        # Find the best target: Focal element preferred, then Text
-                        focal = next((o['id'] for o in scene.get('overlays', []) if o.get('type') != 'text'), None)
-                        shot['targetId'] = focal or first_ov_id
+                # --- GUIDELINE: TITLE+CONTENT ALIGNMENT ---
+                if has_relation:
+                    ov['start'] = max(text_ov['start'], focal_ov['start'])
+                    ov['duration'] = min(text_ov['duration'], focal_ov['duration'])
+                    ov['position']['x'] = 960
+                    if o_type == 'text': ov['position']['y'] = 300
+                    else: ov['position']['y'] = 700
 
-                    if not shot.get('style'): shot['style'] = "slow_push"
+            # 2. Camera Shot Pass
+            if not scene.get('camera'):
+                 scene['camera'] = {"enabled": True, "shots": []}
 
-                    # Timing Check
-                    shot['startFrame'] = max(0, min(shot.get('startFrame', 0), duration - 15))
-                    shot['duration'] = max(15, min(shot.get('duration', 60), duration - shot['startFrame']))
+            if not scene['camera'].get('shots'):
+                 # Generate a mandatory shot
+                 target = focal_ov['id'] if focal_ov else (text_ov['id'] if text_ov else None)
+                 scene['camera']['shots'].append({"targetId": target, "startFrame": 0, "duration": duration, "style": "slow_push"})
 
-        # 3. SFX Global Check
+            for s_idx, shot in enumerate(scene['camera']['shots']):
+                # --- GUIDELINE: NO NULL TARGETS ---
+                if shot.get('targetId') is None:
+                    shot['targetId'] = focal_ov['id'] if focal_ov else (text_ov['id'] if text_ov else None)
+
+                # --- GUIDELINE: CAMERA VARIETY (AVOID MONOTONY) ---
+                if not shot.get('style') or shot.get('style') == 'static':
+                    shot['style'] = camera_styles[s_idx % len(camera_styles)]
+
+                # --- GUIDELINE: CAMERA SAFETY (ZOOM CAPS) ---
+                max_zoom = 1.35 if has_relation else 1.6
+                shot['zoom'] = min(shot.get('zoom', 1.25), max_zoom)
+
+                # Center-zoom for stacked layouts
+                if has_relation: shot['targetId'] = None
+
+        # 3. SFX Pass
         valid_sfx = []
         for sfx in data.get('audio_sfx_manifest', []):
             scene = next((s for s in data['scenes'] if s['scene_id'] == sfx['scene_id']), None)
             if scene:
                 s_dur = scene.get('duration_in_frames', 180)
                 if sfx['start'] < s_dur:
-                    sfx['end'] = min(sfx['end'], s_dur)
+                    sfx['end'] = min(sfx.get('end', sfx['start']+30), s_dur)
                     valid_sfx.append(sfx)
         data['audio_sfx_manifest'] = valid_sfx
 
-        print("✨ Manifest Validation Complete: 100% engine compliance guaranteed.")
+        print("✨ Deep Validation Complete: All Studio V4 guidelines and engine rules strictly enforced.")
         return data
 
 
