@@ -623,6 +623,7 @@ class RemotionJsonMaker:
 
         # Camera Style Rotation Pool
         camera_styles = ["slow_push", "zoom_in", "pan_left", "pan_right", "orbit"]
+        modern_colors = ["#10b981", "#06b6d4", "#3b82f6", "#f43f5e", "#8b5cf6", "#f59e0b"] # Emerald, Cyan, Blue, Rose, Violet, Amber
 
         for idx, scene in enumerate(data['scenes']):
             scene_id = scene.get('scene_id', f"SCENE_{idx+1}")
@@ -631,6 +632,7 @@ class RemotionJsonMaker:
             # --- GUIDELINE: MANDATORY NIVO FOR NUMBERS ---
             # Scan scene text for digits or numerical words
             all_text = " ".join([o.get('content', '') for o in scene.get('overlays', []) if o.get('type') == 'text'])
+            is_scene_bangla = any(ord(c) > 127 for c in all_text)
             has_number = re.search(r'[0-9০-৯]|million|M|k|K|percent|%|দশ|শত|হাজার|কোটি|লক্ষ', all_text, re.I)
             has_focal = any(o.get('type') in ['chart', 'data_indicator', 'ui_panel'] for o in scene.get('overlays', []))
 
@@ -669,14 +671,33 @@ class RemotionJsonMaker:
                 if o_type == 'text':
                     if ov.get('content'):
                         ov['content'] = ov['content'].strip().rstrip('.। ')
+
+                    # Modern Color
+                    if not ov.get('style'):
+                         ov['style'] = f"text-{modern_colors[idx % len(modern_colors)]}"
+
                     if not ov.get('font'):
                         ov['font'] = self.bangla_fonts[0] if self.bangla_fonts else "Arial"
+
+                if o_type == 'chart':
+                    if is_scene_bangla and self.bangla_fonts:
+                        ov['font'] = self.bangla_fonts[0]
+                    if not ov.get('colors'):
+                        ov['colors'] = {"scheme": "nivo"} # Fallback to catchy scheme
 
                 # Indicator Field Integrity
                 if o_type == 'data_indicator':
                     if not ov.get('indicator_type'): ov['indicator_type'] = "kpiNumber"
                     if not ov.get('label'): ov['label'] = "Insight"
                     if 'value' not in ov: ov['value'] = 0
+
+                    # Bangla Font for Nivo if scene is Bangla
+                    if is_scene_bangla and self.bangla_fonts:
+                        ov['font'] = self.bangla_fonts[0]
+
+                    # Modern Color
+                    if not ov.get('colors'):
+                        ov['colors'] = [modern_colors[(idx + 1) % len(modern_colors)]]
 
                     # Formatting
                     try:
@@ -868,7 +889,8 @@ class RemotionJsonMaker:
             "CRITICAL SCHEMA RULES (NEVER BREAK THESE):\n"
             "- USE 'overlays' list. NEVER use 'elements' or 'text_overlay' objects.\n"
             "- USE 'content' for text strings. NEVER use 'text'.\n"
-            "- USE 'font' from the provided lists for every text overlay. MANDATORY.\n"
+            "- USE 'font' from the provided lists for every text and Nivo layer. If narration is Bangla, use a Bangla font for Nivo.\n"
+            "- COLORS: Use attractive, eye-soothing, ultra-modern and catchy colors. Ensure high contrast for readability.\n"
             "- USE type: 'data_indicator' for timers/KPIs/counters. indicator_type: 'countdown' for timers.\n"
             "- USE 'chart_type' or 'indicator_type'. NEVER use 'kind'.\n"
             "- REQUIRED FIELDS for Nivo: 'label', 'value', 'suffix', 'prefix'. For charts: 'data', 'title', 'colors'. NO NULLS.\n"

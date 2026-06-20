@@ -52,11 +52,11 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     const commonProps = {
       theme: {
         axis: {
-          ticks: { text: { fill: '#ffffffb0', fontSize: 14, fontFamily: 'Inter, sans-serif', fontWeight: 'bold' } },
-          legend: { text: { fill: '#ffffffe0', fontSize: 16, fontWeight: '900' } }
+          ticks: { text: { fill: '#ffffffb0', fontSize: 14, fontFamily: overlay.font || 'Inter, sans-serif', fontWeight: 'bold' } },
+          legend: { text: { fill: '#ffffffe0', fontSize: 16, fontFamily: overlay.font || 'Inter, sans-serif', fontWeight: '900' } }
         },
         grid: { line: { stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 } },
-        tooltip: { container: { background: '#09090b', color: '#fff', fontSize: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' } }
+        tooltip: { container: { background: '#09090b', color: '#fff', fontSize: 16, fontFamily: overlay.font || 'Inter, sans-serif', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' } }
       },
       colors: overlay.colors || { scheme: 'nivo' },
       margin: { top: 40, right: 40, bottom: 60, left: 80 },
