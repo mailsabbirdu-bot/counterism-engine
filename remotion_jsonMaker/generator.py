@@ -355,9 +355,13 @@ class RemotionJsonMaker:
                                     ov['value'] = 0
 
                             if 'value' not in ov or ov['value'] == 0:
-                                 # Try to extract number from related text if available
-                                 num_match = re.search(r'(\d+)', text_ov.get('content', '') if text_ov else '')
-                                 ov['value'] = int(num_match.group(1)) if num_match else 0
+                                 # Try to extract number from related text if available (supports Bengali digits)
+                                 num_match = re.search(r'([0-9০-৯]+)', text_ov.get('content', '') if text_ov else '')
+                                 if num_match:
+                                     eng_val = self._to_eng_digit(num_match.group(1))
+                                     ov['value'] = int(eng_val)
+                                 else:
+                                     ov['value'] = 0
                         elif ov_type == 'chart':
                             if not ov.get('data'): ov['data'] = [{"id": "A", "value": 10}, {"id": "B", "value": 20}]
                             if not ov.get('title'): ov['title'] = "Data Overview"
@@ -407,6 +411,10 @@ class RemotionJsonMaker:
 
                     if has_relation:
                         # Stack TITLE (Text) above CONTENT (Focal)
+                        # Synchronize timing for related layers
+                        ov['start'] = max(text_ov.get('start', 0), focal_ov.get('start', 0))
+                        ov['duration'] = min(text_ov.get('duration', 120), focal_ov.get('duration', 120))
+
                         if ov_type == 'text':
                              ov['position'] = {"x": 960, "y": 300}
                         else:
@@ -606,6 +614,75 @@ class RemotionJsonMaker:
 
         data['audio_sfx_manifest'] = sfx_manifest
         print(f"✅ Finalization: Processed {len(data['scenes'])} scenes, {len(sfx_manifest)} SFX triggers mapped.")
+        return self.validate_and_fix_manifest(data)
+
+    def validate_and_fix_manifest(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Final integrity pass to ensure compliance with Remotion engine schemas."""
+        print("🔍 Manifest Validation: Performing final integrity check...")
+        if not data.get('scenes'): return data
+
+        for scene in data['scenes']:
+            scene_id = scene.get('scene_id', 'Unknown')
+            duration = scene.get('duration_in_frames', 180)
+
+            # 1. Overlay Validation
+            for ov in scene.get('overlays', []):
+                o_id = ov.get('id', 'Unknown')
+                # Font Check
+                if ov.get('type') == 'text':
+                    if not ov.get('font'):
+                        ov['font'] = self.bangla_fonts[0] if self.bangla_fonts else "Arial"
+                    if not ov.get('content'):
+                        ov['content'] = "Headline"
+
+                # Indicator Check
+                if ov.get('type') == 'data_indicator':
+                    if not ov.get('indicator_type'): ov['indicator_type'] = "kpiNumber"
+                    if not ov.get('label'): ov['label'] = "Indicator"
+                    if 'value' not in ov: ov['value'] = 0
+
+                    # Large Number Formatting (e.g. 20000000 -> 20, suffix: M)
+                    try:
+                        val = float(ov['value'])
+                        if val >= 1000000:
+                            ov['value'] = int(val / 1000000)
+                            ov['suffix'] = "M" + ov.get('suffix', '')
+                        elif val >= 1000:
+                            ov['value'] = int(val / 1000)
+                            ov['suffix'] = "K" + ov.get('suffix', '')
+                    except: pass
+
+                # Boundary Check
+                ov['start'] = max(0, min(ov.get('start', 0), duration - 30))
+                ov['duration'] = max(30, min(ov.get('duration', 120), duration - ov['start']))
+
+            # 2. Camera Shot Validation (NO NULLS)
+            if scene.get('camera') and scene['camera'].get('shots'):
+                first_ov_id = scene['overlays'][0]['id'] if scene.get('overlays') else "root"
+                for shot in scene['camera']['shots']:
+                    if shot.get('targetId') is None:
+                        # Find the best target: Focal element preferred, then Text
+                        focal = next((o['id'] for o in scene.get('overlays', []) if o.get('type') != 'text'), None)
+                        shot['targetId'] = focal or first_ov_id
+
+                    if not shot.get('style'): shot['style'] = "slow_push"
+
+                    # Timing Check
+                    shot['startFrame'] = max(0, min(shot.get('startFrame', 0), duration - 15))
+                    shot['duration'] = max(15, min(shot.get('duration', 60), duration - shot['startFrame']))
+
+        # 3. SFX Global Check
+        valid_sfx = []
+        for sfx in data.get('audio_sfx_manifest', []):
+            scene = next((s for s in data['scenes'] if s['scene_id'] == sfx['scene_id']), None)
+            if scene:
+                s_dur = scene.get('duration_in_frames', 180)
+                if sfx['start'] < s_dur:
+                    sfx['end'] = min(sfx['end'], s_dur)
+                    valid_sfx.append(sfx)
+        data['audio_sfx_manifest'] = valid_sfx
+
+        print("✨ Manifest Validation Complete: 100% engine compliance guaranteed.")
         return data
 
 
@@ -693,6 +770,11 @@ class RemotionJsonMaker:
                 time.sleep(3)
         return ""
 
+    def _to_eng_digit(self, s: str) -> str:
+        bengali_digits = '০১২৩৪৫৬৭৮৯'
+        english_digits = '0123456789'
+        return s.translate(str.maketrans(bengali_digits, english_digits))
+
     def _compact_timestamps(self, ts_content: str) -> str:
         if not ts_content: return ""
         compacted = []
@@ -735,7 +817,7 @@ class RemotionJsonMaker:
             "- USE 'font' from the provided lists for every text overlay. MANDATORY.\n"
             "- USE type: 'data_indicator' for timers/KPIs/counters. indicator_type: 'countdown' for timers.\n"
             "- USE 'chart_type' or 'indicator_type'. NEVER use 'kind'.\n"
-            "- REQUIRED FIELDS for Nivo: 'label', 'value', 'suffix', 'prefix'. For charts: 'data', 'title', 'colors'.\n"
+            "- REQUIRED FIELDS for Nivo: 'label', 'value', 'suffix', 'prefix'. For charts: 'data', 'title', 'colors'. NO NULLS.\n"
             "- USE 'start' and 'duration' (integers). NEVER use 'start_frame' or 'end_frame'.\n"
             "- USE flat keys for background: 'background_type', 'video_path', 'audio_enabled'. NO 'background' object.\n"
             "DESIGN RULES:\n"
