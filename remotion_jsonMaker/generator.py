@@ -339,7 +339,7 @@ class RemotionJsonMaker:
                             if (ov_type == 'ui_panel' or ov_type == 'data_indicator') and 'indicator_type' not in ov:
                                 ov['indicator_type'] = ov['kind']
 
-                        if ov_type == 'data_indicator' and ov.get('indicator_type') == 'kpi':
+                        if ov_type == 'data_indicator' and ov.get('indicator_type') in ['kpi', 'counter']:
                             ov['indicator_type'] = 'kpiNumber'
 
                         # Mandatory Field Repair for Nivo/Indicators
@@ -690,9 +690,10 @@ class RemotionJsonMaker:
 
                 # Indicator Field Integrity
                 if o_type == 'data_indicator':
-                    if not ov.get('indicator_type'): ov['indicator_type'] = "kpiNumber"
+                    if not ov.get('indicator_type') or ov.get('indicator_type') == 'counter':
+                        ov['indicator_type'] = "kpiNumber"
                     if not ov.get('label'): ov['label'] = "Insight"
-                    if 'value' not in ov: ov['value'] = 0
+                    if 'value' not in ov or ov['value'] is None: ov['value'] = 0
 
                     # Bangla Font for Nivo if scene is Bangla
                     if is_scene_bangla and self.bangla_fonts:
@@ -746,8 +747,10 @@ class RemotionJsonMaker:
                 max_zoom = 1.35 if has_relation else 1.6
                 shot['zoom'] = min(shot.get('zoom', 1.25), max_zoom)
 
-                # Center-zoom for stacked layouts
-                if has_relation: shot['targetId'] = None
+                # Stacked layout: target center but provide focal ID for tracking stability
+                if has_relation:
+                    # Prefer focal element ID, fallback to text ID
+                    shot['targetId'] = focal_ov['id'] if focal_ov else (text_ov['id'] if text_ov else None)
 
         # 3. SFX Pass
         valid_sfx = []
@@ -913,7 +916,7 @@ class RemotionJsonMaker:
             f"TIMESTAMPS: {compact_ts}\n"
             f"STORY: {story}\n"
             f"SCHEMA: {condensed_guidelines}\n"
-            "TASK: Create a clean MASTER manifest. 100% strict schema adherence. Double-check all closing quotes."
+            "TASK: Create a clean MASTER manifest. 100% strict schema adherence. Generate JSON for ALL scenes mentioned in DURATIONS. No scene omission."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
@@ -1059,6 +1062,12 @@ def main():
 
         render_json = maker.generate(story, guidelines, args.prompt_output, ts_content, scene_durations)
         maker.stop_browser()
+
+        expected_scenes = len(scene_durations)
+        if render_json and 'scenes' in render_json:
+             actual_scenes = len(render_json['scenes'])
+             if actual_scenes < expected_scenes:
+                 print(f"⚠️ Warning: Gemini generated only {actual_scenes}/{expected_scenes} scenes.")
 
         if not render_json:
              print("❌ ERROR: Gemini failed to produce any JSON.")
