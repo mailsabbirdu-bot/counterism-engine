@@ -232,6 +232,8 @@ class RemotionJsonMaker:
 
         for scene_idx, scene in enumerate(data['scenes']):
             scene_sfx = [] # Local collection to allow de-duplication
+            s_id = scene.get('scene_id', 'unknown')
+
             # 1. LLM Fix: Root Level Schema Alignment
             if 'duration' in scene and 'duration_in_frames' not in scene:
                 scene['duration_in_frames'] = scene['duration']
@@ -334,10 +336,25 @@ class RemotionJsonMaker:
                             if (ov_type == 'ui_panel' or ov_type == 'data_indicator') and 'indicator_type' not in ov:
                                 ov['indicator_type'] = ov['kind']
 
+                        if ov_type == 'data_indicator' and ov.get('indicator_type') == 'kpi':
+                            ov['indicator_type'] = 'kpiNumber'
+
                         # Mandatory Field Repair for Nivo/Indicators
                         if ov_type == 'data_indicator':
                             if not ov.get('label'): ov['label'] = "Metric"
-                            if 'value' not in ov:
+
+                            # KPI String Parsing (e.g. "20M" -> 20, suffix: "M")
+                            val = ov.get('value', '')
+                            if isinstance(val, str):
+                                val_match = re.search(r'(\d+)([kKmM%]?)', val)
+                                if val_match:
+                                    ov['value'] = int(val_match.group(1))
+                                    if val_match.group(2) and not ov.get('suffix'):
+                                        ov['suffix'] = val_match.group(2).upper()
+                                else:
+                                    ov['value'] = 0
+
+                            if 'value' not in ov or ov['value'] == 0:
                                  # Try to extract number from related text if available
                                  num_match = re.search(r'(\d+)', text_ov.get('content', '') if text_ov else '')
                                  ov['value'] = int(num_match.group(1)) if num_match else 0
@@ -495,7 +512,6 @@ class RemotionJsonMaker:
                         if k in ov: del ov[k]
 
                     # Subtle local SFX (Volume 0.04)
-                    s_id = scene.get('scene_id', 'unknown')
                     if self.in_files:
                         scene_sfx.append({ "scene_id": s_id, "type": "in", "start": ov['start'], "end": ov['start'] + 20 })
                     if self.out_files:
@@ -527,22 +543,25 @@ class RemotionJsonMaker:
                         "inDuration": 30
                     })
 
-            # 5. SFX De-duplication (Scene Level)
-            seen_in = set()
-            seen_out = set()
+            # 5. SFX De-duplication (Scene Level with 5f tolerance window)
+            seen_in = []
+            seen_out = []
+            def is_duplicate(val, seen_list):
+                return any(abs(val - s) <= 5 for s in seen_list)
+
             for sfx in scene_sfx:
                 if sfx['type'] == 'in':
-                    if sfx['start'] not in seen_in:
+                    if not is_duplicate(sfx['start'], seen_in):
                         sfx_file = self.in_files[in_ptr % len(self.in_files)] if self.in_files else "in_1.mp3"
                         sfx_manifest.append({ "scene_id": sfx['scene_id'], "file": sfx_file, "start": sfx['start'], "end": sfx['end'], "volume": 0.04 })
                         in_ptr += 1
-                        seen_in.add(sfx['start'])
+                        seen_in.append(sfx['start'])
                 else:
-                    if sfx['start'] not in seen_out:
+                    if not is_duplicate(sfx['start'], seen_out):
                         sfx_file = self.out_files[out_ptr % len(self.out_files)] if self.out_files else "out_1.mp3"
                         sfx_manifest.append({ "scene_id": sfx['scene_id'], "file": sfx_file, "start": sfx['start'], "end": sfx['end'], "volume": 0.04 })
                         out_ptr += 1
-                        seen_out.add(sfx['start'])
+                        seen_out.append(sfx['start'])
 
             if scene['camera'].get('shots'):
                 camera_styles = ["slow_push", "zoom_in", "pan_left", "pan_right", "orbit"]
