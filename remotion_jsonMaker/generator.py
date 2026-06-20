@@ -596,7 +596,8 @@ class RemotionJsonMaker:
 
                     # 3. Title+Content Safety: Target screen center for stacked layouts
                     if has_relation:
-                        shot['targetId'] = None # Forces center zoom
+                        # Target focal element for stability, but keep zoom conservative
+                        shot['targetId'] = focal_ov['id'] if focal_ov else (text_ov['id'] if text_ov else None)
                         shot['zoom'] = min(shot.get('zoom', 1.25), 1.35)
 
                     # LLM Repair: start_frame / start / end_frame / end in shots
@@ -687,6 +688,11 @@ class RemotionJsonMaker:
                         ov['font'] = self.bangla_fonts[0]
                     if not ov.get('colors'):
                         ov['colors'] = {"scheme": "nivo"} # Fallback to catchy scheme
+                    # Data Integrity Check
+                    if not ov.get('data') or not isinstance(ov['data'], list) or len(ov['data']) == 0:
+                        ov['data'] = [{"id": "A", "value": 10}, {"id": "B", "value": 20}]
+                    if not ov.get('title'):
+                        ov['title'] = "Data Overview"
 
                 # Indicator Field Integrity
                 if o_type == 'data_indicator':
