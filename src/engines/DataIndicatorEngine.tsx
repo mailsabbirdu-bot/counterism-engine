@@ -277,9 +277,9 @@ const KPINumber = ({ overlay, relativeFrame, fps }: any) => {
   });
 
   return (
-    <div className="flex flex-col items-center justify-center bg-zinc-900/80 backdrop-blur-xl p-12 rounded-[2.5rem] border border-white/20 shadow-2xl min-w-[400px]" style={{ fontFamily: overlay.font || 'Inter' }}>
-      <span className="text-white/50 text-xl uppercase tracking-[0.3em] mb-4 font-bold">{overlay.label}</span>
-      <div className="text-8xl font-black tracking-tighter tabular-nums" style={{ color: overlay.color || 'white' }}>
+    <div className="flex flex-col items-center justify-center bg-zinc-900/80 backdrop-blur-xl p-12 rounded-[3rem] border border-white/20 shadow-2xl min-w-[500px]" style={{ fontFamily: overlay.font || 'Inter' }}>
+      <span className="text-white/60 text-3xl uppercase tracking-[0.4em] mb-8 font-black">{overlay.label}</span>
+      <div className="text-9xl font-black tracking-tighter tabular-nums" style={{ color: overlay.color || 'white' }}>
         {Math.round(value).toLocaleString()}
         {overlay.suffix}
       </div>

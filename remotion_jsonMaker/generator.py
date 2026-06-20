@@ -565,13 +565,13 @@ class RemotionJsonMaker:
                 if sfx['type'] == 'in':
                     if not is_duplicate(sfx['start'], seen_in):
                         sfx_file = self.in_files[in_ptr % len(self.in_files)] if self.in_files else "in_1.mp3"
-                        sfx_manifest.append({ "scene_id": sfx['scene_id'], "file": sfx_file, "start": sfx['start'], "end": sfx['end'], "volume": 0.04 })
+                        sfx_manifest.append({ "scene_id": sfx['scene_id'], "file": sfx_file, "start": sfx['start'], "end": sfx['end'], "volume": 0.05 })
                         in_ptr += 1
                         seen_in.append(sfx['start'])
                 else:
                     if not is_duplicate(sfx['start'], seen_out):
                         sfx_file = self.out_files[out_ptr % len(self.out_files)] if self.out_files else "out_1.mp3"
-                        sfx_manifest.append({ "scene_id": sfx['scene_id'], "file": sfx_file, "start": sfx['start'], "end": sfx['end'], "volume": 0.04 })
+                        sfx_manifest.append({ "scene_id": sfx['scene_id'], "file": sfx_file, "start": sfx['start'], "end": sfx['end'], "volume": 0.05 })
                         out_ptr += 1
                         seen_out.append(sfx['start'])
 
@@ -585,7 +585,7 @@ class RemotionJsonMaker:
                             "file": self.camera_files[cam_ptr % len(self.camera_files)],
                             "start": shot.get('startFrame', 0) or shot.get('start', 0),
                             "end": (shot.get('startFrame', 0) or shot.get('start', 0)) + 30,
-                            "volume": 0.06
+                            "volume": 0.07
                         })
                         cam_ptr += 1
 
@@ -720,12 +720,23 @@ class RemotionJsonMaker:
                     # --- GUIDELINE: HERO WORD ---
                     hero = self._get_scene_hero_word(scene_id, ov.get('content', ''))
                     if hero:
-                        hero_anims = ["glow_pulse", "isolate_zoom", "bounce_pop"]
+                        hero_anims = [
+                            "glow_pulse", "isolate_zoom", "bounce_pop", "neon_flicker", "shake_alert",
+                            "rainbow_flow", "ghost_trail", "glitch_pop", "wave_float", "expand_contract",
+                            "blur_reveal", "color_shift", "rotation_swing", "shadow_pulse", "letter_jump",
+                            "skew_slide", "tilt_pan", "bounce_gravity", "border_glow", "glass_shimmer",
+                            "heartbeat", "strobe_flash", "threed_flip", "magnetic_pull", "fire_glow",
+                            "pixel_scatter", "swing_pivot", "depth_shadow", "energy_beam", "spiral_in",
+                            "fly_in_z", "typewriter_flicker", "vibrate_intense", "float_orbit", "mirror_split",
+                            "zoom_blur_pop", "liquid_waver"
+                        ]
+                        # Robust rotation ensures variety across scenes
+                        anim_choice = hero_anims[idx % len(hero_anims)]
                         ov['hero_config'] = {
                             "word": hero['word'],
                             "start": hero['start'],
                             "color": modern_colors[(idx + 2) % len(modern_colors)],
-                            "animation": hero_anims[idx % len(hero_anims)]
+                            "animation": anim_choice
                         }
 
                 if o_type == 'chart':
@@ -955,8 +966,20 @@ class RemotionJsonMaker:
             '"camera":{"enabled":true,"shots":[{"targetId":"chart_1","style":"slow_push","startFrame":30,"duration":100}]}}]}'
         )
 
+        hero_anim_list = [
+            "glow_pulse", "isolate_zoom", "bounce_pop", "neon_flicker", "shake_alert",
+            "rainbow_flow", "ghost_trail", "glitch_pop", "wave_float", "expand_contract",
+            "blur_reveal", "color_shift", "rotation_swing", "shadow_pulse", "letter_jump",
+            "skew_slide", "tilt_pan", "bounce_gravity", "border_glow", "glass_shimmer",
+            "heartbeat", "strobe_flash", "threed_flip", "magnetic_pull", "fire_glow",
+            "pixel_scatter", "swing_pivot", "depth_shadow", "energy_beam", "spiral_in",
+            "fly_in_z", "typewriter_flicker", "vibrate_intense", "float_orbit", "mirror_split",
+            "zoom_blur_pop", "liquid_waver"
+        ]
+
         full_prompt = (
             "YOU ARE A REMOTION MASTER ENGINE. GENERATE RAW MINIFIED JSON ONLY. START '{' END '}'.\n"
+            f"AVAILABLE HERO ANIMATIONS (USE DIFFERENT ONES FOR EVERY SCENE): {', '.join(hero_anim_list)}\n"
             "CRITICAL SCHEMA RULES (NEVER BREAK THESE):\n"
             "- USE 'overlays' list. NEVER use 'elements' or 'text_overlay' objects.\n"
             "- USE 'content' for text strings. NEVER use 'text'.\n"

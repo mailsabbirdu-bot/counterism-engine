@@ -152,6 +152,48 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
                  style.backgroundPosition = `${heroFrame * 5}% 0`;
                  style.WebkitBackgroundClip = 'text';
                  style.WebkitTextFillColor = 'transparent';
+             } else if (anim === 'heartbeat') {
+                 const beat = 1 + Math.pow(Math.sin(heroFrame * 0.2), 4) * 0.2;
+                 style.transform = `scale(${beat})`;
+             } else if (anim === 'strobe_flash') {
+                 style.opacity = progress * (heroFrame % 4 < 2 ? 1 : 0.2);
+                 style.textShadow = `0 0 20px white`;
+             } else if (anim === 'threed_flip') {
+                 style.transform = `perspective(1000px) rotateX(${heroFrame * 10}deg)`;
+             } else if (anim === 'magnetic_pull') {
+                 style.letterSpacing = `${Math.max(-10, 20 - heroFrame)}px`;
+             } else if (anim === 'fire_glow') {
+                 style.textShadow = `0 0 10px #ff4500, 0 0 20px #ff8c00, 0 0 30px #ffd700`;
+                 style.color = '#fff';
+             } else if (anim === 'pixel_scatter') {
+                 style.filter = `contrast(200%) brightness(150%)`;
+                 style.letterSpacing = `${heroFrame % 2 === 0 ? 2 : -2}px`;
+             } else if (anim === 'swing_pivot') {
+                 style.transformOrigin = 'top center';
+                 style.transform = `rotate(${Math.sin(heroFrame * 0.15) * 15}deg)`;
+             } else if (anim === 'depth_shadow') {
+                 style.textShadow = `${heroFrame/2}px ${heroFrame/2}px 0px ${heroConfig.color}88`;
+             } else if (anim === 'energy_beam') {
+                 style.boxShadow = `inset 0 0 50px ${heroConfig.color}, 0 0 20px ${heroConfig.color}`;
+                 style.background = `${heroConfig.color}22`;
+                 style.borderRadius = '8px';
+             } else if (anim === 'spiral_in') {
+                 style.transform = `rotate(${heroFrame * 20}deg) scale(${Math.min(1, heroFrame/10)})`;
+             } else if (anim === 'fly_in_z') {
+                 style.transform = `perspective(1000px) translateZ(${Math.max(0, 500 - heroFrame * 20)}px)`;
+             } else if (anim === 'typewriter_flicker') {
+                 style.borderRight = heroFrame % 10 < 5 ? `4px solid ${heroConfig.color}` : 'none';
+             } else if (anim === 'vibrate_intense') {
+                 style.transform = `translate(${(Math.random()-0.5)*10}px, ${(Math.random()-0.5)*10}px)`;
+             } else if (anim === 'float_orbit') {
+                 style.transform = `translate(${Math.cos(heroFrame*0.1)*20}px, ${Math.sin(heroFrame*0.1)*20}px)`;
+             } else if (anim === 'mirror_split') {
+                 style.filter = `drop-shadow(20px 0 0 ${heroConfig.color}66) drop-shadow(-20px 0 0 ${heroConfig.color}66)`;
+             } else if (anim === 'zoom_blur_pop') {
+                 style.transform = `scale(${1 + Math.max(0, 2 - heroFrame/10)})`;
+                 style.filter = `blur(${Math.max(0, 10 - heroFrame)}px)`;
+             } else if (anim === 'liquid_waver') {
+                 style.transform = `skewX(${Math.sin(heroFrame * 0.05) * 30}deg) skewY(${Math.cos(heroFrame * 0.05) * 10}deg)`;
              } else {
                  // Default Sleek Highlight
                  style.textShadow = `0 0 10px ${heroConfig.color}`;
