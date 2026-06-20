@@ -677,8 +677,9 @@ class RemotionJsonMaker:
                         ov['content'] = ov['content'].strip().rstrip('.। ')
 
                     # Modern Color
+                    ov['color'] = modern_colors[idx % len(modern_colors)]
                     if not ov.get('style'):
-                         ov['style'] = f"text-{modern_colors[idx % len(modern_colors)]}"
+                         ov['style'] = f"text-{ov['color']}"
 
                     if not ov.get('font'):
                         ov['font'] = self.bangla_fonts[0] if self.bangla_fonts else "Arial"
@@ -686,8 +687,11 @@ class RemotionJsonMaker:
                 if o_type == 'chart':
                     if is_scene_bangla and self.bangla_fonts:
                         ov['font'] = self.bangla_fonts[0]
+
+                    ov['color'] = modern_colors[(idx + 1) % len(modern_colors)]
                     if not ov.get('colors'):
                         ov['colors'] = {"scheme": "nivo"} # Fallback to catchy scheme
+
                     # Data Integrity Check
                     if not ov.get('data') or not isinstance(ov['data'], list) or len(ov['data']) == 0:
                         ov['data'] = [{"id": "A", "value": 10}, {"id": "B", "value": 20}]
@@ -706,8 +710,9 @@ class RemotionJsonMaker:
                         ov['font'] = self.bangla_fonts[0]
 
                     # Modern Color
+                    ov['color'] = modern_colors[(idx + 1) % len(modern_colors)]
                     if not ov.get('colors'):
-                        ov['colors'] = [modern_colors[(idx + 1) % len(modern_colors)]]
+                        ov['colors'] = [ov['color']]
 
                     # Formatting
                     try:

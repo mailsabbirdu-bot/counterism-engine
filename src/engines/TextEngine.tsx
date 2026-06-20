@@ -39,7 +39,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         maxWidth: '1600px',
         height: 'auto',
         textShadow: '0 4px 30px rgba(0,0,0,0.5), 0 0 100px rgba(0,0,0,0.2)',
-        color: 'white',
+        color: overlay.color || 'white',
         whiteSpace: 'normal', // Allow wrapping
         lineHeight: 1.2
       }}
