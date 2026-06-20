@@ -623,27 +623,34 @@ class RemotionJsonMaker:
 
     def _get_scene_hero_word(self, scene_id: str, overlay_content: str):
         if not self.raw_timestamps or not overlay_content: return None
+
+        # Meaningless Bangla stop-words to avoid for hero animations
+        STOP_WORDS = ["এই", "একটি", "হলো", "হচ্ছে", "আর", "কিন্তু", "এবং", "বা", "তবে", "যদি", "যে", "সে", "তারা", "ছিল", "হবে", "করে", "করা", "জন্য", "থেকে", "সাথে", "দ্বারা", "মাধ্যমে", "এক", "দুই", "তিন", "চার", "পাচ", "ছয়", "সাত", "আট", "নয়", "দশ", "কোটি", "লক্ষ", "কোটিরও"]
+
         # SCENE_01: [Original: 0.00s - 0.98s] -> [30fps: 0f - 29f] "ঢাকা।"
         pattern = fr'{scene_id}:.*?\[30fps:\s*(\d+)f\s*-\s*\d+f\]\s*"(.*?)"'
         words = re.findall(pattern, self.raw_timestamps)
         if not words: return None
 
-        # Priority 1: Pick a long word (>3 chars) from overlay content that appears in timestamps
         content_clean = re.sub(r'[.।]', '', overlay_content)
         content_words = content_clean.split()
 
+        # Filtered word pool: Must be in content AND not a stop-word
+        candidates = []
         for frame, word in words:
             word_clean = re.sub(r'[.।]', '', word)
-            if word_clean in content_words and len(word_clean) >= 3:
-                return {"word": word_clean, "start": int(frame)}
+            if word_clean in content_words and word_clean not in STOP_WORDS:
+                candidates.append({"word": word_clean, "start": int(frame)})
 
-        # Priority 2: Pick the first word from content found in timestamps
-        for frame, word in words:
-            word_clean = re.sub(r'[.।]', '', word)
-            if word_clean in content_words:
-                 return {"word": word_clean, "start": int(frame)}
+        if not candidates: return None
 
-        return None
+        # Priority 1: Pick the longest meaningful word
+        hero = max(candidates, key=lambda x: len(x['word']))
+
+        # Requirement: Give viewers time to read. Hero animation starts after 45f min.
+        hero['start'] = max(45, hero['start'])
+
+        return hero
 
     def validate_and_fix_manifest(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Final integrity pass to ensure compliance with Studio V4 Guidelines & Engine."""
@@ -805,10 +812,9 @@ class RemotionJsonMaker:
                 max_zoom = 1.35 if has_relation else 1.6
                 shot['zoom'] = min(shot.get('zoom', 1.25), max_zoom)
 
-                # Stacked layout: target center but provide focal ID for tracking stability
+                # Stacked layout: Force center-zoom (null target) to ensure text stays on-screen
                 if has_relation:
-                    # Prefer focal element ID, fallback to text ID
-                    shot['targetId'] = focal_ov['id'] if focal_ov else (text_ov['id'] if text_ov else None)
+                    shot['targetId'] = None
 
         # 3. SFX Pass
         valid_sfx = []
