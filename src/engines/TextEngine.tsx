@@ -98,9 +98,13 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
           if (isHero && heroActive) {
              const anim = heroConfig.animation;
              if (anim === 'glow_pulse') {
-                 const glow = interpolate(heroEntrance, [0, 1], [0, 25]);
-                 style.textShadow = `0 0 ${glow}px ${heroConfig.color}`;
-                 style.transform = `scale(${1 + heroEntrance * 0.15})`;
+                 const pulse = Math.sin(heroFrame * 0.2) * 0.5 + 0.5;
+                 const glowSize = 10 + pulse * 30;
+                 style.color = '#fff';
+                 style.textShadow = `0 0 5px #fff, 0 0 10px ${heroConfig.color}, 0 0 ${glowSize}px ${heroConfig.color}`;
+                 style.filter = `drop-shadow(0 0 2px rgba(255,255,255,0.8))`;
+                 style.WebkitTextStroke = `1.5px ${heroConfig.color}`;
+                 style.transform = `scale(${1 + heroEntrance * 0.15 + pulse * 0.05})`;
              } else if (anim === 'isolate_zoom') {
                  style.transform = `scale(${1 + heroEntrance * 0.35})`;
                  style.zIndex = 100;

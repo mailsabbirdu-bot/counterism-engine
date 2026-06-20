@@ -657,8 +657,18 @@ class RemotionJsonMaker:
         print("🔍 Guardrail Engine: Performing deep validation of engine compliance and user guidelines...")
         if not data.get('scenes'): return data
 
-        # Camera Style Rotation Pool
-        camera_styles = ["slow_push", "zoom_in", "pan_left", "pan_right", "orbit"]
+        # Camera Style Rotation Pool (40 Ultra-Modern Presets)
+        camera_styles = [
+            "slow_push", "slow_pull", "push_in", "pull_out", "whip_pan", "dramatic_reveal",
+            "cinematic_drift", "dynamic_orbit", "vertical_sweep", "spiral_vortex", "glitch_snap",
+            "low_angle_hero", "side_strafe_left", "side_strafe_right", "aerial_top_down",
+            "shaky_handheld", "zoom_blur_reveal", "tilt_shift_focus", "power_zoom", "smooth_glide",
+            "epic_scaling", "warp_speed", "rolling_horizon", "fisheye_distort", "dolly_zoom",
+            "parallax_slide", "staccato_jump", "oblique_view", "macro_focus", "uprising_reveal",
+            "descending_gaze", "infinity_loop", "kaleidoscope", "cyber_scan", "extreme_closeup",
+            "wide_panorama", "pendulum_swing", "drunken_stumble", "floating_weightless", "rapid_fire",
+            "gentle_breeze", "the_matrix", "heartbeat_zoom"
+        ]
         # ULTRA MODERN - EYE SOOTHING - ATTENTION GRABBING PALETTE
         modern_colors = ["#00F5FF", "#FF3E6C", "#00FFAB", "#ADFF2F", "#FFD700", "#FF69B4", "#7B68EE"] # Cyan Glow, Rose, Neon Mint, Lime, Gold, Pink, Iris
 
@@ -807,13 +817,18 @@ class RemotionJsonMaker:
                  })
 
             for s_idx, shot in enumerate(scene['camera']['shots']):
-                # --- GUIDELINE: NO NULL TARGETS ---
-                if shot.get('targetId') is None:
+                # --- GUIDELINE: SMART TARGETING ---
+                # Contradiction Resolution: Null is ONLY for stacked layouts (center-zoom),
+                # otherwise we MUST have a valid target ID to avoid empty focus.
+                if has_relation:
+                    shot['targetId'] = None
+                elif shot.get('targetId') is None:
                     shot['targetId'] = focal_ov['id'] if focal_ov else (text_ov['id'] if text_ov else None)
 
-                # --- GUIDELINE: CAMERA VARIETY (AVOID MONOTONY) ---
+                # --- GUIDELINE: CAMERA VARIETY (40 PRESET ROTATION) ---
+                # Use scene index + shot index to maximize uniqueness across the whole video
                 if not shot.get('style') or shot.get('style') == 'static':
-                    shot['style'] = camera_styles[s_idx % len(camera_styles)]
+                    shot['style'] = camera_styles[(idx + s_idx) % len(camera_styles)]
 
                 # --- GUIDELINE: BUTTERY SMOOTH BEZIER ---
                 if not shot.get('easing'):
@@ -822,10 +837,6 @@ class RemotionJsonMaker:
                 # --- GUIDELINE: CAMERA SAFETY (ZOOM CAPS) ---
                 max_zoom = 1.35 if has_relation else 1.6
                 shot['zoom'] = min(shot.get('zoom', 1.25), max_zoom)
-
-                # Stacked layout: Force center-zoom (null target) to ensure text stays on-screen
-                if has_relation:
-                    shot['targetId'] = None
 
         # 3. SFX Pass
         valid_sfx = []
@@ -977,9 +988,22 @@ class RemotionJsonMaker:
             "zoom_blur_pop", "liquid_waver"
         ]
 
+        camera_style_list = [
+            "slow_push", "slow_pull", "push_in", "pull_out", "whip_pan", "dramatic_reveal",
+            "cinematic_drift", "dynamic_orbit", "vertical_sweep", "spiral_vortex", "glitch_snap",
+            "low_angle_hero", "side_strafe_left", "side_strafe_right", "aerial_top_down",
+            "shaky_handheld", "zoom_blur_reveal", "tilt_shift_focus", "power_zoom", "smooth_glide",
+            "epic_scaling", "warp_speed", "rolling_horizon", "fisheye_distort", "dolly_zoom",
+            "parallax_slide", "staccato_jump", "oblique_view", "macro_focus", "uprising_reveal",
+            "descending_gaze", "infinity_loop", "kaleidoscope", "cyber_scan", "extreme_closeup",
+            "wide_panorama", "pendulum_swing", "drunken_stumble", "floating_weightless", "rapid_fire",
+            "gentle_breeze", "the_matrix", "heartbeat_zoom"
+        ]
+
         full_prompt = (
             "YOU ARE A REMOTION MASTER ENGINE. GENERATE RAW MINIFIED JSON ONLY. START '{' END '}'.\n"
             f"AVAILABLE HERO ANIMATIONS (USE DIFFERENT ONES FOR EVERY SCENE): {', '.join(hero_anim_list)}\n"
+            f"AVAILABLE CAMERA STYLES (USE UNIQUE ONES PER SCENE): {', '.join(camera_style_list)}\n"
             "CRITICAL SCHEMA RULES (NEVER BREAK THESE):\n"
             "- USE 'overlays' list. NEVER use 'elements' or 'text_overlay' objects.\n"
             "- USE 'content' for text strings. NEVER use 'text'.\n"
