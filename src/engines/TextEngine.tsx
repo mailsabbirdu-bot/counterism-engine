@@ -1,6 +1,8 @@
 import React from 'react';
 import { useCurrentFrame, useVideoConfig, interpolate, spring, Easing } from 'remotion';
 
+const cinematicEase = Easing.bezier(0.65, 0, 0.35, 1);
+
 export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { width, height, fps } = useVideoConfig();
@@ -12,9 +14,10 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   }
 
   const text = overlay.text || overlay.content || '';
-  const items = overlay.splitMode === 'char'
-    ? text.split('')
-    : text.split(' ');
+  const items = text.split(' ');
+
+  const heroConfig = overlay.hero_config;
+  const heroWord = heroConfig?.word?.replace(/[.।]/g, '');
 
   const baseFontSize = overlay.fontSize || "120px";
   const x = overlay.position?.x ?? width / 2;
@@ -71,6 +74,17 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
 
           const progress = entrance * exit;
 
+          // Hero Word Logic
+          const isHero = item.replace(/[.।]/g, '') === heroWord;
+          const heroActive = heroConfig && frame >= heroConfig.start;
+          const heroFrame = frame - heroConfig?.start;
+
+          const heroEntrance = spring({
+             frame: heroFrame,
+             fps,
+             config: { damping: 12, stiffness: 100 }
+          });
+
           let style: React.CSSProperties = {
             display: 'inline-block',
             whiteSpace: item === ' ' ? 'pre' : 'normal',
@@ -78,19 +92,39 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
             opacity: progress,
           };
 
+          const activeColor = isHero && heroActive ? heroConfig.color : (overlay.color || 'white');
+          style.color = activeColor;
+
+          if (isHero && heroActive) {
+             if (heroConfig.animation === 'glow_pulse') {
+                 const glow = interpolate(heroEntrance, [0, 1], [0, 40]);
+                 style.textShadow = `0 0 ${glow}px ${heroConfig.color}`;
+                 style.transform = `scale(${1 + heroEntrance * 0.2})`;
+             } else if (heroConfig.animation === 'isolate_zoom') {
+                 style.transform = `scale(${1 + heroEntrance * 0.5})`;
+                 style.zIndex = 100;
+             } else if (heroConfig.animation === 'bounce_pop') {
+                 const jump = Math.sin(heroEntrance * Math.PI) * -30;
+                 style.transform = `translateY(${jump}px) scale(${1 + heroEntrance * 0.1})`;
+             }
+          } else if (heroActive && heroConfig.animation === 'isolate_zoom') {
+             style.opacity = progress * (1 - heroEntrance * 0.8);
+             style.filter = `blur(${heroEntrance * 10}px)`;
+          }
+
           if (overlay.animation === 'cinematicGlow') {
             const blur = interpolate(progress, [0, 1], [20, 0]);
             const brightness = interpolate(progress, [0, 1], [3, 1]);
             const scale = interpolate(progress, [0, 1], [0.9, 1]);
             const yOffset = interpolate(progress, [0, 1], [20, 0]);
-            style.filter = progress < 1 ? `blur(${blur}px) brightness(${brightness})` : 'none';
-            style.transform = `translateY(${yOffset}px) scale(${scale})`;
+            style.filter = progress < 1 ? `blur(${blur}px) brightness(${brightness})` : (style.filter || 'none');
+            style.transform = (style.transform || '') + ` translateY(${yOffset}px) scale(${scale})`;
           } else if (overlay.animation === 'slideUp') {
             const yOffset = interpolate(progress, [0, 1], [150, 0]);
-            style.transform = `translateY(${yOffset}px)`;
+            style.transform = (style.transform || '') + ` translateY(${yOffset}px)`;
           } else if (overlay.animation === 'wordByWord') {
             const scale = interpolate(progress, [0, 1], [0.5, 1]);
-            style.transform = `scale(${scale})`;
+            style.transform = (style.transform || '') + ` scale(${scale})`;
           }
 
           return (

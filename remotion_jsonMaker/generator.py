@@ -24,6 +24,7 @@ class RemotionJsonMaker:
         self.in_files = []
         self.out_files = []
         self.camera_files = []
+        self.raw_timestamps = ""
 
     def load_fps_update(self, filepath: str):
         if not filepath or not os.path.exists(filepath):
@@ -620,6 +621,30 @@ class RemotionJsonMaker:
         print(f"✅ Finalization: Processed {len(data['scenes'])} scenes, {len(sfx_manifest)} SFX triggers mapped.")
         return self.validate_and_fix_manifest(data)
 
+    def _get_scene_hero_word(self, scene_id: str, overlay_content: str):
+        if not self.raw_timestamps or not overlay_content: return None
+        # SCENE_01: [Original: 0.00s - 0.98s] -> [30fps: 0f - 29f] "ঢাকা।"
+        pattern = fr'{scene_id}:.*?\[30fps:\s*(\d+)f\s*-\s*\d+f\]\s*"(.*?)"'
+        words = re.findall(pattern, self.raw_timestamps)
+        if not words: return None
+
+        # Priority 1: Pick a long word (>3 chars) from overlay content that appears in timestamps
+        content_clean = re.sub(r'[.।]', '', overlay_content)
+        content_words = content_clean.split()
+
+        for frame, word in words:
+            word_clean = re.sub(r'[.।]', '', word)
+            if word_clean in content_words and len(word_clean) >= 3:
+                return {"word": word_clean, "start": int(frame)}
+
+        # Priority 2: Pick the first word from content found in timestamps
+        for frame, word in words:
+            word_clean = re.sub(r'[.।]', '', word)
+            if word_clean in content_words:
+                 return {"word": word_clean, "start": int(frame)}
+
+        return None
+
     def validate_and_fix_manifest(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Final integrity pass to ensure compliance with Studio V4 Guidelines & Engine."""
         print("🔍 Guardrail Engine: Performing deep validation of engine compliance and user guidelines...")
@@ -627,7 +652,8 @@ class RemotionJsonMaker:
 
         # Camera Style Rotation Pool
         camera_styles = ["slow_push", "zoom_in", "pan_left", "pan_right", "orbit"]
-        modern_colors = ["#10b981", "#06b6d4", "#3b82f6", "#f43f5e", "#8b5cf6", "#f59e0b"] # Emerald, Cyan, Blue, Rose, Violet, Amber
+        # ULTRA MODERN - EYE SOOTHING - VIBRANT PALETTE
+        modern_colors = ["#4ade80", "#22d3ee", "#60a5fa", "#fb7185", "#a78bfa", "#fbbf24"] # Soft Emerald, Cyber Cyan, Sky Blue, Soft Rose, Lavender, Soft Amber
 
         for idx, scene in enumerate(data['scenes']):
             scene_id = scene.get('scene_id', f"SCENE_{idx+1}")
@@ -683,6 +709,17 @@ class RemotionJsonMaker:
 
                     if not ov.get('font'):
                         ov['font'] = self.bangla_fonts[0] if self.bangla_fonts else "Arial"
+
+                    # --- GUIDELINE: HERO WORD ---
+                    hero = self._get_scene_hero_word(scene_id, ov.get('content', ''))
+                    if hero:
+                        hero_anims = ["glow_pulse", "isolate_zoom", "bounce_pop"]
+                        ov['hero_config'] = {
+                            "word": hero['word'],
+                            "start": hero['start'],
+                            "color": modern_colors[(idx + 2) % len(modern_colors)],
+                            "animation": hero_anims[idx % len(hero_anims)]
+                        }
 
                 if o_type == 'chart':
                     if is_scene_bangla and self.bangla_fonts:
@@ -743,7 +780,13 @@ class RemotionJsonMaker:
             if not scene['camera'].get('shots'):
                  # Generate a mandatory shot
                  target = focal_ov['id'] if focal_ov else (text_ov['id'] if text_ov else None)
-                 scene['camera']['shots'].append({"targetId": target, "startFrame": 0, "duration": duration, "style": "slow_push"})
+                 scene['camera']['shots'].append({
+                     "targetId": target,
+                     "startFrame": 0,
+                     "duration": duration,
+                     "style": "slow_push",
+                     "easing": {"type": "bezier", "bezier": [0.65, 0, 0.35, 1]}
+                 })
 
             for s_idx, shot in enumerate(scene['camera']['shots']):
                 # --- GUIDELINE: NO NULL TARGETS ---
@@ -753,6 +796,10 @@ class RemotionJsonMaker:
                 # --- GUIDELINE: CAMERA VARIETY (AVOID MONOTONY) ---
                 if not shot.get('style') or shot.get('style') == 'static':
                     shot['style'] = camera_styles[s_idx % len(camera_styles)]
+
+                # --- GUIDELINE: BUTTERY SMOOTH BEZIER ---
+                if not shot.get('easing'):
+                    shot['easing'] = {"type": "bezier", "bezier": [0.65, 0, 0.35, 1]}
 
                 # --- GUIDELINE: CAMERA SAFETY (ZOOM CAPS) ---
                 max_zoom = 1.35 if has_relation else 1.6
@@ -868,6 +915,7 @@ class RemotionJsonMaker:
         return s.translate(str.maketrans(bengali_digits, english_digits))
 
     def _compact_timestamps(self, ts_content: str) -> str:
+        self.raw_timestamps = ts_content # Store for hero word selection
         if not ts_content: return ""
         compacted = []
         # SCENE_01: [Original: 0.00s - 0.98s] -> [30fps: 0f - 29f] "ঢাকা।"
