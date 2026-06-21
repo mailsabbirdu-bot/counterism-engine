@@ -54,14 +54,15 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     const commonProps = {
       theme: {
         axis: {
-          ticks: { text: { fill: '#ffffffb0', fontSize: 14, fontFamily: overlay.font || 'Inter, sans-serif', fontWeight: 'bold' } },
-          legend: { text: { fill: '#ffffffe0', fontSize: 16, fontFamily: overlay.font || 'Inter, sans-serif', fontWeight: '900' } }
+          ticks: { text: { fill: '#ffffffb0', fontSize: 20, fontFamily: overlay.font || 'Inter, sans-serif', fontWeight: 'bold' } },
+          legend: { text: { fill: '#ffffffe0', fontSize: 24, fontFamily: overlay.font || 'Inter, sans-serif', fontWeight: '900' } }
         },
         grid: { line: { stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 } },
-        tooltip: { container: { background: '#09090b', color: '#fff', fontSize: 16, fontFamily: overlay.font || 'Inter, sans-serif', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' } }
+        tooltip: { container: { background: '#09090b', color: '#fff', fontSize: 20, fontFamily: overlay.font || 'Inter, sans-serif', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' } },
+        labels: { text: { fontSize: 18, fontWeight: 'bold', fill: '#fff', fontFamily: overlay.font || 'Inter, sans-serif' } }
       },
       colors: overlay.colors || { scheme: 'nivo' },
-      margin: { top: 40, right: 40, bottom: 60, left: 80 },
+      margin: { top: 60, right: 60, bottom: 80, left: 100 },
       animate: false,
     };
 
@@ -109,13 +110,18 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
 
     if (['bar', 'horizontalBar', 'verticalBar', 'groupedBar', 'stackedBar', 'barRace'].includes(overlay.chart_type)) {
        if (!Array.isArray(overlay.data)) return null;
+
        const keys = overlay.keys || ['value'];
        const animatedData = overlay.data.map((item: any) => {
          if (!item) return {};
          const newItem = { ...item };
-         keys.forEach((key: string) => { if (typeof item[key] === 'number') newItem[key] = (item[key] || 0) * dataProgress; });
+         keys.forEach((key: string) => {
+            const baseVal = Number(item[key]) || 0;
+            newItem[key] = baseVal * dataProgress;
+         });
          return newItem;
        });
+
        return (
          <ResponsiveBar
            {...commonProps}
@@ -124,10 +130,15 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
            indexBy={overlay.indexBy || 'id'}
            layout={overlay.chart_type === 'horizontalBar' ? 'horizontal' : 'vertical'}
            groupMode={overlay.chart_type === 'groupedBar' ? 'grouped' : 'stacked'}
-           padding={0.3}
-           borderRadius={8}
-           borderWidth={1}
+           padding={0.5} // Increased padding to avoid "box-like" look
+           innerPadding={4}
+           borderRadius={12}
+           borderWidth={2}
            borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
+           enableLabel={true}
+           labelSkipWidth={12}
+           labelSkipHeight={12}
+           labelTextColor={{ from: 'color', modifiers: [['brighter', 1.6]] }}
          />
        );
     }
