@@ -653,8 +653,9 @@ class RemotionJsonMaker:
         # Priority 1: Pick the longest meaningful word
         hero = max(candidates, key=lambda x: len(x['word']))
 
-        # Requirement: Give viewers time to read. Hero animation starts after 45f min.
-        hero['start'] = max(45, hero['start'])
+        # Requirement: Give viewers time to read. Hero animation starts after 45-60f min buffer.
+        # This ensures initial full-text readability before highlight triggers.
+        hero['start'] = max(60, hero['start'])
 
         return hero
 
@@ -1038,6 +1039,7 @@ class RemotionJsonMaker:
             "YOU ARE A REMOTION MASTER ENGINE. GENERATE RAW MINIFIED JSON ONLY. START '{' END '}'.\n"
             f"AVAILABLE HERO ANIMATIONS (USE DIFFERENT ONES FOR EVERY SCENE): {', '.join(hero_anim_list)}\n"
             f"AVAILABLE CAMERA STYLES (USE UNIQUE ONES PER SCENE): {', '.join(camera_style_list)}\n"
+            "AVAILABLE UI/INDICATORS: kpiNumber, countdown, flickerTextBox, progressBar, circularProgress, semiGauge, dashboardCard, comparisonKPI, deltaIndicator\n"
             "CRITICAL SCHEMA RULES (NEVER BREAK THESE):\n"
             "- USE 'overlays' list. NEVER use 'elements' or 'text_overlay' objects.\n"
             "- USE 'content' for text strings. NEVER use 'text'.\n"

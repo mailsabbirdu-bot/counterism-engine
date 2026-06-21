@@ -27,7 +27,7 @@ const ViolinPlot: React.FC<{ overlay: any; dataProgress: number; commonProps: an
                   }}
                />
                <div className="w-[2px] h-[300px] absolute bg-white/10 -z-10" />
-               <span className="text-white/80 text-xs mt-6 font-black uppercase tracking-tighter">{group.label}</span>
+               <span className="text-white/80 text-xs mt-6 font-black uppercase tracking-tighter" style={{ fontFamily: overlay.font || 'Inter' }}>{group.label}</span>
             </div>
        ))}
     </div>
@@ -59,7 +59,10 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         },
         grid: { line: { stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 } },
         tooltip: { container: { background: '#09090b', color: '#fff', fontSize: 20, fontFamily: overlay.font || 'Inter, sans-serif', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' } },
-        labels: { text: { fontSize: 18, fontWeight: 'bold', fill: '#fff', fontFamily: overlay.font || 'Inter, sans-serif' } }
+        labels: { text: { fontSize: 18, fontWeight: 'bold', fill: '#fff', fontFamily: overlay.font || 'Inter, sans-serif' } },
+        dots: { text: { fontSize: 14, fontFamily: overlay.font || 'Inter, sans-serif' } },
+        legends: { text: { fontSize: 16, fontFamily: overlay.font || 'Inter, sans-serif' } },
+        annotations: { text: { fontFamily: overlay.font || 'Inter, sans-serif' } }
       },
       colors: overlay.colors || { scheme: 'nivo' },
       margin: { top: 60, right: 60, bottom: 80, left: 100 },
