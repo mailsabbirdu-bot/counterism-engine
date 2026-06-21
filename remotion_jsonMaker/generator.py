@@ -399,9 +399,15 @@ class RemotionJsonMaker:
 
                         # Bangla characters are wider/taller; scale box accordingly
                         is_bangla = any(ord(c) > 127 for c in content)
+
+                        # --- HERO WORD SAFETY ---
+                        # If a hero word is present, it will scale up significantly (up to 1.35x).
+                        # Increase the estimated footprint to prevent collisions with other elements.
+                        footprint_scale = 1.4 if ov.get('hero_config') else 1.0
+
                         # Minimalist constraint often results in single lines; use safer width
-                        w = min(1500, len(max(content.split('\n'), key=len)) * (fs * (1.0 if is_bangla else 0.8)))
-                        h = lines * (fs * (1.8 if is_bangla else 1.5))
+                        w = min(1500, len(max(content.split('\n'), key=len)) * (fs * (1.0 if is_bangla else 0.8)) * footprint_scale)
+                        h = lines * (fs * (1.8 if is_bangla else 1.5)) * footprint_scale
 
                     elif ov_type == 'chart':
                         w = ov.get('width', 1000) + 100
@@ -621,7 +627,7 @@ class RemotionJsonMaker:
         print(f"✅ Finalization: Processed {len(data['scenes'])} scenes, {len(sfx_manifest)} SFX triggers mapped.")
         return self.validate_and_fix_manifest(data)
 
-    def _get_scene_hero_word(self, scene_id: str, overlay_content: str):
+    def _get_scene_hero_word(self, scene_id: str, overlay_content: str, scene_duration: int = 180):
         if not self.raw_timestamps or not overlay_content: return None
 
         # Comprehensive Bangla stop-words to avoid meaningless hero highlights
@@ -653,9 +659,16 @@ class RemotionJsonMaker:
         # Priority 1: Pick the longest meaningful word
         hero = max(candidates, key=lambda x: len(x['word']))
 
-        # Requirement: Give viewers time to read. Hero animation starts after 45-60f min buffer.
-        # This ensures initial full-text readability before highlight triggers.
-        hero['start'] = max(60, hero['start'])
+        # --- USER RULE: BUFFERING & PACING ---
+        # 1. Start buffer: Hero word must wait at least 45 frames
+        hero['start'] = max(45, hero['start'])
+
+        # 2. End buffer: Hero word must stay on screen for at least 2 seconds (60 frames)
+        # So it must start animating NO LATER than (total_duration - 60)
+        # We also need to leave some time for the exit animation (15 frames)
+        safe_end_start = scene_duration - 75
+        if hero['start'] > safe_end_start:
+             hero['start'] = max(45, safe_end_start)
 
         return hero
 
@@ -753,7 +766,7 @@ class RemotionJsonMaker:
                         ov['font'] = self.bangla_fonts[0] if self.bangla_fonts else "Arial"
 
                     # --- GUIDELINE: HERO WORD ---
-                    hero = self._get_scene_hero_word(scene_id, ov.get('content', ''))
+                    hero = self._get_scene_hero_word(scene_id, ov.get('content', ''), duration)
                     if not hero:
                         hero = self._get_fallback_hero(ov.get('content', ''))
 
