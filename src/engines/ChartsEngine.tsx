@@ -36,7 +36,7 @@ const ViolinPlot: React.FC<{ overlay: any; dataProgress: number; commonProps: an
 
 export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width: videoWidth } = useVideoConfig();
   const start = Number(overlay.start) || 0;
   const duration = Number(overlay.duration) || 120;
   const relativeFrame = frame - start;
@@ -51,18 +51,19 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const progress = entrance * exit;
 
   const renderChart = () => {
+    const font = overlay.font || 'Inter, sans-serif';
     const commonProps = {
       theme: {
         axis: {
-          ticks: { text: { fill: '#ffffffb0', fontSize: 20, fontFamily: overlay.font || 'Inter, sans-serif', fontWeight: 'bold' } },
-          legend: { text: { fill: '#ffffffe0', fontSize: 24, fontFamily: overlay.font || 'Inter, sans-serif', fontWeight: '900' } }
+          ticks: { text: { fill: '#ffffffb0', fontSize: 20, fontFamily: font, fontWeight: 'bold' } },
+          legend: { text: { fill: '#ffffffe0', fontSize: 24, fontFamily: font, fontWeight: '900' } }
         },
         grid: { line: { stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 } },
-        tooltip: { container: { background: '#09090b', color: '#fff', fontSize: 20, fontFamily: overlay.font || 'Inter, sans-serif', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' } },
-        labels: { text: { fontSize: 18, fontWeight: 'bold', fill: '#fff', fontFamily: overlay.font || 'Inter, sans-serif' } },
-        dots: { text: { fontSize: 14, fontFamily: overlay.font || 'Inter, sans-serif' } },
-        legends: { text: { fontSize: 16, fontFamily: overlay.font || 'Inter, sans-serif' } },
-        annotations: { text: { fontFamily: overlay.font || 'Inter, sans-serif' } }
+        tooltip: { container: { background: '#09090b', color: '#fff', fontSize: 20, fontFamily: font, borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' } },
+        labels: { text: { fontSize: 18, fontWeight: 'bold', fill: '#fff', fontFamily: font } },
+        dots: { text: { fontSize: 14, fontFamily: font } },
+        legends: { text: { fontSize: 16, fontFamily: font } },
+        annotations: { text: { fontFamily: font } }
       },
       colors: overlay.colors || { scheme: 'nivo' },
       margin: { top: 60, right: 60, bottom: 80, left: 100 },
@@ -200,6 +201,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     <div
       className="absolute bg-zinc-950/80 backdrop-blur-3xl rounded-[3rem] border-2 border-white/20 shadow-[0_40px_80px_rgba(0,0,0,0.7)] overflow-hidden p-12"
       style={{
+        fontFamily: overlay.font || 'Inter, sans-serif',
         width: overlay.width || 1000,
         height: overlay.height || 650,
         left: `${overlay.position?.x ?? 960}px`,

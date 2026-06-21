@@ -271,7 +271,7 @@ const MilestoneTracker = ({ overlay, relativeFrame, fps }: any) => {
                   isActive ? 'bg-blue-600 border-white/40' : 'bg-zinc-800 border-white/10'
                 } ${isCurrent ? 'scale-125 shadow-[0_0_20px_rgba(37,99,235,0.8)]' : ''}`}
               >
-                <span className="text-white font-black text-sm">{i + 1}</span>
+                <span className="text-white font-black text-sm" style={fontStyle}>{i + 1}</span>
               </div>
               <span className={`text-[10px] font-bold uppercase whitespace-nowrap ${isActive ? 'text-white' : 'text-white/20'}`} style={fontStyle}>
                 {m.label}
@@ -293,14 +293,15 @@ const KPINumber = ({ overlay, relativeFrame, fps }: any) => {
     extrapolateRight: 'clamp',
   });
 
-  const fontStyle = { fontFamily: overlay.font || 'Inter' };
+  const font = overlay.font || 'Inter';
+  const fontStyle = { fontFamily: font };
 
   return (
     <div className="flex flex-col items-center justify-center bg-zinc-900/80 backdrop-blur-xl p-12 rounded-[3rem] border border-white/20 shadow-2xl min-w-[500px]" style={fontStyle}>
       <span className="text-white/60 text-3xl uppercase tracking-[0.4em] mb-8 font-black" style={fontStyle}>{overlay.label}</span>
-      <div className="text-9xl font-black tracking-tighter tabular-nums" style={{ ...fontStyle, color: overlay.color || 'white' }}>
-        {Math.round(value).toLocaleString()}
-        {overlay.suffix}
+      <div className="text-9xl font-black tracking-tighter tabular-nums flex items-baseline" style={{ ...fontStyle, color: overlay.color || 'white' }}>
+        <span style={fontStyle}>{Math.round(value).toLocaleString()}</span>
+        {overlay.suffix && <span className="ml-4 text-6xl" style={fontStyle}>{overlay.suffix}</span>}
       </div>
     </div>
   );
