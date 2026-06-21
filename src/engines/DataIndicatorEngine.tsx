@@ -5,22 +5,24 @@ import { ArrowUp, ArrowDown, Timer, Calendar, Flag, Activity } from 'lucide-reac
 export const DataIndicatorEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { width: videoWidth, height: videoHeight, fps } = useVideoConfig();
-  const relativeFrame = frame - overlay.start;
+  const start = Number(overlay.start) || 0;
+  const duration = Number(overlay.duration) || 120;
+  const relativeFrame = frame - start;
 
-  if (frame < overlay.start || frame > overlay.start + overlay.duration) {
+  if (frame < start || frame > start + duration) {
     return null;
   }
 
   // Remotion-based timing for sync with camera
   const entrance = spring({
-    frame: relativeFrame,
+    frame: isNaN(relativeFrame) ? 0 : relativeFrame,
     fps,
     config: { damping: 15, stiffness: 100 },
   });
 
-  const exitFrame = overlay.duration - 15;
+  const exitFrame = duration - 15;
   const exit = interpolate(
-    relativeFrame,
+    isNaN(relativeFrame) ? 0 : relativeFrame,
     [exitFrame, exitFrame + 15],
     [1, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
@@ -87,7 +89,8 @@ export const DataIndicatorEngine: React.FC<{ overlay: any }> = ({ overlay }) => 
 };
 
 const DashboardCard = ({ overlay, relativeFrame, fps }: any) => {
-  const value = interpolate(relativeFrame, [20, 80], [0, overlay.value || 0], { extrapolateRight: 'clamp' });
+  const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
+  const value = interpolate(safeFrame, [20, 80], [0, overlay.value || 0], { extrapolateRight: 'clamp' });
   return (
     <div className="bg-zinc-900/80 backdrop-blur-xl p-8 rounded-3xl border border-white/20 w-80 shadow-2xl overflow-hidden relative">
       <div className="absolute top-0 right-0 p-4 opacity-10">
@@ -107,10 +110,11 @@ const DashboardCard = ({ overlay, relativeFrame, fps }: any) => {
 };
 
 const EventTimeline = ({ overlay, relativeFrame, fps }: any) => {
+  const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
   return (
     <div className="flex flex-col gap-8 w-[800px]">
       {overlay.events.map((event: any, i: number) => {
-        const itemFrame = relativeFrame - i * 20;
+        const itemFrame = safeFrame - i * 20;
         const reveal = spring({ frame: itemFrame, fps, config: { damping: 15 } });
         if (itemFrame < 0) return null;
 
@@ -139,11 +143,12 @@ const EventTimeline = ({ overlay, relativeFrame, fps }: any) => {
 };
 
 const MilestoneTimeline = ({ overlay, relativeFrame, fps }: any) => {
+  const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
   return (
     <div className="flex items-center justify-between w-[1200px] relative">
       <div className="absolute top-1/2 left-0 w-full h-1 bg-white/10 -translate-y-1/2 rounded-full" />
       {overlay.milestones.map((m: any, i: number) => {
-        const itemFrame = relativeFrame - i * 30;
+        const itemFrame = safeFrame - i * 30;
         const reveal = spring({ frame: itemFrame, fps, config: { damping: 12 } });
         if (itemFrame < 0) return null;
 
@@ -164,7 +169,8 @@ const MilestoneTimeline = ({ overlay, relativeFrame, fps }: any) => {
 };
 
 const ProgressBar = ({ overlay, relativeFrame, fps }: any) => {
-  const progress = interpolate(relativeFrame, [10, 70], [0, overlay.value || 100], { extrapolateRight: 'clamp' });
+  const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
+  const progress = interpolate(safeFrame, [10, 70], [0, overlay.value || 100], { extrapolateRight: 'clamp' });
   return (
     <div className="bg-zinc-900/90 backdrop-blur-xl p-10 rounded-3xl border border-white/10 w-[600px]">
       <div className="flex justify-between items-end mb-4">
@@ -182,7 +188,8 @@ const ProgressBar = ({ overlay, relativeFrame, fps }: any) => {
 };
 
 const CircularProgress = ({ overlay, relativeFrame, fps }: any) => {
-  const progress = interpolate(relativeFrame, [0, 80], [0, overlay.value || 100], { extrapolateRight: 'clamp' });
+  const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
+  const progress = interpolate(safeFrame, [0, 80], [0, overlay.value || 100], { extrapolateRight: 'clamp' });
   return (
     <div className="relative flex items-center justify-center w-80 h-80">
       <div
@@ -206,7 +213,8 @@ const CircularProgress = ({ overlay, relativeFrame, fps }: any) => {
 };
 
 const SemiGauge = ({ overlay, relativeFrame, fps }: any) => {
-  const progress = interpolate(relativeFrame, [0, 90], [0, overlay.value || 100], { extrapolateRight: 'clamp' });
+  const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
+  const progress = interpolate(safeFrame, [0, 90], [0, overlay.value || 100], { extrapolateRight: 'clamp' });
   const rotation = (progress / 100) * 180 - 90;
 
   return (
@@ -237,9 +245,10 @@ const SemiGauge = ({ overlay, relativeFrame, fps }: any) => {
 };
 
 const MilestoneTracker = ({ overlay, relativeFrame, fps }: any) => {
+  const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
   const activeIndex = Math.min(
     overlay.milestones.length - 1,
-    Math.floor(interpolate(relativeFrame, [0, 100], [0, overlay.milestones.length], { extrapolateRight: 'clamp' }))
+    Math.floor(interpolate(safeFrame, [0, 100], [0, overlay.milestones.length], { extrapolateRight: 'clamp' }))
   );
 
   return (
@@ -272,7 +281,8 @@ const MilestoneTracker = ({ overlay, relativeFrame, fps }: any) => {
 };
 
 const KPINumber = ({ overlay, relativeFrame, fps }: any) => {
-  const value = interpolate(relativeFrame, [0, 45], [0, overlay.value || 0], {
+  const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
+  const value = interpolate(safeFrame, [0, 45], [0, overlay.value || 0], {
     extrapolateRight: 'clamp',
   });
 
@@ -290,7 +300,8 @@ const KPINumber = ({ overlay, relativeFrame, fps }: any) => {
 };
 
 const PercentageCounter = ({ overlay, relativeFrame, fps }: any) => {
-  const value = interpolate(relativeFrame, [0, 60], [0, overlay.value || 0], {
+  const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
+  const value = interpolate(safeFrame, [0, 60], [0, overlay.value || 0], {
     extrapolateRight: 'clamp',
   });
 
@@ -304,8 +315,9 @@ const PercentageCounter = ({ overlay, relativeFrame, fps }: any) => {
 };
 
 const ComparisonKPI = ({ overlay, relativeFrame, fps }: any) => {
-  const v1 = interpolate(relativeFrame, [10, 50], [0, overlay.value1 || 0], { extrapolateRight: 'clamp' });
-  const v2 = interpolate(relativeFrame, [20, 60], [0, overlay.value2 || 0], { extrapolateRight: 'clamp' });
+  const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
+  const v1 = interpolate(safeFrame, [10, 50], [0, overlay.value1 || 0], { extrapolateRight: 'clamp' });
+  const v2 = interpolate(safeFrame, [20, 60], [0, overlay.value2 || 0], { extrapolateRight: 'clamp' });
 
   return (
     <div className="flex gap-12 bg-black/60 backdrop-blur-2xl p-10 rounded-3xl border border-white/10">
@@ -323,7 +335,8 @@ const ComparisonKPI = ({ overlay, relativeFrame, fps }: any) => {
 };
 
 const DeltaIndicator = ({ overlay, relativeFrame, fps }: any) => {
-  const progress = spring({ frame: relativeFrame, fps, config: { damping: 12 } });
+  const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
+  const progress = spring({ frame: safeFrame, fps, config: { damping: 12 } });
   const isPositive = (overlay.value || 0) >= 0;
 
   return (
@@ -342,8 +355,9 @@ const DeltaIndicator = ({ overlay, relativeFrame, fps }: any) => {
 };
 
 const Countdown = ({ overlay, relativeFrame, fps }: any) => {
+  const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
   const totalSeconds = overlay.seconds || 10;
-  const currentSeconds = Math.max(0, totalSeconds - Math.floor(relativeFrame / fps));
+  const currentSeconds = Math.max(0, totalSeconds - Math.floor(safeFrame / fps));
 
   return (
     <div className="bg-rose-600 p-12 rounded-[3rem] shadow-[0_0_100px_rgba(225,29,72,0.5)] border-8 border-white/20 flex items-center gap-8">

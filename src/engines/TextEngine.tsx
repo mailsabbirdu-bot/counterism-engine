@@ -7,9 +7,11 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { width, height, fps } = useVideoConfig();
 
-  const relativeFrame = frame - overlay.start;
+  const start = Number(overlay.start) || 0;
+  const duration = Number(overlay.duration) || 120;
+  const relativeFrame = frame - start;
 
-  if (frame < overlay.start || frame > overlay.start + overlay.duration) {
+  if (frame < start || frame > start + duration) {
     return null;
   }
 
@@ -55,18 +57,18 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         textAlign: 'center'
       }}>
         {items.map((item: string, i: number) => {
-          const itemDelay = i * (overlay.stagger || 3); // stagger in frames
+          const itemDelay = i * (Number(overlay.stagger) || 3); // stagger in frames
           const itemFrame = relativeFrame - itemDelay;
 
           const entrance = spring({
-            frame: itemFrame,
+            frame: isNaN(itemFrame) ? 0 : itemFrame,
             fps,
             config: { damping: 15, stiffness: 100 },
           });
 
-          const exitFrame = overlay.duration - 15 - (items.length - i) * (overlay.stagger || 1);
+          const exitFrame = duration - 15 - (items.length - i) * (Number(overlay.stagger) || 1);
           const exit = interpolate(
-            relativeFrame,
+            isNaN(relativeFrame) ? 0 : relativeFrame,
             [exitFrame, exitFrame + 15],
             [1, 0],
             { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
@@ -121,7 +123,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
                  const jump = Math.sin(heroEntrance * Math.PI) * -25;
                  style.transform = `translateY(${jump}px) scale(${1 + heroEntrance * 0.1})`;
              } else if (anim === 'neon_flicker') {
-                 const flicker = Math.sin(heroFrame * 2) > 0 ? 1 : 0.8;
+                 const flicker = Math.sin(heroFrame * 0.5) > 0 ? 1 : 0.9;
                  style.opacity = progress * flicker;
                  style.textShadow = `0 0 15px ${heroConfig.color}, 0 0 5px white`;
              } else if (anim === 'shake_alert') {
@@ -220,17 +222,17 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
           }
 
           if (overlay.animation === 'cinematicGlow') {
-            const blur = interpolate(progress, [0, 1], [20, 0]);
-            const brightness = interpolate(progress, [0, 1], [3, 1]);
-            const scale = interpolate(progress, [0, 1], [0.9, 1]);
-            const yOffset = interpolate(progress, [0, 1], [20, 0]);
+            const blur = interpolate(isNaN(progress) ? 0 : progress, [0, 1], [20, 0]);
+            const brightness = interpolate(isNaN(progress) ? 0 : progress, [0, 1], [3, 1]);
+            const scale = interpolate(isNaN(progress) ? 0 : progress, [0, 1], [0.9, 1]);
+            const yOffset = interpolate(isNaN(progress) ? 0 : progress, [0, 1], [20, 0]);
             style.filter = progress < 1 ? `blur(${blur}px) brightness(${brightness})` : (style.filter || 'none');
             style.transform = (style.transform || '') + ` translateY(${yOffset}px) scale(${scale})`;
           } else if (overlay.animation === 'slideUp') {
-            const yOffset = interpolate(progress, [0, 1], [150, 0]);
+            const yOffset = interpolate(isNaN(progress) ? 0 : progress, [0, 1], [150, 0]);
             style.transform = (style.transform || '') + ` translateY(${yOffset}px)`;
           } else if (overlay.animation === 'wordByWord') {
-            const scale = interpolate(progress, [0, 1], [0.5, 1]);
+            const scale = interpolate(isNaN(progress) ? 0 : progress, [0, 1], [0.5, 1]);
             style.transform = (style.transform || '') + ` scale(${scale})`;
           }
 

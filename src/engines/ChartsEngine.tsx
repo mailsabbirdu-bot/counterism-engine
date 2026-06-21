@@ -37,15 +37,17 @@ const ViolinPlot: React.FC<{ overlay: any; dataProgress: number; commonProps: an
 export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const relativeFrame = frame - overlay.start;
+  const start = Number(overlay.start) || 0;
+  const duration = Number(overlay.duration) || 120;
+  const relativeFrame = frame - start;
 
-  if (frame < overlay.start || frame > overlay.start + overlay.duration) {
+  if (frame < start || frame > start + duration) {
     return null;
   }
 
-  const entrance = interpolate(relativeFrame, [0, 30], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.2, 0, 0.2, 1) });
-  const exitFrame = overlay.duration - 20;
-  const exit = interpolate(relativeFrame, [exitFrame, exitFrame + 20], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.4, 0, 1, 1) });
+  const entrance = interpolate(isNaN(relativeFrame) ? 0 : relativeFrame, [0, 30], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.2, 0, 0.2, 1) });
+  const exitFrame = duration - 20;
+  const exit = interpolate(isNaN(relativeFrame) ? 0 : relativeFrame, [exitFrame, exitFrame + 20], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.4, 0, 1, 1) });
   const progress = entrance * exit;
 
   const renderChart = () => {
@@ -64,8 +66,8 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     };
 
     const animationStart = 45;
-    const animationEnd = Math.min(overlay.duration - 30, 180);
-    const dataProgress = interpolate(relativeFrame, [animationStart, animationEnd], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.33, 1, 0.68, 1) });
+    const animationEnd = Math.min(duration - 30, 180);
+    const dataProgress = interpolate(isNaN(relativeFrame) ? 0 : relativeFrame, [animationStart, animationEnd], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.33, 1, 0.68, 1) });
 
     if (!overlay?.data) return <div className="text-white flex items-center justify-center h-full">No Data Available</div>;
 

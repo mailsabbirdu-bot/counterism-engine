@@ -133,6 +133,9 @@ export const CameraEngine: React.FC<{
   const frame = useCurrentFrame();
   const { width, height, durationInFrames } = useVideoConfig();
 
+  const start = Number((config as any).start) || 0;
+  const duration = Number((config as any).duration) || durationInFrames;
+
   const mergedKeyframes = useMemo(() => {
     const keys: CameraKeyframe[] = [{ frame: 0, zoom: 1, x: 0, y: 0, rotationZ: 0 }];
 
@@ -256,39 +259,27 @@ export const CameraEngine: React.FC<{
                 currentEasing = Easing.elastic(1) as any;
             }
 
-            // Reach target
-            keys.push({
-                frame: shot.startFrame,
-                lookAt: shot.targetId,
-                zoom: startZoom,
-                rotationX, rotationY, rotationZ,
-                z: zOffset,
-                easing: 'linear'
-            });
-
-            // End hold (animate within shot for cinematic feel)
-            keys.push({
-                frame: shot.startFrame + shot.duration,
-                lookAt: shot.targetId,
-                zoom: endZoom,
-                rotationX: 0, rotationY: 0, rotationZ: 0,
-                z: 0,
-                easing: currentEasing
-            });
-
-            // Reach target
+            // Reach target: start movement transition
             keys.push({
                 frame: shot.startFrame + inDur,
                 lookAt: shot.targetId,
                 zoom: startZoom,
+                rotationX,
+                rotationY,
+                rotationZ,
+                z: zOffset,
                 easing: 'linear'
             });
 
-            // End hold (animate within shot for cinematic feel)
+            // End hold: finish cinematic drift/animation within shot
             keys.push({
                 frame: shot.startFrame + shot.duration,
                 lookAt: shot.targetId,
                 zoom: endZoom,
+                rotationX: 0,
+                rotationY: 0,
+                rotationZ: 0,
+                z: 0,
                 easing: currentEasing
             });
         });
@@ -303,8 +294,8 @@ export const CameraEngine: React.FC<{
     return Array.from(uniqueKeysMap.values()).sort((a, b) => a.frame - b.frame);
   }, [config, durationInFrames]);
 
-  const cameraState = useMemo(() => getCameraState(frame, mergedKeyframes, overlays, width, height), [frame, mergedKeyframes, overlays, width, height]);
-  const nextFrameState = useMemo(() => getCameraState(frame + 0.5, mergedKeyframes, overlays, width, height), [frame, mergedKeyframes, overlays, width, height]);
+  const cameraState = useMemo(() => getCameraState(isNaN(frame) ? 0 : frame, mergedKeyframes, overlays, width, height), [frame, mergedKeyframes, overlays, width, height]);
+  const nextFrameState = useMemo(() => getCameraState(isNaN(frame) ? 0.5 : frame + 0.5, mergedKeyframes, overlays, width, height), [frame, mergedKeyframes, overlays, width, height]);
 
   if (!config?.enabled) {
     return <div style={{ width, height, position: 'relative' }}>{backgroundLayer}{children}</div>;
