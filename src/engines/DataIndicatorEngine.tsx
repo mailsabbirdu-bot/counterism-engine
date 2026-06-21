@@ -243,7 +243,10 @@ const SemiGauge = ({ overlay, relativeFrame, fps }: any) => {
         style={{ transform: `rotate(${rotation}deg)` }}
       />
       <div className="absolute bottom-4 flex flex-col items-center" style={fontStyle}>
-         <div className="text-white text-5xl font-black" style={fontStyle}>{overlay.value}{overlay.suffix}</div>
+         <div className="text-white text-5xl font-black" style={fontStyle}>
+            <span style={fontStyle}>{overlay.value}</span>
+            <span style={fontStyle}>{overlay.suffix}</span>
+         </div>
          <div className="text-white/40 text-sm font-bold uppercase" style={fontStyle}>{overlay.label}</div>
       </div>
     </div>

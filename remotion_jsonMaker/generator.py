@@ -994,6 +994,48 @@ class RemotionJsonMaker:
         english_digits = '0123456789'
         return s.translate(str.maketrans(bengali_digits, english_digits))
 
+    def repair_json(self, s):
+        # Pass 1: Fix "swallowed quotes" like "id":"val,"next"
+        s = re.sub(r'":\s*"([^"]+),\s*"', r'":"\1","', s)
+        s = re.sub(r'":\s*"([^"]+)\s*\}', r'":"\1"}', s)
+        # Pass 2: Fix numeric artifacts in strings like "start": 30f
+        s = re.sub(r'":\s*(\d+)[fs]\b', r'": \1', s)
+        # Pass 3: Quotes after numbers or booleans (e.g., 214" or true")
+        s = re.sub(r'(:[ ]*(\d+|true|false|null))"(\s*[,}\]])', r'\1\3', s)
+
+        # Pass 4: Structural backtracking
+        for i in range(len(s), 0, -1):
+            try:
+                chunk = s[:i].strip()
+                if not chunk: continue
+
+                # Fix unbalanced string quotes
+                if chunk.count('"') % 2 != 0: chunk += '"'
+
+                # Re-calculate stack for current state
+                stack = []
+                in_string = False
+                escaped = False
+                for char in chunk:
+                    if char == '"' and not escaped: in_string = not in_string
+                    if in_string:
+                        if char == '\\': escaped = not escaped
+                        else: escaped = False
+                        continue
+                    if char == '{': stack.append('}')
+                    elif char == '[': stack.append(']')
+                    elif char == '}':
+                        if stack and stack[-1] == '}': stack.pop()
+                    elif char == ']':
+                        if stack and stack[-1] == ']': stack.pop()
+
+                candidate = chunk + "".join(reversed(stack))
+                candidate = re.sub(r',\s*([}\]])', r'\1', candidate)
+                return json.loads(candidate, strict=False)
+            except:
+                continue
+        return None
+
     def _compact_timestamps(self, ts_content: str) -> str:
         self.raw_timestamps = ts_content # Store for hero word selection
         if not ts_content: return ""
@@ -1117,48 +1159,6 @@ class RemotionJsonMaker:
             json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
             json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
 
-            def repair_json(s):
-                # Pass 1: Fix "swallowed quotes" like "id":"val,"next"
-                s = re.sub(r'":\s*"([^"]+),\s*"', r'":"\1","', s)
-                s = re.sub(r'":\s*"([^"]+)\s*\}', r'":"\1"}', s)
-                # Pass 2: Fix numeric artifacts in strings like "start": 30f
-                s = re.sub(r'":\s*(\d+)[fs]\b', r'": \1', s)
-                # Pass 3: Quotes after numbers or booleans (e.g., 214" or true")
-                s = re.sub(r'(:[ ]*(\d+|true|false|null))"(\s*[,}\]])', r'\1\3', s)
-
-                # Pass 4: Structural backtracking
-                for i in range(len(s), 0, -1):
-                    try:
-                        chunk = s[:i].strip()
-                        if not chunk: continue
-
-                        # Fix unbalanced string quotes
-                        if chunk.count('"') % 2 != 0: chunk += '"'
-
-                        # Re-calculate stack for current state
-                        stack = []
-                        in_string = False
-                        escaped = False
-                        for char in chunk:
-                            if char == '"' and not escaped: in_string = not in_string
-                            if in_string:
-                                if char == '\\': escaped = not escaped
-                                else: escaped = False
-                                continue
-                            if char == '{': stack.append('}')
-                            elif char == '[': stack.append(']')
-                            elif char == '}':
-                                if stack and stack[-1] == '}': stack.pop()
-                            elif char == ']':
-                                if stack and stack[-1] == ']': stack.pop()
-
-                        candidate = chunk + "".join(reversed(stack))
-                        candidate = re.sub(r',\s*([}\]])', r'\1', candidate)
-                        return json.loads(candidate, strict=False)
-                    except:
-                        continue
-                return None
-
             try:
                 # Use strict=False to handle unescaped control characters
                 parsed = json.loads(json_str, strict=False)
@@ -1168,7 +1168,7 @@ class RemotionJsonMaker:
                 return parsed
             except Exception as e:
                 print(f"⚠️ JSON primary parse failed. Attempting repair...")
-                result = repair_json(json_str)
+                result = self.repair_json(json_str)
                 if result:
                     if isinstance(result, dict) and 'error' in result:
                         print(f"⚠️ Repaired JSON contains an error key: {result['error']}")

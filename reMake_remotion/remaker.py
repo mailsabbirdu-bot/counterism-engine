@@ -189,14 +189,41 @@ class RemotionRemaker:
         raw_output = self.maker._interact_with_gemini(refine_prompt)
         self.maker.stop_browser()
 
-        # Parse and Update
-        try:
-            # Simple extraction
+        # Robust JSON extraction and repair reusing generator logic
+        new_scene_data = None
+
+        # 1. Look for markdown code blocks first
+        json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_output, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(1)
+        else:
+            # 2. Fallback to finding first { and last }
             start_idx, end_idx = raw_output.find('{'), raw_output.rfind('}')
             if start_idx != -1 and end_idx != -1:
-                new_scene_data = json.loads(raw_output[start_idx:end_idx+1])
-                # Merge or replace? User says "redo everything of a particular scene"
-                # We'll replace the scene data but ensure ID remains consistent
+                json_str = raw_output[start_idx:end_idx+1]
+            else:
+                print("❌ Could not find any JSON-like structures in Gemini response.")
+                return
+
+        try:
+            # Pre-cleanup and primary parse
+            json_str = "".join(ch for ch in json_str if ch.isprintable() or ch in "\n\r\t")
+            json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
+
+            try:
+                new_scene_data = json.loads(json_str, strict=False)
+            except:
+                # Use robust repair logic from generator.py
+                # Note: We'll wrap it in a dummy dict if needed, but Gemini usually returns {} for one scene
+                print("⚠️  Primary parse failed. Attempting repair...")
+                # We can't easily call the private repair_json from here without duplication
+                # unless we make it accessible. Let's use a simplified version for one scene.
+                new_scene_data = self.maker.repair_json(json_str) if hasattr(self.maker, 'repair_json') else None
+
+            if new_scene_data:
+                if isinstance(new_scene_data, dict) and 'scenes' in new_scene_data:
+                    new_scene_data = new_scene_data['scenes'][0]
+
                 new_scene_data['scene_id'] = scene['scene_id']
 
                 # Apply guardrails
@@ -212,7 +239,7 @@ class RemotionRemaker:
             else:
                 print("❌ Gemini failed to produce valid JSON.")
         except Exception as e:
-            print(f"❌ Error parsing Gemini response: {e}")
+            print(f"❌ Error processing Gemini response: {e}")
 
     def render_scene(self, scene_num: int):
         scene_id = f"SCENE_{scene_num:02d}"
@@ -228,11 +255,13 @@ class RemotionRemaker:
         print(f"🎬 Triggering render for {scene_id} via render.ts...")
 
         # cmd: node --loader ts-node/esm render.ts --template=... --scene=SCENE_01 --output=...
+        # Disable skipping logic with --no-resume to ensure scene is always redone
         cmd = [
             "node", "--loader", "ts-node/esm", "render.ts",
             f"--template={self.manifest_path}",
             f"--scene={scene_id}",
-            f"--output={output_rel_path}"
+            f"--output={output_rel_path}",
+            "--no-resume"
         ]
 
         try:
