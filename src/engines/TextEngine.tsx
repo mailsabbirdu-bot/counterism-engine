@@ -121,9 +121,9 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
                  const jump = Math.sin(heroEntrance * Math.PI) * -25;
                  style.transform = `translateY(${jump}px) scale(${1 + heroEntrance * 0.1})`;
              } else if (anim === 'neon_flicker') {
-                 const flicker = Math.sin(heroFrame * 2) > 0 ? 1 : 0.4;
+                 const flicker = Math.sin(heroFrame * 2) > 0 ? 1 : 0.8;
                  style.opacity = progress * flicker;
-                 style.textShadow = `0 0 15px ${heroConfig.color}`;
+                 style.textShadow = `0 0 15px ${heroConfig.color}, 0 0 5px white`;
              } else if (anim === 'shake_alert') {
                  const shake = Math.sin(heroFrame * 3) * 5;
                  style.transform = `translateX(${shake}px) scale(1.1)`;

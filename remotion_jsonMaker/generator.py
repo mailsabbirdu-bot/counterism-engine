@@ -795,9 +795,14 @@ class RemotionJsonMaker:
                     try:
                         val = float(ov['value'])
                         if val >= 1000000:
-                            ov['value'] = int(val / 1000000); ov['suffix'] = "M" + ov.get('suffix', '')
+                            ov['value'] = int(val / 1000000); ov['suffix'] = " M" + ov.get('suffix', '').strip()
                         elif val >= 1000:
-                            ov['value'] = int(val / 1000); ov['suffix'] = "K" + ov.get('suffix', '')
+                            ov['value'] = int(val / 1000); ov['suffix'] = " K" + ov.get('suffix', '').strip()
+
+                        # Ensure space for word-based suffixes (e.g. "কোটি")
+                        suffix = ov.get('suffix', '')
+                        if suffix and not suffix.startswith(' ') and any(ord(c) > 127 for c in suffix):
+                            ov['suffix'] = " " + suffix
                     except: pass
 
                 # --- GUIDELINE: CINEMATIC PACING (15-90-15) ---
