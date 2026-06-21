@@ -211,8 +211,9 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
                  style.textShadow = `0 0 10px ${heroConfig.color}`;
                  style.transform = `scale(1.1)`;
              }
-             // Add horizontal buffer for scaling elements to prevent word overlap
-             style.margin = `0 ${heroEntrance * 15}px`;
+             // Add robust horizontal buffer for scaling elements to prevent word overlap
+             // Using a slightly larger buffer and ensuring it applies to both sides
+             style.margin = `0 ${heroEntrance * 30}px`;
           } else if (heroActive && (heroConfig.animation === 'isolate_zoom' || heroConfig.animation === 'blur_reveal')) {
              style.opacity = progress * (1 - heroEntrance * 0.7);
              style.filter = `blur(${heroEntrance * 8}px)`;
