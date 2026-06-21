@@ -25,6 +25,18 @@ else:
 
 %cd {ENGINE_DIR}
 
+# --- 1b. SYNC ASSETS FROM DRIVE ---
+print("📡 Syncing Assets from Drive...")
+!mkdir -p public/renders/audios public/fonts
+
+# Sync Renders
+!cp -f /content/drive/MyDrive/Counterism_Studio_V4/renders/*.mp4 public/renders/ 2>/dev/null || true
+# Sync SFX
+!cp -rf /content/drive/MyDrive/Counterism_Studio_V4/renders/audios/* public/renders/audios/ 2>/dev/null || true
+# Sync Fonts
+!cp -f /content/drive/MyDrive/Counterism_Studio_V4/*.ttf public/fonts/ 2>/dev/null || true
+!cp -f /content/drive/MyDrive/Counterism_Studio_V4/fonts/*.ttf public/fonts/ 2>/dev/null || true
+
 # Install Playwright for Gemini Refinement
 if shutil.which("playwright") is None:
     print("🛠️ Installing Automation Tools...")

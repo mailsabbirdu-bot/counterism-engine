@@ -79,22 +79,31 @@ class RemotionRemaker:
                 if new_val: text_ov['content'] = new_val
 
             elif choice == '2':
-                print(f"Bangla: {self.maker.bangla_fonts}")
-                print(f"English: {self.maker.english_fonts}")
+                all_fonts = self.maker.bangla_fonts + self.maker.english_fonts
+                print(f"Detected Fonts: {all_fonts}")
                 new_val = input("New Font Name: ").strip()
-                if new_val:
+                if new_val in all_fonts:
+                    for ov in overlays: ov['font'] = new_val
+                    print(f"✅ Font set to {new_val}")
+                else:
+                    print(f"⚠️ Warning: '{new_val}' not found in detected assets. Applying anyway...")
                     for ov in overlays: ov['font'] = new_val
 
             elif choice == '3':
                 new_val = input("New Color Hex (e.g. #00FFAB): ").strip()
                 if self.validate_color(new_val):
                     for ov in overlays: ov['color'] = new_val
-                else: print("⚠️ Invalid Hex Color")
+                    print(f"✅ Color set to {new_val}")
+                else: print("❌ Invalid Hex Color. Use format #RRGGBB")
 
             elif choice == '4' and text_ov:
-                print("Options: neon_flicker, glitch_pop, slideUp, wordByWord, cinematicGlow")
+                anims = ["neon_flicker", "glitch_pop", "slideUp", "wordByWord", "cinematicGlow"]
+                print(f"Supported: {anims}")
                 new_val = input("New Animation: ").strip()
-                if new_val: text_ov['animation'] = new_val
+                if new_val in anims:
+                    text_ov['animation'] = new_val
+                    print(f"✅ Animation set to {new_val}")
+                else: print(f"❌ Unsupported animation. Choose from: {anims}")
 
             elif choice == '5':
                 try:
@@ -117,8 +126,17 @@ class RemotionRemaker:
 
             elif choice == '7' and scene.get('camera', {}).get('shots'):
                 shot = scene['camera']['shots'][0]
+                styles = [
+                    "slow_push", "slow_pull", "push_in", "pull_out", "whip_pan", "dramatic_reveal",
+                    "cinematic_drift", "dynamic_orbit", "vertical_sweep", "spiral_vortex", "glitch_snap",
+                    "low_angle_hero", "side_strafe_left", "side_strafe_right", "aerial_top_down",
+                    "shaky_handheld", "zoom_blur_reveal", "tilt_shift_focus", "power_zoom", "smooth_glide"
+                ]
+                print(f"Common Styles: {styles[:10]}...")
                 new_val = input(f"Current Style: {shot.get('style')}\nNew Style: ").strip()
-                if new_val: shot['style'] = new_val
+                if new_val in styles or new_val:
+                    shot['style'] = new_val
+                    print(f"✅ Camera Style set to {new_val}")
 
             elif choice == '8' and scene.get('camera', {}).get('shots'):
                 shot = scene['camera']['shots'][0]
