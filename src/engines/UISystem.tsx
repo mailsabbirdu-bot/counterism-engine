@@ -15,6 +15,10 @@ export const UISystem: React.FC<{ overlay: any }> = ({ overlay }) => {
 
   const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
 
+  if (overlay.indicator_type === 'flickerTextBox') {
+      return <FlickerTextBox overlay={overlay} safeFrame={safeFrame} fps={fps} />;
+  }
+
   const entrance = spring({
     frame: safeFrame,
     fps,
@@ -98,4 +102,43 @@ export const UISystem: React.FC<{ overlay: any }> = ({ overlay }) => {
       </div>
     </div>
   );
+};
+
+const FlickerTextBox = ({ overlay, safeFrame, fps }: any) => {
+    const flicker = Math.sin(safeFrame * 0.8) > 0 ? 1 : 0.7;
+    const entrance = spring({ frame: safeFrame, fps, config: { damping: 12 } });
+    const fontStyle = { fontFamily: overlay.font || 'Inter' };
+    const color = overlay.color || '#3b82f6';
+
+    return (
+        <div className="absolute" style={{
+            left: `${overlay.position?.x ?? 960}px`,
+            top: `${overlay.position?.y ?? 540}px`,
+            transform: 'translate(-50%, -50%)',
+            zIndex: 100
+        }}>
+            <div style={{
+                ...fontStyle,
+                width: '600px',
+                padding: '40px',
+                backgroundColor: 'rgba(0,0,0,0.85)',
+                backdropFilter: 'blur(20px)',
+                borderRadius: '12px 60px 12px 60px',
+                border: `3px solid ${color}`,
+                boxShadow: `0 0 40px ${color}44, inset 0 0 20px ${color}22`,
+                opacity: flicker * entrance,
+                color: 'white',
+                position: 'relative',
+                overflow: 'hidden'
+            }}>
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 animate-pulse" />
+                <h3 className="text-2xl font-black uppercase tracking-widest mb-4" style={{ ...fontStyle, color }}>{overlay.title}</h3>
+                <p className="text-4xl font-bold leading-tight" style={fontStyle}>{overlay.content}</p>
+                <div className="mt-6 flex items-center justify-between opacity-50">
+                    <span className="text-xs font-mono">STATUS: FLICKER_ACTIVE</span>
+                    <span className="text-xs font-mono">CORE_V4</span>
+                </div>
+            </div>
+        </div>
+    );
 };
