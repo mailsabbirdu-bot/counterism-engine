@@ -652,6 +652,15 @@ class RemotionJsonMaker:
 
         return hero
 
+    def _get_fallback_hero(self, overlay_content: str):
+        """Pick longest word if timestamp matching fails."""
+        if not overlay_content: return None
+        content_clean = re.sub(r'[.।]', '', overlay_content)
+        words = content_clean.split()
+        if not words: return None
+        hero_word = max(words, key=len)
+        return {"word": hero_word, "start": 60} # Default 2sec in
+
     def validate_and_fix_manifest(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Final integrity pass to ensure compliance with Studio V4 Guidelines & Engine."""
         print("🔍 Guardrail Engine: Performing deep validation of engine compliance and user guidelines...")
@@ -729,6 +738,9 @@ class RemotionJsonMaker:
 
                     # --- GUIDELINE: HERO WORD ---
                     hero = self._get_scene_hero_word(scene_id, ov.get('content', ''))
+                    if not hero:
+                        hero = self._get_fallback_hero(ov.get('content', ''))
+
                     if hero:
                         hero_anims = [
                             "glow_pulse", "isolate_zoom", "bounce_pop", "neon_flicker", "shake_alert",

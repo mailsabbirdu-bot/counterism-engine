@@ -76,11 +76,12 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
 
           // Hero Word Logic
           const isHero = item.replace(/[.।]/g, '') === heroWord;
-          const heroActive = heroConfig && frame >= heroConfig.start;
-          const heroFrame = frame - heroConfig?.start;
+          const heroStart = heroConfig?.start ?? 0;
+          const heroActive = !!(heroConfig && frame >= heroStart);
+          const heroFrame = heroConfig ? Math.max(0, frame - heroStart) : 0;
 
           const heroEntrance = spring({
-             frame: heroFrame,
+             frame: isNaN(heroFrame) ? 0 : heroFrame,
              fps,
              config: { damping: 12, stiffness: 100 }
           });
@@ -98,13 +99,21 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
           if (isHero && heroActive) {
              const anim = heroConfig.animation;
              if (anim === 'glow_pulse') {
-                 const pulse = Math.sin(heroFrame * 0.2) * 0.5 + 0.5;
-                 const glowSize = 10 + pulse * 30;
+                 const pulse = Math.sin(heroFrame * 0.15) * 0.5 + 0.5;
+                 const glowIntensity = interpolate(pulse, [0, 1], [0.6, 1]);
                  style.color = '#fff';
-                 style.textShadow = `0 0 5px #fff, 0 0 10px ${heroConfig.color}, 0 0 ${glowSize}px ${heroConfig.color}`;
-                 style.filter = `drop-shadow(0 0 2px rgba(255,255,255,0.8))`;
-                 style.WebkitTextStroke = `1.5px ${heroConfig.color}`;
-                 style.transform = `scale(${1 + heroEntrance * 0.15 + pulse * 0.05})`;
+                 // Ultra Modern Stacked Glow: Sharp core + Neon highlight + Pulsing atmosphere
+                 style.textShadow = `
+                    0 0 4px #fff,
+                    0 0 12px ${heroConfig.color},
+                    0 0 25px ${heroConfig.color},
+                    0 0 ${35 + pulse * 25}px ${heroConfig.color}
+                 `;
+                 style.filter = `brightness(${1.1 + pulse * 0.2}) contrast(1.1) drop-shadow(0 0 1px white)`;
+                 style.WebkitTextStroke = `2px ${heroConfig.color}`;
+                 style.transform = `scale(${1 + heroEntrance * 0.15 + pulse * 0.04}) translateY(${pulse * -8}px)`;
+                 style.zIndex = 100;
+                 style.opacity = progress * glowIntensity;
              } else if (anim === 'isolate_zoom') {
                  style.transform = `scale(${1 + heroEntrance * 0.35})`;
                  style.zIndex = 100;
