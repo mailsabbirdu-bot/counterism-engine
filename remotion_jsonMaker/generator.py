@@ -237,6 +237,7 @@ class RemotionJsonMaker:
         for scene_idx, scene in enumerate(data['scenes']):
             scene_sfx = [] # Local collection to allow de-duplication
             s_id = scene.get('scene_id', 'unknown')
+            has_relation = False # Initialize to prevent UnboundLocalError
 
             # 1. LLM Fix: Root Level Schema Alignment
             if 'duration' in scene and 'duration_in_frames' not in scene:
@@ -664,11 +665,14 @@ class RemotionJsonMaker:
         hero['start'] = max(45, hero['start'])
 
         # 2. End buffer: Hero word must stay on screen for at least 2 seconds (60 frames)
-        # So it must start animating NO LATER than (total_duration - 60)
-        # We also need to leave some time for the exit animation (15 frames)
-        safe_end_start = scene_duration - 75
-        if hero['start'] > safe_end_start:
-             hero['start'] = max(45, safe_end_start)
+        # It must start animating AT LEAST 60 frames BEFORE the scene ends.
+        # This ensures the highlight is visible for the required duration.
+        # We also need to account for the overlay's exit duration (15 frames).
+        latest_possible_start = scene_duration - 75
+
+        if hero['start'] > latest_possible_start:
+             # If audio sync is too late, shift start earlier to satisfy 2s stay rule
+             hero['start'] = max(45, latest_possible_start)
 
         return hero
 

@@ -105,10 +105,10 @@ export const UISystem: React.FC<{ overlay: any }> = ({ overlay }) => {
 };
 
 const FlickerTextBox = ({ overlay, safeFrame, fps }: any) => {
-    const flicker = Math.sin(safeFrame * 0.8) > 0 ? 1 : 0.7;
-    const entrance = spring({ frame: safeFrame, fps, config: { damping: 12 } });
+    const flicker = Math.sin(safeFrame * 1.5) > 0 ? 1 : 0.85;
+    const entrance = spring({ frame: safeFrame, fps, config: { damping: 12, stiffness: 120 } });
     const fontStyle = { fontFamily: overlay.font || 'Inter' };
-    const color = overlay.color || '#3b82f6';
+    const color = overlay.color || '#00F5FF';
 
     return (
         <div className="absolute" style={{
@@ -119,24 +119,41 @@ const FlickerTextBox = ({ overlay, safeFrame, fps }: any) => {
         }}>
             <div style={{
                 ...fontStyle,
-                width: '600px',
-                padding: '40px',
-                backgroundColor: 'rgba(0,0,0,0.85)',
-                backdropFilter: 'blur(20px)',
-                borderRadius: '12px 60px 12px 60px',
-                border: `3px solid ${color}`,
-                boxShadow: `0 0 40px ${color}44, inset 0 0 20px ${color}22`,
+                width: '650px',
+                padding: '50px',
+                background: 'linear-gradient(135deg, rgba(10,10,10,0.95) 0%, rgba(30,30,30,0.9) 100%)',
+                backdropFilter: 'blur(40px)',
+                borderRadius: '4px 80px 4px 80px',
+                border: `4px solid ${color}`,
+                boxShadow: `0 0 60px ${color}33, inset 0 0 30px ${color}11, 0 0 100px rgba(0,0,0,0.5)`,
                 opacity: flicker * entrance,
                 color: 'white',
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                transform: `perspective(1000px) rotateX(${(1-entrance) * 20}deg)`
             }}>
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 animate-pulse" />
-                <h3 className="text-2xl font-black uppercase tracking-widest mb-4" style={{ ...fontStyle, color }}>{overlay.title}</h3>
-                <p className="text-4xl font-bold leading-tight" style={fontStyle}>{overlay.content}</p>
-                <div className="mt-6 flex items-center justify-between opacity-50">
-                    <span className="text-xs font-mono">STATUS: FLICKER_ACTIVE</span>
-                    <span className="text-xs font-mono">CORE_V4</span>
+                {/* Modern Scanline Effect */}
+                <div className="absolute inset-0 pointer-events-none opacity-10" style={{
+                     background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, white 3px)'
+                }} />
+
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white to-transparent opacity-40" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '30px' }}>
+                    <div style={{ width: '12px', height: '12px', backgroundColor: color, borderRadius: '50%', boxShadow: `0 0 10px ${color}` }} />
+                    <h3 className="text-3xl font-black uppercase tracking-[0.25em]" style={{ ...fontStyle, color, textShadow: `0 0 10px ${color}88` }}>{overlay.title || 'ALERT'}</h3>
+                </div>
+
+                <p className="text-5xl font-black leading-[1.1] tracking-tight" style={{ ...fontStyle, textShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>{overlay.content}</p>
+
+                <div className="mt-10 flex items-center justify-between border-t border-white/10 pt-6">
+                    <div className="flex flex-col">
+                        <span className="text-[10px] font-mono opacity-40 uppercase">System Status</span>
+                        <span className="text-xs font-mono font-bold text-emerald-400">FLICKER_STABLE_V4</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                        <span className="text-[10px] font-mono opacity-40 uppercase">Node ID</span>
+                        <span className="text-xs font-mono font-bold opacity-80">{overlay.nodeId || 'PRIM-01'}</span>
+                    </div>
                 </div>
             </div>
         </div>
