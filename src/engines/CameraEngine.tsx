@@ -164,6 +164,8 @@ export const CameraEngine: React.FC<{
             let endZoom = zoom;
             let currentEasing = shot.easing || 'in-out';
 
+            let rotationX = 0, rotationY = 0, rotationZ = 0, zOffset = 0;
+
             if (shot.style === 'push_in' || shot.style === 'slow_push') {
                 startZoom = zoom * 0.85;
                 endZoom = zoom;
@@ -175,17 +177,104 @@ export const CameraEngine: React.FC<{
             } else if (shot.style === 'dramatic_reveal') {
                 startZoom = zoom * 1.5;
                 endZoom = zoom;
-                currentEasing = { type: 'bezier', bezier: [0.16, 1, 0.3, 1] } as any; // Ease Out Expo-ish
-
-                // Add an extra keyframe for the "reveal" tilt/rotate
-                keys.push({
-                    frame: shot.startFrame,
-                    rotationX: 25,
-                    rotationY: -10,
-                    z: -200,
-                    easing: 'out'
-                });
+                currentEasing = { type: 'bezier', bezier: [0.16, 1, 0.3, 1] } as any;
+                rotationX = 25; rotationY = -15; zOffset = -200;
+            } else if (shot.style === 'cinematic_drift') {
+                rotationZ = 2; rotationX = 3;
+            } else if (shot.style === 'dynamic_orbit') {
+                rotationY = 15; rotationX = 5;
+            } else if (shot.style === 'vertical_sweep') {
+                rotationX = -20;
+            } else if (shot.style === 'spiral_vortex') {
+                rotationZ = 45; startZoom = zoom * 0.5;
+            } else if (shot.style === 'glitch_snap') {
+                currentEasing = { type: 'bezier', bezier: [0.1, 0.9, 0.2, 1] } as any;
+                rotationZ = -5;
+            } else if (shot.style === 'low_angle_hero') {
+                rotationX = -35; zOffset = 100;
+            } else if (shot.style === 'side_strafe_left') {
+                rotationY = -20;
+            } else if (shot.style === 'side_strafe_right') {
+                rotationY = 20;
+            } else if (shot.style === 'aerial_top_down') {
+                rotationX = 70; startZoom = zoom * 0.7;
+            } else if (shot.style === 'shaky_handheld') {
+                rotationZ = 3; rotationX = 2; rotationY = 2;
+            } else if (shot.style === 'zoom_blur_reveal') {
+                startZoom = 0.1; currentEasing = { type: 'bezier', bezier: [0.4, 0, 0.2, 1] } as any;
+            } else if (shot.style === 'tilt_shift_focus') {
+                rotationX = 15; rotationY = 15;
+            } else if (shot.style === 'power_zoom') {
+                startZoom = zoom * 0.4; currentEasing = { type: 'bezier', bezier: [0.85, 0, 0.15, 1] } as any;
+            } else if (shot.style === 'smooth_glide') {
+                rotationZ = -1; rotationY = -5;
+            } else if (shot.style === 'epic_scaling') {
+                startZoom = 0.5; endZoom = zoom * 1.2;
+            } else if (shot.style === 'warp_speed') {
+                zOffset = -1000; startZoom = 0.5;
+            } else if (shot.style === 'rolling_horizon') {
+                rotationZ = -90; currentEasing = { type: 'bezier', bezier: [0.6, -0.28, 0.735, 0.045] } as any;
+            } else if (shot.style === 'fisheye_distort') {
+                startZoom = 1.8; endZoom = zoom; rotationX = 10;
+            } else if (shot.style === 'dolly_zoom') {
+                startZoom = zoom * 2; endZoom = zoom; zOffset = 500;
+            } else if (shot.style === 'parallax_slide') {
+                rotationY = 40; zOffset = -300;
+            } else if (shot.style === 'staccato_jump') {
+                currentEasing = { type: 'bezier', bezier: [0, 1, 0, 1] } as any;
+            } else if (shot.style === 'oblique_view') {
+                rotationX = 20; rotationY = 20; rotationZ = 10;
+            } else if (shot.style === 'macro_focus') {
+                startZoom = zoom * 1.4; endZoom = zoom;
+            } else if (shot.style === 'uprising_reveal') {
+                rotationX = -60; zOffset = -500;
+            } else if (shot.style === 'descending_gaze') {
+                rotationX = 60; zOffset = 500;
+            } else if (shot.style === 'infinity_loop') {
+                rotationZ = 360; rotationY = 30;
+            } else if (shot.style === 'kaleidoscope') {
+                rotationZ = 180; rotationX = 20; rotationY = 20;
+            } else if (shot.style === 'cyber_scan') {
+                rotationY = -45; rotationX = 10;
+            } else if (shot.style === 'extreme_closeup') {
+                startZoom = zoom * 3; endZoom = zoom;
+            } else if (shot.style === 'wide_panorama') {
+                startZoom = zoom * 0.3; endZoom = zoom;
+            } else if (shot.style === 'pendulum_swing') {
+                rotationZ = -30; rotationY = 15;
+            } else if (shot.style === 'drunken_stumble') {
+                rotationZ = 10; rotationX = 10; rotationY = 10;
+            } else if (shot.style === 'floating_weightless') {
+                rotationX = 5; rotationY = 5; rotationZ = 5;
+            } else if (shot.style === 'rapid_fire') {
+                currentEasing = Easing.bounce as any;
+            } else if (shot.style === 'gentle_breeze') {
+                rotationZ = 0.5; rotationY = 1;
+            } else if (shot.style === 'the_matrix') {
+                rotationY = 90; startZoom = zoom * 0.5;
+            } else if (shot.style === 'heartbeat_zoom') {
+                currentEasing = Easing.elastic(1) as any;
             }
+
+            // Reach target
+            keys.push({
+                frame: shot.startFrame,
+                lookAt: shot.targetId,
+                zoom: startZoom,
+                rotationX, rotationY, rotationZ,
+                z: zOffset,
+                easing: 'linear'
+            });
+
+            // End hold (animate within shot for cinematic feel)
+            keys.push({
+                frame: shot.startFrame + shot.duration,
+                lookAt: shot.targetId,
+                zoom: endZoom,
+                rotationX: 0, rotationY: 0, rotationZ: 0,
+                z: 0,
+                easing: currentEasing
+            });
 
             // Reach target
             keys.push({
