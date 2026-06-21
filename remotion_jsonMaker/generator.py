@@ -624,8 +624,14 @@ class RemotionJsonMaker:
     def _get_scene_hero_word(self, scene_id: str, overlay_content: str):
         if not self.raw_timestamps or not overlay_content: return None
 
-        # Meaningless Bangla stop-words to avoid for hero animations
-        STOP_WORDS = ["এই", "একটি", "হলো", "হচ্ছে", "আর", "কিন্তু", "এবং", "বা", "তবে", "যদি", "যে", "সে", "তারা", "ছিল", "হবে", "করে", "করা", "জন্য", "থেকে", "সাথে", "দ্বারা", "মাধ্যমে", "এক", "দুই", "তিন", "চার", "পাচ", "ছয়", "সাত", "আট", "নয়", "দশ", "কোটি", "লক্ষ", "কোটিরও"]
+        # Comprehensive Bangla stop-words to avoid meaningless hero highlights
+        STOP_WORDS = [
+            "এই", "একটি", "হলো", "হচ্ছে", "আর", "কিন্তু", "এবং", "বা", "তবে", "যদি", "যে", "সে", "তারা", "ছিল", "হবে",
+            "করে", "করা", "জন্য", "থেকে", "সাথে", "দ্বারা", "মাধ্যমে", "এক", "দুই", "তিন", "চার", "পাচ", "ছয়", "সাত",
+            "আট", "নয়", "দশ", "কোটি", "লক্ষ", "কোটিরও", "বেশি", "কম", "অনেক", "অল্প", "হলে", "যায়", "গিয়ে", "নিয়ে",
+            "হয়ে", "থাকা", "রাখা", "বলছে", "বলেন", "শুরু", "শেষ", "এখন", "তখন", "যখন", "পর্যন্ত", "প্রতিটি", "প্রতি",
+            "সব", "সবাই", "কেউ", "কেউই", "কিছু", "কোন", "কোনো", "মতো", "মত", "মতোই", "মতই", "নিজেই", "নিজে", "বড়", "ছোট"
+        ]
 
         # SCENE_01: [Original: 0.00s - 0.98s] -> [30fps: 0f - 29f] "ঢাকা।"
         pattern = fr'{scene_id}:.*?\[30fps:\s*(\d+)f\s*-\s*\d+f\]\s*"(.*?)"'
@@ -678,8 +684,8 @@ class RemotionJsonMaker:
             "wide_panorama", "pendulum_swing", "drunken_stumble", "floating_weightless", "rapid_fire",
             "gentle_breeze", "the_matrix", "heartbeat_zoom"
         ]
-        # ULTRA MODERN - EYE SOOTHING - ATTENTION GRABBING PALETTE
-        modern_colors = ["#00F5FF", "#FF3E6C", "#00FFAB", "#ADFF2F", "#FFD700", "#FF69B4", "#7B68EE"] # Cyan Glow, Rose, Neon Mint, Lime, Gold, Pink, Iris
+        # ULTRA MODERN - EYE SOOTHING - ATTENTION GRABBING PALETTE (Curated)
+        modern_colors = ["#00F5FF", "#FF3E6C", "#00FFAB", "#ADFF2F", "#FFD700", "#7B68EE", "#FF8C00"] # Cyan, Rose, Neon Mint, Lime, Gold, Iris, Deep Orange
 
         for idx, scene in enumerate(data['scenes']):
             scene_id = scene.get('scene_id', f"SCENE_{idx+1}")
@@ -694,15 +700,24 @@ class RemotionJsonMaker:
 
             if has_number and not has_focal:
                 print(f"   ⚠️ Scene {scene_id} mentions numbers but lacks focal visualization. Injecting KPI.")
-                # Extract the first number found for the KPI value
+                # Improved number extraction: look for patterns like "২ কোটি" or "20 million"
                 num_match = re.search(r'([0-9০-৯]+)', all_text)
                 injected_val = self._to_eng_digit(num_match.group(1)) if num_match else "0"
+
+                # Check for magnitude suffixes in text to refine 'injected_val'
+                suffix = ""
+                if "কোটি" in all_text: suffix = "কোটি"
+                elif "লক্ষ" in all_text: suffix = "লক্ষ"
+                elif "million" in all_text.lower(): suffix = "M"
+                elif "percent" in all_text.lower() or "%" in all_text: suffix = "%"
+
                 scene['overlays'].append({
                     "id": f"kpi_auto_{idx}",
                     "type": "data_indicator",
                     "indicator_type": "kpiNumber",
                     "label": "Metric",
-                    "value": int(injected_val),
+                    "value": int(injected_val) if injected_val != "0" else 10, # Avoid silly '0' values
+                    "suffix": suffix,
                     "start": 30,
                     "duration": duration - 60,
                     "position": {"x": 1440, "y": 540} # Default to right

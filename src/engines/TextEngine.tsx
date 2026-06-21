@@ -102,20 +102,17 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
              const anim = heroConfig.animation;
              if (anim === 'glow_pulse') {
                  const pulse = Math.sin(heroFrame * 0.15) * 0.5 + 0.5;
-                 const glowIntensity = interpolate(pulse, [0, 1], [0.6, 1]);
-                 style.color = '#fff';
-                 // Ultra Modern Stacked Glow: Sharp core + Neon highlight + Pulsing atmosphere
+                 style.color = 'transparent';
+                 // High-end Offset Neon Stroke Design
                  style.textShadow = `
-                    0 0 4px #fff,
-                    0 0 12px ${heroConfig.color},
-                    0 0 25px ${heroConfig.color},
-                    0 0 ${35 + pulse * 25}px ${heroConfig.color}
+                    2px 2px 0px ${heroConfig.color},
+                    -1px -1px 0px white,
+                    0 0 15px ${heroConfig.color}88,
+                    0 0 ${30 + pulse * 20}px ${heroConfig.color}44
                  `;
-                 style.filter = `brightness(${1.1 + pulse * 0.2}) contrast(1.1) drop-shadow(0 0 1px white)`;
-                 style.WebkitTextStroke = `2px ${heroConfig.color}`;
-                 style.transform = `scale(${1 + heroEntrance * 0.15 + pulse * 0.04}) translateY(${pulse * -8}px)`;
+                 style.WebkitTextStroke = `1.5px rgba(255,255,255,0.8)`;
+                 style.transform = `scale(${1 + heroEntrance * 0.12 + pulse * 0.03}) rotate(${pulse * 1.5}deg)`;
                  style.zIndex = 100;
-                 style.opacity = progress * glowIntensity;
              } else if (anim === 'isolate_zoom') {
                  style.transform = `scale(${1 + heroEntrance * 0.35})`;
                  style.zIndex = 100;
