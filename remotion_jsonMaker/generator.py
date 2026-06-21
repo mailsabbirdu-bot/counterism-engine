@@ -799,10 +799,12 @@ class RemotionJsonMaker:
                         elif val >= 1000:
                             ov['value'] = int(val / 1000); ov['suffix'] = " K" + ov.get('suffix', '').strip()
 
-                        # Ensure space for word-based suffixes (e.g. "কোটি")
+                        # Ensure space for word-based suffixes (e.g. "কোটি", "people")
                         suffix = ov.get('suffix', '')
-                        if suffix and not suffix.startswith(' ') and any(ord(c) > 127 for c in suffix):
-                            ov['suffix'] = " " + suffix
+                        if suffix and not suffix.startswith(' '):
+                            # If it starts with a letter or Bangla character, add a space
+                            if re.match(r'[a-zA-Z\u0980-\u09FF]', suffix):
+                                ov['suffix'] = " " + suffix
                     except: pass
 
                 # --- GUIDELINE: CINEMATIC PACING (15-90-15) ---
@@ -1125,11 +1127,18 @@ class RemotionJsonMaker:
 
             try:
                 # Use strict=False to handle unescaped control characters
-                return json.loads(json_str, strict=False)
+                parsed = json.loads(json_str, strict=False)
+                if isinstance(parsed, dict) and 'error' in parsed:
+                    print(f"⚠️ Gemini returned an error JSON: {parsed['error']}")
+                    return {}
+                return parsed
             except Exception as e:
                 print(f"⚠️ JSON primary parse failed. Attempting repair...")
                 result = repair_json(json_str)
                 if result:
+                    if isinstance(result, dict) and 'error' in result:
+                        print(f"⚠️ Repaired JSON contains an error key: {result['error']}")
+                        return {}
                     return result
                 print(f"❌ JSON repair failed.")
                 return {}

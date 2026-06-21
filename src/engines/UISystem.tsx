@@ -5,22 +5,26 @@ import { Terminal, ShieldCheck, Activity, Cpu, Box } from 'lucide-react';
 export const UISystem: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
-  const relativeFrame = frame - overlay.start;
+  const start = Number(overlay.start) || 0;
+  const duration = Number(overlay.duration) || 120;
+  const relativeFrame = frame - start;
 
-  if (frame < overlay.start || frame > overlay.start + overlay.duration) {
+  if (frame < start || frame > start + duration) {
     return null;
   }
 
+  const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
+
   const entrance = spring({
-    frame: relativeFrame,
+    frame: safeFrame,
     fps,
     config: { damping: 15, stiffness: 100 }
   });
 
-  const opacity = interpolate(relativeFrame, [0, 20], [0, 1], { extrapolateRight: 'clamp' });
+  const opacity = interpolate(safeFrame, [0, 20], [0, 1], { extrapolateRight: 'clamp' });
 
   const progressValue = interpolate(
-    relativeFrame,
+    safeFrame,
     [30, 120],
     [overlay.initialProgress || 0, overlay.targetProgress || 100],
     { extrapolateRight: 'clamp' }
