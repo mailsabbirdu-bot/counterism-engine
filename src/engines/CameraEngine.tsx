@@ -340,23 +340,6 @@ export const CameraEngine: React.FC<{
         backgroundColor: '#000'
       }}
     >
-      {/* Fixed Background Layer with Parallax */}
-      {backgroundLayer && (
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width,
-          height,
-          zIndex: 0,
-          // Subtle reactive parallax based on camera target
-          transform: `scale(1.1) translate3d(${(cx - tx) * 0.05}px, ${(cy - ty) * 0.05}px, -100px)`,
-          willChange: 'transform'
-        }}>
-          {backgroundLayer}
-        </div>
-      )}
-
       {/* Cinematic Camera Pivot System */}
       <div
         style={{
@@ -382,7 +365,36 @@ export const CameraEngine: React.FC<{
           backfaceVisibility: 'hidden',
         }}
       >
-        {children}
+        {/* Fixed Background Layer inside the same 3D container for absolute layering */}
+        {backgroundLayer && (
+            <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width,
+                height,
+                // Even further in the distance. scale(12) compensates for perspective shrinkage at -10000px
+                transform: `translate3d(0, 0, -10000px) scale(12)`,
+                zIndex: -100, // Absolute bottom
+                pointerEvents: 'none'
+            }}>
+                {backgroundLayer}
+            </div>
+        )}
+
+        {/* Global Dark Overlay for Readability, placed between BG and Overlays in 3D space */}
+        <div style={{
+            position: 'absolute',
+            top: 0, left: 0, width, height,
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            transform: `translate3d(0, 0, -5000px) scale(6)`,
+            zIndex: -50,
+            pointerEvents: 'none'
+        }} />
+
+        <div style={{ position: 'absolute', top: 0, left: 0, width, height, zIndex: 1, transformStyle: 'preserve-3d' }}>
+            {children}
+        </div>
       </div>
     </div>
   );

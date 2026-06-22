@@ -15,15 +15,19 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     return null;
   }
 
-  const text = overlay.text || overlay.content || '';
-  const items = text.split(' ');
+  const text = (overlay.text || overlay.content || '').trim();
+  const items = text.split(/\s+/);
 
   const heroConfig = overlay.hero_config;
   const heroWord = heroConfig?.word?.replace(/[.।]/g, '');
 
-  const baseFontSize = overlay.fontSize || "120px";
+  const baseFontSize = typeof overlay.fontSize === 'number' ? `${overlay.fontSize}px` : (overlay.fontSize || "120px");
   const x = overlay.position?.x ?? width / 2;
   const y = overlay.position?.y ?? height / 2;
+
+  if (frame % 30 === 0) {
+    console.log(`[TextEngine] Scene: ${overlay.scene_id} Overlay: ${overlay.id} Visible: ${frame >= start && frame <= start + duration} Text: "${text.substring(0, 20)}..." Pos: (${x}, ${y}) Font: ${overlay.font} Size: ${baseFontSize} Hero: ${heroWord}`);
+  }
 
   return (
     <div
@@ -33,20 +37,23 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: overlay.font || 'Inter',
+        fontFamily: overlay.font || 'Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
         fontSize: baseFontSize,
-        zIndex: overlay.zIndex,
+        zIndex: overlay.zIndex || 1000, // Ultra-high zIndex for text
         left: `${x}px`,
         top: `${y}px`,
         transform: 'translate(-50%, -50%)',
         // SCREEN SAFETY: Limit width and ensure wrapping
-        width: 'auto',
+        width: '1600px',
         maxWidth: '1600px',
         height: 'auto',
-        textShadow: '0 4px 30px rgba(0,0,0,0.5), 0 0 100px rgba(0,0,0,0.2)',
+        textShadow: '0 4px 30px rgba(0,0,0,1), 0 0 120px rgba(0,0,0,0.6)', // Maximum contrast shadows
         color: overlay.color || 'white',
+        WebkitTextStroke: '2px rgba(0,0,0,0.5)', // Visible readability stroke
         whiteSpace: 'normal', // Allow wrapping
-        lineHeight: 1.2
+        lineHeight: 1.2,
+        overflow: 'visible',
+        opacity: 1, // Force base opacity
       }}
     >
       <div style={{
@@ -214,9 +221,11 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
              // Add robust horizontal buffer for scaling elements to prevent word overlap
              // Using a slightly larger buffer and ensuring it applies to both sides
              style.margin = `0 ${heroEntrance * 30}px`;
+             style.zIndex = 1001;
           } else if (heroActive && (heroConfig.animation === 'isolate_zoom' || heroConfig.animation === 'blur_reveal')) {
-             style.opacity = progress * (1 - heroEntrance * 0.7);
-             style.filter = `blur(${heroEntrance * 8}px)`;
+             // Less aggressive dimming for non-hero words
+             style.opacity = progress * (1 - heroEntrance * 0.3);
+             style.filter = `blur(${heroEntrance * 3}px)`;
           }
 
           if (overlay.animation === 'cinematicGlow') {

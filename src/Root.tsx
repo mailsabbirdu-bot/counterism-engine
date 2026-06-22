@@ -122,6 +122,7 @@ export const RemotionRoot: React.FC = () => {
   return (
     <>
       {template.scenes.map((scene: any) => {
+        console.log(`[Root] Initializing Composition for Scene: ${scene.scene_id} (${scene.duration_in_frames} frames)`);
         const processedScene = processCameraAutomation(scene);
         return (
           <Composition
