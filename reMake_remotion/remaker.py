@@ -243,22 +243,34 @@ class RemotionRemaker:
 
     def render_scene(self, scene_num: int):
         scene_id = f"SCENE_{scene_num:02d}"
+        scene = self.get_scene(scene_num)
+        if not scene: return
 
-        # We use the existing render.ts script to ensure environment consistency (fonts, assets, etc.)
-        # and to utilize its chunking/resume capabilities if needed.
+        # Standalone architecture: Create a dedicated JSON for just this scene
+        standalone_path = "/content/remake_scene.json"
+        standalone_manifest = {
+            "project_name": f"Remake_{scene_id}",
+            "global_settings": self.data.get("global_settings", {"width": 1920, "height": 1080, "fps": 30}),
+            "scenes": [scene],
+            "audio_sfx_manifest": [s for s in self.data.get("audio_sfx_manifest", []) if s.get("scene_id") == scene_id]
+        }
+
+        with open(standalone_path, 'w', encoding='utf-8') as f:
+            json.dump(standalone_manifest, f, indent=2, ensure_ascii=False)
+
+        # We use the existing render.ts script to ensure environment consistency
         output_rel_path = f"remake/updated_scene_{scene_id}.mp4"
 
         # Ensure remake folder exists relative to Drive output base
         remake_full_dir = "/content/drive/MyDrive/Counterism_Studio_V4/renders/overlays/remotion/remake"
         os.makedirs(remake_full_dir, exist_ok=True)
 
-        print(f"🎬 Triggering render for {scene_id} via render.ts...")
+        print(f"🎬 Triggering standalone render for {scene_id} via render.ts...")
 
         # cmd: node --loader ts-node/esm render.ts --template=... --scene=SCENE_01 --output=...
-        # Disable skipping logic with --no-resume to ensure scene is always redone
         cmd = [
             "node", "--loader", "ts-node/esm", "render.ts",
-            f"--template={self.manifest_path}",
+            f"--template={standalone_path}",
             f"--scene={scene_id}",
             f"--output={output_rel_path}",
             "--no-resume"
@@ -268,7 +280,7 @@ class RemotionRemaker:
             # Change dir to engine root where render.ts is
             cwd = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
             subprocess.run(cmd, check=True, cwd=cwd)
-            print(f"✅ Render Complete. Scene saved to remake folder.")
+            print(f"✅ Standalone Render Complete. Scene saved to remake folder.")
         except subprocess.CalledProcessError as e:
             print(f"❌ Render failed: {e}")
 

@@ -22,11 +22,14 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const heroWord = heroConfig?.word?.replace(/[.।]/g, '');
 
   const baseFontSize = typeof overlay.fontSize === 'number' ? `${overlay.fontSize}px` : (overlay.fontSize || "120px");
-  const x = overlay.position?.x ?? width / 2;
-  const y = overlay.position?.y ?? height / 2;
+  const x = Number(overlay.position?.x) ?? width / 2;
+  const y = Number(overlay.position?.y) ?? height / 2;
 
   if (frame % 30 === 0) {
     console.log(`[TextEngine] Scene: ${overlay.scene_id} Overlay: ${overlay.id} Visible: ${frame >= start && frame <= start + duration} Text: "${text.substring(0, 20)}..." Pos: (${x}, ${y}) Font: ${overlay.font} Size: ${baseFontSize} Hero: ${heroWord}`);
+    if (isNaN(x) || isNaN(y)) {
+        console.error(`❌ COORDINATE ERROR: x or y is NaN for overlay ${overlay.id}. Manifest value:`, overlay.position);
+    }
   }
 
   return (

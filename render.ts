@@ -167,7 +167,7 @@ const start = async () => {
       let outputLocation: string;
       // FIX: Respect --output if we are specifically rendering ONE scene via --scene
       if (outputArg && (template.scenes.length === 1 || sceneIdArg)) {
-        outputLocation = path.isAbsolute(outputArg) ? outputArg : path.join(outputDir, outputArg);
+        outputLocation = path.isAbsolute(outputArg) ? outputArg : path.join(path.dirname(outputDir), outputArg);
       } else {
         outputLocation = path.join(
           outputDir,
