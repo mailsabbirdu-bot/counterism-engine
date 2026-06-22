@@ -16,9 +16,11 @@ except ImportError:
     from remotion_jsonMaker.generator import RemotionJsonMaker
 
 class RemotionRemaker:
-    def __init__(self, manifest_path: str, public_dir: str, timestamp_file: str = None):
+    def __init__(self, manifest_path: str, public_dir: str, timestamp_file: str = None, story_path: str = None):
         self.manifest_path = manifest_path
         self.public_dir = os.path.abspath(public_dir)
+        self.story_path = story_path
+        self.story_scenes = {}
         self.data = self.load_manifest()
         self.maker = RemotionJsonMaker(headless=True)
         self.maker.scan_assets(self.public_dir)
@@ -26,6 +28,22 @@ class RemotionRemaker:
             print(f"📂 Loading timestamps for audio sync: {timestamp_file}")
             with open(timestamp_file, 'r', encoding='utf-8') as f:
                 self.maker.raw_timestamps = f.read()
+
+        self.load_story()
+
+    def load_story(self):
+        if not self.story_path or not os.path.exists(self.story_path):
+            return
+        try:
+            with open(self.story_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                # Split by दृश्य (Scene) markers
+                parts = re.split(r' দৃশ্য\s+[0-9০-৯]+', content)
+                for i, text in enumerate(parts[1:], 1):
+                    self.story_scenes[f"SCENE_{i:02d}"] = text.strip()
+            print(f"📖 Loaded {len(self.story_scenes)} scenes from story.")
+        except Exception as e:
+            print(f"⚠️ Error loading story: {e}")
 
     def load_manifest(self) -> Dict[str, Any]:
         if not os.path.exists(self.manifest_path):
@@ -165,6 +183,30 @@ class RemotionRemaker:
             confirm = input("\nChange anything else? (y/n): ").lower()
             if confirm != 'y': break
 
+    def find_overlays(self, data: Any) -> List[dict]:
+        """Deep search for an overlay list in potentially nested/wrapped Gemini responses."""
+        if isinstance(data, list):
+             # Check if it's a list of dicts with common overlay keys
+             if len(data) > 0 and isinstance(data[0], dict) and any(k in data[0] for k in ['type', 'id', 'content', 'kind']):
+                 return data
+             # Recurse into list items
+             for item in data:
+                 res = self.find_overlays(item)
+                 if res: return res
+        elif isinstance(data, dict):
+             # Check common list keys
+             for k in ['overlays', 'elements', 'layers', 'objects', 'visuals', 'components', 'overlay_list']:
+                 if k in data and isinstance(data[k], list):
+                     return data[k]
+             # Check if the dict ITSELF is an overlay (has 'type' but no scenes/overlays list)
+             if 'type' in data and not any(k in data for k in ['scenes', 'overlays', 'elements']):
+                 return [data]
+             # Recurse into values
+             for v in data.values():
+                 res = self.find_overlays(v)
+                 if res: return res
+        return []
+
     def gemini_change(self, scene_num: int, scene: Dict[str, Any]):
         print("\n🤖 Gemini Refinement Mode")
         print("1. Change entire scene (AI logic)")
@@ -178,12 +220,16 @@ class RemotionRemaker:
 
         # Build a refinement prompt
         current_scene_json = json.dumps(scene, ensure_ascii=False)
+        scene_id = scene.get('scene_id', 'UNKNOWN')
+        story_text = self.story_scenes.get(scene_id, "No narration context available.")
 
         # Get context from original generator (reusing logic)
         self.maker.start_browser()
 
         refine_prompt = (
             f"YOU ARE A REMOTION MASTER. REFINE THIS SPECIFIC SCENE JSON.\n"
+            f"SCENE ID: {scene_id}\n"
+            f"NARRATION: {story_text}\n"
             f"CURRENT JSON: {current_scene_json}\n"
             f"INSTRUCTION: {instruction if instruction else 'Enhance the design and visual impact while keeping the narrative.'}\n"
             f"STRICT RULES:\n"
@@ -194,54 +240,47 @@ class RemotionRemaker:
 
         raw_output = self.maker._interact_with_gemini(refine_prompt)
         self.maker.stop_browser()
+        print(f"📊 Raw response sample: {raw_output[:200]}...")
 
-        # Robust JSON extraction and repair reusing generator logic
-        new_scene_data = None
+        # Robust JSON extraction and repair
+        extracted_data = None
+        try:
+            # Try both { and [ as start characters for single scene responses
+            start_idx = min(i for i in [raw_output.find('{'), raw_output.find('[')] if i != -1) if '{' in raw_output or '[' in raw_output else -1
+            end_idx = max(i for i in [raw_output.rfind('}'), raw_output.rfind(']')] if i != -1) if '}' in raw_output or ']' in raw_output else -1
 
-        # 1. Look for markdown code blocks first
-        json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_output, re.DOTALL)
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            # 2. Fallback to finding first { and last }
-            start_idx, end_idx = raw_output.find('{'), raw_output.rfind('}')
             if start_idx != -1 and end_idx != -1:
                 json_str = raw_output[start_idx:end_idx+1]
-            else:
-                print("❌ Could not find any JSON-like structures in Gemini response.")
-                return
+                json_str = "".join(ch for ch in json_str if ch.isprintable() or ch in "\n\r\t")
+                json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
 
-        try:
-            # Pre-cleanup and primary parse
-            json_str = "".join(ch for ch in json_str if ch.isprintable() or ch in "\n\r\t")
-            json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
+                try:
+                    extracted_data = json.loads(json_str, strict=False)
+                except:
+                    print("⚠️  Primary parse failed. Attempting repair...")
+                    extracted_data = self.maker.repair_json(json_str)
 
-            try:
-                new_scene_data = json.loads(json_str, strict=False)
-            except:
-                # Use robust repair logic from generator.py
-                # Note: We'll wrap it in a dummy dict if needed, but Gemini usually returns {} for one scene
-                print("⚠️  Primary parse failed. Attempting repair...")
-                # We can't easily call the private repair_json from here without duplication
-                # unless we make it accessible. Let's use a simplified version for one scene.
-                new_scene_data = self.maker.repair_json(json_str) if hasattr(self.maker, 'repair_json') else None
+            if extracted_data:
+                # Locate overlays list using deep search
+                overlays = self.find_overlays(extracted_data)
 
-            if new_scene_data:
-                if isinstance(new_scene_data, dict) and 'scenes' in new_scene_data:
-                    new_scene_data = new_scene_data['scenes'][0]
+                if overlays:
+                    print(f"✅ Successfully recovered {len(overlays)} overlays from AI response.")
+                    # We update the scene's overlays but keep its other metadata (duration, etc)
+                    scene['overlays'] = overlays
 
-                new_scene_data['scene_id'] = scene['scene_id']
+                    # Apply guardrails to the full scene context
+                    temp_data = {"scenes": [scene]}
+                    fixed_data = self.maker.finalize_json_durations(temp_data, self.public_dir)
 
-                # Apply guardrails
-                temp_data = {"scenes": [new_scene_data]}
-                fixed_data = self.maker.finalize_json_durations(temp_data, self.public_dir)
-
-                # Update main data
-                for i, s in enumerate(self.data['scenes']):
-                    if s['scene_id'] == scene['scene_id']:
-                        self.data['scenes'][i] = fixed_data['scenes'][0]
-                        break
-                print("✨ Gemini refinement applied.")
+                    # Update main data
+                    for i, s in enumerate(self.data['scenes']):
+                        if s['scene_id'] == scene['scene_id']:
+                            self.data['scenes'][i] = fixed_data['scenes'][0]
+                            break
+                    print("✨ Gemini refinement applied and validated.")
+                else:
+                    print("❌ Could not find valid overlays list in Gemini response.")
             else:
                 print("❌ Gemini failed to produce valid JSON.")
         except Exception as e:
@@ -256,12 +295,22 @@ class RemotionRemaker:
 
         # Standalone architecture: Create a dedicated JSON for just this scene
         standalone_path = "/content/remake_scene.json"
+
+        # Robust context extraction
+        global_settings = self.data.get("global_settings", {"width": 1920, "height": 1080, "fps": 30})
+
+        # IMPORTANT: If Gemini changed overlays but they are still inside 'elements' or other keys,
+        # we need to ensure finalize_json_durations has a chance to fix them in the standalone manifest.
         standalone_manifest = {
             "project_name": f"Remake_{scene_id}",
-            "global_settings": self.data.get("global_settings", {"width": 1920, "height": 1080, "fps": 30}),
+            "global_settings": global_settings,
             "scenes": [scene],
             "audio_sfx_manifest": [s for s in self.data.get("audio_sfx_manifest", []) if s.get("scene_id") == scene_id]
         }
+
+        # Double-check guardrails on standalone manifest to ensure schema compliance (handles recovered keys)
+        standalone_manifest = self.maker.finalize_json_durations(standalone_manifest, self.public_dir)
+        scene = standalone_manifest['scenes'][0] # Refresh scene ref after guardrails
 
         with open(standalone_path, 'w', encoding='utf-8') as f:
             json.dump(standalone_manifest, f, indent=2, ensure_ascii=False)
@@ -271,7 +320,11 @@ class RemotionRemaker:
         print(f"   Background: {scene.get('video_path')}")
         print(f"   Overlays: {len(scene.get('overlays', []))}")
         for ov in scene.get('overlays', []):
-            print(f"     - {ov.get('id')} ({ov.get('type')}) at ({ov.get('position', {}).get('x')}, {ov.get('position', {}).get('y')})")
+            pos = ov.get('position', {})
+            print(f"     - {ov.get('id')} ({ov.get('type')}) at ({pos.get('x')}, {pos.get('y')}) | Font: {ov.get('font')} | Start: {ov.get('start')}")
+
+        if not scene.get('overlays'):
+            print("   ⚠️ WARNING: No overlays detected in this scene manifest!")
 
         # We use the existing render.ts script to ensure environment consistency
         output_rel_path = f"remake/updated_scene_{scene_id}.mp4"
@@ -303,9 +356,10 @@ def main():
     # Paths for Colab
     manifest_path = "/content/drive/MyDrive/Counterism_Studio_V4/manifests/remotion_render.json"
     timestamp_path = "/content/drive/MyDrive/Counterism_Studio_V4/manifests/timestamp.txt"
+    story_path = "/content/drive/MyDrive/Counterism_Studio_V4/audio/story.txt"
     public_dir = "/content/engine/public"
 
-    remaker = RemotionRemaker(manifest_path, public_dir, timestamp_path)
+    remaker = RemotionRemaker(manifest_path, public_dir, timestamp_path, story_path)
 
     while True:
         try:

@@ -16,7 +16,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     return null;
   }
 
-  const text = (overlay.text || overlay.content || '').trim();
+  const text = (overlay.text || overlay.content || overlay.title || overlay.label || '').trim();
   const items = text.split(/\s+/);
 
   const heroConfig = overlay.hero_config;
@@ -38,15 +38,15 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: overlay.font || 'Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+        fontFamily: (overlay.font && overlay.font !== 'undefined') ? overlay.font : 'Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
         fontSize: baseFontSize,
         zIndex: overlay.zIndex || 1000, // Ultra-high zIndex for text
         left: `${x}px`,
         top: `${y}px`,
         transform: 'translate(-50%, -50%)',
         // SCREEN SAFETY: Limit width and ensure wrapping
-        width: '1800px', // Wider canvas for flexible centering
-        maxWidth: '1800px',
+        width: '1700px', // Balanced width for wrapping
+        maxWidth: '1700px',
         height: 'auto',
         textShadow: '0 4px 30px rgba(0,0,0,1), 0 0 120px rgba(0,0,0,0.6)', // Maximum contrast shadows
         color: overlay.color || 'white',
