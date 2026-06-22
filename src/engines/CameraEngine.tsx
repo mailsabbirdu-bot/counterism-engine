@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from 'remotion';
+import { safeNumber } from '../lib/safeNumber';
 import { getPresetKeyframes } from '../lib/cameraPresets';
 import { CameraConfig, CameraKeyframe, CameraPreset } from '../types/camera';
 
@@ -315,13 +316,13 @@ export const CameraEngine: React.FC<{
     shakeRotZ = seedNoise(f, 3) * 0.5 * intensity;
   }
 
-  const tx = cameraState.tx + shakeX;
-  const ty = cameraState.ty + shakeY;
-  const zoom = cameraState.zoom;
-  const rotZ = cameraState.rotationZ + shakeRotZ;
+  const tx = safeNumber(cameraState.tx + shakeX, cx);
+  const ty = safeNumber(cameraState.ty + shakeY, cy);
+  const zoom = safeNumber(cameraState.zoom, 1);
+  const rotZ = safeNumber(cameraState.rotationZ + shakeRotZ, 0);
 
   if (frame % 30 === 0) {
-    console.log(`[CameraEngine] Frame ${frame}: tx=${tx.toFixed(1)}, ty=${ty.toFixed(1)}, zoom=${zoom.toFixed(2)}`);
+    console.log(`[CameraEngine] Frame ${frame}: tx=${tx.toFixed(1)}, ty=${ty.toFixed(1)}, zoom=${zoom.toFixed(2)} rotZ=${rotZ}`);
   }
 
   // Motion Blur (Sub-frame delta)
@@ -392,7 +393,7 @@ export const CameraEngine: React.FC<{
             pointerEvents: 'none'
         }} />
 
-        <div style={{ position: 'absolute', top: 0, left: 0, width, height, zIndex: 1, transformStyle: 'preserve-3d' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, width, height, zIndex: 1000, transformStyle: 'preserve-3d' }}>
             {children}
         </div>
       </div>

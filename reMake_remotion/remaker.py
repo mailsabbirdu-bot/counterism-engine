@@ -41,10 +41,16 @@ class RemotionRemaker:
         try: shutil.copy(self.manifest_path, "/content/remotion_render.json")
         except: pass
 
-    def get_scene(self, scene_num: int) -> Dict[str, Any]:
-        scene_id = f"SCENE_{scene_num:02d}"
+    def get_scene(self, scene_num_or_id: Any) -> Dict[str, Any]:
+        # Handle numeric input (e.g. 1 -> SCENE_01)
+        if isinstance(scene_num_or_id, int) or (isinstance(scene_num_or_id, str) and scene_num_or_id.isdigit()):
+            scene_id = f"SCENE_{int(scene_num_or_id):02d}"
+        else:
+            scene_id = str(scene_num_or_id).upper()
+
         for scene in self.data.get('scenes', []):
-            if scene.get('scene_id') == scene_id:
+            cur_id = scene.get('scene_id', '').upper()
+            if cur_id == scene_id or cur_id.startswith(f"{scene_id}_"):
                 return scene
         return None
 
@@ -241,10 +247,12 @@ class RemotionRemaker:
         except Exception as e:
             print(f"❌ Error processing Gemini response: {e}")
 
-    def render_scene(self, scene_num: int):
-        scene_id = f"SCENE_{scene_num:02d}"
-        scene = self.get_scene(scene_num)
-        if not scene: return
+    def render_scene(self, scene_input: Any):
+        scene = self.get_scene(scene_input)
+        if not scene:
+            print(f"⚠️ Could not find scene for input: {scene_input}")
+            return
+        scene_id = scene.get('scene_id')
 
         # Standalone architecture: Create a dedicated JSON for just this scene
         standalone_path = "/content/remake_scene.json"
@@ -257,6 +265,13 @@ class RemotionRemaker:
 
         with open(standalone_path, 'w', encoding='utf-8') as f:
             json.dump(standalone_manifest, f, indent=2, ensure_ascii=False)
+
+        print(f"\n📄 Standalone Manifest Created at {standalone_path}")
+        print(f"   Scene: {scene_id}")
+        print(f"   Background: {scene.get('video_path')}")
+        print(f"   Overlays: {len(scene.get('overlays', []))}")
+        for ov in scene.get('overlays', []):
+            print(f"     - {ov.get('id')} ({ov.get('type')}) at ({ov.get('position', {}).get('x')}, {ov.get('position', {}).get('y')})")
 
         # We use the existing render.ts script to ensure environment consistency
         output_rel_path = f"remake/updated_scene_{scene_id}.mp4"
@@ -294,24 +309,28 @@ def main():
 
     while True:
         try:
-            line = input("\n👉 Enter scene number to remake (e.g. 1) or 'q' to quit: ").strip()
+            line = input("\n👉 Enter scene number or ID to remake (e.g. 1, SCENE_01_INTRO) or 'q' to quit: ").strip()
             if line.lower() == 'q': break
-            scene_num = int(line)
 
-            scene = remaker.get_scene(scene_num)
+            scene = remaker.get_scene(line)
             if not scene:
-                print(f"⚠️ Scene {scene_num} not found in manifest.")
+                print(f"⚠️ Scene '{line}' not found in manifest.")
                 continue
 
-            print("\nOptions:")
+            print(f"\nOptions for {scene.get('scene_id')}:")
             print("1. Change manually")
             print("2. Change through gemini")
+            print("3. Just Render (no changes)")
             mode = input("Select mode: ").strip()
 
             if mode == '1':
                 remaker.manual_change(scene)
             elif mode == '2':
-                remaker.gemini_change(scene_num, scene)
+                # Convert input to int if possible for legacy method compatibility, else use string
+                scene_ref = int(line) if line.isdigit() else line
+                remaker.gemini_change(scene_ref, scene)
+            elif mode == '3':
+                pass
             else:
                 print("⚠️ Invalid option")
                 continue
@@ -321,7 +340,7 @@ def main():
             remaker.save_manifest()
 
             # Render
-            remaker.render_scene(scene_num)
+            remaker.render_scene(line)
 
             cont = input("\nRemake another scene? (y/n): ").lower()
             if cont != 'y': break

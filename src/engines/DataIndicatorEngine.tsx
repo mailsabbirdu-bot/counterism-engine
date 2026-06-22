@@ -1,12 +1,13 @@
 import React from 'react';
 import { useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
+import { safeNumber } from '../lib/safeNumber';
 import { ArrowUp, ArrowDown, Timer, Calendar, Flag, Activity } from 'lucide-react';
 
 export const DataIndicatorEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { width: videoWidth, height: videoHeight, fps } = useVideoConfig();
-  const start = Number(overlay.start) || 0;
-  const duration = Number(overlay.duration) || 120;
+  const start = safeNumber(overlay.start, 0);
+  const duration = safeNumber(overlay.duration, 120);
   const relativeFrame = frame - start;
 
   if (frame < start || frame > start + duration) {
@@ -64,8 +65,8 @@ export const DataIndicatorEngine: React.FC<{ overlay: any }> = ({ overlay }) => 
     }
   };
 
-  const x = overlay.position?.x ?? videoWidth / 2;
-  const y = overlay.position?.y ?? videoHeight / 2;
+  const x = safeNumber(overlay.position?.x, videoWidth / 2);
+  const y = safeNumber(overlay.position?.y, videoHeight / 2);
 
   return (
     <div
@@ -74,7 +75,7 @@ export const DataIndicatorEngine: React.FC<{ overlay: any }> = ({ overlay }) => 
         left: `${x}px`,
         top: `${y}px`,
         transform: 'translate(-50%, -50%)',
-        zIndex: overlay.zIndex ?? 50,
+        zIndex: safeNumber(overlay.zIndex, 50),
       }}
     >
       <div style={{

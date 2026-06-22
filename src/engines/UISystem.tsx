@@ -1,12 +1,13 @@
 import React from 'react';
 import { interpolate, useCurrentFrame, spring, useVideoConfig } from 'remotion';
+import { safeNumber } from '../lib/safeNumber';
 import { Terminal, ShieldCheck, Activity, Cpu, Box } from 'lucide-react';
 
 export const UISystem: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
-  const start = Number(overlay.start) || 0;
-  const duration = Number(overlay.duration) || 120;
+  const start = safeNumber(overlay.start, 0);
+  const duration = safeNumber(overlay.duration, 120);
   const relativeFrame = frame - start;
 
   if (frame < start || frame > start + duration) {
@@ -44,8 +45,8 @@ export const UISystem: React.FC<{ overlay: any }> = ({ overlay }) => {
     }
   };
 
-  const x = overlay.position?.x ?? width / 2;
-  const y = overlay.position?.y ?? height / 2;
+  const x = safeNumber(overlay.position?.x, width / 2);
+  const y = safeNumber(overlay.position?.y, height / 2);
 
   return (
     <div
@@ -54,7 +55,7 @@ export const UISystem: React.FC<{ overlay: any }> = ({ overlay }) => {
         left: `${x}px`,
         top: `${y}px`,
         opacity,
-        zIndex: overlay.zIndex ?? 40,
+        zIndex: safeNumber(overlay.zIndex, 40),
         transform: `translate(-50%, -50%) perspective(2000px) rotateY(${(1 - entrance) * 30}deg) scale(${0.85 + entrance * 0.15})`,
         filter: `blur(${(1 - opacity) * 10}px)`,
         color: 'white'
@@ -112,10 +113,10 @@ const FlickerTextBox = ({ overlay, safeFrame, fps }: any) => {
 
     return (
         <div className="absolute" style={{
-            left: `${overlay.position?.x ?? 960}px`,
-            top: `${overlay.position?.y ?? 540}px`,
+            left: `${safeNumber(overlay.position?.x, 960)}px`,
+            top: `${safeNumber(overlay.position?.y, 540)}px`,
             transform: 'translate(-50%, -50%)',
-            zIndex: 100
+            zIndex: safeNumber(overlay.zIndex, 100)
         }}>
             <div style={{
                 ...fontStyle,
