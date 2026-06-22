@@ -13,6 +13,9 @@ interface OverlayManagerProps {
 }
 
 export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays }) => {
+  if (overlays.length > 0) {
+      console.log(`[OverlayManager] Rendering ${overlays.length} overlays: ${overlays.map(o => o.id).join(', ')}`);
+  }
   return (
     <>
       {overlays.map((overlay) => {

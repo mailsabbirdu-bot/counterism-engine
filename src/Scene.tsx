@@ -20,15 +20,11 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
         const bgUrl = resolveAsset(sceneData.video_path);
         console.log(`[Scene Background] Path: ${sceneData.video_path} -> Resolved URL: ${bgUrl}`);
         return (
-          <>
-            <OffthreadVideo
-              src={bgUrl}
-              className="w-full h-full object-cover"
-              muted={sceneData.audio_enabled !== true}
-            />
-            {/* Dark overlay for readability */}
-            <AbsoluteFill className="bg-black/40" />
-          </>
+          <OffthreadVideo
+            src={bgUrl}
+            className="w-full h-full object-cover"
+            muted={sceneData.audio_enabled !== true}
+          />
         );
       case 'procedural':
         return <ProceduralBackground config={sceneData.config?.background?.config || sceneData.procedural_config || {}} />;
@@ -39,14 +35,11 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
         if (sceneData.video_path) {
           const fallbackUrl = resolveAsset(sceneData.video_path);
           return (
-            <>
-              <OffthreadVideo
-                src={fallbackUrl}
-                className="w-full h-full object-cover"
-                muted={sceneData.audio_enabled !== true}
-              />
-              <AbsoluteFill className="bg-black/40" />
-            </>
+            <OffthreadVideo
+              src={fallbackUrl}
+              className="w-full h-full object-cover"
+              muted={sceneData.audio_enabled !== true}
+            />
           );
         }
         return null;
