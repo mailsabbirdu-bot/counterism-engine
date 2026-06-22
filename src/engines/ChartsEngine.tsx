@@ -63,7 +63,9 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         labels: { text: { fontSize: 18, fontWeight: 'bold', fill: '#fff', fontFamily: font } },
         dots: { text: { fontSize: 14, fontFamily: font } },
         legends: { text: { fontSize: 16, fontFamily: font } },
-        annotations: { text: { fontFamily: font } }
+        annotations: { text: { fontFamily: font, fontSize: 18, fontWeight: 'bold', fill: '#fff' } },
+        arcLabels: { text: { fontFamily: font, fontSize: 20, fontWeight: 'bold', fill: '#fff' } },
+        arcLinkLabels: { text: { fontFamily: font, fontSize: 16, fill: '#fff' } }
       },
       colors: overlay.colors || { scheme: 'nivo' },
       margin: { top: 60, right: 60, bottom: 80, left: 100 },
