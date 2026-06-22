@@ -27,7 +27,8 @@ export const RemotionRoot: React.FC = () => {
 
     const handle = delayRender('Loading Fonts');
 
-    Promise.all(Array.from(fontsToLoad).map(async (fontName) => {
+    // Font Loading with Timeout and Individual Error Handling
+    const fontPromises = Array.from(fontsToLoad).map(async (fontName) => {
       try {
         console.log(`Loading font: ${fontName}`);
 
@@ -111,7 +112,10 @@ export const RemotionRoot: React.FC = () => {
       } catch (e) {
         console.error(`Failed to load font: ${fontName}`, e);
       }
-    })).then(() => {
+    });
+
+    const timeout = new Promise((resolve) => setTimeout(resolve, 5000));
+    Promise.race([Promise.all(fontPromises), timeout]).then(() => {
       continueRender(handle);
     }).catch(err => {
       console.error("Critical font loading error", err);

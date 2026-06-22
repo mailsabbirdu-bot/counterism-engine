@@ -1,5 +1,6 @@
 import React from 'react';
 import { useCurrentFrame, useVideoConfig, interpolate, spring, Easing } from 'remotion';
+import { safeNumber } from '../lib/safeNumber';
 
 const cinematicEase = Easing.bezier(0.65, 0, 0.35, 1);
 
@@ -7,8 +8,8 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { width, height, fps } = useVideoConfig();
 
-  const start = Number(overlay.start) || 0;
-  const duration = Number(overlay.duration) || 120;
+  const start = safeNumber(overlay.start, 0);
+  const duration = safeNumber(overlay.duration, 120);
   const relativeFrame = frame - start;
 
   if (frame < start || frame > start + duration) {
@@ -22,14 +23,11 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const heroWord = heroConfig?.word?.replace(/[.।]/g, '');
 
   const baseFontSize = typeof overlay.fontSize === 'number' ? `${overlay.fontSize}px` : (overlay.fontSize || "120px");
-  const x = Number(overlay.position?.x) ?? width / 2;
-  const y = Number(overlay.position?.y) ?? height / 2;
+  const x = safeNumber(overlay.position?.x, width / 2);
+  const y = safeNumber(overlay.position?.y, height / 2);
 
   if (frame % 30 === 0) {
     console.log(`[TextEngine] Scene: ${overlay.scene_id} Overlay: ${overlay.id} Visible: ${frame >= start && frame <= start + duration} Text: "${text.substring(0, 20)}..." Pos: (${x}, ${y}) Font: ${overlay.font} Size: ${baseFontSize} Hero: ${heroWord}`);
-    if (isNaN(x) || isNaN(y)) {
-        console.error(`❌ COORDINATE ERROR: x or y is NaN for overlay ${overlay.id}. Manifest value:`, overlay.position);
-    }
   }
 
   return (
@@ -47,8 +45,8 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         top: `${y}px`,
         transform: 'translate(-50%, -50%)',
         // SCREEN SAFETY: Limit width and ensure wrapping
-        width: '1600px',
-        maxWidth: '1600px',
+        width: '1800px', // Wider canvas for flexible centering
+        maxWidth: '1800px',
         height: 'auto',
         textShadow: '0 4px 30px rgba(0,0,0,1), 0 0 120px rgba(0,0,0,0.6)', // Maximum contrast shadows
         color: overlay.color || 'white',

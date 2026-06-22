@@ -263,7 +263,10 @@ class RemotionJsonMaker:
             # 2. Strict Background Enforcement
             scene['background_type'] = 'video'
             scene['audio_enabled'] = True
-            if not scene.get('video_path') or not scene['video_path'].startswith('renders/'):
+
+            # Preserve existing valid render paths (important for Remake project)
+            current_vpath = scene.get('video_path', '')
+            if not current_vpath or not current_vpath.startswith('renders/'):
                 scene['video_path'] = f"renders/scene_SC_{scene_idx+1:02d}.mp4"
 
             # 3. Authoritative Duration Resolution

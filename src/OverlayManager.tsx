@@ -14,11 +14,14 @@ interface OverlayManagerProps {
 
 export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays }) => {
   if (overlays.length > 0) {
-      console.log(`[OverlayManager] Rendering ${overlays.length} overlays: ${overlays.map(o => o.id).join(', ')}`);
+      console.log(`[OverlayManager] Detected ${overlays.length} overlays: ${overlays.map(o => `(${o.id}: ${o.type})`).join(', ')}`);
   }
   return (
     <>
       {overlays.map((overlay) => {
+        if (!overlay.id) {
+            console.error(`[OverlayManager] CRITICAL: Overlay missing ID!`, overlay);
+        }
         const renderOverlay = () => {
           switch (overlay.type) {
             case 'text':
