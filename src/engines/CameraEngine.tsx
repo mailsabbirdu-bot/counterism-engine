@@ -341,14 +341,35 @@ export const CameraEngine: React.FC<{
         backgroundColor: '#000'
       }}
     >
-      {/* Cinematic Camera Pivot System */}
+      {/* STATIC BACKGROUND SYSTEM: Unaffected by Camera Movements */}
+      {backgroundLayer && (
+          <div style={{
+              position: 'absolute',
+              top: 0, left: 0, width, height,
+              zIndex: 0,
+              pointerEvents: 'none'
+          }}>
+              {backgroundLayer}
+          </div>
+      )}
+
+      {/* Global Dark Overlay for Readability - Static */}
+      <div style={{
+          position: 'absolute',
+          top: 0, left: 0, width, height,
+          backgroundColor: 'rgba(0,0,0,0.4)',
+          zIndex: 5,
+          pointerEvents: 'none'
+      }} />
+
+      {/* Cinematic Camera Pivot System - Transforms Overlays only */}
       <div
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
           width, height,
-          zIndex: 1,
+          zIndex: 10,
           transformStyle: 'preserve-3d',
           // 1. Move the pivot point (target) to the screen center
           // 2. Scale and Rotate around that pivot
@@ -366,33 +387,6 @@ export const CameraEngine: React.FC<{
           backfaceVisibility: 'hidden',
         }}
       >
-        {/* Fixed Background Layer inside the same 3D container for absolute layering */}
-        {backgroundLayer && (
-            <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width,
-                height,
-                // Even further in the distance. scale(12) compensates for perspective shrinkage at -10000px
-                transform: `translate3d(0, 0, -10000px) scale(12)`,
-                zIndex: -100, // Absolute bottom
-                pointerEvents: 'none'
-            }}>
-                {backgroundLayer}
-            </div>
-        )}
-
-        {/* Global Dark Overlay for Readability, placed between BG and Overlays in 3D space */}
-        <div style={{
-            position: 'absolute',
-            top: 0, left: 0, width, height,
-            backgroundColor: 'rgba(0,0,0,0.4)',
-            transform: `translate3d(0, 0, -5000px) scale(6)`,
-            zIndex: -50,
-            pointerEvents: 'none'
-        }} />
-
         <div style={{ position: 'absolute', top: 0, left: 0, width, height, zIndex: 1000, transformStyle: 'preserve-3d' }}>
             {children}
         </div>
