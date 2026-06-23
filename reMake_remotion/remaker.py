@@ -253,19 +253,21 @@ class RemotionRemaker:
             has_bangla = False
             for ov in overlays:
                 for key in ['content', 'title', 'label']:
-                    if ov.get(key) and self._is_bangla(str(ov[key])):
+                    val = str(ov.get(key, ""))
+                    if val and self._is_bangla(val) and "Insight" not in val and "REMOTION" not in val:
                         has_bangla = True
                         break
                 if has_bangla: break
 
             if not has_bangla:
-                errors.append("LANGUAGE ERROR: Target is BANGLA but no Bangla script was found in 'content', 'title', or 'label' fields.")
+                errors.append("LANGUAGE ERROR: Target is BANGLA but no Bangla script was found in 'content', 'title', or 'label' fields. DO NOT USE ENGLISH.")
 
         # 3. Narrative Match
+        # Expanded stop words for better filtering
         STOP_WORDS = ["এই", "একটি", "হলো", "হচ্ছে", "আর", "কিন্তু", "এবং", "বা", "তবে", "যদি", "যে", "সে", "তারা", "ছিল", "হবে", "করে", "করা", "জন্য", "থেকে", "সাথে", "দ্বারা", "মাধ্যমে", "এক", "দুই", "তিন", "চার", "পাচ", "ছয়", "সাত", "আট", "নয়", "দশ", "কোটি", "লক্ষ", "কোটিরও", "বেশি", "কম", "অনেক", "অল্প", "হলে", "যায়", "গিয়ে", "নিয়ে", "হয়ে", "থাকা", "রাখা", "বলছে", "বলেন", "শুরু", "শেষ", "এখন", "তখন", "যখন", "পর্যন্ত", "প্রতিটি", "প্রতি", "সব", "সবাই", "কেউ", "কেউই", "কিছু", "কোন", "কোনো", "মতো", "মত", "মতোই", "মতই", "নিজেই", "নিজে", "বড়", "ছোট"]
 
-        # Extract meaningful keywords from story_text
-        story_words = re.findall(r'[\u0980-\u09FF\w]{3,}', story_text)
+        # Extract meaningful keywords from story_text (Bengali words or English words > 3 chars)
+        story_words = re.findall(r'[\u0980-\u09FF]+|[a-zA-Z]{4,}', story_text)
         meaningful_story_words = [w for w in story_words if w not in STOP_WORDS]
 
         if meaningful_story_words:
@@ -276,15 +278,14 @@ class RemotionRemaker:
                     if ov.get(key): visual_text += " " + str(ov[key])
 
             # Check for matches
-            for word in meaningful_story_words:
-                if word in visual_text:
-                    found_match = True
-                    break
+            matched_words = [w for w in meaningful_story_words if w in visual_text]
+            if len(matched_words) > 0:
+                found_match = True
 
             if not found_match:
                 # Provide hints for narrative alignment
                 hints = ", ".join(meaningful_story_words[:5])
-                errors.append(f"NARRATIVE MISMATCH: Visual content does not reflect the narration. Keywords like '{hints}' are missing.")
+                errors.append(f"NARRATIVE MISMATCH: Visual content must contain keywords from the narration. PLEASE USE THESE WORDS: {hints}")
 
         return errors
 
@@ -300,7 +301,6 @@ class RemotionRemaker:
             instruction = input("Enter your specific instruction for Gemini: ").strip()
 
         # Build a refinement prompt
-        current_scene_json = json.dumps(scene, ensure_ascii=False)
         scene_id = scene.get('scene_id', 'UNKNOWN')
 
         # Improved Scene ID matching to handle suffixes (e.g., SCENE_01_INTRO -> SCENE_01)
@@ -308,6 +308,14 @@ class RemotionRemaker:
         base_id = base_match.group(0) if base_match else scene_id
         story_text = self.story_scenes.get(base_id, "No narration context available.")
         lang = "BANGLA" if self._is_bangla(story_text) else "ENGLISH"
+
+        # Simplify JSON to avoid confusing Gemini with internal engine props
+        clean_scene = {
+            "scene_id": scene.get("scene_id"),
+            "overlays": scene.get("overlays", []),
+            "camera": scene.get("camera", {})
+        }
+        current_scene_json = json.dumps(clean_scene, ensure_ascii=False)
 
         # FILTER FONTS TO REDUCE CONFUSION
         target_fonts = self.maker.bangla_fonts if lang == "BANGLA" else self.maker.english_fonts
@@ -346,12 +354,13 @@ class RemotionRemaker:
                 f"YOU ARE A REMOTION MASTER. REFINE THIS SPECIFIC SCENE JSON.\n"
                 f"SCENE ID: {scene_id}\n"
                 f"TARGET LANGUAGE: {lang}\n"
-                f"NARRATION (USE THIS FOR CONTENT): {story_text}\n"
-                f"CURRENT JSON (IGNORE ENGLISH TEXT IN THIS IF TARGET IS BANGLA): {current_scene_json}\n"
+                f"NARRATION AUTHORITY: THE NARRATION BELOW IS THE ONLY SOURCE FOR CONTENT. IGNORE ENGLISH PLACEHOLDERS IN CURRENT JSON.\n"
+                f"NARRATION: {story_text}\n"
+                f"CURRENT JSON: {current_scene_json}\n"
                 f"AVAILABLE {lang} FONTS: {target_fonts}\n"
                 f"AVAILABLE HERO ANIMATIONS: {', '.join(hero_anim_list)}\n"
                 f"AVAILABLE CAMERA STYLES: {', '.join(camera_style_list)}\n"
-                f"INSTRUCTION: {instruction if instruction else 'Enhance the design and visual impact while keeping the narrative.'}\n"
+                f"INSTRUCTION: {instruction if instruction else 'Enhance the design and visual impact while strictly following the narrative.'}\n"
                 f"FEEDBACK FROM PREVIOUS ATTEMPT: {feedback_context if feedback_context else 'None'}\n"
                 f"STRICT RULES (STRICT MODE ON):\n"
                 f"- OUTPUT A SINGLE JSON OBJECT FOR THIS SCENE ONLY.\n"
@@ -360,6 +369,7 @@ class RemotionRemaker:
                 f"- MANDATORY KEYS: 'overlays' (List), 'camera' (Object).\n"
                 f"- DO NOT USE WRAPPER KEYS like 'sceneId', 'meta', or 'timeline'.\n"
                 f"- EVERY TEXT/NIVO LAYER MUST HAVE A VALID 'content' OR 'data' FIELD BASED ON THE NARRATION.\n"
+                f"- CONTENT MUST BE MEANINGFUL AND DERIVED FROM THE NARRATION. NO PLACEHOLDERS LIKE 'INSIGHT'.\n"
                 f"- YOU MUST UPDATE 'overlays' (animations, content, colors) AND 'camera' (presets, shots) BASED ON THE NARRATION.\n"
                 f"- Follow Studio V4 minimalist guidelines.\n"
                 f"- USE {lang} appropriate fonts from the provided list. NEVER use English fonts for Bangla text.\n"
@@ -399,11 +409,11 @@ class RemotionRemaker:
                     # Guardrail Validation
                     validation_errors = self.validate_gemini_output(extracted_data, story_text, lang)
                     if validation_errors:
-                        print(f"⚠️ Guardrail Mismatch Detected: {', '.join(validation_errors)}")
-                        feedback_context = "CRITICAL ERRORS: " + ". ".join(validation_errors)
+                        print(f"⚠️ Guardrail Attempt {attempt+1} FAILED: {', '.join(validation_errors)}")
+                        feedback_context = "CRITICAL ERRORS FOUND: " + ". ".join(validation_errors) + ". PLEASE RE-READ THE NARRATION AND UPDATE CONTENT."
                         continue # Retry
 
-                    print("✅ Guardrail Passed: Output matches language and narration.")
+                    print(f"✅ Guardrail Attempt {attempt+1} PASSED: Output matches language and narration.")
                     print(f"🔍 DEBUG: Extracted JSON keys: {list(extracted_data.keys()) if isinstance(extracted_data, dict) else 'Not a dict'}")
 
                     # Update entire scene if the response is a full scene object
@@ -442,11 +452,25 @@ class RemotionRemaker:
                     print("✨ Gemini refinement applied and validated.")
                     break # Success!
                 else:
-                    print("❌ Gemini failed to produce valid JSON.")
-                    feedback_context = "Your previous output was not a valid JSON object. Please try again."
+                    print(f"❌ Gemini Attempt {attempt+1} failed to produce valid JSON.")
+                    feedback_context = "Your previous output was not a valid JSON object. Ensure you output ONLY the raw JSON block."
             except Exception as e:
-                print(f"❌ Error processing Gemini response: {e}")
+                print(f"❌ Error processing Gemini response (Attempt {attempt+1}): {e}")
                 feedback_context = f"Internal error processing your response: {str(e)}"
+
+        if feedback_context and attempt == 2:
+            print("\n❌ ALL GEMINI ATTEMPTS FAILED. Keeping original scene content to prevent corruption.")
+            print(f"   Final Error: {feedback_context}")
+        else:
+            print(f"\n📊 --- FINAL MANIFEST SYNC CHECK (SCENE: {scene_id}) ---")
+            print(f"   Target Language: {lang}")
+            print(f"   Narration: {story_text}")
+            ovs = scene.get('overlays', [])
+            print(f"   Visual Content ({len(ovs)} Overlays):")
+            for ov in ovs:
+                content = ov.get('content') or ov.get('title') or ov.get('label') or "EMPTY"
+                print(f"     - [{ov.get('type', '???')}] Content: \"{content}\" | Font: {ov.get('font')}")
+            print("-" * 50)
 
         self.maker.stop_browser()
 
