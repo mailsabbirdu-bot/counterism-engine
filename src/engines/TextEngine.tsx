@@ -50,11 +50,15 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         height: 'auto',
         textShadow: '0 4px 30px rgba(0,0,0,1), 0 0 80px rgba(0,0,0,0.8)', // Maximum density shadows for depth
         color: overlay.color || 'white',
-        WebkitTextStroke: '0px', // REMOVE STROKE: It causes visual gaps and incorrect filling in complex fonts
+        WebkitTextStroke: 'none', // EXPLICIT NONE: prevents glyph outline artifacts
         whiteSpace: 'pre-wrap',
         lineHeight: 1.2,
         overflow: 'visible',
-        opacity: 1, // Force base opacity
+        opacity: 1,
+        textRendering: 'optimizeLegibility',
+        WebkitFontSmoothing: 'antialiased',
+        MozOsxFontSmoothing: 'grayscale',
+        letterSpacing: '0px'
       }}
     >
       <div style={{
@@ -99,8 +103,9 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
           let style: React.CSSProperties = {
             display: 'inline-block',
             whiteSpace: item === ' ' ? 'pre' : 'normal',
-            fontWeight: 900, // Maximum weight for visibility
+            fontWeight: 800, // Reduce slightly to avoid path overlap in complex fonts
             opacity: progress,
+            letterSpacing: 'normal'
           };
 
           const activeColor = isHero && heroActive ? heroConfig.color : (overlay.color || 'white');
