@@ -239,6 +239,55 @@ class RemotionRemaker:
     def _is_bangla(self, text: str) -> bool:
         return any('\u0980' <= c <= '\u09FF' for c in text)
 
+    def validate_gemini_output(self, extracted_data: Any, story_text: str, target_lang: str) -> List[str]:
+        errors = []
+
+        # 1. Basic Structure
+        overlays = self.find_overlays(extracted_data)
+        if not overlays:
+            errors.append("CRITICAL: No overlays found in AI response.")
+            return errors
+
+        # 2. Language Integrity
+        if target_lang == "BANGLA":
+            has_bangla = False
+            for ov in overlays:
+                for key in ['content', 'title', 'label']:
+                    if ov.get(key) and self._is_bangla(str(ov[key])):
+                        has_bangla = True
+                        break
+                if has_bangla: break
+
+            if not has_bangla:
+                errors.append("LANGUAGE ERROR: Target is BANGLA but no Bangla script was found in 'content', 'title', or 'label' fields.")
+
+        # 3. Narrative Match
+        STOP_WORDS = ["এই", "একটি", "হলো", "হচ্ছে", "আর", "কিন্তু", "এবং", "বা", "তবে", "যদি", "যে", "সে", "তারা", "ছিল", "হবে", "করে", "করা", "জন্য", "থেকে", "সাথে", "দ্বারা", "মাধ্যমে", "এক", "দুই", "তিন", "চার", "পাচ", "ছয়", "সাত", "আট", "নয়", "দশ", "কোটি", "লক্ষ", "কোটিরও", "বেশি", "কম", "অনেক", "অল্প", "হলে", "যায়", "গিয়ে", "নিয়ে", "হয়ে", "থাকা", "রাখা", "বলছে", "বলেন", "শুরু", "শেষ", "এখন", "তখন", "যখন", "পর্যন্ত", "প্রতিটি", "প্রতি", "সব", "সবাই", "কেউ", "কেউই", "কিছু", "কোন", "কোনো", "মতো", "মত", "মতোই", "মতই", "নিজেই", "নিজে", "বড়", "ছোট"]
+
+        # Extract meaningful keywords from story_text
+        story_words = re.findall(r'[\u0980-\u09FF\w]{3,}', story_text)
+        meaningful_story_words = [w for w in story_words if w not in STOP_WORDS]
+
+        if meaningful_story_words:
+            found_match = False
+            visual_text = ""
+            for ov in overlays:
+                for key in ['content', 'title', 'label']:
+                    if ov.get(key): visual_text += " " + str(ov[key])
+
+            # Check for matches
+            for word in meaningful_story_words:
+                if word in visual_text:
+                    found_match = True
+                    break
+
+            if not found_match:
+                # Provide hints for narrative alignment
+                hints = ", ".join(meaningful_story_words[:5])
+                errors.append(f"NARRATIVE MISMATCH: Visual content does not reflect the narration. Keywords like '{hints}' are missing.")
+
+        return errors
+
     def gemini_change(self, scene_num: int, scene: Dict[str, Any]):
         print("\n🤖 Gemini Refinement Mode")
         print("1. Change entire scene (AI logic)")
@@ -253,7 +302,11 @@ class RemotionRemaker:
         # Build a refinement prompt
         current_scene_json = json.dumps(scene, ensure_ascii=False)
         scene_id = scene.get('scene_id', 'UNKNOWN')
-        story_text = self.story_scenes.get(scene_id, "No narration context available.")
+
+        # Improved Scene ID matching to handle suffixes (e.g., SCENE_01_INTRO -> SCENE_01)
+        base_match = re.search(r'SCENE_(\d+)', scene_id)
+        base_id = base_match.group(0) if base_match else scene_id
+        story_text = self.story_scenes.get(base_id, "No narration context available.")
         lang = "BANGLA" if self._is_bangla(story_text) else "ENGLISH"
 
         # FILTER FONTS TO REDUCE CONFUSION
@@ -285,93 +338,117 @@ class RemotionRemaker:
             "gentle_breeze", "the_matrix", "heartbeat_zoom"
         ]
 
-        refine_prompt = (
-            f"YOU ARE A REMOTION MASTER. REFINE THIS SPECIFIC SCENE JSON.\n"
-            f"SCENE ID: {scene_id}\n"
-            f"TARGET LANGUAGE: {lang}\n"
-            f"NARRATION (USE THIS FOR CONTENT): {story_text}\n"
-            f"CURRENT JSON (IGORE ENGLISH TEXT IN THIS IF TARGET IS BANGLA): {current_scene_json}\n"
-            f"AVAILABLE {lang} FONTS: {target_fonts}\n"
-            f"AVAILABLE HERO ANIMATIONS: {', '.join(hero_anim_list)}\n"
-            f"AVAILABLE CAMERA STYLES: {', '.join(camera_style_list)}\n"
-            f"INSTRUCTION: {instruction if instruction else 'Enhance the design and visual impact while keeping the narrative.'}\n"
-            f"STRICT RULES (STRICT MODE ON):\n"
-            f"- OUTPUT A SINGLE JSON OBJECT FOR THIS SCENE ONLY.\n"
-            f"- STRICT LANGUAGE RULE: All 'content', 'title', and 'label' fields MUST BE IN {lang}. Do NOT use English if narration is Bangla.\n"
-            f"- DO NOT TRANSLATE BANGLA NARRATION TO ENGLISH TEXT. KEEP IT BANGLA.\n"
-            f"- MANDATORY KEYS: 'overlays' (List), 'camera' (Object).\n"
-            f"- DO NOT USE WRAPPER KEYS like 'sceneId', 'meta', or 'timeline'.\n"
-            f"- EVERY TEXT/NIVO LAYER MUST HAVE A VALID 'content' OR 'data' FIELD BASED ON THE NARRATION.\n"
-            f"- YOU MUST UPDATE 'overlays' (animations, content, colors) AND 'camera' (presets, shots) BASED ON THE NARRATION.\n"
-            f"- Follow Studio V4 minimalist guidelines.\n"
-            f"- USE {lang} appropriate fonts from the provided list. NEVER use English fonts for Bangla text.\n"
-            f"- EXAMPLE: If Narration is 'ঢাকা।', content must be 'ঢাকা', font must be a Bangla font.\n"
-            f"- Maintain audio sync for hero words.\n"
-        )
+        feedback_context = ""
+        for attempt in range(3):
+            print(f"\n🔄 Gemini Interaction Attempt {attempt + 1}/3...")
 
-        raw_output = self.maker._interact_with_gemini(refine_prompt)
-        self.maker.stop_browser()
-        print(f"📊 Raw response sample: {raw_output[:200]}...")
+            refine_prompt = (
+                f"YOU ARE A REMOTION MASTER. REFINE THIS SPECIFIC SCENE JSON.\n"
+                f"SCENE ID: {scene_id}\n"
+                f"TARGET LANGUAGE: {lang}\n"
+                f"NARRATION (USE THIS FOR CONTENT): {story_text}\n"
+                f"CURRENT JSON (IGNORE ENGLISH TEXT IN THIS IF TARGET IS BANGLA): {current_scene_json}\n"
+                f"AVAILABLE {lang} FONTS: {target_fonts}\n"
+                f"AVAILABLE HERO ANIMATIONS: {', '.join(hero_anim_list)}\n"
+                f"AVAILABLE CAMERA STYLES: {', '.join(camera_style_list)}\n"
+                f"INSTRUCTION: {instruction if instruction else 'Enhance the design and visual impact while keeping the narrative.'}\n"
+                f"FEEDBACK FROM PREVIOUS ATTEMPT: {feedback_context if feedback_context else 'None'}\n"
+                f"STRICT RULES (STRICT MODE ON):\n"
+                f"- OUTPUT A SINGLE JSON OBJECT FOR THIS SCENE ONLY.\n"
+                f"- STRICT LANGUAGE RULE: All 'content', 'title', and 'label' fields MUST BE IN {lang}. Do NOT use English if narration is Bangla.\n"
+                f"- DO NOT TRANSLATE BANGLA NARRATION TO ENGLISH TEXT. KEEP IT BANGLA.\n"
+                f"- MANDATORY KEYS: 'overlays' (List), 'camera' (Object).\n"
+                f"- DO NOT USE WRAPPER KEYS like 'sceneId', 'meta', or 'timeline'.\n"
+                f"- EVERY TEXT/NIVO LAYER MUST HAVE A VALID 'content' OR 'data' FIELD BASED ON THE NARRATION.\n"
+                f"- YOU MUST UPDATE 'overlays' (animations, content, colors) AND 'camera' (presets, shots) BASED ON THE NARRATION.\n"
+                f"- Follow Studio V4 minimalist guidelines.\n"
+                f"- USE {lang} appropriate fonts from the provided list. NEVER use English fonts for Bangla text.\n"
+                f"- EXAMPLE: If Narration is 'ঢাকা।', content must be 'ঢাকা', font must be a Bangla font.\n"
+                f"- Maintain audio sync for hero words.\n"
+            )
 
-        # Robust JSON extraction and repair
-        extracted_data = None
-        try:
-            # Try both { and [ as start characters for single scene responses
-            start_idx = min(i for i in [raw_output.find('{'), raw_output.find('[')] if i != -1) if '{' in raw_output or '[' in raw_output else -1
-            end_idx = max(i for i in [raw_output.rfind('}'), raw_output.rfind(']')] if i != -1) if '}' in raw_output or ']' in raw_output else -1
+            print("\n📝 --- FULL PROMPT SENT TO GEMINI ---")
+            print(refine_prompt)
+            print("-" * 50)
 
-            if start_idx != -1 and end_idx != -1:
-                json_str = raw_output[start_idx:end_idx+1]
-                json_str = "".join(ch for ch in json_str if ch.isprintable() or ch in "\n\r\t")
-                json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
+            raw_output = self.maker._interact_with_gemini(refine_prompt)
 
-                try:
-                    extracted_data = json.loads(json_str, strict=False)
-                except:
-                    print("⚠️  Primary parse failed. Attempting repair...")
-                    extracted_data = self.maker.repair_json(json_str)
+            print("\n📊 --- RAW GEMINI OUTPUT ---")
+            print(raw_output)
+            print("-" * 50)
 
-            if extracted_data:
-                print(f"🔍 DEBUG: Extracted JSON keys: {list(extracted_data.keys()) if isinstance(extracted_data, dict) else 'Not a dict'}")
+            # Robust JSON extraction and repair
+            extracted_data = None
+            try:
+                # Try both { and [ as start characters for single scene responses
+                start_idx = min(i for i in [raw_output.find('{'), raw_output.find('[')] if i != -1) if '{' in raw_output or '[' in raw_output else -1
+                end_idx = max(i for i in [raw_output.rfind('}'), raw_output.rfind(']')] if i != -1) if '}' in raw_output or ']' in raw_output else -1
 
-                # Update entire scene if the response is a full scene object
-                if isinstance(extracted_data, dict) and ('overlays' in extracted_data or 'camera' in extracted_data):
-                    print("✅ AI returned a full scene object. Merging camera and overlays.")
-                    if 'overlays' in extracted_data: scene['overlays'] = extracted_data['overlays']
-                    if 'camera' in extracted_data: scene['camera'] = extracted_data['camera']
+                if start_idx != -1 and end_idx != -1:
+                    json_str = raw_output[start_idx:end_idx+1]
+                    json_str = "".join(ch for ch in json_str if ch.isprintable() or ch in "\n\r\t")
+                    json_str = re.sub(r'//.*$', '', json_str, flags=re.MULTILINE)
+
+                    try:
+                        extracted_data = json.loads(json_str, strict=False)
+                    except:
+                        print("⚠️  Primary parse failed. Attempting repair...")
+                        extracted_data = self.maker.repair_json(json_str)
+
+                if extracted_data:
+                    # Guardrail Validation
+                    validation_errors = self.validate_gemini_output(extracted_data, story_text, lang)
+                    if validation_errors:
+                        print(f"⚠️ Guardrail Mismatch Detected: {', '.join(validation_errors)}")
+                        feedback_context = "CRITICAL ERRORS: " + ". ".join(validation_errors)
+                        continue # Retry
+
+                    print("✅ Guardrail Passed: Output matches language and narration.")
+                    print(f"🔍 DEBUG: Extracted JSON keys: {list(extracted_data.keys()) if isinstance(extracted_data, dict) else 'Not a dict'}")
+
+                    # Update entire scene if the response is a full scene object
+                    if isinstance(extracted_data, dict) and ('overlays' in extracted_data or 'camera' in extracted_data):
+                        print("✅ AI returned a full scene object. Merging camera and overlays.")
+                        if 'overlays' in extracted_data: scene['overlays'] = extracted_data['overlays']
+                        if 'camera' in extracted_data: scene['camera'] = extracted_data['camera']
+                    else:
+                        # Locate overlays list using deep search
+                        overlays = self.find_overlays(extracted_data)
+                        if overlays:
+                            print(f"✅ Successfully recovered {len(overlays)} overlays from AI response.")
+                            scene['overlays'] = overlays
+
+                        # Also try to find camera in the nested response
+                        if isinstance(extracted_data, dict):
+                             for k in ['camera', 'camera_settings', 'motion']:
+                                 if k in extracted_data:
+                                     print(f"✅ Recovered camera settings from key '{k}'")
+                                     scene['camera'] = extracted_data[k]
+                                     break
+
+                    # Apply guardrails to the full scene context
+                    temp_data = {"scenes": [scene]}
+                    fixed_data = self.maker.finalize_json_durations(temp_data, self.public_dir)
+
+                    # Update main data
+                    for i, s in enumerate(self.data['scenes']):
+                        if s['scene_id'] == scene['scene_id']:
+                            self.data['scenes'][i] = fixed_data['scenes'][0]
+                            final_ov_count = len(fixed_data['scenes'][0].get('overlays', []))
+                            print(f"🛠️  Scene {scene['scene_id']} updated with {final_ov_count} overlays.")
+                            if final_ov_count > 0:
+                                print(f"   Visual Content: {fixed_data['scenes'][0]['overlays'][0].get('content') or fixed_data['scenes'][0]['overlays'][0].get('title')}")
+                            break
+                    print("✨ Gemini refinement applied and validated.")
+                    break # Success!
                 else:
-                    # Locate overlays list using deep search
-                    overlays = self.find_overlays(extracted_data)
-                    if overlays:
-                        print(f"✅ Successfully recovered {len(overlays)} overlays from AI response.")
-                        scene['overlays'] = overlays
+                    print("❌ Gemini failed to produce valid JSON.")
+                    feedback_context = "Your previous output was not a valid JSON object. Please try again."
+            except Exception as e:
+                print(f"❌ Error processing Gemini response: {e}")
+                feedback_context = f"Internal error processing your response: {str(e)}"
 
-                    # Also try to find camera in the nested response
-                    if isinstance(extracted_data, dict):
-                         for k in ['camera', 'camera_settings', 'motion']:
-                             if k in extracted_data:
-                                 print(f"✅ Recovered camera settings from key '{k}'")
-                                 scene['camera'] = extracted_data[k]
-                                 break
-
-                # Apply guardrails to the full scene context
-                temp_data = {"scenes": [scene]}
-                fixed_data = self.maker.finalize_json_durations(temp_data, self.public_dir)
-
-                # Update main data
-                for i, s in enumerate(self.data['scenes']):
-                    if s['scene_id'] == scene['scene_id']:
-                        self.data['scenes'][i] = fixed_data['scenes'][0]
-                        final_ov_count = len(fixed_data['scenes'][0].get('overlays', []))
-                        print(f"🛠️  Scene {scene['scene_id']} updated with {final_ov_count} overlays.")
-                        if final_ov_count > 0:
-                            print(f"   Visual Content: {fixed_data['scenes'][0]['overlays'][0].get('content') or fixed_data['scenes'][0]['overlays'][0].get('title')}")
-                        break
-                print("✨ Gemini refinement applied and validated.")
-            else:
-                print("❌ Gemini failed to produce valid JSON.")
-        except Exception as e:
-            print(f"❌ Error processing Gemini response: {e}")
+        self.maker.stop_browser()
 
     def render_scene(self, scene_input: Any):
         scene = self.get_scene(scene_input)
