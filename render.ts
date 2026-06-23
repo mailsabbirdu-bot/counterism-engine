@@ -167,7 +167,17 @@ const start = async () => {
       let outputLocation: string;
       // FIX: Respect --output if we are specifically rendering ONE scene via --scene
       if (outputArg && (template.scenes.length === 1 || sceneIdArg)) {
-        outputLocation = path.isAbsolute(outputArg) ? outputArg : path.join(path.dirname(outputDir), outputArg);
+        // If relative, join it with outputDir (which points to Drive if available)
+        outputLocation = path.isAbsolute(outputArg) ? outputArg : path.join(outputDir, outputArg);
+
+        // Ensure absolute for directory creation
+        const absoluteOutput = path.resolve(process.cwd(), outputLocation);
+        const parentDir = path.dirname(absoluteOutput);
+
+        if (!fs.existsSync(parentDir)) {
+             console.log(`📂 Creating parent directory for output: ${parentDir}`);
+             fs.mkdirSync(parentDir, { recursive: true });
+        }
       } else {
         outputLocation = path.join(
           outputDir,

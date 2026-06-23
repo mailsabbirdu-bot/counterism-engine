@@ -239,21 +239,44 @@ class RemotionJsonMaker:
             s_id = scene.get('scene_id', 'unknown')
             has_relation = False # Initialize to prevent UnboundLocalError
 
+            print(f"   🎬 Processing Scene: {s_id}")
+
             # 1. LLM Fix: Root Level Schema Alignment
             if 'duration' in scene and 'duration_in_frames' not in scene:
                 scene['duration_in_frames'] = scene['duration']
 
-            if 'elements' in scene and not scene.get('overlays'):
-                scene['overlays'] = scene['elements']
+            # Robust Overlay Key Detection (Handles empty lists or missing keys)
+            if not scene.get('overlays') or (isinstance(scene.get('overlays'), list) and len(scene.get('overlays')) == 0):
+                for k in ['elements', 'layers', 'objects', 'visuals', 'components', 'items', 'content_list']:
+                    if scene.get(k) and isinstance(scene[k], list) and len(scene[k]) > 0:
+                        scene['overlays'] = scene[k]
+                        print(f"      🔧 Recovered overlays from list key '{k}'")
+                        break
+
+            # LLM Repair: Handle non-list overlays (e.g. single object)
+            if 'overlays' in scene and isinstance(scene['overlays'], dict):
+                 scene['overlays'] = [scene['overlays']]
+                 print(f"      🔧 Converted single overlay object to list")
 
             # LLM Repair: text_overlay / focal_element object patterns
-            if not scene.get('overlays'):
+            if not scene.get('overlays') or not isinstance(scene['overlays'], list) or len(scene['overlays']) == 0:
                 scene['overlays'] = []
-                for k in ['text_overlay', 'focal_element', 'overlay']:
-                    if k in scene and isinstance(scene[k], dict):
-                        obj = scene[k]
-                        if k == 'text_overlay': obj['type'] = 'text'
-                        scene['overlays'].append(obj)
+                # Extreme recovery: search for any key that looks like it contains an overlay
+                for k in ['text_overlay', 'focal_element', 'overlay', 'text', 'chart', 'indicator', 'data', 'overlay_list', 'graphic']:
+                    if k in scene:
+                        val = scene[k]
+                        if isinstance(val, list):
+                            for obj in val:
+                                if isinstance(obj, dict):
+                                    if k == 'text_overlay' or k == 'text': obj['type'] = 'text'
+                                    scene['overlays'].append(obj)
+                            print(f"      🔧 Recovered {len(val)} overlays from list key '{k}'")
+                        elif isinstance(val, dict):
+                            obj = val
+                            if k == 'text_overlay' or k == 'text': obj['type'] = 'text'
+                            if k == 'chart' or k == 'indicator': obj['type'] = k
+                            scene['overlays'].append(obj)
+                            print(f"      🔧 Recovered overlay from dict key '{k}'")
 
             if 'background' in scene and isinstance(scene['background'], dict):
                 bg = scene['background']
@@ -264,10 +287,15 @@ class RemotionJsonMaker:
             scene['background_type'] = 'video'
             scene['audio_enabled'] = True
 
+            # Smart Indexing: Try to get scene number from ID (e.g. SCENE_05 -> 5)
+            id_match = re.search(r'(\d+)', s_id)
+            id_num = int(id_match.group(1)) if id_match else (scene_idx + 1)
+
             # Preserve existing valid render paths (important for Remake project)
             current_vpath = scene.get('video_path', '')
             if not current_vpath or not current_vpath.startswith('renders/'):
-                scene['video_path'] = f"renders/scene_SC_{scene_idx+1:02d}.mp4"
+                scene['video_path'] = f"renders/scene_SC_{id_num:02d}.mp4"
+                print(f"      🎬 Assigned background: {scene['video_path']} (derived from ID '{s_id}')")
 
             # 3. Authoritative Duration Resolution
             scene_duration = scene.get('duration_in_frames', 180)
@@ -300,19 +328,29 @@ class RemotionJsonMaker:
                         if 'end_frame' in ov: ov['duration'] = max(60, ov['end_frame'] - ov.get('start', 0))
                         elif 'end' in ov: ov['duration'] = max(60, ov['end'] - ov.get('start', 0))
 
-                    # Determine initial type for repair
+                    # LLM Repair: text_overlay / focal_element object patterns
+                    if not ov.get('type'):
+                        if 'text' in ov or 'content' in ov: ov['type'] = 'text'
+                        elif 'chart_type' in ov or 'kind' in ov: ov['type'] = 'chart'
+                        elif 'indicator_type' in ov: ov['type'] = 'data_indicator'
+
+                    # LLM Repair: kind -> indicator_type / chart_type (CRITICAL: Do this before resolving ov_type)
+                    if 'kind' in ov:
+                        if ('chart' in str(ov.get('kind')) or 'bar' in str(ov.get('kind')) or 'pie' in str(ov.get('kind'))):
+                             ov['type'] = 'chart'
+                             if 'chart_type' not in ov: ov['chart_type'] = ov['kind']
+                        else:
+                             ov['type'] = 'data_indicator'
+                             if 'indicator_type' not in ov: ov['indicator_type'] = ov['kind']
+
+                    # Re-resolve type after potential repair
                     ov_type = ov.get('type', 'text')
 
                     # LLM Repair: ui -> ui_panel, text missing but key present
                     if ov_type == 'ui' or ov_type == 'ui_panel': ov['type'] = 'ui_panel'
                     if ov_type == 'indicator' or ov_type == 'data_indicator': ov['type'] = 'data_indicator'
 
-                    if not ov.get('type'):
-                        if 'text' in ov or 'content' in ov: ov['type'] = 'text'
-                        elif 'chart_type' in ov or 'kind' in ov: ov['type'] = 'chart'
-                        elif 'indicator_type' in ov: ov['type'] = 'data_indicator'
-
-                    # Re-resolve type after potential repair
+                    # Final re-resolve for branching
                     ov_type = ov.get('type', 'text')
 
                     if ov_type == 'text':
@@ -334,7 +372,8 @@ class RemotionJsonMaker:
                         # Font Fallback
                         content = ov.get('content', '')
                         is_bangla = any(ord(c) > 127 for c in content)
-                        if not ov.get('font'):
+                        f = ov.get('font')
+                        if not f or f == 'undefined' or f == 'null':
                             if is_bangla and self.bangla_fonts:
                                 ov['font'] = self.bangla_fonts[0]
                             elif not is_bangla and self.english_fonts:
@@ -386,6 +425,7 @@ class RemotionJsonMaker:
                     valid_overlays.append(ov)
 
                 scene['overlays'] = valid_overlays
+                print(f"      📊 Manifest Stats: {len(valid_overlays)} overlays validated ({text_count} text, {focal_count} focal)")
 
                 for i, ov in enumerate(scene['overlays']):
                     # Ensure ID exists
