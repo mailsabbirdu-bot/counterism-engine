@@ -48,10 +48,10 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         width: '1700px', // Balanced width for wrapping
         maxWidth: '1700px',
         height: 'auto',
-        textShadow: '0 4px 20px rgba(0,0,0,0.8), 0 0 60px rgba(0,0,0,0.4)', // Sharper contrast
+        textShadow: '0 4px 30px rgba(0,0,0,1), 0 0 80px rgba(0,0,0,0.8)', // Maximum density shadows for depth
         color: overlay.color || 'white',
-        WebkitTextStroke: '1px rgba(0,0,0,0.4)', // Subtle readability stroke
-        whiteSpace: 'normal', // Allow wrapping
+        WebkitTextStroke: '0px', // REMOVE STROKE: It causes visual gaps and incorrect filling in complex fonts
+        whiteSpace: 'pre-wrap',
         lineHeight: 1.2,
         overflow: 'visible',
         opacity: 1, // Force base opacity
@@ -60,7 +60,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       <div style={{
         display: 'flex',
         flexWrap: 'wrap',
-        gap: '12px',
+        gap: '8px', // Tighten for character cohesion
         justifyContent: 'center',
         textAlign: 'center'
       }}>
@@ -99,7 +99,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
           let style: React.CSSProperties = {
             display: 'inline-block',
             whiteSpace: item === ' ' ? 'pre' : 'normal',
-            fontWeight: 800, // Slightly less blocky
+            fontWeight: 900, // Maximum weight for visibility
             opacity: progress,
           };
 
@@ -114,12 +114,12 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
                  style.color = 'white';
                  // High-end Offset Neon Stroke Design
                  style.textShadow = `
-                    2px 2px 0px ${heroConfig.color},
-                    -1px -1px 0px rgba(255,255,255,0.5),
-                    0 0 15px ${heroConfig.color}88,
-                    0 0 ${30 + pulse * 20}px ${heroConfig.color}44
+                    1px 1px 0px ${heroConfig.color},
+                    -1px -1px 0px rgba(255,255,255,0.2),
+                    0 0 15px ${heroConfig.color},
+                    0 0 ${30 + pulse * 20}px ${heroConfig.color}88
                  `;
-                 style.WebkitTextStroke = `1px rgba(255,255,255,0.3)`;
+                 style.WebkitTextStroke = 'none'; // No stroke on glow to avoid separation
                  style.transform = `scale(${1 + heroEntrance * 0.12 + pulse * 0.03}) rotate(${pulse * 1.5}deg)`;
                  style.zIndex = 100;
              } else if (anim === 'isolate_zoom') {
@@ -168,11 +168,11 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
                  style.padding = '4px 12px';
                  style.borderRadius = '12px';
              } else if (anim === 'glass_shimmer') {
-                 style.background = `linear-gradient(90deg, transparent, white, transparent)`;
+                 style.background = `linear-gradient(90deg, ${heroConfig.color}, white, ${heroConfig.color})`;
                  style.backgroundSize = '200% 100%';
                  style.backgroundPosition = `${heroFrame * 5}% 0`;
                  style.WebkitBackgroundClip = 'text';
-                 style.WebkitTextFillColor = 'transparent';
+                 style.WebkitTextFillColor = 'white'; // Solid fallback for glyph cohesion
              } else if (anim === 'heartbeat') {
                  const beat = 1 + Math.pow(Math.sin(heroFrame * 0.2), 4) * 0.2;
                  style.transform = `scale(${beat})`;

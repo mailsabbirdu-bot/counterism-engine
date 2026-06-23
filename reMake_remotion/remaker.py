@@ -191,26 +191,49 @@ class RemotionRemaker:
 
     def find_overlays(self, data: Any) -> List[dict]:
         """Deep search for an overlay list in potentially nested/wrapped Gemini responses."""
+        VALID_TYPES = ['text', 'chart', 'data_indicator', 'ui_panel', 'indicator', 'kpi', 'media']
+        CAMERA_KEYS = ['targetId', 'style', 'shots', 'motionBlur']
+
         if isinstance(data, list):
              # Check if it's a list of dicts with common overlay keys
-             if len(data) > 0 and isinstance(data[0], dict) and any(k in data[0] for k in ['type', 'id', 'content', 'kind']):
-                 return data
+             if len(data) > 0 and isinstance(data[0], dict):
+                 first = data[0]
+                 # Ensure it's not a camera shot list
+                 if any(k in first for k in CAMERA_KEYS) and not any(k in first for k in ['content', 'data']):
+                     pass
+                 else:
+                     if any(k in first for k in ['content', 'kind', 'indicator_type', 'chart_type']):
+                         return data
+                     if first.get('type') in VALID_TYPES:
+                         return data
+
              # Recurse into list items
              for item in data:
                  res = self.find_overlays(item)
                  if res: return res
         elif isinstance(data, dict):
-             # Check common list keys
-             for k in ['overlays', 'elements', 'layers', 'objects', 'visuals', 'components', 'overlay_list']:
-                 if k in data and isinstance(data[k], list):
-                     return data[k]
-             # Check if the dict ITSELF is an overlay (has 'type' but no scenes/overlays list)
-             if 'type' in data and not any(k in data for k in ['scenes', 'overlays', 'elements']):
-                 return [data]
+             # Ensure the dict itself isn't a camera object
+             if any(k in data for k in CAMERA_KEYS) and not any(k in data for k in ['content', 'data', 'overlays']):
+                 pass
+             else:
+                 # Check common list keys
+                 for k in ['overlays', 'elements', 'layers', 'objects', 'visuals', 'components', 'overlay_list', 'timeline']:
+                     if k in data and isinstance(data[k], list):
+                         found = self.find_overlays(data[k])
+                         if found: return found
+
+                 # Check if the dict ITSELF is an overlay
+                 if data.get('type') in VALID_TYPES:
+                     return [data]
+                 if any(k in data for k in ['content', 'indicator_type', 'chart_type']):
+                     # Final check: it must have a type or we must infer it
+                     return [data]
+
              # Recurse into values
              for v in data.values():
-                 res = self.find_overlays(v)
-                 if res: return res
+                 if isinstance(v, (dict, list)):
+                     res = self.find_overlays(v)
+                     if res: return res
         return []
 
     def _is_bangla(self, text: str) -> bool:
@@ -269,8 +292,11 @@ class RemotionRemaker:
             f"AVAILABLE HERO ANIMATIONS: {', '.join(hero_anim_list)}\n"
             f"AVAILABLE CAMERA STYLES: {', '.join(camera_style_list)}\n"
             f"INSTRUCTION: {instruction if instruction else 'Enhance the design and visual impact while keeping the narrative.'}\n"
-            f"STRICT RULES:\n"
-            f"- Output RAW MINIFIED JSON for THIS SCENE ONLY.\n"
+            f"STRICT RULES (STRICT MODE ON):\n"
+            f"- OUTPUT A SINGLE JSON OBJECT FOR THIS SCENE ONLY.\n"
+            f"- MANDATORY KEYS: 'overlays' (List), 'camera' (Object).\n"
+            f"- DO NOT USE WRAPPER KEYS like 'sceneId', 'meta', or 'timeline'.\n"
+            f"- EVERY TEXT/NIVO LAYER MUST HAVE A VALID 'content' OR 'data' FIELD BASED ON THE NARRATION.\n"
             f"- YOU MUST UPDATE 'overlays' (animations, content, colors) AND 'camera' (presets, shots) BASED ON THE NARRATION.\n"
             f"- Follow Studio V4 minimalist guidelines.\n"
             f"- USE {lang} appropriate fonts. NEVER use English fonts for Bangla text.\n"
@@ -330,7 +356,10 @@ class RemotionRemaker:
                 for i, s in enumerate(self.data['scenes']):
                     if s['scene_id'] == scene['scene_id']:
                         self.data['scenes'][i] = fixed_data['scenes'][0]
-                        print(f"🛠️  Scene {scene['scene_id']} updated with {len(fixed_data['scenes'][0].get('overlays', []))} overlays.")
+                        final_ov_count = len(fixed_data['scenes'][0].get('overlays', []))
+                        print(f"🛠️  Scene {scene['scene_id']} updated with {final_ov_count} overlays.")
+                        if final_ov_count > 0:
+                            print(f"   Visual Content: {fixed_data['scenes'][0]['overlays'][0].get('content') or fixed_data['scenes'][0]['overlays'][0].get('title')}")
                         break
                 print("✨ Gemini refinement applied and validated.")
             else:
