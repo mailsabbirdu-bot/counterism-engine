@@ -256,6 +256,9 @@ class RemotionRemaker:
         story_text = self.story_scenes.get(scene_id, "No narration context available.")
         lang = "BANGLA" if self._is_bangla(story_text) else "ENGLISH"
 
+        # FILTER FONTS TO REDUCE CONFUSION
+        target_fonts = self.maker.bangla_fonts if lang == "BANGLA" else self.maker.english_fonts
+
         # Get context from original generator (reusing logic)
         self.maker.start_browser()
 
@@ -285,21 +288,24 @@ class RemotionRemaker:
         refine_prompt = (
             f"YOU ARE A REMOTION MASTER. REFINE THIS SPECIFIC SCENE JSON.\n"
             f"SCENE ID: {scene_id}\n"
-            f"LANGUAGE: {lang}\n"
-            f"NARRATION: {story_text}\n"
-            f"CURRENT JSON: {current_scene_json}\n"
-            f"AVAILABLE FONTS: Bangla: {self.maker.bangla_fonts} | English: {self.maker.english_fonts}\n"
+            f"TARGET LANGUAGE: {lang}\n"
+            f"NARRATION (USE THIS FOR CONTENT): {story_text}\n"
+            f"CURRENT JSON (IGORE ENGLISH TEXT IN THIS IF TARGET IS BANGLA): {current_scene_json}\n"
+            f"AVAILABLE {lang} FONTS: {target_fonts}\n"
             f"AVAILABLE HERO ANIMATIONS: {', '.join(hero_anim_list)}\n"
             f"AVAILABLE CAMERA STYLES: {', '.join(camera_style_list)}\n"
             f"INSTRUCTION: {instruction if instruction else 'Enhance the design and visual impact while keeping the narrative.'}\n"
             f"STRICT RULES (STRICT MODE ON):\n"
             f"- OUTPUT A SINGLE JSON OBJECT FOR THIS SCENE ONLY.\n"
+            f"- STRICT LANGUAGE RULE: All 'content', 'title', and 'label' fields MUST BE IN {lang}. Do NOT use English if narration is Bangla.\n"
+            f"- DO NOT TRANSLATE BANGLA NARRATION TO ENGLISH TEXT. KEEP IT BANGLA.\n"
             f"- MANDATORY KEYS: 'overlays' (List), 'camera' (Object).\n"
             f"- DO NOT USE WRAPPER KEYS like 'sceneId', 'meta', or 'timeline'.\n"
             f"- EVERY TEXT/NIVO LAYER MUST HAVE A VALID 'content' OR 'data' FIELD BASED ON THE NARRATION.\n"
             f"- YOU MUST UPDATE 'overlays' (animations, content, colors) AND 'camera' (presets, shots) BASED ON THE NARRATION.\n"
             f"- Follow Studio V4 minimalist guidelines.\n"
-            f"- USE {lang} appropriate fonts. NEVER use English fonts for Bangla text.\n"
+            f"- USE {lang} appropriate fonts from the provided list. NEVER use English fonts for Bangla text.\n"
+            f"- EXAMPLE: If Narration is 'ঢাকা।', content must be 'ঢাকা', font must be a Bangla font.\n"
             f"- Maintain audio sync for hero words.\n"
         )
 
