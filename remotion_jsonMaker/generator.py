@@ -239,6 +239,9 @@ class RemotionJsonMaker:
             s_id = scene.get('scene_id', 'unknown')
             has_relation = False # Initialize to prevent UnboundLocalError
 
+            # Detect language for the scene based on narration if available
+            # If no narration context is injected yet, we fallback to text overlays later
+
             print(f"   🎬 Processing Scene: {s_id}")
 
             # 1. LLM Fix: Root Level Schema Alignment
@@ -371,13 +374,17 @@ class RemotionJsonMaker:
 
                         # Font Fallback
                         content = ov.get('content', '')
-                        is_bangla = any(ord(c) > 127 for c in content)
+                        is_bangla = self._is_bangla(content)
                         f = ov.get('font')
                         if not f or f == 'undefined' or f == 'null':
                             if is_bangla and self.bangla_fonts:
                                 ov['font'] = self.bangla_fonts[0]
                             elif not is_bangla and self.english_fonts:
                                 ov['font'] = self.english_fonts[0]
+
+                        # Sanitize font names (ensure no weird characters or extensions)
+                        if ov.get('font'):
+                            ov['font'] = re.sub(r'\.(ttf|otf|woff|woff2)$', '', str(ov['font']), flags=re.I)
                     elif ov_type in ['chart', 'ui_panel', 'data_indicator']:
                         if focal_count >= MAX_FOCAL_PER_SCENE: continue
                         focal_count += 1
@@ -760,7 +767,7 @@ class RemotionJsonMaker:
             # --- GUIDELINE: MANDATORY NIVO FOR NUMBERS ---
             # Scan scene text for digits or numerical words
             all_text = " ".join([o.get('content', '') for o in scene.get('overlays', []) if o.get('type') == 'text'])
-            is_scene_bangla = any(ord(c) > 127 for c in all_text)
+            is_scene_bangla = self._is_bangla(all_text)
             has_number = re.search(r'[0-9০-৯]|million|M|k|K|percent|%|দশ|শত|হাজার|কোটি|লক্ষ', all_text, re.I)
             has_focal = any(o.get('type') in ['chart', 'data_indicator', 'ui_panel'] for o in scene.get('overlays', []))
 
@@ -822,7 +829,13 @@ class RemotionJsonMaker:
                          ov['style'] = f"text-{ov['color']}"
 
                     if not ov.get('font'):
-                        ov['font'] = self.bangla_fonts[0] if self.bangla_fonts else "Arial"
+                        is_ov_bangla = self._is_bangla(ov.get('content', ''))
+                        if is_ov_bangla and self.bangla_fonts:
+                            ov['font'] = self.bangla_fonts[0]
+                        elif not is_ov_bangla and self.english_fonts:
+                            ov['font'] = self.english_fonts[0]
+                        else:
+                            ov['font'] = "Arial"
 
                     # --- GUIDELINE: HERO WORD ---
                     hero = self._get_scene_hero_word(scene_id, ov.get('content', ''), duration)
@@ -1103,7 +1116,24 @@ class RemotionJsonMaker:
                 compacted.append(f"{match.group(1)}:{match.group(2)}f \"{match.group(3)}\"")
         return " | ".join(compacted)
 
+    def _is_bangla(self, text: str) -> bool:
+        return any('\u0980' <= c <= '\u09FF' for c in text)
+
     def generate(self, story: str, guidelines: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None) -> Dict[str, Any]:
+        # Pre-process story into scenes for explicit language detection and context
+        pattern = r'দৃশ্য\s+[0-9০-৯]+'
+        story_parts = re.split(pattern, story)
+        if story_parts and not story_parts[0].strip():
+            story_parts = story_parts[1:]
+
+        scene_narrations = []
+        for i, text in enumerate(story_parts, 1):
+            narration = text.strip()
+            lang = "BANGLA" if self._is_bangla(narration) else "ENGLISH"
+            scene_narrations.append(f"SCENE_{i:02d} ({lang}): {narration}")
+
+        story_context = "\n".join(scene_narrations)
+
         story = self.adjust_durations_in_text(story)
         local_fonts = f"BANGLA FONTS: {self.bangla_fonts} | ENGLISH FONTS: {self.english_fonts}"
         compact_ts = self._compact_timestamps(timestamp_context)
@@ -1157,7 +1187,7 @@ class RemotionJsonMaker:
             "CRITICAL SCHEMA RULES (NEVER BREAK THESE):\n"
             "- USE 'overlays' list. NEVER use 'elements' or 'text_overlay' objects.\n"
             "- USE 'content' for text strings. NEVER use 'text'.\n"
-            "- USE 'font' from the provided lists for every text and Nivo layer. If narration is Bangla, use a Bangla font for Nivo.\n"
+            "- USE 'font' from the provided lists for every text and Nivo layer. MATCH LANGUAGE: Use Bangla fonts for Bangla text, English fonts for English text. Check STORY_CONTEXT for scene language.\n"
             "- COLORS: Use attractive, eye-soothing, ultra-modern and catchy colors. Ensure high contrast for readability.\n"
             "- USE type: 'data_indicator' for timers/KPIs/counters. indicator_type: 'countdown' for timers.\n"
             "- USE 'chart_type' or 'indicator_type'. NEVER use 'kind'.\n"
@@ -1165,8 +1195,9 @@ class RemotionJsonMaker:
             "- USE 'start' and 'duration' (integers). NEVER use 'start_frame' or 'end_frame'.\n"
             "- USE flat keys for background: 'background_type', 'video_path', 'audio_enabled'. NO 'background' object.\n"
             "DESIGN RULES:\n"
-            "1. MINIMALISM: Max 1 text overlay + 1 focal element per scene. NEVER crowd the screen.\n"
-            "2. MANDATORY NIVO FOR NUMBERS: If a number or numerical word is mentioned in the narration (e.g., 'two', '10M', '৫০%', 'দশ'), you MUST include an appropriate Nivo layer (KPI, chart, graph, timer) to visualize it. Ensure all fields like 'value' and 'label' are populated accurately. NO EXCEPTIONS.\n"
+            "1. NARRATIVE SYNC: Every overlay MUST relate to the SCENE NARRATION in STORY_CONTEXT. Do not hallucinate irrelevant text.\n"
+            "2. MINIMALISM: Max 1 text overlay + 1 focal element per scene. NEVER crowd the screen.\n"
+            "3. MANDATORY NIVO FOR NUMBERS: If a number or numerical word is mentioned in the narration (e.g., 'two', '10M', '৫০%', 'দশ'), you MUST include an appropriate Nivo layer (KPI, chart, graph, timer) to visualize it. Ensure all fields like 'value' and 'label' are populated accurately. NO EXCEPTIONS.\n"
             "3. TITLE+CONTENT LAYOUT: If text and Nivo layers are related, treat Text as TITLE and Nivo as CONTENT. Place TITLE above CONTENT.\n"
             "4. TEXT: 3-4 words max. NO terminal punctuation ('.' or '।'). Capture 'vibe', NOT subtitles. If a number is in narration, prioritize showing that number in text. Sync 'start' to word's StartFrame.\n"
             "5. VIDEO: background_type: 'video' is MANDATORY. video_path must be 'renders/scene_SC_XX.mp4'.\n"
@@ -1176,7 +1207,8 @@ class RemotionJsonMaker:
             f"CAMERA_SFX: {self.camera_files}\n"
             f"DURATIONS: {duration_context}\n"
             f"TIMESTAMPS: {compact_ts}\n"
-            f"STORY: {story}\n"
+            f"STORY_CONTEXT (SCENE-BY-SCENE): \n{story_context}\n"
+            f"RAW_STORY: {story}\n"
             f"SCHEMA: {condensed_guidelines}\n"
             "TASK: Create a clean MASTER manifest. 100% strict schema adherence. Generate JSON for ALL scenes mentioned in DURATIONS. No scene omission."
         )

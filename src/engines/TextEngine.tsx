@@ -48,9 +48,9 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         width: '1700px', // Balanced width for wrapping
         maxWidth: '1700px',
         height: 'auto',
-        textShadow: '0 4px 30px rgba(0,0,0,1), 0 0 120px rgba(0,0,0,0.6)', // Maximum contrast shadows
+        textShadow: '0 4px 20px rgba(0,0,0,0.8), 0 0 60px rgba(0,0,0,0.4)', // Sharper contrast
         color: overlay.color || 'white',
-        WebkitTextStroke: '2px rgba(0,0,0,0.5)', // Visible readability stroke
+        WebkitTextStroke: '1px rgba(0,0,0,0.4)', // Subtle readability stroke
         whiteSpace: 'normal', // Allow wrapping
         lineHeight: 1.2,
         overflow: 'visible',
@@ -99,7 +99,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
           let style: React.CSSProperties = {
             display: 'inline-block',
             whiteSpace: item === ' ' ? 'pre' : 'normal',
-            fontWeight: 900,
+            fontWeight: 800, // Slightly less blocky
             opacity: progress,
           };
 

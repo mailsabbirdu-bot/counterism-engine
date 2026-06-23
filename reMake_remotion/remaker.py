@@ -37,9 +37,15 @@ class RemotionRemaker:
         try:
             with open(self.story_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-                # Split by दृश्य (Scene) markers
-                parts = re.split(r' দৃশ্য\s+[0-9০-৯]+', content)
-                for i, text in enumerate(parts[1:], 1):
+                # Split by দৃশ্য (Scene) markers, handling cases where it starts at the beginning
+                # Regex looks for "দৃশ্য" followed by space and numbers
+                pattern = r'দৃশ্য\s+[0-9০-৯]+'
+                parts = re.split(pattern, content)
+                # If the first part is empty, it means the file started with a scene marker
+                if parts and not parts[0].strip():
+                    parts = parts[1:]
+
+                for i, text in enumerate(parts, 1):
                     self.story_scenes[f"SCENE_{i:02d}"] = text.strip()
             print(f"📖 Loaded {len(self.story_scenes)} scenes from story.")
         except Exception as e:
@@ -207,6 +213,9 @@ class RemotionRemaker:
                  if res: return res
         return []
 
+    def _is_bangla(self, text: str) -> bool:
+        return any('\u0980' <= c <= '\u09FF' for c in text)
+
     def gemini_change(self, scene_num: int, scene: Dict[str, Any]):
         print("\n🤖 Gemini Refinement Mode")
         print("1. Change entire scene (AI logic)")
@@ -222,6 +231,7 @@ class RemotionRemaker:
         current_scene_json = json.dumps(scene, ensure_ascii=False)
         scene_id = scene.get('scene_id', 'UNKNOWN')
         story_text = self.story_scenes.get(scene_id, "No narration context available.")
+        lang = "BANGLA" if self._is_bangla(story_text) else "ENGLISH"
 
         # Get context from original generator (reusing logic)
         self.maker.start_browser()
@@ -229,12 +239,15 @@ class RemotionRemaker:
         refine_prompt = (
             f"YOU ARE A REMOTION MASTER. REFINE THIS SPECIFIC SCENE JSON.\n"
             f"SCENE ID: {scene_id}\n"
+            f"LANGUAGE: {lang}\n"
             f"NARRATION: {story_text}\n"
             f"CURRENT JSON: {current_scene_json}\n"
+            f"AVAILABLE FONTS: Bangla: {self.maker.bangla_fonts} | English: {self.maker.english_fonts}\n"
             f"INSTRUCTION: {instruction if instruction else 'Enhance the design and visual impact while keeping the narrative.'}\n"
             f"STRICT RULES:\n"
             f"- Output RAW MINIFIED JSON for THIS SCENE ONLY.\n"
             f"- Follow Studio V4 minimalist guidelines.\n"
+            f"- USE {lang} appropriate fonts. NEVER use English fonts for Bangla text.\n"
             f"- Maintain audio sync for hero words.\n"
         )
 
