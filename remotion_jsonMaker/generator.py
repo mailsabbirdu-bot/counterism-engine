@@ -837,6 +837,10 @@ class RemotionJsonMaker:
                         else:
                             ov['font'] = "Arial"
 
+                    # Force Bangla font if content contains Bangla characters, regardless of AI selection
+                    if self._is_bangla(ov.get('content', '')) and self.bangla_fonts:
+                        ov['font'] = self.bangla_fonts[0]
+
                     # --- GUIDELINE: HERO WORD ---
                     hero = self._get_scene_hero_word(scene_id, ov.get('content', ''), duration)
                     if not hero:
@@ -865,6 +869,9 @@ class RemotionJsonMaker:
                 if o_type == 'chart':
                     if is_scene_bangla and self.bangla_fonts:
                         ov['font'] = self.bangla_fonts[0]
+                    # Robustness: ensure a font is always assigned
+                    if not ov.get('font'):
+                         ov['font'] = self.english_fonts[0] if self.english_fonts else "Arial"
 
                     ov['color'] = modern_colors[(idx + 1) % len(modern_colors)]
                     if not ov.get('colors'):
@@ -878,6 +885,9 @@ class RemotionJsonMaker:
 
                 # Indicator Field Integrity
                 if o_type == 'data_indicator':
+                    # Robustness: ensure a font is always assigned
+                    if not ov.get('font'):
+                         ov['font'] = self.english_fonts[0] if self.english_fonts else "Arial"
                     if not ov.get('indicator_type') or ov.get('indicator_type') == 'counter':
                         ov['indicator_type'] = "kpiNumber"
                     if not ov.get('label'): ov['label'] = "Insight"
@@ -1181,27 +1191,17 @@ class RemotionJsonMaker:
 
         full_prompt = (
             "YOU ARE A REMOTION MASTER ENGINE. GENERATE RAW MINIFIED JSON ONLY. START '{' END '}'.\n"
-            f"AVAILABLE HERO ANIMATIONS (USE DIFFERENT ONES FOR EVERY SCENE): {', '.join(hero_anim_list)}\n"
-            f"AVAILABLE CAMERA STYLES (USE UNIQUE ONES PER SCENE): {', '.join(camera_style_list)}\n"
-            "AVAILABLE UI/INDICATORS: kpiNumber, countdown, flickerTextBox, progressBar, circularProgress, semiGauge, dashboardCard, comparisonKPI, deltaIndicator\n"
-            "CRITICAL SCHEMA RULES (NEVER BREAK THESE):\n"
-            "- USE 'overlays' list. NEVER use 'elements' or 'text_overlay' objects.\n"
-            "- USE 'content' for text strings. NEVER use 'text'.\n"
-            "- USE 'font' from the provided lists for every text and Nivo layer. MATCH LANGUAGE: Use Bangla fonts for Bangla text, English fonts for English text. Check STORY_CONTEXT for scene language.\n"
-            "- COLORS: Use attractive, eye-soothing, ultra-modern and catchy colors. Ensure high contrast for readability.\n"
-            "- USE type: 'data_indicator' for timers/KPIs/counters. indicator_type: 'countdown' for timers.\n"
-            "- USE 'chart_type' or 'indicator_type'. NEVER use 'kind'.\n"
-            "- REQUIRED FIELDS for Nivo: 'label', 'value', 'suffix', 'prefix'. For charts: 'data', 'title', 'colors'. NO NULLS.\n"
-            "- USE 'start' and 'duration' (integers). NEVER use 'start_frame' or 'end_frame'.\n"
-            "- USE flat keys for background: 'background_type', 'video_path', 'audio_enabled'. NO 'background' object.\n"
-            "DESIGN RULES:\n"
-            "1. NARRATIVE SYNC: Every overlay MUST relate to the SCENE NARRATION in STORY_CONTEXT. Do not hallucinate irrelevant text.\n"
-            "2. MINIMALISM: Max 1 text overlay + 1 focal element per scene. NEVER crowd the screen.\n"
-            "3. MANDATORY NIVO FOR NUMBERS: If a number or numerical word is mentioned in the narration (e.g., 'two', '10M', '৫০%', 'দশ'), you MUST include an appropriate Nivo layer (KPI, chart, graph, timer) to visualize it. Ensure all fields like 'value' and 'label' are populated accurately. NO EXCEPTIONS.\n"
-            "3. TITLE+CONTENT LAYOUT: If text and Nivo layers are related, treat Text as TITLE and Nivo as CONTENT. Place TITLE above CONTENT.\n"
-            "4. TEXT: 3-4 words max. NO terminal punctuation ('.' or '।'). Capture 'vibe', NOT subtitles. If a number is in narration, prioritize showing that number in text. Sync 'start' to word's StartFrame.\n"
-            "5. VIDEO: background_type: 'video' is MANDATORY. video_path must be 'renders/scene_SC_XX.mp4'.\n"
-            "6. CAMERA: Every scene must have 'camera' with 'shots' targeting 'targetId'. AVOID MONOTONY: rotate styles (slow_push, zoom_in, pan_left, pan_right, orbit). Ensure targets stay on-screen. Max zoom 1.6x.\n"
+            "SCHEMA INSTRUCTIONS:\n"
+            "- 'scenes': [ { 'scene_id', 'duration', 'video_path', 'overlays': [], 'camera': { 'shots': [] } } ]\n"
+            "- 'overlays': [ { 'id', 'type': 'text'|'chart'|'data_indicator', 'content', 'font', 'start', 'duration', 'position' } ]\n"
+            "- 'camera': { 'enabled': true, 'shots': [ { 'targetId', 'style', 'zoom', 'startFrame', 'duration' } ] }\n"
+            "DESIGN CONSTRAINTS:\n"
+            "1. NARRATIVE SYNC: Overlays MUST relate to STORY_CONTEXT. No hallucinated text.\n"
+            "2. MINIMALISM: Max 1 text + 1 focal element per scene.\n"
+            "3. MANDATORY NIVO: Visualize EVERY number mentioned in narration using a KPI or chart.\n"
+            "4. FONTS: Match language. Bangla text -> Bangla font. English text -> English font.\n"
+            "5. NO TERMINAL PUNCTUATION in text overlays.\n"
+            "6. UNIQUE STYLES: Rotate camera presets and hero animations for every scene.\n"
             f"REFERENCE_SCHEMA: {schema_ref}\n"
             f"FONTS: {local_fonts}\n"
             f"CAMERA_SFX: {self.camera_files}\n"
