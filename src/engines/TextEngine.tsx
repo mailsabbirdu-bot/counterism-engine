@@ -60,7 +60,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       <div style={{
         display: 'flex',
         flexWrap: 'wrap',
-        gap: '24px',
+        gap: '12px',
         justifyContent: 'center',
         textAlign: 'center'
       }}>
@@ -110,15 +110,16 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
              const anim = heroConfig.animation;
              if (anim === 'glow_pulse') {
                  const pulse = Math.sin(heroFrame * 0.15) * 0.5 + 0.5;
-                 style.color = 'transparent';
+                 // RE-ENABLE SOLID FILL: transparent color causes issues with overlapping glyphs in Bangla fonts
+                 style.color = 'white';
                  // High-end Offset Neon Stroke Design
                  style.textShadow = `
                     2px 2px 0px ${heroConfig.color},
-                    -1px -1px 0px white,
+                    -1px -1px 0px rgba(255,255,255,0.5),
                     0 0 15px ${heroConfig.color}88,
                     0 0 ${30 + pulse * 20}px ${heroConfig.color}44
                  `;
-                 style.WebkitTextStroke = `1.5px rgba(255,255,255,0.8)`;
+                 style.WebkitTextStroke = `1px rgba(255,255,255,0.3)`;
                  style.transform = `scale(${1 + heroEntrance * 0.12 + pulse * 0.03}) rotate(${pulse * 1.5}deg)`;
                  style.zIndex = 100;
              } else if (anim === 'isolate_zoom') {
