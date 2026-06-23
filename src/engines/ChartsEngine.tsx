@@ -11,6 +11,20 @@ import { ResponsiveScatterPlot } from '@nivo/scatterplot';
 import { ResponsiveSankey } from '@nivo/sankey';
 import { ResponsiveChord } from '@nivo/chord';
 import { ResponsiveNetwork } from '@nivo/network';
+import { ResponsiveBump } from '@nivo/bump';
+import { ResponsiveAreaBump } from '@nivo/bump';
+import { ResponsiveHeatMap } from '@nivo/heatmap';
+import { ResponsiveRadar } from '@nivo/radar';
+import { ResponsiveRadialBar } from '@nivo/radial-bar';
+import { ResponsiveStream } from '@nivo/stream';
+import { ResponsiveSwarmPlot } from '@nivo/swarmplot';
+import { ResponsiveWaffle } from '@nivo/waffle';
+import { ResponsiveFunnel } from '@nivo/funnel';
+import { ResponsiveMarimekko } from '@nivo/marimekko';
+import { ResponsiveCalendar } from '@nivo/calendar';
+import { ResponsiveCirclePacking } from '@nivo/circle-packing';
+import { ResponsiveVoronoi } from '@nivo/voronoi';
+import { ResponsiveParallelCoordinates } from '@nivo/parallel-coordinates';
 
 const ViolinPlot: React.FC<{ overlay: any; dataProgress: number; commonProps: any }> = ({ overlay, dataProgress }) => {
   if (!overlay?.data || !Array.isArray(overlay.data)) return null;
@@ -81,12 +95,14 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     const animationEnd = Math.min(duration - 30, 180);
     const dataProgress = interpolate(isNaN(relativeFrame) ? 0 : relativeFrame, [animationStart, animationEnd], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.33, 1, 0.68, 1) });
 
-  if (!overlay?.data || !Array.isArray(overlay.data)) {
+  if (!overlay?.data || (typeof overlay.data !== 'object')) {
       // Inject placeholder data to prevent crash
       overlay.data = [{ id: "A", value: 10 }, { id: "B", value: 20 }];
   }
 
-    if (['line', 'multiLine', 'area', 'stackedArea', 'forecast'].includes(overlay.chart_type)) {
+    const type = overlay.chart_type;
+
+    if (['line', 'area', 'forecast'].includes(type)) {
       const isFlat = Array.isArray(overlay.data) && overlay.data.length > 0 && !overlay.data[0].data;
       const seriesArray = isFlat ? [{ id: overlay.title || 'Data', data: overlay.data }] : (Array.isArray(overlay.data) ? overlay.data : []);
 
@@ -107,11 +123,11 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
           {...commonProps}
           data={animatedData}
           xScale={{ type: 'point' }}
-          yScale={{ type: 'linear', min: overlay.minY ?? 0, max: overlay.maxY ?? 'auto', stacked: overlay.chart_type === 'stackedArea' }}
+          yScale={{ type: 'linear', min: overlay.minY ?? 0, max: overlay.maxY ?? 'auto' }}
           curve={overlay.curve || "monotoneX"}
-          enableArea={['area', 'stackedArea', 'forecast'].includes(overlay.chart_type)}
+          enableArea={['area', 'forecast'].includes(type)}
           areaOpacity={0.25}
-          pointSize={overlay.chart_type === 'forecast' ? 0 : 8}
+          pointSize={type === 'forecast' ? 0 : 8}
           pointColor="#09090b"
           pointBorderWidth={2}
           pointBorderColor={{ from: 'serieColor' }}
@@ -122,63 +138,141 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       );
     }
 
-    if (['bar', 'horizontalBar', 'verticalBar', 'groupedBar', 'stackedBar', 'barRace'].includes(overlay.chart_type)) {
+    if (['bar', 'horizontalBar', 'verticalBar', 'groupedBar', 'stackedBar'].includes(type)) {
        if (!Array.isArray(overlay.data)) return null;
-
        const keys = overlay.keys || ['value'];
        const animatedData = overlay.data.map((item: any) => {
-         if (!item) return {};
          const newItem = { ...item };
-         keys.forEach((key: string) => {
-            const baseVal = Number(item[key]) || 0;
-            newItem[key] = baseVal * dataProgress;
-         });
+         keys.forEach((key: string) => { newItem[key] = (Number(item[key]) || 0) * dataProgress; });
          return newItem;
        });
-
        return (
          <ResponsiveBar
            {...commonProps}
            data={animatedData}
            keys={keys}
            indexBy={overlay.indexBy || 'id'}
-           layout={overlay.chart_type === 'horizontalBar' ? 'horizontal' : 'vertical'}
-           groupMode={overlay.chart_type === 'groupedBar' ? 'grouped' : 'stacked'}
-           padding={0.5} // Increased padding to avoid "box-like" look
-           innerPadding={4}
-           borderRadius={12}
+           layout={type === 'horizontalBar' ? 'horizontal' : 'vertical'}
+           groupMode={type === 'groupedBar' ? 'grouped' : 'stacked'}
+           padding={0.4}
+           borderRadius={8}
            borderWidth={2}
            borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
-           enableLabel={true}
-           labelSkipWidth={12}
-           labelSkipHeight={12}
-           labelTextColor={{ from: 'color', modifiers: [['brighter', 1.6]] }}
          />
        );
     }
 
-    if (['pie', 'donut'].includes(overlay.chart_type)) {
+    if (['pie', 'donut'].includes(type)) {
        if (!Array.isArray(overlay.data)) return null;
-       const animatedData = overlay.data.map((item: any) => {
-           if (!item) return {};
-           return { ...item, value: (item.value || 0) * dataProgress };
-       });
-       return <ResponsivePie {...commonProps} data={animatedData} innerRadius={overlay.chart_type === 'donut' ? 0.6 : 0} padAngle={0.7} cornerRadius={3} />;
+       const animatedData = overlay.data.map((item: any) => ({ ...item, value: (item.value || 0) * dataProgress }));
+       return <ResponsivePie {...commonProps} data={animatedData} innerRadius={type === 'donut' ? 0.6 : 0} padAngle={0.7} cornerRadius={3} />;
     }
 
-    if (overlay.chart_type === 'treemap') {
+    if (type === 'bump' || type === 'areaBump') {
+        if (!Array.isArray(overlay.data)) return null;
+        const animatedData = overlay.data.map((series: any) => ({
+            ...series,
+            data: series.data.map((p: any, i: number) => {
+                const reveal = interpolate(dataProgress * series.data.length, [i, i + 0.8], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+                return { ...p, y: (p.y || 0) * reveal };
+            })
+        }));
+        return type === 'bump' ? <ResponsiveBump {...commonProps} data={animatedData} /> : <ResponsiveAreaBump {...commonProps} data={animatedData} />;
+    }
+
+    if (type === 'heatmap') {
+        if (!Array.isArray(overlay.data)) return null;
+        const animatedData = overlay.data.map((row: any) => ({
+            ...row,
+            data: row.data.map((d: any) => ({ ...d, value: (d.value || 0) * dataProgress }))
+        }));
+        return <ResponsiveHeatMap {...commonProps} data={animatedData} />;
+    }
+
+    if (type === 'radar') {
+        if (!Array.isArray(overlay.data)) return null;
+        const animatedData = overlay.data.map((item: any) => {
+            const newItem = { ...item };
+            (overlay.keys || ['value']).forEach((k: string) => { newItem[k] = (item[k] || 0) * dataProgress; });
+            return newItem;
+        });
+        return <ResponsiveRadar {...commonProps} data={animatedData} keys={overlay.keys || ['value']} indexBy={overlay.indexBy || 'id'} />;
+    }
+
+    if (type === 'radialBar') {
+        if (!Array.isArray(overlay.data)) return null;
+        const animatedData = overlay.data.map((series: any) => ({
+            ...series,
+            data: series.data.map((d: any) => ({ ...d, y: (d.y || 0) * dataProgress }))
+        }));
+        return <ResponsiveRadialBar {...commonProps} data={animatedData} />;
+    }
+
+    if (type === 'stream') {
+        if (!Array.isArray(overlay.data)) return null;
+        const animatedData = overlay.data.map((row: any) => {
+            const newRow = { ...row };
+            (overlay.keys || []).forEach((k: string) => { newRow[k] = (row[k] || 0) * dataProgress; });
+            return newRow;
+        });
+        return <ResponsiveStream {...commonProps} data={animatedData} keys={overlay.keys || []} />;
+    }
+
+    if (type === 'swarmplot') {
+        if (!Array.isArray(overlay.data)) return null;
+        const animatedData = overlay.data.map((d: any) => ({ ...d, value: (d.value || 0) * dataProgress }));
+        return <ResponsiveSwarmPlot {...commonProps} data={animatedData} groups={overlay.groups || []} identity="id" value="value" />;
+    }
+
+    if (type === 'waffle') {
+        if (!Array.isArray(overlay.data)) return null;
+        const total = overlay.total || 100;
+        const animatedData = overlay.data.map((d: any) => ({ ...d, value: (d.value || 0) * dataProgress }));
+        return <ResponsiveWaffle {...commonProps} data={animatedData} total={total} rows={10} columns={10} />;
+    }
+
+    if (type === 'funnel') {
+        if (!Array.isArray(overlay.data)) return null;
+        const animatedData = overlay.data.map((d: any) => ({ ...d, value: (d.value || 0) * dataProgress }));
+        return <ResponsiveFunnel {...commonProps} data={animatedData} />;
+    }
+
+    if (type === 'marimekko') {
+        if (!Array.isArray(overlay.data)) return null;
+        const animatedData = overlay.data.map((d: any) => ({ ...d, value: (d.value || 0) * dataProgress }));
+        return <ResponsiveMarimekko {...commonProps} data={animatedData} id="id" value="value" dimensions={overlay.dimensions || []} />;
+    }
+
+    if (type === 'circlePacking') {
+        if (!overlay.data) return null;
+        const anim = (node: any): any => ({ ...node, value: typeof node.value === 'number' ? node.value * dataProgress : undefined, children: node.children ? node.children.map(anim) : undefined });
+        return <ResponsiveCirclePacking {...commonProps} data={anim(overlay.data)} id="name" value="value" />;
+    }
+
+    if (type === 'calendar') {
+        if (!Array.isArray(overlay.data)) return null;
+        const animatedData = overlay.data.map((d: any) => ({ ...d, value: (d.value || 0) * dataProgress }));
+        return <ResponsiveCalendar {...commonProps} data={animatedData} from={overlay.from} to={overlay.to} />;
+    }
+
+    if (type === 'parallelCoordinates') {
+        if (!Array.isArray(overlay.data)) return null;
+        return <ResponsiveParallelCoordinates {...commonProps} data={overlay.data} variables={overlay.variables || []} />;
+    }
+
+    if (type === 'treemap') {
        if (!overlay.data) return null;
        const anim = (node: any): any => ({ ...node, value: typeof node.value === 'number' ? node.value * dataProgress : undefined, children: node.children ? node.children.map(anim) : undefined });
        return <ResponsiveTreeMap {...commonProps} data={anim(overlay.data)} identity="name" value="value" />;
     }
 
-    if (overlay.chart_type === 'sunburst') {
+    if (type === 'sunburst') {
        if (!overlay.data) return null;
        const anim = (node: any): any => ({ ...node, value: typeof node.value === 'number' ? node.value * dataProgress : undefined, children: node.children ? node.children.map(anim) : undefined });
        return <ResponsiveSunburst {...commonProps} data={anim(overlay.data)} id="name" value="value" />;
     }
 
-    if (overlay.chart_type === 'scatter' || overlay.chart_type === 'bubble') {
+    if (type === 'scatter' || type === 'bubble') {
         if (!Array.isArray(overlay.data)) return null;
         const animatedData = overlay.data.map((series: any) => {
             if (!series || !Array.isArray(series.data)) return { ...series, data: [] };
@@ -187,22 +281,22 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
                 data: series.data.map((p: any) => ({ ...p, y: (p.y || 0) * dataProgress, z: (p.z || 10) * dataProgress }))
             };
         });
-        return <ResponsiveScatterPlot {...commonProps} data={animatedData} xScale={{ type: 'linear', min: 0, max: 'auto' }} yScale={{ type: 'linear', min: 0, max: 'auto' }} nodeSize={overlay.chart_type === 'bubble' ? (d: any) => d.data.z : 8} />;
+        return <ResponsiveScatterPlot {...commonProps} data={animatedData} xScale={{ type: 'linear', min: 0, max: 'auto' }} yScale={{ type: 'linear', min: 0, max: 'auto' }} nodeSize={type === 'bubble' ? (d: any) => d.data.z : 8} />;
     }
 
-    if (overlay.chart_type === 'network') {
+    if (type === 'network') {
        if (!overlay.data?.nodes || !overlay.data?.links || !Array.isArray(overlay.data.nodes)) return null;
        const animatedData = { nodes: overlay.data.nodes.map((n: any) => ({ ...n, size: (n.size || 12) * dataProgress })), links: overlay.data.links };
        return <ResponsiveNetwork {...(commonProps as any)} data={animatedData} linkDistance={e => (e as any).distance || 50} repulsivity={450} nodeColor={e => (e as any).color || '#ffffff'} linkThickness={n => (2 + 2 * ((n as any).target?.data?.index ?? 0)) * dataProgress} />;
     }
 
-    if (overlay.chart_type === 'chord') {
+    if (type === 'chord') {
         if (!Array.isArray(overlay.data)) return null;
         const animatedData = overlay.data.map((row: any) => (Array.isArray(row) ? row.map((val: number) => val * dataProgress) : []));
         return <ResponsiveChord {...commonProps} data={animatedData} keys={overlay.keys || []} />;
     }
 
-    if (overlay.chart_type === 'violinPlot') return <ViolinPlot overlay={overlay} dataProgress={dataProgress} commonProps={commonProps} />;
+    if (type === 'violinPlot') return <ViolinPlot overlay={overlay} dataProgress={dataProgress} commonProps={commonProps} />;
 
     return null;
   };
@@ -219,7 +313,6 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         opacity: progress,
         zIndex: safeNumber(overlay.zIndex, 30),
         transform: `translate(-50%, -50%) scale(${0.98 + progress * 0.02})`,
-        // Fix: Apply blur only during transition (when progress < 1)
         filter: progress < 1 ? `blur(${(1 - progress) * 10}px)` : 'none'
       }}
     >
