@@ -236,6 +236,29 @@ class RemotionRemaker:
         # Get context from original generator (reusing logic)
         self.maker.start_browser()
 
+        hero_anim_list = [
+            "glow_pulse", "isolate_zoom", "bounce_pop", "neon_flicker", "shake_alert",
+            "rainbow_flow", "ghost_trail", "glitch_pop", "wave_float", "expand_contract",
+            "blur_reveal", "color_shift", "rotation_swing", "shadow_pulse", "letter_jump",
+            "skew_slide", "tilt_pan", "bounce_gravity", "border_glow", "glass_shimmer",
+            "heartbeat", "strobe_flash", "threed_flip", "magnetic_pull", "fire_glow",
+            "pixel_scatter", "swing_pivot", "depth_shadow", "energy_beam", "spiral_in",
+            "fly_in_z", "typewriter_flicker", "vibrate_intense", "float_orbit", "mirror_split",
+            "zoom_blur_pop", "liquid_waver"
+        ]
+
+        camera_style_list = [
+            "slow_push", "slow_pull", "push_in", "pull_out", "whip_pan", "dramatic_reveal",
+            "cinematic_drift", "dynamic_orbit", "vertical_sweep", "spiral_vortex", "glitch_snap",
+            "low_angle_hero", "side_strafe_left", "side_strafe_right", "aerial_top_down",
+            "shaky_handheld", "zoom_blur_reveal", "tilt_shift_focus", "power_zoom", "smooth_glide",
+            "epic_scaling", "warp_speed", "rolling_horizon", "fisheye_distort", "dolly_zoom",
+            "parallax_slide", "staccato_jump", "oblique_view", "macro_focus", "uprising_reveal",
+            "descending_gaze", "infinity_loop", "kaleidoscope", "cyber_scan", "extreme_closeup",
+            "wide_panorama", "pendulum_swing", "drunken_stumble", "floating_weightless", "rapid_fire",
+            "gentle_breeze", "the_matrix", "heartbeat_zoom"
+        ]
+
         refine_prompt = (
             f"YOU ARE A REMOTION MASTER. REFINE THIS SPECIFIC SCENE JSON.\n"
             f"SCENE ID: {scene_id}\n"
@@ -243,9 +266,12 @@ class RemotionRemaker:
             f"NARRATION: {story_text}\n"
             f"CURRENT JSON: {current_scene_json}\n"
             f"AVAILABLE FONTS: Bangla: {self.maker.bangla_fonts} | English: {self.maker.english_fonts}\n"
+            f"AVAILABLE HERO ANIMATIONS: {', '.join(hero_anim_list)}\n"
+            f"AVAILABLE CAMERA STYLES: {', '.join(camera_style_list)}\n"
             f"INSTRUCTION: {instruction if instruction else 'Enhance the design and visual impact while keeping the narrative.'}\n"
             f"STRICT RULES:\n"
             f"- Output RAW MINIFIED JSON for THIS SCENE ONLY.\n"
+            f"- YOU MUST UPDATE 'overlays' (animations, content, colors) AND 'camera' (presets, shots) BASED ON THE NARRATION.\n"
             f"- Follow Studio V4 minimalist guidelines.\n"
             f"- USE {lang} appropriate fonts. NEVER use English fonts for Bangla text.\n"
             f"- Maintain audio sync for hero words.\n"
@@ -274,26 +300,39 @@ class RemotionRemaker:
                     extracted_data = self.maker.repair_json(json_str)
 
             if extracted_data:
-                # Locate overlays list using deep search
-                overlays = self.find_overlays(extracted_data)
+                print(f"🔍 DEBUG: Extracted JSON keys: {list(extracted_data.keys()) if isinstance(extracted_data, dict) else 'Not a dict'}")
 
-                if overlays:
-                    print(f"✅ Successfully recovered {len(overlays)} overlays from AI response.")
-                    # We update the scene's overlays but keep its other metadata (duration, etc)
-                    scene['overlays'] = overlays
-
-                    # Apply guardrails to the full scene context
-                    temp_data = {"scenes": [scene]}
-                    fixed_data = self.maker.finalize_json_durations(temp_data, self.public_dir)
-
-                    # Update main data
-                    for i, s in enumerate(self.data['scenes']):
-                        if s['scene_id'] == scene['scene_id']:
-                            self.data['scenes'][i] = fixed_data['scenes'][0]
-                            break
-                    print("✨ Gemini refinement applied and validated.")
+                # Update entire scene if the response is a full scene object
+                if isinstance(extracted_data, dict) and ('overlays' in extracted_data or 'camera' in extracted_data):
+                    print("✅ AI returned a full scene object. Merging camera and overlays.")
+                    if 'overlays' in extracted_data: scene['overlays'] = extracted_data['overlays']
+                    if 'camera' in extracted_data: scene['camera'] = extracted_data['camera']
                 else:
-                    print("❌ Could not find valid overlays list in Gemini response.")
+                    # Locate overlays list using deep search
+                    overlays = self.find_overlays(extracted_data)
+                    if overlays:
+                        print(f"✅ Successfully recovered {len(overlays)} overlays from AI response.")
+                        scene['overlays'] = overlays
+
+                    # Also try to find camera in the nested response
+                    if isinstance(extracted_data, dict):
+                         for k in ['camera', 'camera_settings', 'motion']:
+                             if k in extracted_data:
+                                 print(f"✅ Recovered camera settings from key '{k}'")
+                                 scene['camera'] = extracted_data[k]
+                                 break
+
+                # Apply guardrails to the full scene context
+                temp_data = {"scenes": [scene]}
+                fixed_data = self.maker.finalize_json_durations(temp_data, self.public_dir)
+
+                # Update main data
+                for i, s in enumerate(self.data['scenes']):
+                    if s['scene_id'] == scene['scene_id']:
+                        self.data['scenes'][i] = fixed_data['scenes'][0]
+                        print(f"🛠️  Scene {scene['scene_id']} updated with {len(fixed_data['scenes'][0].get('overlays', []))} overlays.")
+                        break
+                print("✨ Gemini refinement applied and validated.")
             else:
                 print("❌ Gemini failed to produce valid JSON.")
         except Exception as e:
