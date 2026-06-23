@@ -93,52 +93,6 @@ class RemotionJsonMaker:
         # Fallback for environments where ffmpeg/ffprobe is bundled with Remotion
         return ["npx", "remotion", tool]
 
-    def probe_video_duration_and_fps(self, video_path: str):
-        filename = os.path.basename(video_path)
-        if filename in self.fps_cache:
-            return float(self.fps_cache[filename]), 30.0
-
-        try:
-            # Get video info (exact logic from user request)
-            cmd = self._get_ff_tool("ffprobe") + [
-                "-v", "error",
-                "-select_streams", "v:0",
-                "-show_entries", "stream=r_frame_rate,avg_frame_rate,nb_frames,duration",
-                "-of", "json",
-                video_path
-            ]
-            output = subprocess.check_output(cmd).decode("utf-8")
-            data = json.loads(output)
-
-            if not data.get('streams'):
-                print(f"⚠️ No streams found in {video_path}")
-                return 0.0, 30.0
-
-            stream = data['streams'][0]
-
-            duration = float(stream.get("duration", 0))
-
-            # Original FPS
-            fps_str = stream.get("avg_frame_rate", "0/1")
-            num, den = map(int, fps_str.split("/"))
-            fps = num / den if den else 0
-
-            # Total frames
-            nb_frames = stream.get("nb_frames")
-            if nb_frames is not None:
-                total_frames = int(nb_frames)
-            else:
-                total_frames = int(round(duration * fps))
-
-            # Frames after converting to 30 FPS (User formula: round(duration * 30))
-            frames_at_30fps = int(round(duration * 30))
-
-            # Return frames instead of seconds for the first parameter to satisfy the engine requirement
-            return float(frames_at_30fps), 30.0
-        except Exception as e:
-            print(f"⚠️ Error probing video {video_path}: {e}")
-            return 0.0, 30.0
-
     def adjust_durations_in_text(self, text: str, public_dir: str = "../public") -> str:
         def replacement_logic(match):
             block = match.group(0)
@@ -553,30 +507,33 @@ class RemotionJsonMaker:
 
                     placed_overlays.append((ov, w, h))
 
-                    # 4. Cinematic Pacing (User Mandate)
-                    # 15f intro, 15f outro, 90-120f resting
+                    # 4. Cinematic Pacing (User Mandate) & Intro Sync
+                    # Every nivo and text layer should have short intro/outro and long resting period.
+                    # Sync start with the first word of the scene from timestamp.txt.
+
                     intro_frames = 15
                     outro_frames = 15
-                    resting_frames = 90 # Min resting
+                    resting_frames = 90 # Mandatory resting time
 
-                    target_total = intro_frames + resting_frames + outro_frames # 120f
+                    # Intro Sync: Use the starting 30fps value from timestamp.txt
+                    start_f = self._get_scene_start_frame(s_id)
 
-                    start_f = ov.get('start', 0)
-                    if start_f >= scene_duration - 30:
-                        start_f = max(0, scene_duration - target_total)
-
-                    # Ensure duration is at least enough for intro+resting+outro
+                    # Ensure we have enough duration for intro + resting + outro
+                    target_total = intro_frames + resting_frames + outro_frames
                     duration_f = max(target_total, ov.get('duration', target_total))
 
+                    # Safety check against scene duration
                     if start_f + duration_f > scene_duration:
-                        duration_f = scene_duration - start_f
-
-                    # 4b. Audio Sync Logic: If duration is too short for resting, start earlier
-                    if duration_f < target_total and start_f > 0:
-                        needed = target_total - duration_f
-                        shift = min(start_f, needed)
-                        start_f -= shift
-                        duration_f += shift
+                        # If it exceeds, we prioritize start_f and shorten duration down to target_total if possible
+                        if start_f + target_total <= scene_duration:
+                            duration_f = target_total
+                        else:
+                            # If even target_total doesn't fit, we must shift start earlier or just cap
+                            duration_f = scene_duration - start_f
+                            if duration_f < target_total:
+                                shift = min(start_f, target_total - duration_f)
+                                start_f -= shift
+                                duration_f += shift
 
                     ov['start'] = start_f
                     ov['duration'] = duration_f
@@ -919,9 +876,27 @@ class RemotionJsonMaker:
                     except: pass
 
                 # --- GUIDELINE: CINEMATIC PACING (15-90-15) ---
-                min_total = 120 # 15 + 90 + 15
-                ov['start'] = max(0, min(ov.get('start', 15), duration - min_total))
+                # Strictly enforce 15f intro, 15f outro, and 90-120f resting period.
+                # Every overlay should follow the scene start frame from timestamp.txt for intro sync.
+                intro_frames = 15
+                outro_frames = 15
+                resting_frames = 90
+                min_total = intro_frames + resting_frames + outro_frames # 120f
+
+                # Intro Sync: Use scene start frame if available
+                ov['start'] = self._get_scene_start_frame(scene_id)
+
+                # Ensure duration is at least enough for intro+resting+outro
                 ov['duration'] = max(min_total, min(ov.get('duration', min_total), duration - ov['start']))
+
+                # If still too long, cap it
+                if ov['start'] + ov['duration'] > duration:
+                    ov['duration'] = duration - ov['start']
+                    if ov['duration'] < min_total:
+                        # Shift start earlier if possible to accommodate min_total
+                        shift = min(ov['start'], min_total - ov['duration'])
+                        ov['start'] -= shift
+                        ov['duration'] += shift
 
                 # --- GUIDELINE: TITLE+CONTENT ALIGNMENT ---
                 if has_relation:
@@ -1028,7 +1003,7 @@ class RemotionJsonMaker:
                 stop_btn = "button[aria-label*='Stop generating']"
 
                 for i in range(600):
-                    time.sleep(0.5) # Even faster polling
+                    time.sleep(0.2) # Aggressive polling for Colab speed
                     if get_msg_count() <= initial_count: continue
 
                     try: is_generating = page.locator(stop_btn).is_visible()
@@ -1043,14 +1018,15 @@ class RemotionJsonMaker:
 
                     if current_text and current_text == last_text:
                         stable_count += 1
-                        # Aggressive early exit if we see the JSON closing brace and it's stable
-                        if not is_generating and stable_count >= 3:
+                        # Aggressive early exit for RAW JSON (User Mandate)
+                        # If the response ends with } and we've been stable for 2 polls, grab it.
+                        if not is_generating and stable_count >= 2:
                              stripped = current_text.strip()
-                             if stripped.endswith("}") or (stripped.endswith("```") and "{" in stripped):
+                             if stripped.endswith("}"):
                                  print(f"✨ Gemini response finished ({len(current_text)} chars).")
                                  return current_text
 
-                        if stable_count >= 15:
+                        if stable_count >= 10: # Lowered from 15 for speed
                              print(f"✨ Gemini response stabilized ({len(current_text)} chars).")
                              return current_text
                     else:
@@ -1126,6 +1102,15 @@ class RemotionJsonMaker:
                 compacted.append(f"{match.group(1)}:{match.group(2)}f \"{match.group(3)}\"")
         return " | ".join(compacted)
 
+    def _get_scene_start_frame(self, scene_id: str):
+        if not self.raw_timestamps: return 0
+        # Format: SCENE_01: [Original: 0.00s - 0.98s] -> [30fps: 0f - 29f] "ঢাকা।"
+        pattern = fr'{scene_id}:.*?\[30fps:\s*(\d+)f'
+        match = re.search(pattern, self.raw_timestamps)
+        if match:
+            return int(match.group(1))
+        return 0
+
     def _is_bangla(self, text: str) -> bool:
         return any('\u0980' <= c <= '\u09FF' for c in text)
 
@@ -1190,27 +1175,25 @@ class RemotionJsonMaker:
         ]
 
         full_prompt = (
-            "YOU ARE A REMOTION MASTER ENGINE. GENERATE RAW MINIFIED JSON ONLY. START '{' END '}'.\n"
-            "SCHEMA INSTRUCTIONS:\n"
+            "ACT AS REMOTION JSON ENGINE. OUTPUT RAW MINIFIED JSON ONLY. NO PREAMBLE. NO MARKDOWN. NO CONVERSATION.\n"
+            "STRICT SCHEMA:\n"
             "- 'scenes': [ { 'scene_id', 'duration', 'video_path', 'overlays': [], 'camera': { 'shots': [] } } ]\n"
             "- 'overlays': [ { 'id', 'type': 'text'|'chart'|'data_indicator', 'content', 'font', 'start', 'duration', 'position' } ]\n"
             "- 'camera': { 'enabled': true, 'shots': [ { 'targetId', 'style', 'zoom', 'startFrame', 'duration' } ] }\n"
-            "DESIGN CONSTRAINTS:\n"
-            "1. NARRATIVE SYNC: Overlays MUST relate to STORY_CONTEXT. NO translation. If narration is Bangla, content MUST be Bangla.\n"
-            "2. MINIMALISM: Max 1 text + 1 focal element per scene.\n"
-            "3. MANDATORY NIVO: Visualize EVERY number mentioned in narration using a KPI or chart.\n"
-            "4. FONTS: Match language. Bangla text -> Bangla font. English text -> English font. Use provided lists.\n"
-            "5. NO TERMINAL PUNCTUATION in text overlays.\n"
-            "6. UNIQUE STYLES: Rotate camera presets and hero animations for every scene.\n"
-            f"REFERENCE_SCHEMA: {schema_ref}\n"
+            "CORE RULES:\n"
+            "1. NO TRANSLATION. If Story is Bangla, Content MUST be Bangla.\n"
+            "2. SYNC: Use provided TIMESTAMPS for 'start' frames. Intro MUST be synced.\n"
+            "3. MINIMALISM: Exactly 1 text + 1 focal (chart/kpi) per scene.\n"
+            "4. MANDATORY NIVO: Visualize EVERY number from story using KPI/Chart.\n"
+            "5. FONTS: Use Bangla list for Bangla text, English list for English.\n"
+            "6. PACING: Ensure focal elements have 90f+ resting time.\n"
             f"FONTS: {local_fonts}\n"
-            f"CAMERA_SFX: {self.camera_files}\n"
+            f"SFX: {self.camera_files}\n"
             f"DURATIONS: {duration_context}\n"
             f"TIMESTAMPS: {compact_ts}\n"
-            f"STORY_CONTEXT (SCENE-BY-SCENE): \n{story_context}\n"
-            f"RAW_STORY: {story}\n"
-            f"SCHEMA: {condensed_guidelines}\n"
-            "TASK: Create a clean MASTER manifest. 100% strict schema adherence. Generate JSON for ALL scenes mentioned in DURATIONS. No scene omission."
+            f"STORY: \n{story_context}\n"
+            f"REFERENCE: {schema_ref}\n"
+            "TASK: Generate the master JSON for ALL scenes. Start with '{' and end with '}'."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
