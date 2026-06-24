@@ -25,23 +25,26 @@ print("🛠️ Installing dependencies...")
 !playwright install-deps
 !npm install
 
-# --- 3. LOAD POWERFUL MANIFEST ---
+# --- 3. PRELOAD ASSETS (Offline Rendering) ---
+print("📡 Preloading SVG assets for deterministic rendering...")
+!npx ts-node --esm svg/scripts/preloadAssets.ts svg/example.json
+
+# --- 4. LOAD MANIFEST ---
 print("📄 Loading SVG directions from svg/example.json...")
 example_path = "svg/example.json"
 if os.path.exists(example_path):
     with open(example_path, 'r') as f:
         manifest = json.load(f)
 
-    # Save as the active manifest
     with open("remotion_render.json", "w") as f:
         json.dump(manifest, f, indent=2)
     print("✅ Manifest loaded successfully.")
 else:
     print("❌ ERROR: svg/example.json not found!")
 
-# --- 4. RENDER ---
+# --- 5. RENDER ---
 print("🎬 Rendering Powerful SVG Video...")
-!node --loader ts-node/esm render.ts --template=remotion_render.json --output=svg_powerful_showcase.mp4
+!node --loader ts-node/esm render.ts --template=remotion_render.json --output=svg_powerful_showcase.mp4 --no-resume
 
 print("✅ DONE! Check the renders folder for 'svg_powerful_showcase.mp4'.")
 ```

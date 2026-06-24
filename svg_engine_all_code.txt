@@ -1667,11 +1667,12 @@ import { SvgScene, SvgProvider, StorytellingElement } from '../types';
 import { SvgProviderService } from './SvgProviderService';
 import { SvgRegistry } from '../lib/svgRegistry';
 import { COMPOSITIONS } from '../lib/compositionLibrary';
+import { staticFile } from 'remotion';
 
 /**
  * SVG Asset Preloader
- * Scans scene data and downloads/processes all required SVGs before rendering.
- * MUST be called during the setup/pre-render phase.
+ * Scans scene data and populates the registry for zero-runtime fetching.
+ * In production/offline mode, it loads from public/svg-cache/
  */
 export class SvgAssetPreloader {
   static async preloadScene(scene: SvgScene) {
@@ -1681,35 +1682,35 @@ export class SvgAssetPreloader {
     // 1. Scan elements
     scene.elements.forEach(el => this.scanElement(el, sceneProvider, queries));
 
-    // 2. Scan hub networks (center and outer nodes)
-    scene.elements.forEach(el => {
-        if (el.type === 'hub_network') {
-            queries.add({ query: el.centerSvg, provider: el.provider || sceneProvider });
-            el.nodes.forEach(q => queries.add({ query: queryToKey(q), provider: el.provider || sceneProvider }));
-        }
-    });
-
-    function queryToKey(q: string) { return q; }
-
-    // 3. Download and process
+    // 2. Load and process
     const parser = new DOMParser();
     const promises = Array.from(queries).map(async ({ query, provider }) => {
       try {
-        const markup = await SvgProviderService.fetchSvg(query, provider);
+        // Try local fetch first (via Remotion's public static file system)
+        const safeName = `${provider}-${query.replace(/[^a-z0-9]/gi, '_')}.svg`;
+        const localUrl = staticFile(`svg-cache/${safeName}`);
+
+        let markup: string;
+        try {
+            const resp = await fetch(localUrl);
+            if (!resp.ok) throw new Error('Local asset not found');
+            markup = await resp.text();
+        } catch (e) {
+            // FALLBACK: Runtime fetch (only if pre-render script was skipped)
+            console.warn(`Asset ${query} not found in local cache, falling back to network...`);
+            markup = await SvgProviderService.fetchSvg(query, provider);
+        }
+
         const doc = parser.parseFromString(markup, 'image/svg+xml');
         const svg = doc.querySelector('svg');
 
         if (!svg) throw new Error('Invalid SVG');
 
-        // Extract total path length (approximation or measurement)
         let totalLength = 0;
         const paths = svg.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon');
         paths.forEach((p: any) => {
             if (p.getTotalLength) {
-                totalLength = Math.max(totalLength, p.getTotalLength());
-            } else {
-                const bbox = p.getBBox();
-                totalLength = Math.max(totalLength, (bbox.width + bbox.height) * 2);
+                try { totalLength = Math.max(totalLength, p.getTotalLength()); } catch(e) {}
             }
         });
 
@@ -1788,6 +1789,48 @@ export class SvgCacheService {
 }
 
 --- END OF svg/services/SvgCacheService.ts ---
+
+--- FILE: svg/services/SvgFileStore.ts ---
+import fs from 'fs';
+import path from 'path';
+import { SvgProvider } from '../types';
+
+/**
+ * Local SVG File Store
+ * Manages caching of SVGs in the public/ folder for offline rendering.
+ */
+export class SvgFileStore {
+    private static CACHE_DIR = 'public/svg-cache';
+
+    static ensureCacheDir() {
+        if (!fs.existsSync(this.CACHE_DIR)) {
+            fs.mkdirSync(this.CACHE_DIR, { recursive: true });
+        }
+    }
+
+    static getLocalPath(query: string, provider: SvgProvider): string {
+        const safeName = `${provider}-${query.replace(/[^a-z0-9]/gi, '_')}.svg`;
+        return path.join(this.CACHE_DIR, safeName);
+    }
+
+    static exists(query: string, provider: SvgProvider): boolean {
+        return fs.existsSync(this.getLocalPath(query, provider));
+    }
+
+    static save(query: string, provider: SvgProvider, markup: string) {
+        this.ensureCacheDir();
+        fs.writeFileSync(this.getLocalPath(query, provider), markup);
+    }
+
+    static load(query: string, provider: SvgProvider): string | null {
+        if (this.exists(query, provider)) {
+            return fs.readFileSync(this.getLocalPath(query, provider), 'utf8');
+        }
+        return null;
+    }
+}
+
+--- END OF svg/services/SvgFileStore.ts ---
 
 --- FILE: svg/services/SvgProviderService.ts ---
 import { SvgProvider } from '../types';
@@ -2406,6 +2449,75 @@ export const getTheme = (themeName?: InfographicTheme): ThemeConfig => {
 };
 
 --- END OF svg/lib/themes.ts ---
+
+--- FILE: svg/scripts/preloadAssets.ts ---
+import fs from 'fs';
+import path from 'path';
+import { SvgProviderService } from '../services/SvgProviderService';
+import { SvgFileStore } from '../services/SvgFileStore';
+import { SvgScene, SvgProvider, StorytellingElement } from '../types';
+import { COMPOSITIONS } from '../lib/compositionLibrary';
+
+/**
+ * Pre-render Asset Downloader
+ * Scans a Remotion template and downloads all SVGs to local storage.
+ */
+async function preloadAll() {
+    const templatePath = process.argv.slice(2)[0] || 'remotion_render.json';
+    if (!fs.existsSync(templatePath)) {
+        console.error(`❌ Template not found: ${templatePath}`);
+        return;
+    }
+
+    const template = JSON.parse(fs.readFileSync(templatePath, 'utf8'));
+    const queries = new Set<string>(); // "provider:query"
+
+    template.scenes.forEach((scene: any) => {
+        const sceneProvider = scene.sceneIconTheme || 'lucide';
+        (scene.elements || []).forEach((el: any) => scanElement(el, sceneProvider, queries));
+    });
+
+    console.log(`🔍 Found ${queries.size} unique SVGs to preload...`);
+
+    for (const entry of queries) {
+        const [provider, query] = entry.split(':');
+        if (SvgFileStore.exists(query, provider as SvgProvider)) {
+            console.log(`  ✅ ${entry} already in local store.`);
+            continue;
+        }
+
+        try {
+            console.log(`  📡 Downloading ${entry}...`);
+            const markup = await SvgProviderService.fetchSvg(query, provider as SvgProvider);
+            SvgFileStore.save(query, provider as SvgProvider, markup);
+            console.log(`  ✨ Saved ${entry} locally.`);
+        } catch (e) {
+            console.error(`  ❌ Failed to download ${entry}:`, e);
+        }
+    }
+}
+
+function scanElement(el: any, defaultProvider: SvgProvider, queries: Set<string>) {
+    if (el.type === 'svg') {
+      queries.add(`${el.provider || defaultProvider}:${el.query}`);
+    } else if (el.type === 'hub_network') {
+      queries.add(`${el.provider || defaultProvider}:${el.centerSvg}`);
+      (el.nodes || []).forEach((q: string) => queries.add(`${el.provider || defaultProvider}:${q}`));
+    } else if (el.type === 'flow_diagram' || el.type === 'process') {
+      (el.steps || []).forEach((q: string) => queries.add(`${defaultProvider}:${q}`));
+    } else if (el.type === 'kpi' && el.icon) {
+      queries.add(`${defaultProvider}:${el.icon}`);
+    } else if (el.type === 'composition') {
+        const comp = COMPOSITIONS[el.compositionType];
+        if (comp) {
+            comp.elements.forEach((sub: any) => queries.add(`${sub.provider || defaultProvider}:${sub.query}`));
+        }
+    }
+}
+
+preloadAll().then(() => console.log("🏁 Preloading complete."));
+
+--- END OF svg/scripts/preloadAssets.ts ---
 
 --- FILE: svg/styles/svgAnimations.css ---
 /**
