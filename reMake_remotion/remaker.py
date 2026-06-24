@@ -274,7 +274,8 @@ class RemotionRemaker:
             found_match = False
             visual_text = ""
             for ov in overlays:
-                for key in ['content', 'title', 'label']:
+                # Include 'query' for SVG narrative matching
+                for key in ['content', 'title', 'label', 'query']:
                     if ov.get(key): visual_text += " " + str(ov[key])
 
             # Check for matches
