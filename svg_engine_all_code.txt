@@ -1,0 +1,1020 @@
+--- FILE: svg/components/AnimatedSvg.tsx ---
+import React, { useMemo, useState } from 'react';
+import { interpolate, useCurrentFrame, spring, useVideoConfig } from 'remotion';
+import { LayeredSvg } from './LayeredSvg';
+import { AnimationType, SvgProvider, SvgStyle, Importance, GlowConfig, GradientConfig } from '../types';
+import { GlassPanel } from './GlassPanel';
+
+interface AnimatedSvgProps {
+  query: string;
+  provider: SvgProvider;
+  animation: AnimationType;
+  startFrame: number;
+  durationInFrames: number;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  color?: string;
+  strokeWidth?: number;
+
+  // Professional Styling
+  style?: SvgStyle;
+  importance?: Importance;
+  glow?: boolean | GlowConfig;
+  depth?: boolean;
+  container?: 'glass_panel';
+  gradient?: GradientConfig;
+  id?: string;
+
+  // Grouping/Composition support
+  groupOffset?: { x: number, y: number };
+}
+
+export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
+  query,
+  provider,
+  animation,
+  startFrame,
+  durationInFrames,
+  width,
+  height,
+  x,
+  y,
+  color = 'white',
+  strokeWidth = 2,
+  style = 'fill',
+  importance = 'secondary',
+  glow,
+  depth,
+  container,
+  gradient,
+  id = 'svg',
+  groupOffset = { x: 0, y: 0 }
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const [pathLength, setPathLength] = useState<number>(5000);
+
+  const relativeFrame = frame - startFrame;
+
+  // Automatic importance-based scaling and opacity
+  const baseScale = importance === 'primary' ? 1.2 : importance === 'decorative' ? 0.7 : 1;
+  const baseOpacity = importance === 'decorative' ? 0.4 : 1;
+  const importanceGlow = importance === 'primary' && !glow ? { color, intensity: 0.4, radius: 30 } : glow;
+
+  // Base entrance spring
+  const spr = spring({
+    frame: relativeFrame,
+    fps,
+    config: { damping: 12 },
+  });
+
+  const animationStyles = useMemo(() => {
+    if (relativeFrame < 0) return { opacity: 0 };
+
+    const progress = Math.min(1, Math.max(0, relativeFrame / durationInFrames));
+
+    switch (animation) {
+      case 'fade':
+        return { opacity: spr * baseOpacity };
+      case 'scale':
+        return { opacity: spr * baseOpacity, transform: `scale(${spr * baseScale})` };
+      case 'pop':
+        return { opacity: spr * baseOpacity, transform: `scale(${spr * 1.1 * baseScale})` };
+      case 'rotate':
+        return { opacity: spr * baseOpacity, transform: `rotate(${spr * 360}deg) scale(${spr * baseScale})` };
+      case 'bounce':
+        const bounce = spring({ frame: relativeFrame, fps, config: { mass: 0.5, damping: 5 } });
+        return { opacity: baseOpacity, transform: `scale(${bounce * baseScale})` };
+      case 'slideUp':
+        return { opacity: spr * baseOpacity, transform: `translateY(${(1 - spr) * 100}px) scale(${baseScale})` };
+      case 'slideDown':
+        return { opacity: spr * baseOpacity, transform: `translateY(${(spr - 1) * 100}px) scale(${baseScale})` };
+      case 'pulse':
+        const pulse = 1 + Math.sin(relativeFrame / 10) * 0.05;
+        return { opacity: baseOpacity, transform: `scale(${spr * baseScale * pulse})` };
+      case 'float':
+        const floatY = Math.sin(relativeFrame / 20) * 20;
+        return { opacity: spr * baseOpacity, transform: `translateY(${floatY}px) scale(${spr * baseScale})` };
+      case 'orbit':
+        const orbitX = Math.cos(relativeFrame / 30) * 50;
+        const orbitY = Math.sin(relativeFrame / 30) * 50;
+        return { opacity: spr * baseOpacity, transform: `translate(${orbitX}px, ${orbitY}px) scale(${spr * baseScale})` };
+      case 'reveal':
+        return { opacity: 1, clipPath: `inset(0 ${100 - spr * 100}% 0 0)`, transform: `scale(${baseScale})` };
+      case 'draw':
+      case 'trace':
+        return { opacity: 1, transform: `scale(${baseScale})` };
+      case 'glowPulse':
+        return { opacity: 1, transform: `scale(${baseScale})` };
+      default:
+        return { opacity: baseOpacity, transform: `scale(${baseScale})` };
+    }
+  }, [animation, relativeFrame, spr, baseScale, baseOpacity, durationInFrames, fps]);
+
+  const customAnimStyles = useMemo(() => {
+    if (animation !== 'draw' && animation !== 'trace' && animation !== 'glowPulse') return {};
+
+    return {
+        '--draw-progress': spr,
+        '--path-length': pathLength,
+        '--glow-pulse': 0.5 + Math.sin(relativeFrame / 15) * 0.5,
+    };
+  }, [animation, spr, pathLength, relativeFrame]);
+
+  const content = (
+    <div
+      style={{
+        position: 'absolute',
+        left: x + groupOffset.x,
+        top: y + groupOffset.y,
+        width,
+        height,
+        transform: 'translate(-50%, -50%)',
+        ...animationStyles,
+        ...customAnimStyles as any
+      }}
+      className={`svg-motion-container ${animation}`}
+    >
+      <LayeredSvg
+        query={query}
+        provider={provider}
+        color={color}
+        strokeWidth={strokeWidth}
+        style={style}
+        gradient={gradient}
+        glow={animation === 'glowPulse' ? true : importanceGlow}
+        depth={depth}
+        width={width}
+        height={height}
+        id={id}
+        onLoad={(_, lengths) => {
+            if (lengths.length > 0) {
+                // We use the max length of all paths for the CSS animation
+                setPathLength(Math.max(...lengths));
+            }
+        }}
+      />
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .svg-motion-container.draw svg path,
+        .svg-motion-container.trace svg path {
+          stroke-dasharray: var(--path-length, 5000);
+          stroke-dashoffset: calc(var(--path-length, 5000) * (1 - var(--draw-progress, 1)));
+          transition: stroke-dashoffset 0.1s linear;
+        }
+        .svg-motion-container.trace svg path {
+          stroke-width: 4px;
+          filter: drop-shadow(0 0 10px currentColor);
+        }
+        .svg-motion-container.glowPulse > div {
+           filter: drop-shadow(0 0 calc(var(--glow-pulse) * 30px) ${color});
+           opacity: calc(0.6 + var(--glow-pulse) * 0.4);
+        }
+      `}} />
+    </div>
+  );
+
+  if (container === 'glass_panel') {
+      return (
+        <div style={{ position: 'absolute', left: x + groupOffset.x, top: y + groupOffset.y, transform: 'translate(-50%, -50%)' }}>
+            <GlassPanel width={width * 1.5} height={height * 1.5} startFrame={startFrame}>
+                <div style={{ transform: 'scale(0.8)' }}>
+                    <LayeredSvg
+                        query={query}
+                        provider={provider}
+                        color={color}
+                        strokeWidth={strokeWidth}
+                        style={style}
+                        gradient={gradient}
+                        glow={importanceGlow}
+                        depth={depth}
+                        width={width}
+                        height={height}
+                        id={id}
+                    />
+                </div>
+            </GlassPanel>
+        </div>
+      );
+  }
+
+  return content;
+};
+--- END OF svg/components/AnimatedSvg.tsx ---
+
+--- FILE: svg/components/GlassPanel.tsx ---
+import React from 'react';
+import { spring, useCurrentFrame, useVideoConfig } from 'remotion';
+
+interface GlassPanelProps {
+  children: React.ReactNode;
+  width: number;
+  height: number;
+  startFrame: number;
+}
+
+export const GlassPanel: React.FC<GlassPanelProps> = ({ children, width, height, startFrame }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const spr = spring({
+    frame: frame - startFrame,
+    fps,
+    config: { damping: 12 },
+  });
+
+  if (frame < startFrame) return null;
+
+  return (
+    <div style={{
+      width,
+      height,
+      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+      backdropFilter: 'blur(20px)',
+      border: '1px solid rgba(255, 255, 255, 0.1)',
+      borderRadius: '24px',
+      boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 0 0 1px rgba(255, 255, 255, 0.1)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      opacity: spr,
+      transform: `scale(${0.8 + spr * 0.2})`,
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* Subtle sheen reflection */}
+      <div style={{
+        position: 'absolute',
+        top: '-50%',
+        left: '-50%',
+        width: '200%',
+        height: '200%',
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,0.1) 100%)',
+        transform: `rotate(${spr * 20}deg)`,
+        pointerEvents: 'none'
+      }} />
+
+      {children}
+    </div>
+  );
+};
+--- END OF svg/components/GlassPanel.tsx ---
+
+--- FILE: svg/components/InfographicBackgrounds.tsx ---
+import React from 'react';
+import { AbsoluteFill } from 'remotion';
+import { BackgroundType } from '../types';
+
+interface InfographicBackgroundProps {
+  type?: BackgroundType;
+}
+
+export const InfographicBackground: React.FC<InfographicBackgroundProps> = ({ type }) => {
+  if (!type) return null;
+
+  return (
+    <AbsoluteFill className="pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
+      {type === 'tech_grid' && (
+        <div
+          className="absolute inset-0 opacity-[0.1]"
+          style={{
+            backgroundImage: `linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px)`,
+            backgroundSize: '100px 100px'
+          }}
+        />
+      )}
+
+      {type === 'blueprint_grid' && (
+        <div
+          className="absolute inset-0 opacity-[0.15]"
+          style={{
+            backgroundColor: '#001a33',
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 2px, transparent 2px), linear-gradient(90deg, rgba(255,255,255,0.1) 2px, transparent 2px), linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)`,
+            backgroundSize: '100px 100px, 100px 100px, 20px 20px, 20px 20px'
+          }}
+        />
+      )}
+
+      {type === 'dotted_pattern' && (
+        <div
+          className="absolute inset-0 opacity-[0.1]"
+          style={{
+            backgroundImage: `radial-gradient(circle, #ffffff 2px, transparent 0)`,
+            backgroundSize: '50px 50px'
+          }}
+        />
+      )}
+
+      {type === 'network_pattern' && (
+        <svg className="absolute inset-0 w-full h-full opacity-[0.1]">
+          <pattern id="network" x="0" y="0" width="200" height="200" patternUnits="userSpaceOnUse">
+            <circle cx="20" cy="20" r="3" fill="white" />
+            <circle cx="150" cy="40" r="3" fill="white" />
+            <circle cx="80" cy="120" r="3" fill="white" />
+            <circle cx="180" cy="160" r="3" fill="white" />
+            <line x1="20" y1="20" x2="150" y2="40" stroke="white" strokeWidth="1" />
+            <line x1="20" y1="20" x2="80" y2="120" stroke="white" strokeWidth="1" />
+            <line x1="150" y1="40" x2="180" y2="160" stroke="white" strokeWidth="1" />
+            <line x1="80" y1="120" x2="180" y2="160" stroke="white" strokeWidth="1" />
+          </pattern>
+          <rect width="100%" height="100%" fill="url(#network)" />
+        </svg>
+      )}
+
+      {type === 'radial_glow' && (
+        <div
+          className="absolute inset-0 opacity-[0.15]"
+          style={{
+            background: 'radial-gradient(circle at center, rgba(59, 130, 246, 0.4) 0%, rgba(0, 0, 0, 0) 70%)'
+          }}
+        />
+      )}
+    </AbsoluteFill>
+  );
+};
+--- END OF svg/components/InfographicBackgrounds.tsx ---
+
+--- FILE: svg/components/InfographicComposer.tsx ---
+import React, { useMemo } from 'react';
+import { AbsoluteFill, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { ConnectionLine, GlowNode, OrbitRing } from './InfographicElements';
+import { InfographicBackground } from './InfographicBackgrounds';
+import { AnimatedSvg } from './AnimatedSvg';
+import { SvgGroup, SvgElement } from '../types';
+
+interface InfographicComposerProps {
+  sceneData: any;
+}
+
+export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneData }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  if (!sceneData) return null;
+
+  const elements = sceneData.elements || [];
+  const groups: SvgGroup[] = sceneData.groups || [];
+  const lines = sceneData.infographic_lines || [];
+  const nodes = sceneData.infographic_nodes || [];
+  const background = sceneData.background;
+
+  // 1. Resolve element positions (including group-based layouts)
+  const resolvedElements = useMemo(() => {
+      // Create a deep copy to avoid mutating original data
+      const result = elements.map((el: any) => ({ ...el }));
+
+      groups.forEach(group => {
+          const children = result.filter(el => el.groupId === group.id);
+          const groupX = group.x ?? 960;
+          const groupY = group.y ?? 540;
+          const spacing = group.spacing ?? 200;
+
+          children.forEach((child, index) => {
+              if (group.layout === 'horizontal') {
+                  const offset = (index - (children.length - 1) / 2) * spacing;
+                  child.x = groupX + offset;
+                  child.y = groupY;
+              } else if (group.layout === 'vertical') {
+                  const offset = (index - (children.length - 1) / 2) * spacing;
+                  child.x = groupX;
+                  child.y = groupY + offset;
+              } else if (group.layout === 'orbit') {
+                  const angle = (index / children.length) * Math.PI * 2;
+                  child.x = groupX + Math.cos(angle) * spacing;
+                  child.y = groupY + Math.sin(angle) * spacing;
+              } else if (group.layout === 'grid') {
+                  const cols = Math.ceil(Math.sqrt(children.length));
+                  const row = Math.floor(index / cols);
+                  const col = index % cols;
+                  child.x = groupX + (col - (cols - 1) / 2) * spacing;
+                  child.y = groupY + (row - (Math.ceil(children.length / cols) - 1) / 2) * spacing;
+              }
+          });
+      });
+
+      return result;
+  }, [elements, groups]);
+
+  // 2. Map ID to resolved position for lines
+  const positionMap = useMemo(() => {
+      const map: Record<string, { x: number, y: number }> = {};
+      resolvedElements.forEach(el => {
+          if (el.id) map[el.id] = { x: el.x, y: el.y };
+      });
+      return map;
+  }, [resolvedElements]);
+
+  return (
+    <AbsoluteFill className="pointer-events-none">
+      {/* Background System */}
+      <InfographicBackground type={background} />
+
+      {/* Orbit Rings (Behind elements) */}
+      {nodes.filter((n: any) => n.radius).map((node: any, i: number) => (
+        <OrbitRing
+          key={`orbit-${i}`}
+          x={node.x}
+          y={node.y}
+          radius={node.radius}
+          startFrame={node.start || 0}
+          color={node.color}
+        />
+      ))}
+
+      {/* Connection Lines (Resolved by ID) */}
+      {lines.map((line: any, i: number) => {
+          const start = line.from ? positionMap[line.from] : line.start_pos;
+          const end = line.to ? positionMap[line.to] : line.end_pos;
+
+          if (!start || !end) return null;
+
+          return (
+            <ConnectionLine
+              key={`line-${i}`}
+              start={start}
+              end={end}
+              startFrame={line.start || 0}
+              duration={line.duration || 60}
+              color={line.color}
+              type={line.type}
+            />
+          );
+      })}
+
+      {/* Glow Nodes & Primitives */}
+      {nodes.filter((n: any) => !n.radius).map((node: any, i: number) => (
+        <GlowNode
+          key={`node-${i}`}
+          x={node.x}
+          y={node.y}
+          startFrame={node.start || 0}
+          color={node.color}
+          type={node.type}
+        />
+      ))}
+
+      {/* Group Animations & Elements */}
+      {resolvedElements.filter((el: any) => el.type === 'svg').map((el: any) => {
+          const group = groups.find(g => g.id === el.groupId);
+
+          // Group-level animation logic (staggered entrance offset)
+          let groupOffset = { x: 0, y: 0 };
+          if (group && group.animation) {
+              const spr = spring({
+                  frame: frame - (el.startFrame || 0),
+                  fps,
+                  config: { damping: 15 }
+              });
+
+              if (group.animation === 'slideUp') groupOffset.y = (1 - spr) * 50;
+              if (group.animation === 'scale') {
+                  // Handled via groupOffset doesn't make sense for scale,
+                  // but we could support group-level properties in the future
+              }
+          }
+
+          return (
+            <AnimatedSvg
+              key={el.id}
+              {...el}
+              groupOffset={groupOffset}
+            />
+          );
+      })}
+    </AbsoluteFill>
+  );
+};
+--- END OF svg/components/InfographicComposer.tsx ---
+
+--- FILE: svg/components/InfographicElements.tsx ---
+import React from 'react';
+import { spring, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+
+interface ConnectionLineProps {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+  startFrame: number;
+  duration: number;
+  color?: string;
+  type?: 'solid' | 'dotted' | 'arrow';
+}
+
+export const ConnectionLine: React.FC<ConnectionLineProps> = ({
+  start,
+  end,
+  startFrame,
+  duration,
+  color = 'rgba(255,255,255,0.2)',
+  type = 'dotted'
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const progress = spring({
+    frame: frame - startFrame,
+    fps,
+    config: { damping: 20 },
+  });
+
+  if (frame < startFrame) return null;
+
+  const currentX = interpolate(progress, [0, 1], [start.x, end.x]);
+  const currentY = interpolate(progress, [0, 1], [start.y, end.y]);
+
+  return (
+    <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
+      <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill={color} />
+        </marker>
+      </defs>
+      <line
+        x1={start.x}
+        y1={start.y}
+        x2={currentX}
+        y2={currentY}
+        stroke={color}
+        strokeWidth="2"
+        strokeDasharray={type === 'dotted' ? "4 4" : "0"}
+        markerEnd={type === 'arrow' ? "url(#arrowhead)" : ""}
+      />
+    </svg>
+  );
+};
+
+export const GlowNode: React.FC<{ x: number, y: number, startFrame: number, color?: string, type?: 'glow' | 'pulse' | 'signal' }> = ({
+  x, y, startFrame, color = '#3b82f6', type = 'glow'
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const relativeFrame = frame - startFrame;
+  const progress = spring({
+    frame: relativeFrame,
+    fps,
+    config: { damping: 10, stiffness: 100 },
+  });
+
+  if (frame < startFrame) return null;
+
+  const pulse = type === 'pulse' ? Math.sin(relativeFrame / 10) * 0.2 + 1 : 1;
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        width: 12,
+        height: 12,
+        backgroundColor: color,
+        borderRadius: '50%',
+        transform: `translate(-50%, -50%) scale(${progress * pulse})`,
+        boxShadow: `0 0 ${20 * pulse}px ${color}`,
+        zIndex: 2
+      }}
+    >
+      {type === 'signal' && (
+        <div style={{
+          position: 'absolute',
+          inset: -20,
+          border: `2px solid ${color}`,
+          borderRadius: '50%',
+          opacity: interpolate(relativeFrame % 30, [0, 30], [0.6, 0]),
+          transform: `scale(${interpolate(relativeFrame % 30, [0, 30], [0.5, 2])})`
+        }} />
+      )}
+    </div>
+  );
+};
+
+export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFrame: number, color?: string }> = ({
+    x, y, radius, startFrame, color = 'rgba(255,255,255,0.1)'
+}) => {
+    const frame = useCurrentFrame();
+    const relativeFrame = frame - startFrame;
+    if (frame < startFrame) return null;
+
+    return (
+        <div style={{
+            position: 'absolute',
+            left: x,
+            top: y,
+            width: radius * 2,
+            height: radius * 2,
+            border: `1px solid ${color}`,
+            borderRadius: '50%',
+            transform: `translate(-50%, -50%) rotate(${relativeFrame}deg)`,
+            zIndex: 1
+        }}>
+            <div style={{
+                position: 'absolute',
+                top: -4,
+                left: '50%',
+                width: 8,
+                height: 8,
+                backgroundColor: color,
+                borderRadius: '50%',
+                boxShadow: `0 0 10px ${color}`
+            }} />
+        </div>
+    );
+};
+--- END OF svg/components/InfographicElements.tsx ---
+
+--- FILE: svg/components/JsonSceneRenderer.tsx ---
+import React from 'react';
+import { AbsoluteFill } from 'remotion';
+import { AnimatedSvg } from './AnimatedSvg';
+import { SvgScene } from '../types';
+
+interface JsonSceneRendererProps {
+  sceneData: SvgScene;
+}
+
+export const JsonSceneRenderer: React.FC<JsonSceneRendererProps> = ({ sceneData }) => {
+  if (!sceneData || !sceneData.elements) return null;
+
+  return (
+    <AbsoluteFill>
+      {sceneData.elements.map((el) => {
+        if (el.type !== 'svg') return null;
+
+        return (
+          <AnimatedSvg
+            key={el.id}
+            query={el.query}
+            provider={el.provider}
+            animation={el.animation}
+            startFrame={el.startFrame}
+            durationInFrames={el.durationInFrames}
+            width={el.width}
+            height={el.height}
+            x={el.x}
+            y={el.y}
+            color={el.color}
+            strokeWidth={el.strokeWidth}
+          />
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+--- END OF svg/components/JsonSceneRenderer.tsx ---
+
+--- FILE: svg/components/LayeredSvg.tsx ---
+import React from 'react';
+import { RemoteSvg } from './RemoteSvg';
+import { SvgProvider, SvgStyle, GradientConfig, GlowConfig } from '../types';
+
+interface LayeredSvgProps {
+  query: string;
+  provider: SvgProvider;
+  color?: string;
+  strokeWidth?: number;
+  style?: SvgStyle;
+  gradient?: GradientConfig;
+  glow?: boolean | GlowConfig;
+  depth?: boolean;
+  id?: string;
+  width: number;
+  height: number;
+  onLoad?: (svgData: string, pathLengths: number[]) => void;
+}
+
+export const LayeredSvg: React.FC<LayeredSvgProps> = ({
+  query,
+  provider,
+  color = 'white',
+  strokeWidth = 2,
+  style = 'fill',
+  gradient,
+  glow,
+  depth,
+  id,
+  width,
+  height,
+  onLoad
+}) => {
+  const glowConfig: GlowConfig | null = typeof glow === 'object' ? glow : glow ? { color: color, intensity: 0.6, radius: 20 } : null;
+
+  return (
+    <div style={{ width, height, position: 'relative' }}>
+      {/* 1. DEPTH LAYER (Shadow) */}
+      {depth && (
+        <div style={{ position: 'absolute', inset: 0, transform: 'translate(10px, 10px)', filter: 'blur(10px)', opacity: 0.3 }}>
+          <RemoteSvg
+            query={query}
+            provider={provider}
+            color="black"
+            style={style}
+          />
+        </div>
+      )}
+
+      {/* 2. GLOW LAYER */}
+      {glowConfig && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          filter: `blur(${glowConfig.radius || 20}px)`,
+          opacity: glowConfig.intensity || 0.6,
+          transform: 'scale(1.05)'
+        }}>
+          <RemoteSvg
+            query={query}
+            provider={provider}
+            color={glowConfig.color || color}
+            style={style === 'outline' ? 'outline' : 'fill'}
+            strokeWidth={strokeWidth + 2}
+          />
+        </div>
+      )}
+
+      {/* 3. MAIN LAYER */}
+      <div style={{ position: 'absolute', inset: 0 }}>
+        <RemoteSvg
+          query={query}
+          provider={provider}
+          color={color}
+          style={style}
+          strokeWidth={strokeWidth}
+          gradient={gradient}
+          id={id}
+          onLoad={onLoad}
+        />
+      </div>
+
+      {/* 4. HIGHLIGHT LAYER */}
+      {style === 'tech' && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          opacity: 0.4,
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 50%)',
+          mixBlendMode: 'overlay',
+          pointerEvents: 'none',
+          borderRadius: 'inherit'
+        }} />
+      )}
+    </div>
+  );
+};
+--- END OF svg/components/LayeredSvg.tsx ---
+
+--- FILE: svg/components/RemoteSvg.tsx ---
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { SvgProvider, SvgStyle, GradientConfig } from '../types';
+import { SvgCacheService } from '../services/SvgCacheService';
+import { random } from 'remotion';
+
+interface RemoteSvgProps {
+  query: string;
+  provider: SvgProvider;
+  color?: string;
+  strokeWidth?: number;
+  style?: SvgStyle;
+  gradient?: GradientConfig;
+  id?: string;
+  onLoad?: (svgData: string, pathLengths: number[]) => void;
+}
+
+export const RemoteSvg: React.FC<RemoteSvgProps> = ({
+  query,
+  provider,
+  color = 'white',
+  strokeWidth = 2,
+  style = 'fill',
+  gradient,
+  id = 'svg',
+  onLoad
+}) => {
+  const [svgContent, setSvgContent] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const gradientId = useMemo(() => `grad-${query.replace(/[^a-z0-9]/gi, '')}-${Math.floor(random(id) * 10000)}`, [query, id]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    SvgCacheService.getSvg(query, provider)
+      .then(content => {
+        if (!isMounted) return;
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(content, 'image/svg+xml');
+        const svgElement = doc.querySelector('svg');
+
+        if (!svgElement) {
+            throw new Error('Invalid SVG: No root element');
+        }
+
+        svgElement.setAttribute('width', '100%');
+        svgElement.setAttribute('height', '100%');
+        svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+        const finalColor = gradient ? `url(#${gradientId})` : color;
+
+        // TARGET ALL STYLABLE ELEMENTS
+        const elements = svgElement.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon');
+
+        elements.forEach(el => {
+            // Remove ANY hardcoded styles or attributes that might override our theme
+            el.removeAttribute('style');
+            el.removeAttribute('fill');
+            el.removeAttribute('stroke');
+            el.removeAttribute('stroke-width');
+
+            if (style === 'outline') {
+                el.setAttribute('fill', 'none');
+                el.setAttribute('stroke', finalColor);
+                el.setAttribute('stroke-width', strokeWidth.toString());
+            } else {
+                // Determine if element should be stroke-only or fill-based
+                // Most icons use fill for the main shape.
+                // We default to fill, but allow stroke if specifically requested or if it's a line-based shape
+                const isLineType = ['line', 'polyline'].includes(el.tagName.toLowerCase());
+
+                if (isLineType) {
+                    el.setAttribute('fill', 'none');
+                    el.setAttribute('stroke', finalColor);
+                    el.setAttribute('stroke-width', strokeWidth.toString());
+                } else {
+                    el.setAttribute('fill', finalColor);
+                    // Add subtle stroke even to filled shapes for 'tech' style crispness
+                    if (style === 'tech' || style === 'corporate') {
+                        el.setAttribute('stroke', finalColor);
+                        el.setAttribute('stroke-width', (strokeWidth * 0.5).toString());
+                    }
+                }
+            }
+        });
+
+        if (gradient) {
+            const defs = doc.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            const linearGrad = doc.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+            linearGrad.setAttribute('id', gradientId);
+            linearGrad.setAttribute('x1', '0%');
+            linearGrad.setAttribute('y1', '0%');
+            linearGrad.setAttribute('x2', '100%');
+            linearGrad.setAttribute('y2', '100%');
+
+            const stop1 = doc.createElementNS('http://www.w3.org/2000/svg', 'stop');
+            stop1.setAttribute('offset', '0%');
+            stop1.setAttribute('stop-color', gradient.start);
+
+            const stop2 = doc.createElementNS('http://www.w3.org/2000/svg', 'stop');
+            stop2.setAttribute('offset', '100%');
+            stop2.setAttribute('stop-color', gradient.end);
+
+            linearGrad.appendChild(stop1);
+            linearGrad.appendChild(stop2);
+            defs.appendChild(linearGrad);
+            svgElement.insertBefore(defs, svgElement.firstChild);
+        }
+
+        const serialized = new XMLSerializer().serializeToString(doc);
+        setSvgContent(serialized);
+      })
+      .catch(err => {
+        if (isMounted) setError(err.message);
+      });
+
+    return () => { isMounted = false; };
+  }, [query, provider, color, strokeWidth, style, gradient, gradientId]);
+
+  useEffect(() => {
+      if (svgContent && containerRef.current && onLoad) {
+          const paths = containerRef.current.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon');
+          const lengths: number[] = [];
+          paths.forEach((p: any) => {
+              try {
+                  // For non-paths, we can approximate or use special methods if available
+                  if (p.getTotalLength) {
+                      lengths.push(p.getTotalLength());
+                  } else {
+                      // Bounding box approximation for simple shapes
+                      const bbox = p.getBBox();
+                      lengths.push((bbox.width + bbox.height) * 2);
+                  }
+              } catch(e) {
+                  lengths.push(5000);
+              }
+          });
+          onLoad(svgContent, lengths);
+      }
+  }, [svgContent, onLoad]);
+
+  if (error) {
+    return (
+        <div className="bg-red-500/10 p-2 rounded text-[10px] text-red-500 border border-red-500/20 text-center">
+            SVG Missing: {query}
+        </div>
+    );
+  }
+
+  if (!svgContent) {
+    return <div className="animate-pulse bg-white/10 rounded-full w-full h-full" />;
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="w-full h-full flex items-center justify-center"
+      dangerouslySetInnerHTML={{ __html: svgContent }}
+    />
+  );
+};
+--- END OF svg/components/RemoteSvg.tsx ---
+
+--- FILE: svg/services/SvgCacheService.ts ---
+import { SvgProvider } from '../types';
+import { SvgProviderService } from './SvgProviderService';
+
+export class SvgCacheService {
+  private static cache: Map<string, Promise<string>> = new Map();
+
+  static getSvg(query: string, provider: SvgProvider): Promise<string> {
+    const key = `${provider}:${query}`;
+    if (this.cache.has(key)) {
+      return this.cache.get(key)!;
+    }
+
+    const fetchPromise = SvgProviderService.fetchSvg(query, provider);
+    this.cache.set(key, fetchPromise);
+    return fetchPromise;
+  }
+}
+--- END OF svg/services/SvgCacheService.ts ---
+
+--- FILE: svg/services/SvgProviderService.ts ---
+import { SvgProvider } from '../types';
+
+export class SvgProviderService {
+  private static FETCH_TIMEOUT = 5000;
+  private static MAX_RETRIES = 2;
+
+  /**
+   * Fetch SVG data from public APIs based on provider and query.
+   */
+  static async fetchSvg(query: string, provider: SvgProvider): Promise<string> {
+    const cleanQuery = query.trim().toLowerCase();
+
+    // Primary URL based on provider
+    let primaryUrl = '';
+    switch (provider) {
+      case 'lucide':
+        // Lucide on Iconify is more robust for aliases
+        primaryUrl = `https://api.iconify.design/lucide/${cleanQuery}.svg`;
+        break;
+      case 'tabler':
+        primaryUrl = `https://api.iconify.design/tabler/${cleanQuery}.svg`;
+        break;
+      case 'iconify':
+      default:
+        const iconName = cleanQuery.includes(':') ? cleanQuery : `mdi:${cleanQuery}`;
+        primaryUrl = `https://api.iconify.design/${iconName.replace(':', '/')}.svg`;
+        break;
+    }
+
+    try {
+        return await this.fetchWithRetry(primaryUrl);
+    } catch (e) {
+        // FALLBACK: Try standard MDI via Iconify if specific provider fails
+        console.warn(`Primary fetch failed for ${cleanQuery}, trying fallback...`);
+        const fallbackUrl = `https://api.iconify.design/mdi/${cleanQuery}.svg`;
+        return this.fetchWithRetry(fallbackUrl);
+    }
+  }
+
+  private static async fetchWithRetry(url: string, attempt: number = 0): Promise<string> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.FETCH_TIMEOUT);
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP Error: ${response.status}`);
+      }
+
+      const svgText = await response.text();
+
+      if (!svgText.includes('<svg')) {
+        throw new Error('Invalid SVG content received');
+      }
+
+      return svgText;
+    } catch (error) {
+      if (attempt < this.MAX_RETRIES) {
+        return this.fetchWithRetry(url, attempt + 1);
+      }
+      throw error;
+    }
+  }
+}
+--- END OF svg/services/SvgProviderService.ts ---
