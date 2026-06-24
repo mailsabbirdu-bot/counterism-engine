@@ -7,8 +7,7 @@ import { LabelSystem } from './LabelSystem';
 import { CalloutSystem } from './CalloutSystem';
 import { KpiCard } from './KpiCard';
 import { Timeline } from './Timeline';
-import { CompositionEngine } from './CompositionEngine';
-import { HubNetworkElement, FlowDiagramElement, ProcessElement, LabelElement, CalloutElement, KpiElement, TimelineElement, CompositionElement, SvgGroup, StorytellingElement, LayerType, SvgProvider, InfographicTheme } from '../types';
+import { HubNetworkElement, FlowDiagramElement, ProcessElement, LabelElement, CalloutElement, KpiElement, TimelineElement, StorytellingElement, SvgProvider } from '../types';
 
 /**
  * Narrative Template Engine
@@ -72,14 +71,17 @@ interface TemplateProps {
     story?: string;
     startFrame?: number;
     sceneIconTheme?: SvgProvider;
+    positionMap: Record<string, { x: number, y: number }>;
 }
 
-export const NarrativeTemplate: React.FC<TemplateProps> = ({ story, startFrame = 0, sceneIconTheme }) => {
+/**
+ * Narrative Template Component
+ * HARDENING: Correctly renders all expanded elements (P2-4).
+ */
+export const NarrativeTemplate: React.FC<TemplateProps> = ({ story, startFrame = 0, sceneIconTheme, positionMap }) => {
     const elements = useMemo(() => story ? expandNarrativeTemplate(story, startFrame) : [], [story, startFrame]);
     if (!elements.length) return null;
 
-    // This would typically be rendered by InfographicComposer recursively or mapped here
-    // For simplicity, we just return the expanded components mapped manually for now
     return (
         <>
             {elements.map((el: any) => {
@@ -87,6 +89,8 @@ export const NarrativeTemplate: React.FC<TemplateProps> = ({ story, startFrame =
                     case 'hub_network': return <HubNetwork key={el.id} element={el} sceneIconTheme={sceneIconTheme} />;
                     case 'process': return <ProcessDiagram key={el.id} element={el} sceneIconTheme={sceneIconTheme} />;
                     case 'timeline': return <Timeline key={el.id} element={el} />;
+                    case 'label': return <LabelSystem key={el.id} element={el} targetPos={positionMap[el.target]} />;
+                    case 'callout': return <CalloutSystem key={el.id} element={el} targetPos={positionMap[el.target]} />;
                     default: return null;
                 }
             })}

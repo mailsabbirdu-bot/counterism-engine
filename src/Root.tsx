@@ -1,13 +1,14 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Composition, delayRender, continueRender, staticFile, getInputProps } from 'remotion';
 import { Scene } from './Scene';
+import { SvgAssetPreloader } from '../svg/services/SvgAssetPreloader';
+import { SvgScene } from '../svg/types';
 import defaultTemplate from '../remotion_template.json';
 
 // Import Global SVG Styles once
 import '../svg/styles/svgAnimations.css';
 
 const inputProps = getInputProps();
-// Support both { templateData: ... } and direct template JSON
 const template = (inputProps as any)?.scenes
   ? inputProps
   : ((inputProps as any)?.templateData || defaultTemplate);
@@ -17,111 +18,67 @@ const processCameraAutomation = (scene: any) => {
 };
 
 export const RemotionRoot: React.FC = () => {
-  // Pre-load fonts from template
+  // Pre-load fonts and SVGs
   useEffect(() => {
+    const handle = delayRender('Loading Assets');
+
+    const assetsPromises: Promise<any>[] = [];
+
+    // 1. Font Loading
     const fontsToLoad = new Set<string>();
     template.scenes.forEach((scene: any) => {
-      scene.overlays.forEach((overlay: any) => {
+      (scene.overlays || []).forEach((overlay: any) => {
         if (overlay.type === 'text' && overlay.font) {
           fontsToLoad.add(overlay.font);
         }
       });
     });
 
-    const handle = delayRender('Loading Fonts');
-
-    // Font Loading with Timeout and Individual Error Handling
     const fontPromises = Array.from(fontsToLoad).map(async (fontName) => {
       try {
-        console.log(`Loading font: ${fontName}`);
-
-        // 1. Try to load as a local font from /public/fonts/
         const extensions = ['ttf', 'otf', 'woff2', 'woff'];
-        const nameVariants = [
-            fontName,
-            fontName.replace(/ /g, '_'),
-            fontName.replace(/ /g, '-'),
-            fontName.toLowerCase().replace(/ /g, '_'),
-            fontName.toLowerCase().replace(/ /g, '-')
-        ];
+        const variant = fontName.replace(/ /g, '_');
+        let loaded = false;
 
-        let loadedLocally = false;
-
-        for (const variant of Array.from(new Set(nameVariants))) {
-            for (const ext of extensions) {
-                const urls = [
-                    staticFile(`fonts/${variant}.${ext}`),
-                    staticFile(`fonts/drive_fonts/${variant}.${ext}`),
-                    `/fonts/${variant}.${ext}`, // Direct path fallback
-                    `./fonts/${variant}.${ext}`, // Relative path fallback
-                ];
-
-                for (const url of urls) {
-                    try {
-                        // Encode URL to handle spaces/special chars
-                        const safeUrl = url.includes('%') ? url : encodeURI(url);
-                        const fontFace = new FontFace(fontName, `url(${safeUrl})`);
-                        await fontFace.load();
-                        document.fonts.add(fontFace);
-                        console.log(`✅ Success: Loaded local font "${fontName}" from variant "${variant}" via ${safeUrl}`);
-                        loadedLocally = true;
-                        break;
-                    } catch (e) {
-                        // Try next URL/extension/variant
-                    }
-                }
-                if (loadedLocally) break;
-            }
-            if (loadedLocally) break;
-        }
-
-        // 1b. Fallback: Try injecting @font-face style if FontFace API is being picky
-        if (!loadedLocally) {
-            console.log(`⚠️ FontFace API failed for ${fontName}, trying @font-face injection...`);
-            const style = document.createElement('style');
-            // Try a likely filename
-            const variant = fontName.replace(/ /g, '_');
-            const safeUrl = encodeURI(staticFile(`fonts/${variant}.ttf`));
-            style.appendChild(document.createTextNode(`
-                @font-face {
-                    font-family: '${fontName}';
-                    src: url('${safeUrl}') format('truetype');
-                }
-            `));
-            document.head.appendChild(style);
-
+        for (const ext of extensions) {
             try {
-                await document.fonts.load(`1em ${fontName}`);
-                console.log(`✅ Success: Loaded local font "${fontName}" via @font-face injection.`);
-                loadedLocally = true;
-            } catch (e) {
-                // Style injection failed too
-            }
+                const url = staticFile(`fonts/${variant}.${ext}`);
+                const fontFace = new FontFace(fontName, `url(${url})`);
+                await fontFace.load();
+                document.fonts.add(fontFace);
+                loaded = true;
+                break;
+            } catch (e) {}
         }
 
-        if (!loadedLocally) {
-            // 2. Fallback to Google Fonts
-            console.log(`Local font not found, falling back to Google Fonts for ${fontName}`);
+        if (!loaded) {
             const link = document.createElement('link');
             link.rel = 'stylesheet';
             link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:wght@400;700&display=swap`;
             document.head.appendChild(link);
-
-            // Wait for font to load
             await document.fonts.load(`1em ${fontName}`);
         }
-
-        console.log(`Successfully loaded font: ${fontName}`);
       } catch (e) {
         console.error(`Failed to load font: ${fontName}`, e);
       }
     });
+    assetsPromises.push(...fontPromises);
 
-    const timeout = new Promise((resolve) => setTimeout(resolve, 5000));
-    Promise.race([Promise.all(fontPromises), timeout]).then(() => {
+    // 2. SVG Preloading (Critical for deterministic rendering)
+    const svgPromises = template.scenes.map(async (scene: any) => {
+        try {
+            await SvgAssetPreloader.preloadScene(scene as SvgScene);
+        } catch (e) {
+            console.error(`Failed to preload SVGs for scene ${scene.scene_id}`, e);
+        }
+    });
+    assetsPromises.push(...svgPromises);
+
+    const timeout = new Promise((resolve) => setTimeout(resolve, 10000));
+    Promise.race([Promise.all(assetsPromises), timeout]).then(() => {
       continueRender(handle);
     }).catch(err => {
-      console.error("Critical font loading error", err);
+      console.error("Critical asset loading error", err);
       continueRender(handle);
     });
   }, []);
@@ -129,7 +86,6 @@ export const RemotionRoot: React.FC = () => {
   return (
     <>
       {template.scenes.map((scene: any) => {
-        console.log(`[Root] Initializing Composition for Scene: ${scene.scene_id} (${scene.duration_in_frames} frames)`);
         const processedScene = processCameraAutomation(scene);
         return (
           <Composition

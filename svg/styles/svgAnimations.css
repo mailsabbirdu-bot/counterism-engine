@@ -1,6 +1,8 @@
 /**
  * Professional SVG Motion Graphics Animations
  * Optimized for Remotion Storytelling Engine
+ *
+ * HARDENING: Removed time-based transitions. All animations are frame-driven.
  */
 
 .svg-motion-container svg path,
@@ -11,8 +13,7 @@
 .svg-motion-container svg polyline,
 .svg-motion-container svg polygon {
     stroke-dasharray: var(--path-length, 5000);
-    stroke-dashoffset: calc(var(--path-length, 5000) * (1 - var(--draw-progress, 1)));
-    transition: stroke-dashoffset 0.1s linear;
+    stroke-dashoffset: var(--dash-offset, 0);
 }
 
 .svg-motion-container.trace svg path,

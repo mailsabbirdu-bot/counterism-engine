@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useMemo } from 'react';
 import { SvgProvider, SvgStyle, GradientConfig } from '../types';
-import { SvgCacheService } from '../services/SvgCacheService';
-import { random } from 'remotion';
+import { SvgRegistry } from '../lib/svgRegistry';
+import { ENGINE_CONSTANTS } from '../lib/constants';
 
 interface RemoteSvgProps {
   query: string;
@@ -11,153 +11,88 @@ interface RemoteSvgProps {
   style?: SvgStyle;
   gradient?: GradientConfig;
   id?: string;
-  onLoad?: (svgData: string, pathLengths: number[]) => void;
+  onLoad?: (pathLength: number) => void;
 }
 
 export const RemoteSvg: React.FC<RemoteSvgProps> = ({
   query,
   provider,
   color = 'white',
-  strokeWidth = 2,
+  strokeWidth = ENGINE_CONSTANTS.DEFAULT_STROKE_WIDTH,
   style = 'fill',
   gradient,
   id = 'svg',
   onLoad
 }) => {
-  const [svgContent, setSvgContent] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  // HARDENING: Render from registry ONLY. No runtime fetching or DOM parsing.
+  const asset = SvgRegistry.get(query, provider);
 
-  const gradientId = useMemo(() => `grad-${query.replace(/[^a-z0-9]/gi, '')}-${Math.floor(random(id) * 10000)}`, [query, id]);
+  const gradientId = useMemo(() => `grad-${query.replace(/[^a-z0-9]/gi, '')}-${id}`, [query, id]);
 
-  useEffect(() => {
-    let isMounted = true;
+  const processedMarkup = useMemo(() => {
+      if (!asset) return null;
 
-    SvgCacheService.getSvg(query, provider)
-      .then(content => {
-        if (!isMounted) return;
+      let markup = asset.markup;
+      const finalColor = gradient ? `url(#${gradientId})` : color;
 
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(content, 'image/svg+xml');
-        const svgElement = doc.querySelector('svg');
+      // Robust attribute injection via simple string replacement for performance
+      // since markup was already sanitized/processed in preloader.
 
-        if (!svgElement) {
-            throw new Error('Invalid SVG: No root element');
-        }
+      // 1. Force Scaling
+      markup = markup.replace(/<svg/, `<svg width="100%" height="100%" preserveAspectRatio="xMidYMid meet"`);
 
-        svgElement.setAttribute('width', '100%');
-        svgElement.setAttribute('height', '100%');
-        svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-
-        const finalColor = gradient ? `url(#${gradientId})` : color;
-
-        // TARGET ALL STYLABLE ELEMENTS
-        const elements = svgElement.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon');
-
-        elements.forEach(el => {
-            // Remove ANY hardcoded styles or attributes that might override our theme
-            el.removeAttribute('style');
-            el.removeAttribute('fill');
-            el.removeAttribute('stroke');
-            el.removeAttribute('stroke-width');
-
-            if (style === 'outline') {
-                el.setAttribute('fill', 'none');
-                el.setAttribute('stroke', finalColor);
-                el.setAttribute('stroke-width', strokeWidth.toString());
-            } else {
-                // Determine if element should be stroke-only or fill-based
-                // Most icons use fill for the main shape.
-                // We default to fill, but allow stroke if specifically requested or if it's a line-based shape
-                const isLineType = ['line', 'polyline'].includes(el.tagName.toLowerCase());
-
-                if (isLineType) {
-                    el.setAttribute('fill', 'none');
-                    el.setAttribute('stroke', finalColor);
-                    el.setAttribute('stroke-width', strokeWidth.toString());
-                } else {
-                    el.setAttribute('fill', finalColor);
-                    // Add subtle stroke even to filled shapes for 'tech' style crispness
-                    if (style === 'tech' || style === 'corporate') {
-                        el.setAttribute('stroke', finalColor);
-                        el.setAttribute('stroke-width', (strokeWidth * 0.5).toString());
-                    }
-                }
-            }
-        });
-
-        if (gradient) {
-            const defs = doc.createElementNS('http://www.w3.org/2000/svg', 'defs');
-            const linearGrad = doc.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
-            linearGrad.setAttribute('id', gradientId);
-            linearGrad.setAttribute('x1', '0%');
-            linearGrad.setAttribute('y1', '0%');
-            linearGrad.setAttribute('x2', '100%');
-            linearGrad.setAttribute('y2', '100%');
-
-            const stop1 = doc.createElementNS('http://www.w3.org/2000/svg', 'stop');
-            stop1.setAttribute('offset', '0%');
-            stop1.setAttribute('stop-color', gradient.start);
-
-            const stop2 = doc.createElementNS('http://www.w3.org/2000/svg', 'stop');
-            stop2.setAttribute('offset', '100%');
-            stop2.setAttribute('stop-color', gradient.end);
-
-            linearGrad.appendChild(stop1);
-            linearGrad.appendChild(stop2);
-            defs.appendChild(linearGrad);
-            svgElement.insertBefore(defs, svgElement.firstChild);
-        }
-
-        const serialized = new XMLSerializer().serializeToString(doc);
-        setSvgContent(serialized);
-      })
-      .catch(err => {
-        if (isMounted) setError(err.message);
-      });
-
-    return () => { isMounted = false; };
-  }, [query, provider, color, strokeWidth, style, gradient, gradientId]);
-
-  useEffect(() => {
-      if (svgContent && containerRef.current && onLoad) {
-          const paths = containerRef.current.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon');
-          const lengths: number[] = [];
-          paths.forEach((p: any) => {
-              try {
-                  // For non-paths, we can approximate or use special methods if available
-                  if (p.getTotalLength) {
-                      lengths.push(p.getTotalLength());
-                  } else {
-                      // Bounding box approximation for simple shapes
-                      const bbox = p.getBBox();
-                      lengths.push((bbox.width + bbox.height) * 2);
-                  }
-              } catch(e) {
-                  lengths.push(5000);
-              }
-          });
-          onLoad(svgContent, lengths);
+      // 2. Inject Gradient if needed
+      if (gradient) {
+          const gradDef = `
+            <defs>
+                <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:${gradient.start};stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:${gradient.end};stop-opacity:1" />
+                </linearGradient>
+            </defs>
+          `;
+          markup = markup.replace(/>/, `>${gradDef}`);
       }
-  }, [svgContent, onLoad]);
 
-  if (error) {
+      // 3. Apply Style (Deterministic string replacement)
+      // Note: In a real production system, we might use a more sophisticated
+      // pre-serialized JSON structure for paths, but for this refactor
+      // we maintain the current string-based injection for compatibility.
+
+      if (style === 'outline') {
+          markup = markup.replace(/fill="[^"]*"/g, 'fill="none"');
+          markup = markup.replace(/stroke="[^"]*"/g, `stroke="${finalColor}"`);
+          markup = markup.replace(/stroke-width="[^"]*"/g, `stroke-width="${strokeWidth}"`);
+      } else {
+          markup = markup.replace(/fill="[^"]*"/g, `fill="${finalColor}"`);
+          if (style === 'tech' || style === 'corporate') {
+              markup = markup.replace(/stroke="[^"]*"/g, `stroke="${finalColor}"`);
+              markup = markup.replace(/stroke-width="[^"]*"/g, `stroke-width="${strokeWidth * 0.5}"`);
+          }
+      }
+
+      return markup;
+  }, [asset, color, strokeWidth, style, gradient, gradientId]);
+
+  // Notify parent of path length for animations
+  useMemo(() => {
+      if (asset && onLoad) {
+          onLoad(asset.pathLength);
+      }
+  }, [asset, onLoad]);
+
+  if (!asset) {
     return (
         <div className="bg-red-500/10 p-2 rounded text-[10px] text-red-500 border border-red-500/20 text-center">
-            SVG Missing: {query}
+            SVG Missing: {query} (Run Preloader)
         </div>
     );
   }
 
-  if (!svgContent) {
-    return <div className="animate-pulse bg-white/10 rounded-full w-full h-full" />;
-  }
-
   return (
     <div
-      ref={containerRef}
       className="w-full h-full flex items-center justify-center"
-      dangerouslySetInnerHTML={{ __html: svgContent }}
+      dangerouslySetInnerHTML={{ __html: processedMarkup || '' }}
     />
   );
 };

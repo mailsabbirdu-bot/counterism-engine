@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { RemoteSvg } from './RemoteSvg';
 import { SvgProvider, SvgStyle, GradientConfig, GlowConfig } from '../types';
+import { generateSvgId } from '../lib/svgUtils';
 
 interface LayeredSvgProps {
   query: string;
@@ -14,9 +15,13 @@ interface LayeredSvgProps {
   id?: string;
   width: number;
   height: number;
-  onLoad?: (svgData: string, pathLengths: number[]) => void;
+  onLoad?: (pathLength: number) => void;
 }
 
+/**
+ * Layered SVG Rendering
+ * HARDENING: Use SVG Filters (drop-shadow, blur) to reduce DOM node duplication (P1-2).
+ */
 export const LayeredSvg: React.FC<LayeredSvgProps> = ({
   query,
   provider,
@@ -26,47 +31,32 @@ export const LayeredSvg: React.FC<LayeredSvgProps> = ({
   gradient,
   glow,
   depth,
-  id,
+  id = 'layer',
   width,
   height,
   onLoad
 }) => {
   const glowConfig: GlowConfig | null = typeof glow === 'object' ? glow : glow ? { color: color, intensity: 0.6, radius: 20 } : null;
+  const filterId = useMemo(() => generateSvgId('filter', `${query}-${id}`), [query, id]);
+
+  const filter = useMemo(() => {
+      const filters = [];
+      if (depth) {
+          filters.push(`drop-shadow(10px 10px 10px rgba(0,0,0,0.3))`);
+      }
+      if (glowConfig) {
+          filters.push(`drop-shadow(0 0 ${glowConfig.radius || 20}px ${glowConfig.color || color})`);
+      }
+      return filters.join(' ');
+  }, [depth, glowConfig, color]);
 
   return (
-    <div style={{ width, height, position: 'relative' }}>
-      {/* 1. DEPTH LAYER (Shadow) */}
-      {depth && (
-        <div style={{ position: 'absolute', inset: 0, transform: 'translate(10px, 10px)', filter: 'blur(10px)', opacity: 0.3 }}>
-          <RemoteSvg
-            query={query}
-            provider={provider}
-            color="black"
-            style={style}
-          />
-        </div>
-      )}
-
-      {/* 2. GLOW LAYER */}
-      {glowConfig && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          filter: `blur(${glowConfig.radius || 20}px)`,
-          opacity: glowConfig.intensity || 0.6,
-          transform: 'scale(1.05)'
-        }}>
-          <RemoteSvg
-            query={query}
-            provider={provider}
-            color={glowConfig.color || color}
-            style={style === 'outline' ? 'outline' : 'fill'}
-            strokeWidth={strokeWidth + 2}
-          />
-        </div>
-      )}
-
-      {/* 3. MAIN LAYER */}
+    <div style={{
+        width, height,
+        position: 'relative',
+        filter: filter, // Single pass rendering using browser optimized filters
+    }}>
+      {/* 3. MAIN LAYER (Now handles styles/gradients) */}
       <div style={{ position: 'absolute', inset: 0 }}>
         <RemoteSvg
           query={query}
@@ -80,7 +70,7 @@ export const LayeredSvg: React.FC<LayeredSvgProps> = ({
         />
       </div>
 
-      {/* 4. HIGHLIGHT LAYER */}
+      {/* 4. HIGHLIGHT LAYER (Tech Overlay) */}
       {style === 'tech' && (
         <div style={{
           position: 'absolute',
@@ -89,7 +79,9 @@ export const LayeredSvg: React.FC<LayeredSvgProps> = ({
           background: 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 50%)',
           mixBlendMode: 'overlay',
           pointerEvents: 'none',
-          borderRadius: 'inherit'
+          borderRadius: 'inherit',
+          // Mask the highlight with the main SVG for depth?
+          // Browser support for mask on div is complex, so we stick to simple overlay pass.
         }} />
       )}
     </div>

@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 import { LayeredSvg } from './LayeredSvg';
 import { AnimationType, SvgProvider, SvgStyle, Importance, GlowConfig, GradientConfig, LayerType } from '../types';
 import { GlassPanel } from './GlassPanel';
 import { getEntranceProgress } from '../lib/animationUtils';
+import { useAnimation } from './AnimationContext';
+import { ENGINE_CONSTANTS } from '../lib/constants';
 
-// Import CSS once in the composition root or here for individual components
-// but standardizing on a single stylesheet helps performance.
+// Import CSS once in the composition root
 import '../styles/svgAnimations.css';
 
 export interface AnimatedSvgProps {
@@ -36,18 +36,22 @@ export interface AnimatedSvgProps {
   groupOffset?: { x: number, y: number };
 }
 
+/**
+ * Professional Animated SVG Component
+ * HARDENING: Wrapper architecture for GlassPanel (P1-3).
+ */
 export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
   query,
   provider,
   animation = 'fade',
   startFrame = 0,
-  durationInFrames = 150,
+  durationInFrames = ENGINE_CONSTANTS.DEFAULT_ANIMATION_DURATION,
   width,
   height,
   x,
   y,
   color = 'white',
-  strokeWidth = 2,
+  strokeWidth = ENGINE_CONSTANTS.DEFAULT_STROKE_WIDTH,
   style = 'fill',
   importance = 'secondary',
   glow,
@@ -57,14 +61,12 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
   id = 'svg',
   groupOffset = { x: 0, y: 0 }
 }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const [pathLength, setPathLength] = useState<number>(5000);
+  const { frame, fps } = useAnimation();
+  const [pathLength, setPathLength] = useState<number>(ENGINE_CONSTANTS.MAX_SVG_PATH_LENGTH);
 
   const relativeFrame = frame - startFrame;
 
   // 1. OPTIMIZATION: Conditional Spring vs Interpolation
-  // High importance or center hub objects get smooth springs
   const isHighImportance = importance === 'primary' || container === 'glass_panel';
   const spr = getEntranceProgress(frame, fps, startFrame, isHighImportance);
 
@@ -101,79 +103,75 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
         return { opacity: spr * baseOpacity, transform: `translate(${orbitX}px, ${orbitY}px) scale(${spr * baseScale})` };
       case 'reveal':
         return { opacity: 1, clipPath: `inset(0 ${100 - spr * 100}% 0 0)`, transform: `scale(${baseScale})` };
+      case 'draw':
+      case 'trace':
+          return { opacity: 1, transform: `scale(${baseScale})` };
       default:
         return { opacity: spr * baseOpacity, transform: `scale(${baseScale})` };
     }
   }, [animation, relativeFrame, spr, baseScale, baseOpacity]);
 
-  // 2. HARDENING: Use inline styles for variables only, shared CSS for rules
   const variableStyles = useMemo(() => {
+    const dashOffset = pathLength * (1 - spr);
+
     return {
         '--draw-progress': spr,
-        '--path-length': pathLength,
+        '--dash-offset': `${dashOffset}px`,
+        '--path-length': `${pathLength}px`,
         '--glow-pulse': 0.5 + Math.sin(relativeFrame / 15) * 0.5,
         '--glow-color': color
     } as React.CSSProperties;
   }, [spr, pathLength, relativeFrame, color]);
 
-  const content = (
+  const svgLayer = (
+    <LayeredSvg
+      query={query}
+      provider={provider}
+      color={color}
+      strokeWidth={strokeWidth}
+      style={style}
+      gradient={gradient}
+      glow={animation === 'glowPulse' ? true : importanceGlow}
+      depth={depth}
+      width={width}
+      height={height}
+      id={id}
+      onLoad={(length) => {
+          setPathLength(length);
+      }}
+    />
+  );
+
+  const innerContent = (
     <div
       style={{
-        position: 'absolute',
-        left: x + groupOffset.x,
-        top: y + groupOffset.y,
         width,
         height,
-        transform: 'translate(-50%, -50%)',
+        transform: container === 'glass_panel' ? 'scale(0.8)' : 'none',
         ...animationStyles,
         ...variableStyles
       }}
       className={`svg-motion-container ${animation}`}
     >
-      <LayeredSvg
-        query={query}
-        provider={provider}
-        color={color}
-        strokeWidth={strokeWidth}
-        style={style}
-        gradient={gradient}
-        glow={animation === 'glowPulse' ? true : importanceGlow}
-        depth={depth}
-        width={width}
-        height={height}
-        id={id}
-        onLoad={(_, lengths) => {
-            if (lengths.length > 0) {
-                setPathLength(Math.max(...lengths));
-            }
-        }}
-      />
+      {svgLayer}
     </div>
   );
 
-  if (container === 'glass_panel') {
-      return (
-        <div style={{ position: 'absolute', left: x + groupOffset.x, top: y + groupOffset.y, transform: 'translate(-50%, -50%)' }}>
+  return (
+    <div style={{
+        position: 'absolute',
+        left: x + groupOffset.x,
+        top: y + groupOffset.y,
+        transform: 'translate(-50%, -50%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+    }}>
+        {container === 'glass_panel' ? (
             <GlassPanel width={width * 1.5} height={height * 1.5} startFrame={startFrame}>
-                <div style={{ transform: 'scale(0.8)' }}>
-                    <LayeredSvg
-                        query={query}
-                        provider={provider}
-                        color={color}
-                        strokeWidth={strokeWidth}
-                        style={style}
-                        gradient={gradient}
-                        glow={importanceGlow}
-                        depth={depth}
-                        width={width}
-                        height={height}
-                        id={id}
-                    />
-                </div>
+                {innerContent}
             </GlassPanel>
-        </div>
-      );
-  }
-
-  return content;
+        ) : innerContent}
+    </div>
+  );
 };

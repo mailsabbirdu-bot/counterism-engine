@@ -1,15 +1,20 @@
 import React from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
+import { useVideoConfig } from 'remotion';
 import { TimelineElement } from '../types';
 import { getEntranceProgress } from '../lib/animationUtils';
+import { useAnimation } from './AnimationContext';
+import { ENGINE_CONSTANTS } from '../lib/constants';
 
 export const Timeline: React.FC<{ element: TimelineElement }> = ({ element }) => {
   const { events, x, y, startFrame = 0 } = element;
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { frame, fps } = useAnimation();
 
-  const totalWidth = 1200;
-  const stepX = totalWidth / (events.length - 1);
+  // HARDENING: Guard divide-by-zero (BUG-2)
+  const totalEvents = events.length;
+  if (totalEvents === 0) return null;
+
+  const totalWidth = ENGINE_CONSTANTS.TIMELINE_WIDTH;
+  const stepX = totalEvents > 1 ? totalWidth / (totalEvents - 1) : 0;
 
   const overallProgress = getEntranceProgress(frame, fps, startFrame, false);
 
@@ -29,7 +34,7 @@ export const Timeline: React.FC<{ element: TimelineElement }> = ({ element }) =>
       {/* 2. Events */}
       {events.map((ev, i) => {
           const eventX = (-totalWidth / 2) + (i * stepX);
-          const eventStart = startFrame + 15 + (i * 30);
+          const eventStart = startFrame + 15 + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL * 3);
           const spr = getEntranceProgress(frame, fps, eventStart, true);
 
           if (frame < eventStart) return null;
