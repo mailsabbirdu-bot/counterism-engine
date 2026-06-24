@@ -163,8 +163,10 @@ class RemotionJsonMaker:
         TYPE_SIZES = {
             'text': (600, 120),
             'chart': (1000, 600),
+            'shadcn_chart': (1000, 600),
             'ui_panel': (700, 500),
             'data_indicator': (450, 400),
+            'shadcn_indicator': (450, 400),
             'media': (900, 700),
             'image': (900, 700),
             'video': (900, 700)
@@ -272,7 +274,7 @@ class RemotionJsonMaker:
             if scene.get('overlays'):
                 # Pass 0: Detect Title+Content relation
                 text_ov = next((o for o in scene['overlays'] if o.get('type') == 'text' or 'text' in o or 'content' in o), None)
-                focal_ov = next((o for o in scene['overlays'] if o.get('type') in ['chart', 'ui_panel', 'data_indicator', 'indicator'] or 'chart_type' in o or 'kind' in o), None)
+                focal_ov = next((o for o in scene['overlays'] if o.get('type') in ['chart', 'shadcn_chart', 'ui_panel', 'data_indicator', 'shadcn_indicator', 'indicator'] or 'chart_type' in o or 'kind' in o), None)
                 has_relation = text_ov and focal_ov
 
                 # First Pass: Budgeting & Schema Alignment
@@ -732,7 +734,7 @@ class RemotionJsonMaker:
             all_text = " ".join([o.get('content', '') for o in scene.get('overlays', []) if o.get('type') == 'text'])
             is_scene_bangla = self._is_bangla(all_text)
             has_number = re.search(r'[0-9০-৯]|million|M|k|K|percent|%|দশ|শত|হাজার|কোটি|লক্ষ', all_text, re.I)
-            has_focal = any(o.get('type') in ['chart', 'data_indicator', 'ui_panel'] for o in scene.get('overlays', []))
+            has_focal = any(o.get('type') in ['chart', 'shadcn_chart', 'data_indicator', 'shadcn_indicator', 'ui_panel'] for o in scene.get('overlays', []))
 
             if has_number and not has_focal:
                 print(f"   ⚠️ Scene {scene_id} mentions numbers but lacks focal visualization. Injecting KPI.")
@@ -829,7 +831,7 @@ class RemotionJsonMaker:
                             "animation": anim_choice
                         }
 
-                if o_type == 'chart':
+                if o_type in ['chart', 'shadcn_chart']:
                     if is_scene_bangla and self.bangla_fonts:
                         ov['font'] = self.bangla_fonts[0]
                     # Robustness: ensure a font is always assigned
@@ -841,13 +843,13 @@ class RemotionJsonMaker:
                         ov['colors'] = {"scheme": "nivo"} # Fallback to catchy scheme
 
                     # Data Integrity Check
-                    if not ov.get('data') or not isinstance(ov['data'], list) or len(ov['data']) == 0:
+                    if not ov.get('data') or (not isinstance(ov['data'], list) and not isinstance(ov['data'], dict)):
                         ov['data'] = [{"id": "A", "value": 10}, {"id": "B", "value": 20}]
                     if not ov.get('title'):
                         ov['title'] = "Data Overview"
 
                 # Indicator Field Integrity
-                if o_type == 'data_indicator':
+                if o_type in ['data_indicator', 'shadcn_indicator']:
                     # Robustness: ensure a font is always assigned
                     if not ov.get('font'):
                          ov['font'] = self.english_fonts[0] if self.english_fonts else "Arial"
