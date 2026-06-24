@@ -1,5 +1,5 @@
 {
-  "project_name": "Ultra Powerful SVG Showcase",
+  "project_name": "Ultra Robust SVG Showcase",
   "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
   "scenes": [
     {
@@ -12,7 +12,7 @@
         {
           "id": "house-main",
           "type": "svg",
-          "query": "home",
+          "query": "house",
           "provider": "lucide",
           "animation": "draw",
           "start": 15,
@@ -51,21 +51,22 @@
           "start": 10,
           "duration": 100,
           "position": { "x": 480, "y": 540 },
-          "width": 400,
-          "height": 400,
-          "color": "#6366f1"
+          "width": 500,
+          "height": 500,
+          "color": "#6366f1",
+          "strokeWidth": 2
         },
         {
           "id": "icon-iconify",
           "type": "svg",
-          "query": "mdi:robot-industrial",
+          "query": "robot",
           "provider": "iconify",
           "animation": "pop",
           "start": 60,
           "duration": 100,
           "position": { "x": 960, "y": 540 },
-          "width": 450,
-          "height": 450,
+          "width": 500,
+          "height": 500,
           "color": "#10b881"
         },
         {
@@ -77,9 +78,10 @@
           "start": 110,
           "duration": 100,
           "position": { "x": 1440, "y": 540 },
-          "width": 400,
-          "height": 400,
-          "color": "#f43f5e"
+          "width": 450,
+          "height": 450,
+          "color": "#f43f5e",
+          "strokeWidth": 2
         }
       ]
     }

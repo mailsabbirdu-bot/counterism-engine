@@ -27,16 +27,17 @@ export const RemoteSvg: React.FC<RemoteSvgProps> = ({
       .then(content => {
         if (!isMounted) return;
 
-        // Inject color and stroke-width if needed into the raw SVG string
+        // 1. SCALING FIX: Strip hardcoded width/height and force 100%
         let processed = content;
+        processed = processed.replace(/width="[^"]*"/, 'width="100%"');
+        processed = processed.replace(/height="[^"]*"/, 'height="100%"');
 
-        // Basic injection (Real production system would use a parser,
-        // but this keeps architecture simple as requested)
+        // 2. STYLING FIX: Inject color and stroke-width
         processed = processed.replace(/stroke="[^"]*"/g, `stroke="${color}"`);
         processed = processed.replace(/fill="[^"]*"/g, `fill="${color}"`);
         processed = processed.replace(/stroke-width="[^"]*"/g, `stroke-width="${strokeWidth}"`);
 
-        // If the SVG doesn't have these attributes, prepend them to paths
+        // Ensure stroke and stroke-width exist for outlines
         if (!processed.includes('stroke=')) {
           processed = processed.replace(/<path/g, `<path stroke="${color}" stroke-width="${strokeWidth}" fill="none"`);
         }
@@ -52,7 +53,11 @@ export const RemoteSvg: React.FC<RemoteSvgProps> = ({
   }, [query, provider, color, strokeWidth]);
 
   if (error) {
-    return <div style={{ color: 'red', fontSize: '12px' }}>Icon Error: {error}</div>;
+    return (
+        <div className="bg-red-500/10 p-2 rounded text-[10px] text-red-500 border border-red-500/20 text-center">
+            SVG Missing: {query}
+        </div>
+    );
   }
 
   if (!svgContent) {

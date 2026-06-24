@@ -8,28 +8,33 @@ export class SvgProviderService {
    * Fetch SVG data from public APIs based on provider and query.
    */
   static async fetchSvg(query: string, provider: SvgProvider): Promise<string> {
-    let url = '';
-
-    // Normalize query (e.g. house -> mdi:house for iconify if needed)
     const cleanQuery = query.trim().toLowerCase();
 
+    // Primary URL based on provider
+    let primaryUrl = '';
     switch (provider) {
-      case 'iconify':
-        // Iconify supports many sets. Defaulting to mdi if no set prefix provided
-        const iconName = cleanQuery.includes(':') ? cleanQuery : `mdi:${cleanQuery}`;
-        url = `https://api.iconify.design/${iconName.replace(':', '/')}.svg`;
-        break;
       case 'lucide':
-        url = `https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/${cleanQuery}.svg`;
+        // Lucide on Iconify is more robust for aliases
+        primaryUrl = `https://api.iconify.design/lucide/${cleanQuery}.svg`;
         break;
       case 'tabler':
-        url = `https://raw.githubusercontent.com/tabler/tabler-icons/master/icons/${cleanQuery}.svg`;
+        primaryUrl = `https://api.iconify.design/tabler/${cleanQuery}.svg`;
         break;
+      case 'iconify':
       default:
-        throw new Error(`Unsupported provider: ${provider}`);
+        const iconName = cleanQuery.includes(':') ? cleanQuery : `mdi:${cleanQuery}`;
+        primaryUrl = `https://api.iconify.design/${iconName.replace(':', '/')}.svg`;
+        break;
     }
 
-    return this.fetchWithRetry(url);
+    try {
+        return await this.fetchWithRetry(primaryUrl);
+    } catch (e) {
+        // FALLBACK: Try standard MDI via Iconify if specific provider fails
+        console.warn(`Primary fetch failed for ${cleanQuery}, trying fallback...`);
+        const fallbackUrl = `https://api.iconify.design/mdi/${cleanQuery}.svg`;
+        return this.fetchWithRetry(fallbackUrl);
+    }
   }
 
   private static async fetchWithRetry(url: string, attempt: number = 0): Promise<string> {
@@ -53,7 +58,6 @@ export class SvgProviderService {
       return svgText;
     } catch (error) {
       if (attempt < this.MAX_RETRIES) {
-        console.warn(`Retrying fetch for ${url} (Attempt ${attempt + 1})...`);
         return this.fetchWithRetry(url, attempt + 1);
       }
       throw error;
