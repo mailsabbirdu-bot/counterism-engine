@@ -1,5 +1,4 @@
 import React from 'react';
-import { AbsoluteFill } from 'remotion';
 import { RemoteSvg } from './RemoteSvg';
 import { SvgProvider, SvgStyle, GradientConfig, GlowConfig } from '../types';
 
@@ -15,6 +14,7 @@ interface LayeredSvgProps {
   id?: string;
   width: number;
   height: number;
+  onLoad?: (svgData: string, pathLengths: number[]) => void;
 }
 
 export const LayeredSvg: React.FC<LayeredSvgProps> = ({
@@ -28,7 +28,8 @@ export const LayeredSvg: React.FC<LayeredSvgProps> = ({
   depth,
   id,
   width,
-  height
+  height,
+  onLoad
 }) => {
   const glowConfig: GlowConfig | null = typeof glow === 'object' ? glow : glow ? { color: color, intensity: 0.6, radius: 20 } : null;
 
@@ -75,10 +76,11 @@ export const LayeredSvg: React.FC<LayeredSvgProps> = ({
           strokeWidth={strokeWidth}
           gradient={gradient}
           id={id}
+          onLoad={onLoad}
         />
       </div>
 
-      {/* 4. HIGHLIGHT LAYER (Subtle top sheen for 'tech' style) */}
+      {/* 4. HIGHLIGHT LAYER */}
       {style === 'tech' && (
         <div style={{
           position: 'absolute',
@@ -87,7 +89,7 @@ export const LayeredSvg: React.FC<LayeredSvgProps> = ({
           background: 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 50%)',
           mixBlendMode: 'overlay',
           pointerEvents: 'none',
-          WebkitMaskImage: 'url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==)' // Fallback mask placeholder
+          borderRadius: 'inherit'
         }} />
       )}
     </div>

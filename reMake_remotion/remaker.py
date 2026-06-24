@@ -343,6 +343,7 @@ class RemotionRemaker:
         svg_style_list = ["outline", "fill", "tech", "corporate", "infographic"]
         importance_list = ["primary", "secondary", "decorative"]
         background_list = ["tech_grid", "blueprint_grid", "dotted_pattern", "network_pattern", "radial_glow"]
+        group_layout_list = ["horizontal", "vertical", "orbit", "grid"]
 
         camera_style_list = [
             "slow_push", "slow_pull", "push_in", "pull_out", "whip_pan", "dramatic_reveal",
@@ -377,9 +378,11 @@ class RemotionRemaker:
                 f"  - STYLES: {', '.join(svg_style_list)}. Use 'outline' with 'draw' for best results.\n"
                 f"  - IMPORTANCE: {', '.join(importance_list)}. Primary elements get automatic scale/glow.\n"
                 f"  - EFFECTS: 'glow' (bool), 'depth' (bool), 'container': 'glass_panel', 'gradient': {{'start': '#hex', 'end': '#hex'}}.\n"
+                f"  - GROUPING: 'groupId' (string). Elements in same group are laid out automatically.\n"
                 f"- INFOGRAPHIC COMPOSITION (Add these keys to the scene object):\n"
                 f"  - 'background': {', '.join(background_list)}.\n"
-                f"  - 'infographic_lines': List of {{'start_pos': {{'x', 'y'}}, 'end_pos': {{'x', 'y'}}, 'type': 'solid'|'dotted'|'arrow', 'color': '#hex'}}.\n"
+                f"  - 'groups': List of {{'id', 'layout': {', '.join(group_layout_list)}, 'spacing': number, 'x', 'y', 'animation': 'slideUp' }}.\n"
+                f"  - 'infographic_lines': List of {{'from': 'elementId', 'to': 'elementId', 'type': 'solid'|'dotted'|'arrow', 'color': '#hex'}}.\n"
                 f"  - 'infographic_nodes': List of {{'x', 'y', 'type': 'glow'|'pulse'|'signal', 'color': '#hex'}}. Add 'radius' for Orbit Rings.\n"
                 f"- 'chart_type' (for 'chart'): line, area, forecast, bar, horizontalBar, verticalBar, groupedBar, stackedBar, pie, donut, bump, areaBump, heatmap, radar, radialBar, stream, swarmplot, waffle, funnel, marimekko, circlePacking, calendar, parallelCoordinates, treemap, sunburst, scatter, network, chord, violinPlot.\n"
                 f"- 'indicator_type' (for 'data_indicator'): kpiNumber, percentageCounter, comparisonKPI, deltaIndicator, countdown, progressBar, circularProgress, semiGauge, milestoneTracker, dashboardCard, statGrid, techMetric, dataWave, scoreCard, batteryLevel, pulseRadar, multiProgress, speedometer, ringChart, statusBadge, metricRing, floatingTag, stepIndicator, eventTimeline, milestoneTimeline.\n"

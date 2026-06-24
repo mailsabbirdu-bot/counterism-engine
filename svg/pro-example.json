@@ -1,5 +1,5 @@
 {
-  "project_name": "ProMotionGraphics_Demo",
+  "project_name": "Engine_V4_Pro_Composition",
   "global_settings": {
     "width": 1920,
     "height": 1080,
@@ -8,31 +8,28 @@
   "scenes": [
     {
       "scene_id": "SCENE_01",
-      "background": "blueprint_grid",
-      "infographic_lines": [
+      "background": "tech_grid",
+      "groups": [
         {
-          "start_pos": { "x": 960, "y": 540 },
-          "end_pos": { "x": 560, "y": 340 },
-          "type": "arrow",
-          "color": "#60a5fa",
-          "start": 30
-        },
-        {
-          "start_pos": { "x": 960, "y": 540 },
-          "end_pos": { "x": 1360, "y": 340 },
-          "type": "arrow",
-          "color": "#34d399",
-          "start": 45
+          "id": "hub_network",
+          "layout": "orbit",
+          "spacing": 300,
+          "x": 960,
+          "y": 540
         }
       ],
+      "infographic_lines": [
+        { "from": "main_server", "to": "db_node", "type": "arrow", "color": "#60a5fa", "start": 45 },
+        { "from": "main_server", "to": "cloud_node", "type": "arrow", "color": "#34d399", "start": 60 },
+        { "from": "main_server", "to": "user_node", "type": "arrow", "color": "#fbbf24", "start": 75 }
+      ],
       "infographic_nodes": [
-        { "x": 560, "y": 340, "type": "signal", "color": "#60a5fa", "start": 60 },
-        { "x": 1360, "y": 340, "type": "pulse", "color": "#34d399", "start": 75 },
-        { "x": 960, "y": 540, "radius": 400, "color": "rgba(255,255,255,0.05)", "start": 0 }
+        { "x": 960, "y": 540, "radius": 300, "color": "rgba(255,255,255,0.05)", "start": 0 }
       ],
       "elements": [
         {
-          "id": "main_hub",
+          "id": "main_server",
+          "groupId": "hub_network",
           "type": "svg",
           "query": "server",
           "provider": "lucide",
@@ -45,43 +42,53 @@
           "gradient": { "start": "#3b82f6", "end": "#2dd4bf" },
           "startFrame": 0,
           "durationInFrames": 150,
-          "x": 960,
-          "y": 540,
-          "width": 300,
-          "height": 300
+          "width": 250,
+          "height": 250
         },
         {
-          "id": "node_left",
+          "id": "db_node",
+          "groupId": "hub_network",
           "type": "svg",
           "query": "database",
           "provider": "lucide",
           "animation": "draw",
           "style": "outline",
           "importance": "secondary",
-          "startFrame": 60,
+          "startFrame": 45,
           "durationInFrames": 120,
-          "x": 560,
-          "y": 340,
-          "width": 150,
-          "height": 150,
+          "width": 120,
+          "height": 120,
           "color": "#60a5fa"
         },
         {
-          "id": "node_right",
+          "id": "cloud_node",
+          "groupId": "hub_network",
           "type": "svg",
           "query": "cloud",
           "provider": "lucide",
-          "animation": "reveal",
-          "style": "infographic",
+          "animation": "draw",
+          "style": "outline",
           "importance": "secondary",
-          "glow": { "color": "#34d399", "radius": 40 },
+          "startFrame": 60,
+          "durationInFrames": 120,
+          "width": 120,
+          "height": 120,
+          "color": "#34d399"
+        },
+        {
+          "id": "user_node",
+          "groupId": "hub_network",
+          "type": "svg",
+          "query": "users",
+          "provider": "lucide",
+          "animation": "draw",
+          "style": "outline",
+          "importance": "secondary",
           "startFrame": 75,
           "durationInFrames": 120,
-          "x": 1360,
-          "y": 340,
-          "width": 150,
-          "height": 150,
-          "color": "#34d399"
+          "width": 120,
+          "height": 120,
+          "color": "#fbbf24"
         }
       ]
     }

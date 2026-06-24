@@ -57,11 +57,26 @@ export interface SvgElement {
   depth?: boolean;
   container?: 'glass_panel';
   gradient?: GradientConfig;
+
+  // Composition
+  groupId?: string;
+}
+
+export interface SvgGroup {
+    id: string;
+    animation?: AnimationType;
+    x?: number;
+    y?: number;
+    scale?: number;
+    layout?: 'horizontal' | 'vertical' | 'grid' | 'orbit';
+    spacing?: number;
 }
 
 export interface InfographicLine {
-  start_pos: { x: number; y: number };
-  end_pos: { x: number; y: number };
+  start_pos?: { x: number; y: number };
+  end_pos?: { x: number; y: number };
+  from?: string; // element ID
+  to?: string;   // element ID
   start?: number;
   duration?: number;
   color?: string;
@@ -74,10 +89,12 @@ export interface InfographicNode {
   start?: number;
   color?: string;
   type?: 'glow' | 'pulse' | 'signal';
+  radius?: number;
 }
 
 export interface SvgScene {
   elements: SvgElement[];
+  groups?: SvgGroup[];
   infographic_lines?: InfographicLine[];
   infographic_nodes?: InfographicNode[];
   background?: BackgroundType;
