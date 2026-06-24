@@ -48,6 +48,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays }) => {
             case 'svg':
               return (
                 <AnimatedSvg
+                  {...overlay}
                   query={overlay.query || overlay.content || 'house'}
                   provider={overlay.provider || 'iconify'}
                   animation={overlay.animation || 'draw'}
@@ -57,8 +58,6 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays }) => {
                   height={overlay.height || 300}
                   x={overlay.position?.x || 960}
                   y={overlay.position?.y || 540}
-                  color={overlay.color}
-                  strokeWidth={overlay.strokeWidth}
                 />
               );
             default:
