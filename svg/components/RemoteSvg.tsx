@@ -1,12 +1,16 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { SvgProvider } from '../types';
+import { SvgProvider, SvgStyle, GradientConfig } from '../types';
 import { SvgProviderService } from '../services/SvgProviderService';
+import { random } from 'remotion';
 
 interface RemoteSvgProps {
   query: string;
   provider: SvgProvider;
   color?: string;
   strokeWidth?: number;
+  style?: SvgStyle;
+  gradient?: GradientConfig;
+  id?: string;
   onLoad?: (svgData: string) => void;
 }
 
@@ -15,10 +19,15 @@ export const RemoteSvg: React.FC<RemoteSvgProps> = ({
   provider,
   color = 'white',
   strokeWidth = 2,
+  style = 'fill',
+  gradient,
+  id = 'svg',
   onLoad
 }) => {
   const [svgContent, setSvgContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const gradientId = useMemo(() => `grad-${query.replace(/[^a-z0-9]/gi, '')}-${Math.floor(random(id) * 10000)}`, [query, id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -32,14 +41,37 @@ export const RemoteSvg: React.FC<RemoteSvgProps> = ({
         processed = processed.replace(/width="[^"]*"/, 'width="100%"');
         processed = processed.replace(/height="[^"]*"/, 'height="100%"');
 
-        // 2. STYLING FIX: Inject color and stroke-width
-        processed = processed.replace(/stroke="[^"]*"/g, `stroke="${color}"`);
-        processed = processed.replace(/fill="[^"]*"/g, `fill="${color}"`);
-        processed = processed.replace(/stroke-width="[^"]*"/g, `stroke-width="${strokeWidth}"`);
+        const finalColor = gradient ? `url(#${gradientId})` : color;
 
-        // Ensure stroke and stroke-width exist for outlines
-        if (!processed.includes('stroke=')) {
-          processed = processed.replace(/<path/g, `<path stroke="${color}" stroke-width="${strokeWidth}" fill="none"`);
+        // 2. STYLING SYSTEM
+        if (style === 'outline') {
+            // Force outline mode: kill all fills, force strokes
+            processed = processed.replace(/fill="[^"]*"/g, 'fill="none"');
+            processed = processed.replace(/stroke="[^"]*"/g, `stroke="${finalColor}"`);
+            processed = processed.replace(/stroke-width="[^"]*"/g, `stroke-width="${strokeWidth}"`);
+
+            if (!processed.includes('stroke=')) {
+                processed = processed.replace(/<(path|rect|circle|ellipse|line|polyline|polygon)/g, `<$1 stroke="${finalColor}" stroke-width="${strokeWidth}" fill="none"`);
+            }
+        } else {
+            // Fill or other styles
+            processed = processed.replace(/fill="[^"]*"/g, `fill="${finalColor}"`);
+            processed = processed.replace(/stroke="[^"]*"/g, `stroke="${finalColor}"`);
+            processed = processed.replace(/stroke-width="[^"]*"/g, `stroke-width="${strokeWidth}"`);
+        }
+
+        // 3. GRADIENT INJECTION
+        if (gradient) {
+            const gradDef = `
+                <defs>
+                    <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:${gradient.start};stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:${gradient.end};stop-opacity:1" />
+                    </linearGradient>
+                </defs>
+            `;
+            // Insert defs at the beginning of SVG
+            processed = processed.replace(/<svg([^>]*)>/, `<svg$1>${gradDef}`);
         }
 
         setSvgContent(processed);
@@ -50,7 +82,7 @@ export const RemoteSvg: React.FC<RemoteSvgProps> = ({
       });
 
     return () => { isMounted = false; };
-  }, [query, provider, color, strokeWidth]);
+  }, [query, provider, color, strokeWidth, style, gradient, gradientId]);
 
   if (error) {
     return (

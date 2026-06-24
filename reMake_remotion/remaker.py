@@ -335,6 +335,15 @@ class RemotionRemaker:
             "zoom_blur_pop", "liquid_waver"
         ]
 
+        svg_animation_list = [
+            "fade", "scale", "pop", "slideLeft", "slideRight", "slideUp", "slideDown",
+            "rotate", "bounce", "draw", "trace", "pulse", "float", "orbit", "reveal", "glowPulse"
+        ]
+
+        svg_style_list = ["outline", "fill", "tech", "corporate", "infographic"]
+        importance_list = ["primary", "secondary", "decorative"]
+        background_list = ["tech_grid", "blueprint_grid", "dotted_pattern", "network_pattern", "radial_glow"]
+
         camera_style_list = [
             "slow_push", "slow_pull", "push_in", "pull_out", "whip_pan", "dramatic_reveal",
             "cinematic_drift", "dynamic_orbit", "vertical_sweep", "spiral_vortex", "glitch_snap",
@@ -363,7 +372,15 @@ class RemotionRemaker:
                 f"AVAILABLE CAMERA STYLES: {', '.join(camera_style_list)}\n"
                 f"INSTRUCTION: {instruction if instruction else 'Enhance the design and visual impact while strictly following the narrative.'}\n"
                 f"VISUAL LIBRARY (CHOOSE SLEEK/ULTRA-MODERN PRESETS):\n"
-                f"- 'svg' (type: 'svg'): provider ('iconify'|'lucide'|'tabler'), query (icon name), animation ('draw'|'pop'|'bounce'|'fade'). Use 'draw' for outline icons.\n"
+                f"- 'svg' (type: 'svg'): provider ('iconify'|'lucide'|'tabler'), query (icon name).\n"
+                f"  - ANIMATIONS: {', '.join(svg_animation_list)}. Use 'draw' or 'trace' for professional infographics.\n"
+                f"  - STYLES: {', '.join(svg_style_list)}. Use 'outline' with 'draw' for best results.\n"
+                f"  - IMPORTANCE: {', '.join(importance_list)}. Primary elements get automatic scale/glow.\n"
+                f"  - EFFECTS: 'glow' (bool), 'depth' (bool), 'container': 'glass_panel', 'gradient': {{'start': '#hex', 'end': '#hex'}}.\n"
+                f"- INFOGRAPHIC COMPOSITION (Add these keys to the scene object):\n"
+                f"  - 'background': {', '.join(background_list)}.\n"
+                f"  - 'infographic_lines': List of {{'start_pos': {{'x', 'y'}}, 'end_pos': {{'x', 'y'}}, 'type': 'solid'|'dotted'|'arrow', 'color': '#hex'}}.\n"
+                f"  - 'infographic_nodes': List of {{'x', 'y', 'type': 'glow'|'pulse'|'signal', 'color': '#hex'}}. Add 'radius' for Orbit Rings.\n"
                 f"- 'chart_type' (for 'chart'): line, area, forecast, bar, horizontalBar, verticalBar, groupedBar, stackedBar, pie, donut, bump, areaBump, heatmap, radar, radialBar, stream, swarmplot, waffle, funnel, marimekko, circlePacking, calendar, parallelCoordinates, treemap, sunburst, scatter, network, chord, violinPlot.\n"
                 f"- 'indicator_type' (for 'data_indicator'): kpiNumber, percentageCounter, comparisonKPI, deltaIndicator, countdown, progressBar, circularProgress, semiGauge, milestoneTracker, dashboardCard, statGrid, techMetric, dataWave, scoreCard, batteryLevel, pulseRadar, multiProgress, speedometer, ringChart, statusBadge, metricRing, floatingTag, stepIndicator, eventTimeline, milestoneTimeline.\n"
                 f"- SHADCN LIBRARY (type: 'shadcn_chart' | 'shadcn_indicator'):\n"

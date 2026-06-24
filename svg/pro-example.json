@@ -1,0 +1,89 @@
+{
+  "project_name": "ProMotionGraphics_Demo",
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "scenes": [
+    {
+      "scene_id": "SCENE_01",
+      "background": "blueprint_grid",
+      "infographic_lines": [
+        {
+          "start_pos": { "x": 960, "y": 540 },
+          "end_pos": { "x": 560, "y": 340 },
+          "type": "arrow",
+          "color": "#60a5fa",
+          "start": 30
+        },
+        {
+          "start_pos": { "x": 960, "y": 540 },
+          "end_pos": { "x": 1360, "y": 340 },
+          "type": "arrow",
+          "color": "#34d399",
+          "start": 45
+        }
+      ],
+      "infographic_nodes": [
+        { "x": 560, "y": 340, "type": "signal", "color": "#60a5fa", "start": 60 },
+        { "x": 1360, "y": 340, "type": "pulse", "color": "#34d399", "start": 75 },
+        { "x": 960, "y": 540, "radius": 400, "color": "rgba(255,255,255,0.05)", "start": 0 }
+      ],
+      "elements": [
+        {
+          "id": "main_hub",
+          "type": "svg",
+          "query": "server",
+          "provider": "lucide",
+          "animation": "trace",
+          "style": "tech",
+          "importance": "primary",
+          "glow": true,
+          "depth": true,
+          "container": "glass_panel",
+          "gradient": { "start": "#3b82f6", "end": "#2dd4bf" },
+          "startFrame": 0,
+          "durationInFrames": 150,
+          "x": 960,
+          "y": 540,
+          "width": 300,
+          "height": 300
+        },
+        {
+          "id": "node_left",
+          "type": "svg",
+          "query": "database",
+          "provider": "lucide",
+          "animation": "draw",
+          "style": "outline",
+          "importance": "secondary",
+          "startFrame": 60,
+          "durationInFrames": 120,
+          "x": 560,
+          "y": 340,
+          "width": 150,
+          "height": 150,
+          "color": "#60a5fa"
+        },
+        {
+          "id": "node_right",
+          "type": "svg",
+          "query": "cloud",
+          "provider": "lucide",
+          "animation": "reveal",
+          "style": "infographic",
+          "importance": "secondary",
+          "glow": { "color": "#34d399", "radius": 40 },
+          "startFrame": 75,
+          "durationInFrames": 120,
+          "x": 1360,
+          "y": 340,
+          "width": 150,
+          "height": 150,
+          "color": "#34d399"
+        }
+      ]
+    }
+  ]
+}
