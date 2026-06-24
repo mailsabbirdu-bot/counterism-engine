@@ -25,6 +25,9 @@ interface AnimatedSvgProps {
   container?: 'glass_panel';
   gradient?: GradientConfig;
   id?: string;
+
+  // Grouping/Composition support
+  groupOffset?: { x: number, y: number };
 }
 
 export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
@@ -45,11 +48,12 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
   depth,
   container,
   gradient,
-  id = 'svg'
+  id = 'svg',
+  groupOffset = { x: 0, y: 0 }
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const [hasPaths, setHasPaths] = useState(false);
+  const [pathLength, setPathLength] = useState<number>(5000);
 
   const relativeFrame = frame - startFrame;
 
@@ -99,7 +103,6 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
       case 'reveal':
         return { opacity: 1, clipPath: `inset(0 ${100 - spr * 100}% 0 0)`, transform: `scale(${baseScale})` };
       case 'draw':
-        return { opacity: 1, transform: `scale(${baseScale})` };
       case 'trace':
         return { opacity: 1, transform: `scale(${baseScale})` };
       case 'glowPulse':
@@ -109,27 +112,22 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
     }
   }, [animation, relativeFrame, spr, baseScale, baseOpacity, durationInFrames, fps]);
 
-  // CSS for Draw/Trace/GlowPulse animations
   const customAnimStyles = useMemo(() => {
     if (animation !== 'draw' && animation !== 'trace' && animation !== 'glowPulse') return {};
 
-    // Fallback if no paths (fill-only icon)
-    if (!hasPaths && (animation === 'draw' || animation === 'trace')) {
-        return { opacity: spr, transform: `scale(${spr * baseScale})` };
-    }
-
     return {
         '--draw-progress': spr,
+        '--path-length': pathLength,
         '--glow-pulse': 0.5 + Math.sin(relativeFrame / 15) * 0.5,
     };
-  }, [animation, hasPaths, spr, relativeFrame, baseScale]);
+  }, [animation, spr, pathLength, relativeFrame]);
 
   const content = (
     <div
       style={{
         position: 'absolute',
-        left: x,
-        top: y,
+        left: x + groupOffset.x,
+        top: y + groupOffset.y,
         width,
         height,
         transform: 'translate(-50%, -50%)',
@@ -150,14 +148,19 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
         width={width}
         height={height}
         id={id}
+        onLoad={(_, lengths) => {
+            if (lengths.length > 0) {
+                // We use the max length of all paths for the CSS animation
+                setPathLength(Math.max(...lengths));
+            }
+        }}
       />
 
-      {/* Global CSS for Advanced Animations */}
       <style dangerouslySetInnerHTML={{ __html: `
         .svg-motion-container.draw svg path,
         .svg-motion-container.trace svg path {
-          stroke-dasharray: 5000;
-          stroke-dashoffset: calc(5000 * (1 - var(--draw-progress, 1)));
+          stroke-dasharray: var(--path-length, 5000);
+          stroke-dashoffset: calc(var(--path-length, 5000) * (1 - var(--draw-progress, 1)));
           transition: stroke-dashoffset 0.1s linear;
         }
         .svg-motion-container.trace svg path {
@@ -174,10 +177,9 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
 
   if (container === 'glass_panel') {
       return (
-        <div style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -50%)' }}>
+        <div style={{ position: 'absolute', left: x + groupOffset.x, top: y + groupOffset.y, transform: 'translate(-50%, -50%)' }}>
             <GlassPanel width={width * 1.5} height={height * 1.5} startFrame={startFrame}>
                 <div style={{ transform: 'scale(0.8)' }}>
-                    {/* Render relative to center of panel */}
                     <LayeredSvg
                         query={query}
                         provider={provider}
