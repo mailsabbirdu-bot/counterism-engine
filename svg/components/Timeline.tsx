@@ -1,16 +1,17 @@
 import React from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 import { TimelineElement } from '../types';
+import { getEntranceProgress } from '../lib/animationUtils';
 
 export const Timeline: React.FC<{ element: TimelineElement }> = ({ element }) => {
-  const { events, x, y } = element;
+  const { events, x, y, startFrame = 0 } = element;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const totalWidth = 1200;
   const stepX = totalWidth / (events.length - 1);
 
-  const overallProgress = spring({ frame: frame - 15, fps, config: { damping: 20 } });
+  const overallProgress = getEntranceProgress(frame, fps, startFrame, false);
 
   return (
     <div style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -50%)' }}>
@@ -28,10 +29,10 @@ export const Timeline: React.FC<{ element: TimelineElement }> = ({ element }) =>
       {/* 2. Events */}
       {events.map((ev, i) => {
           const eventX = (-totalWidth / 2) + (i * stepX);
-          const start = 30 + (i * 30);
-          const spr = spring({ frame: frame - start, fps, config: { damping: 12 } });
+          const eventStart = startFrame + 15 + (i * 30);
+          const spr = getEntranceProgress(frame, fps, eventStart, true);
 
-          if (frame < start) return null;
+          if (frame < eventStart) return null;
 
           return (
             <div key={`event_${i}`} style={{ position: 'absolute', left: eventX, top: 0 }}>

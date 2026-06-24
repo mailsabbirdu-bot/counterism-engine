@@ -14,7 +14,7 @@ export const CompositionEngine: React.FC<{
     return null;
   }
 
-  const { x: baseX, y: baseY, scale = 1, enterAnimation = 'scale' } = element;
+  const { x: baseX, y: baseY, scale = 1, enterAnimation = 'scale', startFrame = 0 } = element;
 
   // 1. Expand elements with base coordinates
   const expandedElements = useMemo(() => {
@@ -27,10 +27,10 @@ export const CompositionEngine: React.FC<{
       height: el.height * scale,
       animation: el.animation || enterAnimation,
       provider: el.provider || sceneIconTheme || 'lucide',
-      startFrame: el.startFrame || 0,
+      startFrame: startFrame + (el.startFrame || 0),
       durationInFrames: el.durationInFrames || 150
     })) as SvgElement[];
-  }, [definition, baseX, baseY, scale, enterAnimation, sceneIconTheme, element.id]);
+  }, [definition, baseX, baseY, scale, enterAnimation, sceneIconTheme, element.id, startFrame]);
 
   // 2. Map for line resolution
   const posMap = useMemo(() => {
@@ -54,7 +54,7 @@ export const CompositionEngine: React.FC<{
             key={`${element.id}_line_${i}`}
             start={start}
             end={end}
-            startFrame={30} // Staggered start
+            startFrame={startFrame + 30} // Staggered start
             duration={60}
             type={line.type as any}
           />

@@ -11,7 +11,8 @@ import { CalloutSystem } from './CalloutSystem';
 import { KpiCard } from './KpiCard';
 import { Timeline } from './Timeline';
 import { CompositionEngine } from './CompositionEngine';
-import { SvgGroup, StorytellingElement, LayerType } from '../types';
+import { NarrativeTemplate } from './NarrativeTemplates';
+import { SvgGroup, StorytellingElement, LayerType, SvgProvider } from '../types';
 
 interface InfographicComposerProps {
   sceneData: any;
@@ -19,7 +20,7 @@ interface InfographicComposerProps {
 
 const LAYER_ORDER: LayerType[] = ['background', 'decorative', 'secondary', 'primary', 'foreground', 'overlay'];
 
-export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneData }) => {
+export const InfographicComposer: React.FC<InfographicComposerProps> = React.memo(({ sceneData }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -30,7 +31,7 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
   const lines = sceneData.infographic_lines || [];
   const nodes = sceneData.infographic_nodes || [];
   const background = sceneData.background;
-  const sceneIconTheme = sceneData.sceneIconTheme;
+  const sceneIconTheme: SvgProvider | undefined = sceneData.sceneIconTheme;
 
   // 1. Resolve element positions (including group-based layouts)
   const resolvedElements = useMemo(() => {
@@ -77,6 +78,11 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
       const map: Record<string, { x: number, y: number }> = {};
       resolvedElements.forEach((el: any) => {
           if (el.id) map[el.id] = { x: el.x, y: el.y };
+
+          // Special handling for sub-components (HubNetwork ids)
+          if (el.type === 'hub_network') {
+              map[`${el.id}_center`] = { x: el.x, y: el.y };
+          }
       });
       return map;
   }, [resolvedElements]);
@@ -92,10 +98,13 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
 
   return (
     <AbsoluteFill className="pointer-events-none">
-      {/* 1. Background System */}
+      {/* Narrative Templates (Phase 15) */}
+      <NarrativeTemplate story={sceneData.story} startFrame={sceneData.startFrame || 0} sceneIconTheme={sceneIconTheme} />
+
+      {/* Background System */}
       <InfographicBackground type={background} />
 
-      {/* 2. Orbit Rings */}
+      {/* Orbit Rings */}
       {nodes.filter((n: any) => n.radius).map((node: any, i: number) => (
         <OrbitRing
           key={`orbit-${i}`}
@@ -107,7 +116,7 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
         />
       ))}
 
-      {/* 3. Group background rings */}
+      {/* Group background rings */}
       {groups.filter(g => g.backgroundRing).map((group, i) => (
           <OrbitRing
             key={`group-ring-${i}`}
@@ -119,7 +128,7 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
           />
       ))}
 
-      {/* 4. Connection Lines (Resolved by ID) */}
+      {/* Connection Lines (Resolved by ID) */}
       {lines.map((line: any, i: number) => {
           const start = line.from ? positionMap[line.from] : line.start_pos;
           const end = line.to ? positionMap[line.to] : line.end_pos;
@@ -137,7 +146,7 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
           );
       })}
 
-      {/* 5. Components Rendering */}
+      {/* Components Rendering */}
       {sortedElements.map((el: any) => {
           const commonProps = { key: el.id, sceneIconTheme };
 
@@ -163,7 +172,7 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
           }
       })}
 
-      {/* 6. Simple Nodes */}
+      {/* Simple Nodes */}
       {nodes.filter((n: any) => !n.radius).map((node: any, i: number) => (
         <GlowNode
           key={`node-${i}`}
@@ -176,4 +185,4 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
       ))}
     </AbsoluteFill>
   );
-};
+});

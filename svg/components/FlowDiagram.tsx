@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
-import { FlowDiagramElement } from '../types';
+import { FlowDiagramElement, SvgProvider } from '../types';
 import { AnimatedSvg } from './AnimatedSvg';
 import { ConnectionLine } from './InfographicElements';
 
-export const FlowDiagram: React.FC<{ element: FlowDiagramElement, sceneIconTheme?: any }> = ({ element, sceneIconTheme }) => {
-  const { x, y, steps, layout = 'horizontal', arrowStyle = 'arrow', spacing = 250 } = element;
+export const FlowDiagram: React.FC<{ element: FlowDiagramElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
+  const { x, y, steps, layout = 'horizontal', arrowStyle = 'arrow', spacing = 250, startFrame = 0 } = element;
 
   const nodePositions = useMemo(() => {
     return steps.map((_, i) => {
@@ -27,7 +27,7 @@ export const FlowDiagram: React.FC<{ element: FlowDiagramElement, sceneIconTheme
             key={`${element.id}_flow_${i}`}
             start={prevPos}
             end={pos}
-            startFrame={30 + (i * 20)}
+            startFrame={startFrame + 15 + (i * 20)}
             duration={45}
             type={arrowStyle === 'glow' ? 'solid' : arrowStyle as any}
             color={arrowStyle === 'glow' ? '#00F5FF' : undefined}
@@ -47,7 +47,7 @@ export const FlowDiagram: React.FC<{ element: FlowDiagramElement, sceneIconTheme
           width={120}
           height={120}
           animation="pop"
-          startFrame={15 + (i * 20)}
+          startFrame={startFrame + (i * 20)}
           durationInFrames={120}
           style="infographic"
           importance={i === 0 || i === steps.length - 1 ? 'primary' : 'secondary'}

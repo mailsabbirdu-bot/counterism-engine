@@ -1,7 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Composition, delayRender, continueRender, staticFile, getInputProps } from 'remotion';
 import { Scene } from './Scene';
 import defaultTemplate from '../remotion_template.json';
+
+// Import Global SVG Styles once
+import '../svg/styles/svgAnimations.css';
 
 const inputProps = getInputProps();
 // Support both { templateData: ... } and direct template JSON

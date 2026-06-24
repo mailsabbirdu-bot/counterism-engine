@@ -1,0 +1,35 @@
+/**
+ * Professional SVG Motion Graphics Animations
+ * Optimized for Remotion Storytelling Engine
+ */
+
+.svg-motion-container svg path,
+.svg-motion-container svg rect,
+.svg-motion-container svg circle,
+.svg-motion-container svg ellipse,
+.svg-motion-container svg line,
+.svg-motion-container svg polyline,
+.svg-motion-container svg polygon {
+    stroke-dasharray: var(--path-length, 5000);
+    stroke-dashoffset: calc(var(--path-length, 5000) * (1 - var(--draw-progress, 1)));
+    transition: stroke-dashoffset 0.1s linear;
+}
+
+.svg-motion-container.trace svg path,
+.svg-motion-container.trace svg rect,
+.svg-motion-container.trace svg circle {
+    stroke-width: 4px;
+    filter: drop-shadow(0 0 10px currentColor);
+}
+
+.svg-motion-container.glowPulse > div {
+    filter: drop-shadow(0 0 calc(var(--glow-pulse, 0) * 30px) var(--glow-color, #00F5FF));
+    opacity: calc(0.6 + var(--glow-pulse, 0) * 0.4);
+}
+
+.infographic-glass-panel {
+    background-color: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}

@@ -1,15 +1,16 @@
-import React from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import React, { useMemo } from 'react';
+import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { CalloutElement } from '../types';
+import { getEntranceProgress } from '../lib/animationUtils';
 
 export const CalloutSystem: React.FC<{ element: CalloutElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
-  const { title, body, direction = 'right' } = element;
+  const { title, body, direction = 'right', startFrame = 0 } = element;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   if (!targetPos) return null;
 
-  const spr = spring({ frame: frame - 60, fps, config: { damping: 15 } });
+  const spr = getEntranceProgress(frame, fps, startFrame, true);
 
   const lineLength = 150;
   const boxWidth = 300;
