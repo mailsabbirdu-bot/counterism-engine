@@ -17,7 +17,7 @@ export const AudioEngine: React.FC<{ sceneId: string }> = ({ sceneId }) => {
   const template = props?.scenes ? props : (props?.templateData || {});
 
   useEffect(() => {
-    if (template?.audio_sfx_manifest) {
+    if (template?.audio_sfx_manifest && template.audio_sfx_manifest.length > 0) {
         setAudioManifest(template.audio_sfx_manifest);
         return;
     }
