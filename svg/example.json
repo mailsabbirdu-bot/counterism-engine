@@ -1,87 +1,141 @@
 {
-  "project_name": "Ultra Robust SVG Showcase",
-  "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
+  "project_name": "Amazon_Supply_Chain_Infographic",
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
   "scenes": [
     {
-      "scene_id": "SCENE_01_LARGE_HOUSE",
-      "duration_in_frames": 180,
-      "background_type": "procedural",
-      "procedural_config": { "variant": "neon_grid", "primaryColor": "#0f172a" },
-      "camera": { "enabled": true, "shots": [] },
-      "overlays": [
+      "scene_id": "SCENE_01",
+      "duration_in_frames": 300,
+      "background": "tech_grid",
+      "theme": "tech",
+      "sceneIconTheme": "solar",
+      "groups": [
         {
-          "id": "house-main",
-          "type": "svg",
-          "query": "house",
-          "provider": "lucide",
-          "animation": "draw",
-          "start": 15,
-          "duration": 150,
-          "position": { "x": 960, "y": 540 },
-          "width": 950,
-          "height": 950,
-          "color": "#3b82f6",
-          "strokeWidth": 4
-        },
-        {
-          "id": "txt-label",
-          "type": "text",
-          "content": "SMART ARCHITECTURE",
-          "font": "Orbitron",
-          "fontSize": "60px",
-          "position": { "x": 960, "y": 950 },
-          "start": 90,
-          "duration": 90
+          "id": "global_hub",
+          "layout": "orbit",
+          "spacing": 350,
+          "x": 960,
+          "y": 540,
+          "backgroundRing": true,
+          "enterAnimation": "slideUp"
         }
-      ]
-    },
-    {
-      "scene_id": "SCENE_02_SVG_GALLERY",
-      "duration_in_frames": 240,
-      "background_type": "procedural",
-      "procedural_config": { "variant": "dark_particles" },
-      "camera": { "enabled": true, "shots": [] },
-      "overlays": [
+      ],
+      "infographic_lines": [
+        { "from": "amazon_hq", "to": "warehouse_us", "type": "arrow", "color": "#00F5FF" },
+        { "from": "amazon_hq", "to": "warehouse_eu", "type": "arrow", "color": "#00F5FF" },
+        { "from": "amazon_hq", "to": "warehouse_asia", "type": "arrow", "color": "#00F5FF" },
+        { "from": "warehouse_us", "to": "customer_1", "type": "dotted", "color": "#00FFAB" },
+        { "from": "warehouse_eu", "to": "customer_2", "type": "dotted", "color": "#00FFAB" }
+      ],
+      "elements": [
         {
-          "id": "icon-lucide",
+          "id": "amazon_hq",
           "type": "svg",
-          "query": "cpu",
-          "provider": "lucide",
-          "animation": "bounce",
-          "start": 10,
-          "duration": 100,
-          "position": { "x": 480, "y": 540 },
-          "width": 500,
-          "height": 500,
-          "color": "#6366f1",
-          "strokeWidth": 2
+          "query": "buildings",
+          "provider": "solar",
+          "animation": "trace",
+          "importance": "primary",
+          "style": "tech",
+          "glow": true,
+          "container": "glass_panel",
+          "x": 960,
+          "y": 540,
+          "width": 250,
+          "height": 250,
+          "startFrame": 0
         },
         {
-          "id": "icon-iconify",
+          "id": "warehouse_us",
+          "groupId": "global_hub",
           "type": "svg",
-          "query": "robot",
-          "provider": "iconify",
+          "query": "box",
+          "provider": "solar",
+          "animation": "draw",
+          "style": "outline",
+          "width": 120,
+          "height": 120,
+          "startFrame": 45
+        },
+        {
+          "id": "warehouse_eu",
+          "groupId": "global_hub",
+          "type": "svg",
+          "query": "box",
+          "provider": "solar",
+          "animation": "draw",
+          "style": "outline",
+          "width": 120,
+          "height": 120,
+          "startFrame": 60
+        },
+        {
+          "id": "warehouse_asia",
+          "groupId": "global_hub",
+          "type": "svg",
+          "query": "box",
+          "provider": "solar",
+          "animation": "draw",
+          "style": "outline",
+          "width": 120,
+          "height": 120,
+          "startFrame": 75
+        },
+        {
+          "id": "customer_1",
+          "type": "svg",
+          "query": "user",
+          "provider": "solar",
           "animation": "pop",
-          "start": 60,
-          "duration": 100,
-          "position": { "x": 960, "y": 540 },
-          "width": 500,
-          "height": 500,
-          "color": "#10b881"
+          "x": 400,
+          "y": 300,
+          "width": 80,
+          "height": 80,
+          "startFrame": 120,
+          "layer": "secondary"
         },
         {
-          "id": "icon-tabler",
+          "id": "customer_2",
           "type": "svg",
-          "query": "drone",
-          "provider": "tabler",
-          "animation": "rotate",
-          "start": 110,
-          "duration": 100,
-          "position": { "x": 1440, "y": 540 },
-          "width": 450,
-          "height": 450,
-          "color": "#f43f5e",
-          "strokeWidth": 2
+          "query": "user",
+          "provider": "solar",
+          "animation": "pop",
+          "x": 1520,
+          "y": 800,
+          "width": 80,
+          "height": 80,
+          "startFrame": 140,
+          "layer": "secondary"
+        },
+        {
+          "id": "stat_1",
+          "type": "kpi",
+          "title": "Fulfillment Centers",
+          "value": "175",
+          "subtitle": "Worldwide locations",
+          "icon": "map-point",
+          "x": 1600,
+          "y": 200,
+          "startFrame": 90
+        },
+        {
+          "id": "label_hq",
+          "type": "label",
+          "target": "amazon_hq",
+          "text": "Amazon Global HQ",
+          "position": "bottom",
+          "startFrame": 30
+        },
+        {
+          "id": "callout_scale",
+          "type": "callout",
+          "target": "amazon_hq",
+          "title": "Massive Scale",
+          "body": "Operating a vast global supply chain across every continent.",
+          "direction": "right",
+          "startFrame": 180
         }
       ]
     }
