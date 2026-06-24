@@ -1,9 +1,10 @@
-# 🚀 SVG Motion Graphics - Remotion Colab
+# 🚀 SVG Motion Graphics - Powerful Showcase
 
-Run this cell to render the SVG showcase.
+Run this cell to render the SVG showcase defined in `svg/example.json`.
 
 ```python
 import os
+import json
 
 # --- 1. SETUP ---
 print("📦 Setting up environment...")
@@ -24,46 +25,23 @@ print("🛠️ Installing dependencies...")
 !playwright install-deps
 !npm install
 
-# --- 3. CREATE TEST MANIFEST ---
-print("📄 Creating SVG showcase manifest...")
-import json
+# --- 3. LOAD POWERFUL MANIFEST ---
+print("📄 Loading SVG directions from svg/example.json...")
+example_path = "svg/example.json"
+if os.path.exists(example_path):
+    with open(example_path, 'r') as f:
+        manifest = json.load(f)
 
-manifest = {
-  "project_name": "SVG Motion Showcase",
-  "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
-  "scenes": [
-    {
-      "scene_id": "SCENE_SVG_LARGE",
-      "duration_in_frames": 180,
-      "background_type": "procedural",
-      "procedural_config": { "variant": "neon_grid" },
-      "camera": { "enabled": True, "shots": [] },
-      "overlays": [
-        {
-          "id": "house-large",
-          "type": "svg",
-          "query": "home",
-          "provider": "lucide",
-          "animation": "draw",
-          "start": 15,
-          "duration": 150,
-          "position": { "x": 960, "y": 540 },
-          "width": 900,
-          "height": 900,
-          "color": "#3b82f6",
-          "strokeWidth": 4
-        }
-      ]
-    }
-  ]
-}
-
-with open("svg_showcase.json", "w") as f:
-    json.dump(manifest, f, indent=2)
+    # Save as the active manifest
+    with open("remotion_render.json", "w") as f:
+        json.dump(manifest, f, indent=2)
+    print("✅ Manifest loaded successfully.")
+else:
+    print("❌ ERROR: svg/example.json not found!")
 
 # --- 4. RENDER ---
-print("🎬 Rendering SVG Video...")
-!node --loader ts-node/esm render.ts --template=svg_showcase.json --output=svg_motion.mp4
+print("🎬 Rendering Powerful SVG Video...")
+!node --loader ts-node/esm render.ts --template=remotion_render.json --output=svg_powerful_showcase.mp4
 
-print("✅ DONE! Check the renders folder.")
+print("✅ DONE! Check the renders folder for 'svg_powerful_showcase.mp4'.")
 ```
