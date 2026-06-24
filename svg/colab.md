@@ -33,51 +33,25 @@ manifest = {
   "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
   "scenes": [
     {
-      "scene_id": "SCENE_SVG",
-      "duration_in_frames": 150,
+      "scene_id": "SCENE_SVG_LARGE",
+      "duration_in_frames": 180,
       "background_type": "procedural",
       "procedural_config": { "variant": "neon_grid" },
       "camera": { "enabled": True, "shots": [] },
       "overlays": [
         {
-          "id": "icon1",
+          "id": "house-large",
           "type": "svg",
-          "query": "cpu",
+          "query": "home",
           "provider": "lucide",
           "animation": "draw",
-          "start": 0,
-          "duration": 90,
-          "position": { "x": 480, "y": 540 },
-          "width": 400,
-          "height": 400,
-          "color": "#3b82f6",
-          "strokeWidth": 3
-        },
-        {
-          "id": "icon2",
-          "type": "svg",
-          "query": "zap",
-          "provider": "lucide",
-          "animation": "bounce",
-          "start": 30,
-          "duration": 90,
+          "start": 15,
+          "duration": 150,
           "position": { "x": 960, "y": 540 },
-          "width": 300,
-          "height": 300,
-          "color": "#eab308"
-        },
-        {
-          "id": "icon3",
-          "type": "svg",
-          "query": "shield",
-          "provider": "lucide",
-          "animation": "pop",
-          "start": 60,
-          "duration": 60,
-          "position": { "x": 1440, "y": 540 },
-          "width": 350,
-          "height": 350,
-          "color": "#10b881"
+          "width": 900,
+          "height": 900,
+          "color": "#3b82f6",
+          "strokeWidth": 4
         }
       ]
     }
