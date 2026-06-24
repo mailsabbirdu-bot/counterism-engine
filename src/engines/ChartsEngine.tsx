@@ -96,7 +96,6 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     const dataProgress = interpolate(isNaN(relativeFrame) ? 0 : relativeFrame, [animationStart, animationEnd], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.33, 1, 0.68, 1) });
 
   if (!overlay?.data || (typeof overlay.data !== 'object')) {
-      // Inject placeholder data to prevent crash
       overlay.data = [{ id: "A", value: 10 }, { id: "B", value: 20 }];
   }
 
@@ -186,7 +185,8 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
             ...row,
             data: row.data.map((d: any) => ({ ...d, value: (d.value || 0) * dataProgress }))
         }));
-        return <ResponsiveHeatMap {...commonProps} data={animatedData} />;
+        // Fix for HeatMap color scale issue
+        return <ResponsiveHeatMap {...commonProps} data={animatedData} colors={{ type: 'sequential', scheme: 'blues' }} />;
     }
 
     if (type === 'radar') {
@@ -203,7 +203,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         if (!Array.isArray(overlay.data)) return null;
         const animatedData = overlay.data.map((series: any) => ({
             ...series,
-            data: series.data.map((d: any) => ({ ...d, y: (d.y || 0) * dataProgress }))
+            data: (series.data || []).map((d: any) => ({ ...d, y: (d.y || 0) * dataProgress }))
         }));
         return <ResponsiveRadialBar {...commonProps} data={animatedData} />;
     }
@@ -258,6 +258,11 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     if (type === 'parallelCoordinates') {
         if (!Array.isArray(overlay.data)) return null;
         return <ResponsiveParallelCoordinates {...commonProps} data={overlay.data} variables={overlay.variables || []} />;
+    }
+
+    if (type === 'voronoi') {
+        if (!Array.isArray(overlay.data)) return null;
+        return <ResponsiveVoronoi {...commonProps} data={overlay.data} />;
     }
 
     if (type === 'treemap') {
