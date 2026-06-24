@@ -117,6 +117,13 @@ export interface InfographicLine {
   type?: 'solid' | 'dotted' | 'arrow';
 }
 
+export interface ConnectionLineProps {
+    startFrame?: number;
+    duration?: number;
+    color?: string;
+    type?: 'solid' | 'dotted' | 'arrow';
+}
+
 export interface InfographicNode {
   x: number;
   y: number;
@@ -139,6 +146,7 @@ export interface HubNetworkElement {
   nodes: string[];
   connectionStyle?: 'solid' | 'dotted' | 'arrow';
   animation?: AnimationType;
+  startFrame?: number;
 }
 
 export interface FlowDiagramElement {
@@ -150,6 +158,7 @@ export interface FlowDiagramElement {
   spacing?: number;
   x: number;
   y: number;
+  startFrame?: number;
 }
 
 export interface ProcessElement {
@@ -158,6 +167,7 @@ export interface ProcessElement {
   steps: string[];
   x: number;
   y: number;
+  startFrame?: number;
 }
 
 export interface LabelElement {
@@ -169,6 +179,7 @@ export interface LabelElement {
   fontSize?: number;
   color?: string;
   animation?: AnimationType;
+  startFrame?: number;
 }
 
 export interface CalloutElement {
@@ -180,6 +191,7 @@ export interface CalloutElement {
   direction?: 'top' | 'bottom' | 'left' | 'right';
   x?: number;
   y?: number;
+  startFrame?: number;
 }
 
 export interface KpiElement {
@@ -192,6 +204,7 @@ export interface KpiElement {
   icon?: string;
   x: number;
   y: number;
+  startFrame?: number;
 }
 
 export interface ChartElement {
@@ -202,6 +215,7 @@ export interface ChartElement {
   width: number;
   height: number;
   data: any[];
+  startFrame?: number;
 }
 
 export interface TimelineEvent {
@@ -215,6 +229,7 @@ export interface TimelineElement {
   events: TimelineEvent[];
   x: number;
   y: number;
+  startFrame?: number;
 }
 
 export interface CompositionElement {
@@ -226,6 +241,7 @@ export interface CompositionElement {
   scale?: number;
   enterAnimation?: AnimationType;
   theme?: InfographicTheme;
+  startFrame?: number;
 }
 
 export type StorytellingElement =

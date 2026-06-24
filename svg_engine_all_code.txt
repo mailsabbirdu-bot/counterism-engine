@@ -1,16 +1,21 @@
 --- FILE: svg/components/AnimatedSvg.tsx ---
 import React, { useMemo, useState } from 'react';
-import { interpolate, useCurrentFrame, spring, useVideoConfig } from 'remotion';
+import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 import { LayeredSvg } from './LayeredSvg';
-import { AnimationType, SvgProvider, SvgStyle, Importance, GlowConfig, GradientConfig } from '../types';
+import { AnimationType, SvgProvider, SvgStyle, Importance, GlowConfig, GradientConfig, LayerType } from '../types';
 import { GlassPanel } from './GlassPanel';
+import { getEntranceProgress } from '../lib/animationUtils';
 
-interface AnimatedSvgProps {
+// Import CSS once in the composition root or here for individual components
+// but standardizing on a single stylesheet helps performance.
+import '../styles/svgAnimations.css';
+
+export interface AnimatedSvgProps {
   query: string;
   provider: SvgProvider;
-  animation: AnimationType;
-  startFrame: number;
-  durationInFrames: number;
+  animation?: AnimationType;
+  startFrame?: number;
+  durationInFrames?: number;
   width: number;
   height: number;
   x: number;
@@ -26,6 +31,7 @@ interface AnimatedSvgProps {
   container?: 'glass_panel';
   gradient?: GradientConfig;
   id?: string;
+  layer?: LayerType;
 
   // Grouping/Composition support
   groupOffset?: { x: number, y: number };
@@ -34,9 +40,9 @@ interface AnimatedSvgProps {
 export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
   query,
   provider,
-  animation,
-  startFrame,
-  durationInFrames,
+  animation = 'fade',
+  startFrame = 0,
+  durationInFrames = 150,
   width,
   height,
   x,
@@ -58,22 +64,18 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
 
   const relativeFrame = frame - startFrame;
 
+  // 1. OPTIMIZATION: Conditional Spring vs Interpolation
+  // High importance or center hub objects get smooth springs
+  const isHighImportance = importance === 'primary' || container === 'glass_panel';
+  const spr = getEntranceProgress(frame, fps, startFrame, isHighImportance);
+
   // Automatic importance-based scaling and opacity
   const baseScale = importance === 'primary' ? 1.2 : importance === 'decorative' ? 0.7 : 1;
   const baseOpacity = importance === 'decorative' ? 0.4 : 1;
   const importanceGlow = importance === 'primary' && !glow ? { color, intensity: 0.4, radius: 30 } : glow;
 
-  // Base entrance spring
-  const spr = spring({
-    frame: relativeFrame,
-    fps,
-    config: { damping: 12 },
-  });
-
   const animationStyles = useMemo(() => {
     if (relativeFrame < 0) return { opacity: 0 };
-
-    const progress = Math.min(1, Math.max(0, relativeFrame / durationInFrames));
 
     switch (animation) {
       case 'fade':
@@ -83,10 +85,7 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
       case 'pop':
         return { opacity: spr * baseOpacity, transform: `scale(${spr * 1.1 * baseScale})` };
       case 'rotate':
-        return { opacity: spr * baseOpacity, transform: `rotate(${spr * 360}deg) scale(${spr * baseScale})` };
-      case 'bounce':
-        const bounce = spring({ frame: relativeFrame, fps, config: { mass: 0.5, damping: 5 } });
-        return { opacity: baseOpacity, transform: `scale(${bounce * baseScale})` };
+        return { opacity: spr * baseOpacity, transform: `rotate(${(spr * 360) % 360}deg) scale(${spr * baseScale})` };
       case 'slideUp':
         return { opacity: spr * baseOpacity, transform: `translateY(${(1 - spr) * 100}px) scale(${baseScale})` };
       case 'slideDown':
@@ -103,25 +102,20 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
         return { opacity: spr * baseOpacity, transform: `translate(${orbitX}px, ${orbitY}px) scale(${spr * baseScale})` };
       case 'reveal':
         return { opacity: 1, clipPath: `inset(0 ${100 - spr * 100}% 0 0)`, transform: `scale(${baseScale})` };
-      case 'draw':
-      case 'trace':
-        return { opacity: 1, transform: `scale(${baseScale})` };
-      case 'glowPulse':
-        return { opacity: 1, transform: `scale(${baseScale})` };
       default:
-        return { opacity: baseOpacity, transform: `scale(${baseScale})` };
+        return { opacity: spr * baseOpacity, transform: `scale(${baseScale})` };
     }
-  }, [animation, relativeFrame, spr, baseScale, baseOpacity, durationInFrames, fps]);
+  }, [animation, relativeFrame, spr, baseScale, baseOpacity]);
 
-  const customAnimStyles = useMemo(() => {
-    if (animation !== 'draw' && animation !== 'trace' && animation !== 'glowPulse') return {};
-
+  // 2. HARDENING: Use inline styles for variables only, shared CSS for rules
+  const variableStyles = useMemo(() => {
     return {
         '--draw-progress': spr,
         '--path-length': pathLength,
         '--glow-pulse': 0.5 + Math.sin(relativeFrame / 15) * 0.5,
-    };
-  }, [animation, spr, pathLength, relativeFrame]);
+        '--glow-color': color
+    } as React.CSSProperties;
+  }, [spr, pathLength, relativeFrame, color]);
 
   const content = (
     <div
@@ -133,7 +127,7 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
         height,
         transform: 'translate(-50%, -50%)',
         ...animationStyles,
-        ...customAnimStyles as any
+        ...variableStyles
       }}
       className={`svg-motion-container ${animation}`}
     >
@@ -151,28 +145,10 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
         id={id}
         onLoad={(_, lengths) => {
             if (lengths.length > 0) {
-                // We use the max length of all paths for the CSS animation
                 setPathLength(Math.max(...lengths));
             }
         }}
       />
-
-      <style dangerouslySetInnerHTML={{ __html: `
-        .svg-motion-container.draw svg path,
-        .svg-motion-container.trace svg path {
-          stroke-dasharray: var(--path-length, 5000);
-          stroke-dashoffset: calc(var(--path-length, 5000) * (1 - var(--draw-progress, 1)));
-          transition: stroke-dashoffset 0.1s linear;
-        }
-        .svg-motion-container.trace svg path {
-          stroke-width: 4px;
-          filter: drop-shadow(0 0 10px currentColor);
-        }
-        .svg-motion-container.glowPulse > div {
-           filter: drop-shadow(0 0 calc(var(--glow-pulse) * 30px) ${color});
-           opacity: calc(0.6 + var(--glow-pulse) * 0.4);
-        }
-      `}} />
     </div>
   );
 
@@ -206,18 +182,19 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
 --- END OF svg/components/AnimatedSvg.tsx ---
 
 --- FILE: svg/components/CalloutSystem.tsx ---
-import React from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import React, { useMemo } from 'react';
+import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { CalloutElement } from '../types';
+import { getEntranceProgress } from '../lib/animationUtils';
 
 export const CalloutSystem: React.FC<{ element: CalloutElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
-  const { title, body, direction = 'right' } = element;
+  const { title, body, direction = 'right', startFrame = 0 } = element;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   if (!targetPos) return null;
 
-  const spr = spring({ frame: frame - 60, fps, config: { damping: 15 } });
+  const spr = getEntranceProgress(frame, fps, startFrame, true);
 
   const lineLength = 150;
   const boxWidth = 300;
@@ -285,7 +262,7 @@ export const CompositionEngine: React.FC<{
     return null;
   }
 
-  const { x: baseX, y: baseY, scale = 1, enterAnimation = 'scale' } = element;
+  const { x: baseX, y: baseY, scale = 1, enterAnimation = 'scale', startFrame = 0 } = element;
 
   // 1. Expand elements with base coordinates
   const expandedElements = useMemo(() => {
@@ -298,10 +275,10 @@ export const CompositionEngine: React.FC<{
       height: el.height * scale,
       animation: el.animation || enterAnimation,
       provider: el.provider || sceneIconTheme || 'lucide',
-      startFrame: el.startFrame || 0,
+      startFrame: startFrame + (el.startFrame || 0),
       durationInFrames: el.durationInFrames || 150
     })) as SvgElement[];
-  }, [definition, baseX, baseY, scale, enterAnimation, sceneIconTheme, element.id]);
+  }, [definition, baseX, baseY, scale, enterAnimation, sceneIconTheme, element.id, startFrame]);
 
   // 2. Map for line resolution
   const posMap = useMemo(() => {
@@ -325,7 +302,7 @@ export const CompositionEngine: React.FC<{
             key={`${element.id}_line_${i}`}
             start={start}
             end={end}
-            startFrame={30} // Staggered start
+            startFrame={startFrame + 30} // Staggered start
             duration={60}
             type={line.type as any}
           />
@@ -351,12 +328,12 @@ export const CompositionEngine: React.FC<{
 
 --- FILE: svg/components/FlowDiagram.tsx ---
 import React, { useMemo } from 'react';
-import { FlowDiagramElement } from '../types';
+import { FlowDiagramElement, SvgProvider } from '../types';
 import { AnimatedSvg } from './AnimatedSvg';
 import { ConnectionLine } from './InfographicElements';
 
-export const FlowDiagram: React.FC<{ element: FlowDiagramElement, sceneIconTheme?: any }> = ({ element, sceneIconTheme }) => {
-  const { x, y, steps, layout = 'horizontal', arrowStyle = 'arrow', spacing = 250 } = element;
+export const FlowDiagram: React.FC<{ element: FlowDiagramElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
+  const { x, y, steps, layout = 'horizontal', arrowStyle = 'arrow', spacing = 250, startFrame = 0 } = element;
 
   const nodePositions = useMemo(() => {
     return steps.map((_, i) => {
@@ -379,7 +356,7 @@ export const FlowDiagram: React.FC<{ element: FlowDiagramElement, sceneIconTheme
             key={`${element.id}_flow_${i}`}
             start={prevPos}
             end={pos}
-            startFrame={30 + (i * 20)}
+            startFrame={startFrame + 15 + (i * 20)}
             duration={45}
             type={arrowStyle === 'glow' ? 'solid' : arrowStyle as any}
             color={arrowStyle === 'glow' ? '#00F5FF' : undefined}
@@ -399,7 +376,7 @@ export const FlowDiagram: React.FC<{ element: FlowDiagramElement, sceneIconTheme
           width={120}
           height={120}
           animation="pop"
-          startFrame={15 + (i * 20)}
+          startFrame={startFrame + (i * 20)}
           durationInFrames={120}
           style="infographic"
           importance={i === 0 || i === steps.length - 1 ? 'primary' : 'secondary'}
@@ -472,12 +449,12 @@ export const GlassPanel: React.FC<GlassPanelProps> = ({ children, width, height,
 
 --- FILE: svg/components/HubNetwork.tsx ---
 import React, { useMemo } from 'react';
-import { HubNetworkElement } from '../types';
+import { HubNetworkElement, SvgProvider } from '../types';
 import { AnimatedSvg } from './AnimatedSvg';
 import { ConnectionLine, OrbitRing, GlowNode } from './InfographicElements';
 
-export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?: any }> = ({ element, sceneIconTheme }) => {
-  const { x, y, radius, nodes, centerSvg, provider, connectionStyle = 'arrow', animation = 'pop' } = element;
+export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
+  const { x, y, radius, nodes, centerSvg, provider, connectionStyle = 'arrow', animation = 'pop', startFrame = 0 } = element;
 
   const nodePositions = useMemo(() => {
     return nodes.map((_, i) => {
@@ -492,7 +469,7 @@ export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?:
   return (
     <>
       {/* 1. Orbit Ring */}
-      <OrbitRing x={x} y={y} radius={radius} startFrame={0} color="rgba(255,255,255,0.05)" />
+      <OrbitRing x={x} y={y} radius={radius} startFrame={startFrame} color="rgba(255,255,255,0.05)" />
 
       {/* 2. Connection Lines */}
       {nodePositions.map((pos, i) => (
@@ -500,7 +477,7 @@ export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?:
           key={`${element.id}_line_${i}`}
           start={{ x, y }}
           end={pos}
-          startFrame={30 + (i * 5)}
+          startFrame={startFrame + 15 + (i * 5)}
           duration={60}
           type={connectionStyle as any}
         />
@@ -518,7 +495,7 @@ export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?:
           width={100}
           height={100}
           animation={animation}
-          startFrame={45 + (i * 10)}
+          startFrame={startFrame + 30 + (i * 10)}
           durationInFrames={120}
           importance="secondary"
         />
@@ -538,7 +515,7 @@ export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?:
         importance="primary"
         glow={true}
         container="glass_panel"
-        startFrame={15}
+        startFrame={startFrame}
         durationInFrames={150}
       />
 
@@ -548,7 +525,7 @@ export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?:
             key={`${element.id}_glow_${i}`}
             x={pos.x}
             y={pos.y}
-            startFrame={60 + (i * 10)}
+            startFrame={startFrame + 45 + (i * 10)}
             type="pulse"
             color="rgba(255,255,255,0.2)"
         />
@@ -648,7 +625,8 @@ import { CalloutSystem } from './CalloutSystem';
 import { KpiCard } from './KpiCard';
 import { Timeline } from './Timeline';
 import { CompositionEngine } from './CompositionEngine';
-import { SvgGroup, StorytellingElement, LayerType } from '../types';
+import { NarrativeTemplate } from './NarrativeTemplates';
+import { SvgGroup, StorytellingElement, LayerType, SvgProvider } from '../types';
 
 interface InfographicComposerProps {
   sceneData: any;
@@ -656,7 +634,7 @@ interface InfographicComposerProps {
 
 const LAYER_ORDER: LayerType[] = ['background', 'decorative', 'secondary', 'primary', 'foreground', 'overlay'];
 
-export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneData }) => {
+export const InfographicComposer: React.FC<InfographicComposerProps> = React.memo(({ sceneData }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -667,7 +645,7 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
   const lines = sceneData.infographic_lines || [];
   const nodes = sceneData.infographic_nodes || [];
   const background = sceneData.background;
-  const sceneIconTheme = sceneData.sceneIconTheme;
+  const sceneIconTheme: SvgProvider | undefined = sceneData.sceneIconTheme;
 
   // 1. Resolve element positions (including group-based layouts)
   const resolvedElements = useMemo(() => {
@@ -714,6 +692,11 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
       const map: Record<string, { x: number, y: number }> = {};
       resolvedElements.forEach((el: any) => {
           if (el.id) map[el.id] = { x: el.x, y: el.y };
+
+          // Special handling for sub-components (HubNetwork ids)
+          if (el.type === 'hub_network') {
+              map[`${el.id}_center`] = { x: el.x, y: el.y };
+          }
       });
       return map;
   }, [resolvedElements]);
@@ -729,10 +712,13 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
 
   return (
     <AbsoluteFill className="pointer-events-none">
-      {/* 1. Background System */}
+      {/* Narrative Templates (Phase 15) */}
+      <NarrativeTemplate story={sceneData.story} startFrame={sceneData.startFrame || 0} sceneIconTheme={sceneIconTheme} />
+
+      {/* Background System */}
       <InfographicBackground type={background} />
 
-      {/* 2. Orbit Rings */}
+      {/* Orbit Rings */}
       {nodes.filter((n: any) => n.radius).map((node: any, i: number) => (
         <OrbitRing
           key={`orbit-${i}`}
@@ -744,7 +730,7 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
         />
       ))}
 
-      {/* 3. Group background rings */}
+      {/* Group background rings */}
       {groups.filter(g => g.backgroundRing).map((group, i) => (
           <OrbitRing
             key={`group-ring-${i}`}
@@ -756,7 +742,7 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
           />
       ))}
 
-      {/* 4. Connection Lines (Resolved by ID) */}
+      {/* Connection Lines (Resolved by ID) */}
       {lines.map((line: any, i: number) => {
           const start = line.from ? positionMap[line.from] : line.start_pos;
           const end = line.to ? positionMap[line.to] : line.end_pos;
@@ -774,7 +760,7 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
           );
       })}
 
-      {/* 5. Components Rendering */}
+      {/* Components Rendering */}
       {sortedElements.map((el: any) => {
           const commonProps = { key: el.id, sceneIconTheme };
 
@@ -800,7 +786,7 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
           }
       })}
 
-      {/* 6. Simple Nodes */}
+      {/* Simple Nodes */}
       {nodes.filter((n: any) => !n.radius).map((node: any, i: number) => (
         <GlowNode
           key={`node-${i}`}
@@ -813,49 +799,43 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
       ))}
     </AbsoluteFill>
   );
-};
+});
 
 --- END OF svg/components/InfographicComposer.tsx ---
 
 --- FILE: svg/components/InfographicElements.tsx ---
-import React from 'react';
-import { spring, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import React, { useMemo } from 'react';
+import { useCurrentFrame, useVideoConfig } from 'remotion';
+import { ConnectionLineProps } from '../types';
+import { generateSvgId } from '../lib/svgUtils';
+import { getEntranceProgress } from '../lib/animationUtils';
 
-interface ConnectionLineProps {
-  start: { x: number; y: number };
-  end: { x: number; y: number };
-  startFrame: number;
-  duration: number;
-  color?: string;
-  type?: 'solid' | 'dotted' | 'arrow';
-}
-
-export const ConnectionLine: React.FC<ConnectionLineProps> = ({
+export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, y:number}, end: {x:number, y:number} }> = ({
   start,
   end,
-  startFrame,
-  duration,
+  startFrame = 0,
+  duration = 60,
   color = 'rgba(255,255,255,0.2)',
   type = 'dotted'
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const progress = spring({
-    frame: frame - startFrame,
-    fps,
-    config: { damping: 20 },
-  });
+  // OPTIMIZATION: Use interpolation for lines
+  const progress = getEntranceProgress(frame, fps, startFrame, false);
+
+  // HARDENING: Unique Marker IDs to prevent collisions
+  const markerId = useMemo(() => generateSvgId('arrowhead', `${start.x}-${start.y}-${end.x}-${end.y}`), [start, end]);
 
   if (frame < startFrame) return null;
 
-  const currentX = interpolate(progress, [0, 1], [start.x, end.x]);
-  const currentY = interpolate(progress, [0, 1], [start.y, end.y]);
+  const currentX = start.x + (end.x - start.x) * progress;
+  const currentY = start.y + (end.y - start.y) * progress;
 
   return (
     <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
       <defs>
-        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <marker id={markerId} markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
           <polygon points="0 0, 10 3.5, 0 7" fill={color} />
         </marker>
       </defs>
@@ -867,24 +847,20 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
         stroke={color}
         strokeWidth="2"
         strokeDasharray={type === 'dotted' ? "4 4" : "0"}
-        markerEnd={type === 'arrow' ? "url(#arrowhead)" : ""}
+        markerEnd={type === 'arrow' ? `url(#${markerId})` : ""}
       />
     </svg>
   );
 };
 
-export const GlowNode: React.FC<{ x: number, y: number, startFrame: number, color?: string, type?: 'glow' | 'pulse' | 'signal' }> = ({
-  x, y, startFrame, color = '#3b82f6', type = 'glow'
+export const GlowNode: React.FC<{ x: number, y: number, startFrame?: number, color?: string, type?: 'glow' | 'pulse' | 'signal' }> = ({
+  x, y, startFrame = 0, color = '#3b82f6', type = 'glow'
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const relativeFrame = frame - startFrame;
-  const progress = spring({
-    frame: relativeFrame,
-    fps,
-    config: { damping: 10, stiffness: 100 },
-  });
+  const progress = getEntranceProgress(frame, fps, startFrame, false);
 
   if (frame < startFrame) return null;
 
@@ -911,20 +887,23 @@ export const GlowNode: React.FC<{ x: number, y: number, startFrame: number, colo
           inset: -20,
           border: `2px solid ${color}`,
           borderRadius: '50%',
-          opacity: interpolate(relativeFrame % 30, [0, 30], [0.6, 0]),
-          transform: `scale(${interpolate(relativeFrame % 30, [0, 30], [0.5, 2])})`
+          opacity: (1 - (relativeFrame % 30) / 30) * 0.6,
+          transform: `scale(${0.5 + ((relativeFrame % 30) / 30) * 1.5})`
         }} />
       )}
     </div>
   );
 };
 
-export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFrame: number, color?: string }> = ({
-    x, y, radius, startFrame, color = 'rgba(255,255,255,0.1)'
+export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFrame?: number, color?: string, orbitSpeed?: number }> = ({
+    x, y, radius, startFrame = 0, color = 'rgba(255,255,255,0.1)', orbitSpeed = 1
 }) => {
     const frame = useCurrentFrame();
     const relativeFrame = frame - startFrame;
     if (frame < startFrame) return null;
+
+    // HARDENING: Clamp rotation
+    const rotation = (relativeFrame * orbitSpeed) % 360;
 
     return (
         <div style={{
@@ -935,7 +914,7 @@ export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFr
             height: radius * 2,
             border: `1px solid ${color}`,
             borderRadius: '50%',
-            transform: `translate(-50%, -50%) rotate(${relativeFrame}deg)`,
+            transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
             zIndex: 1
         }}>
             <div style={{
@@ -996,22 +975,26 @@ export const JsonSceneRenderer: React.FC<JsonSceneRendererProps> = ({ sceneData 
 --- END OF svg/components/JsonSceneRenderer.tsx ---
 
 --- FILE: svg/components/KpiCard.tsx ---
-import React from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
-import { KpiElement } from '../types';
+import React, { useMemo } from 'react';
+import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
+import { KpiElement, SvgProvider } from '../types';
 import { RemoteSvg } from './RemoteSvg';
+import { getEntranceProgress } from '../lib/animationUtils';
 
-export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: any }> = ({ element, sceneIconTheme }) => {
-  const { title, value, trend, subtitle, icon, x, y } = element;
+export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
+  const { title, value, trend, subtitle, icon, x, y, startFrame = 0 } = element;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const spr = spring({ frame: frame - 15, fps, config: { damping: 12 } });
+  const spr = getEntranceProgress(frame, fps, startFrame, true);
 
   // Value animation (numeric only)
   const displayValue = useMemo(() => {
+    const rel = frame - (startFrame + 15);
+    if (rel < 0) return typeof value === 'number' ? '0' : value;
+
     if (typeof value === 'number') {
-        const count = interpolate(frame - 30, [0, 60], [0, value], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+        const count = interpolate(rel, [0, 60], [0, value], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
         return Math.round(count).toLocaleString();
     }
     // Handle strings like "170M"
@@ -1019,11 +1002,11 @@ export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: any }> = 
     if (match) {
         const num = parseFloat(match[1]);
         const suffix = match[2] || '';
-        const count = interpolate(frame - 30, [0, 60], [0, num], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+        const count = interpolate(rel, [0, 60], [0, num], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
         return `${count.toFixed(match[1].includes('.') ? 1 : 0)}${suffix}`;
     }
     return value;
-  }, [value, frame]);
+  }, [value, frame, startFrame]);
 
   return (
     <div style={{
@@ -1076,24 +1059,22 @@ export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: any }> = 
   );
 };
 
-// Add useMemo to imports
-import { useMemo } from 'react';
-
 --- END OF svg/components/KpiCard.tsx ---
 
 --- FILE: svg/components/LabelSystem.tsx ---
 import React from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { LabelElement } from '../types';
+import { getEntranceProgress } from '../lib/animationUtils';
 
 export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
-  const { text, position = 'bottom', fontSize = 32, color = 'white', animation = 'slideUp' } = element;
+  const { text, position = 'bottom', fontSize = 32, color = 'white', animation = 'slideUp', startFrame = 0 } = element;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   if (!targetPos) return null;
 
-  const spr = spring({ frame: frame - 45, fps, config: { damping: 12 } });
+  const spr = getEntranceProgress(frame, fps, startFrame, false);
 
   const offsets = {
     top: { x: 0, y: -80 },
@@ -1113,7 +1094,7 @@ export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: num
       case 'slideUp': return { opacity: spr, transform: `translateY(${(1-spr)*20}px)` };
       case 'slideDown': return { opacity: spr, transform: `translateY(${(spr-1)*20}px)` };
       case 'reveal': return { clipPath: `inset(0 ${100-spr*100}% 0 0)` };
-      case 'typewriter': return { opacity: 1 }; // Fallback
+      case 'typewriter': return { opacity: spr }; // Fallback
       default: return { opacity: spr };
     }
   };
@@ -1241,14 +1222,114 @@ export const LayeredSvg: React.FC<LayeredSvgProps> = ({
 
 --- END OF svg/components/LayeredSvg.tsx ---
 
+--- FILE: svg/components/NarrativeTemplates.tsx ---
+import React, { useMemo } from 'react';
+import { COMPOSITIONS, CompositionDefinition } from '../lib/compositionLibrary';
+import { HubNetwork } from './HubNetwork';
+import { FlowDiagram } from './FlowDiagram';
+import { ProcessDiagram } from './ProcessDiagram';
+import { LabelSystem } from './LabelSystem';
+import { CalloutSystem } from './CalloutSystem';
+import { KpiCard } from './KpiCard';
+import { Timeline } from './Timeline';
+import { CompositionEngine } from './CompositionEngine';
+import { HubNetworkElement, FlowDiagramElement, ProcessElement, LabelElement, CalloutElement, KpiElement, TimelineElement, CompositionElement, SvgGroup, StorytellingElement, LayerType, SvgProvider, InfographicTheme } from '../types';
+
+/**
+ * Narrative Template Engine
+ * Automatically expands high-level story templates into visual components.
+ */
+export const expandNarrativeTemplate = (storyType: string, startFrame: number = 0): StorytellingElement[] => {
+    switch (storyType) {
+        case 'hub_explanation':
+            return [
+                {
+                    id: 'story_hub',
+                    type: 'hub_network',
+                    centerSvg: 'network',
+                    nodes: ['database', 'cpu', 'cloud', 'lock'],
+                    radius: 300,
+                    x: 960,
+                    y: 540,
+                    startFrame
+                } as HubNetworkElement,
+                {
+                    id: 'hub_label',
+                    type: 'label',
+                    target: 'story_hub_center',
+                    text: 'Central Intelligence',
+                    position: 'top',
+                    startFrame: startFrame + 30
+                } as LabelElement
+            ];
+        case 'process_breakdown':
+            return [
+                {
+                    id: 'story_process',
+                    type: 'process',
+                    steps: ['search', 'settings', 'code-2', 'rocket'],
+                    x: 960,
+                    y: 540,
+                    startFrame
+                } as ProcessElement
+            ];
+        case 'timeline_story':
+            return [
+                {
+                    id: 'story_timeline',
+                    type: 'timeline',
+                    events: [
+                        { year: '2020', label: 'Inception' },
+                        { year: '2022', label: 'Growth' },
+                        { year: '2024', label: 'Scale' }
+                    ],
+                    x: 960,
+                    y: 540,
+                    startFrame
+                } as TimelineElement
+            ];
+        default:
+            return [];
+    }
+};
+
+interface TemplateProps {
+    story?: string;
+    startFrame?: number;
+    sceneIconTheme?: SvgProvider;
+}
+
+export const NarrativeTemplate: React.FC<TemplateProps> = ({ story, startFrame = 0, sceneIconTheme }) => {
+    const elements = useMemo(() => story ? expandNarrativeTemplate(story, startFrame) : [], [story, startFrame]);
+    if (!elements.length) return null;
+
+    // This would typically be rendered by InfographicComposer recursively or mapped here
+    // For simplicity, we just return the expanded components mapped manually for now
+    return (
+        <>
+            {elements.map((el: any) => {
+                switch(el.type) {
+                    case 'hub_network': return <HubNetwork key={el.id} element={el} sceneIconTheme={sceneIconTheme} />;
+                    case 'process': return <ProcessDiagram key={el.id} element={el} sceneIconTheme={sceneIconTheme} />;
+                    case 'timeline': return <Timeline key={el.id} element={el} />;
+                    default: return null;
+                }
+            })}
+        </>
+    );
+};
+
+--- END OF svg/components/NarrativeTemplates.tsx ---
+
 --- FILE: svg/components/ProcessDiagram.tsx ---
 import React, { useMemo } from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
-import { ProcessElement } from '../types';
+import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
+import { ProcessElement, SvgProvider } from '../types';
 import { AnimatedSvg } from './AnimatedSvg';
+import { getEntranceProgress } from '../lib/animationUtils';
 
-export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?: any }> = ({ element, sceneIconTheme }) => {
-  const { x, y, steps } = element;
+export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
+  const { x, y, steps, startFrame = 0 } = element;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -1280,8 +1361,8 @@ export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?
           if (i === 0) return null;
           const prevX = nodePositions[i - 1].x;
           const nextX = nodePositions[i].x;
-          const start = 60 + (i * 30);
-          const progress = spring({ frame: frame - start, fps, config: { damping: 20 } });
+          const start = startFrame + 45 + (i * 30);
+          const progress = getEntranceProgress(frame, fps, start, false);
 
           return (
             <div key={`progress_${i}`} style={{
@@ -1300,46 +1381,51 @@ export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?
       })}
 
       {/* 3. Steps */}
-      {steps.map((query, i) => (
-        <div key={`step_${i}`} style={{ position: 'absolute', left: nodePositions[i].x, top: nodePositions[i].y, transform: 'translate(-50%, -50%)' }}>
-            {/* Number Bubble */}
-            <div style={{
-                position: 'absolute',
-                top: -80,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: 40,
-                height: 40,
-                borderRadius: '50%',
-                border: '2px solid #00F5FF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: 18,
-                fontWeight: 'bold',
-                backgroundColor: 'rgba(0, 245, 255, 0.1)',
-                opacity: spring({ frame: frame - (15 + i * 30), fps })
-            }}>
-                {i + 1}
-            </div>
+      {steps.map((query, i) => {
+        const stepStart = startFrame + (i * 30);
+        const spr = getEntranceProgress(frame, fps, stepStart, true);
 
-            <AnimatedSvg
-                id={`${element.id}_node_${i}`}
-                query={query}
-                provider={sceneIconTheme || 'lucide'}
-                x={0}
-                y={0}
-                width={140}
-                height={140}
-                animation="scale"
-                startFrame={30 + (i * 30)}
-                durationInFrames={120}
-                style="tech"
-                importance="primary"
-            />
-        </div>
-      ))}
+        return (
+            <div key={`step_${i}`} style={{ position: 'absolute', left: nodePositions[i].x, top: nodePositions[i].y, transform: 'translate(-50%, -50%)' }}>
+                {/* Number Bubble */}
+                <div style={{
+                    position: 'absolute',
+                    top: -80,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    border: '2px solid #00F5FF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontSize: 18,
+                    fontWeight: 'bold',
+                    backgroundColor: 'rgba(0, 245, 255, 0.1)',
+                    opacity: spr
+                }}>
+                    {i + 1}
+                </div>
+
+                <AnimatedSvg
+                    id={`${element.id}_node_${i}`}
+                    query={query}
+                    provider={sceneIconTheme || 'lucide'}
+                    x={0}
+                    y={0}
+                    width={140}
+                    height={140}
+                    animation="scale"
+                    startFrame={stepStart + 15}
+                    durationInFrames={120}
+                    style="tech"
+                    importance="primary"
+                />
+            </div>
+        );
+      })}
     </>
   );
 };
@@ -1515,18 +1601,19 @@ export const RemoteSvg: React.FC<RemoteSvgProps> = ({
 
 --- FILE: svg/components/Timeline.tsx ---
 import React from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 import { TimelineElement } from '../types';
+import { getEntranceProgress } from '../lib/animationUtils';
 
 export const Timeline: React.FC<{ element: TimelineElement }> = ({ element }) => {
-  const { events, x, y } = element;
+  const { events, x, y, startFrame = 0 } = element;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const totalWidth = 1200;
   const stepX = totalWidth / (events.length - 1);
 
-  const overallProgress = spring({ frame: frame - 15, fps, config: { damping: 20 } });
+  const overallProgress = getEntranceProgress(frame, fps, startFrame, false);
 
   return (
     <div style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -50%)' }}>
@@ -1544,10 +1631,10 @@ export const Timeline: React.FC<{ element: TimelineElement }> = ({ element }) =>
       {/* 2. Events */}
       {events.map((ev, i) => {
           const eventX = (-totalWidth / 2) + (i * stepX);
-          const start = 30 + (i * 30);
-          const spr = spring({ frame: frame - start, fps, config: { damping: 12 } });
+          const eventStart = startFrame + 15 + (i * 30);
+          const spr = getEntranceProgress(frame, fps, eventStart, true);
 
-          if (frame < start) return null;
+          if (frame < eventStart) return null;
 
           return (
             <div key={`event_${i}`} style={{ position: 'absolute', left: eventX, top: 0 }}>
@@ -1600,15 +1687,26 @@ import { SvgProviderService } from './SvgProviderService';
 
 export class SvgCacheService {
   private static cache: Map<string, Promise<string>> = new Map();
+  private static MAX_ENTRIES = 500;
+  private static keys: string[] = [];
 
-  static getSvg(query: string, provider: SvgProvider): Promise<string> {
+  static async getSvg(query: string, provider: SvgProvider): Promise<string> {
     const key = `${provider}:${query}`;
+
     if (this.cache.has(key)) {
       return this.cache.get(key)!;
     }
 
+    // LRU Implementation
+    if (this.cache.size >= this.MAX_ENTRIES) {
+        const oldest = this.keys.shift();
+        if (oldest) this.cache.delete(oldest);
+    }
+
     const fetchPromise = SvgProviderService.fetchSvg(query, provider);
     this.cache.set(key, fetchPromise);
+    this.keys.push(key);
+
     return fetchPromise;
   }
 }
@@ -1695,3 +1793,364 @@ export class SvgProviderService {
 }
 
 --- END OF svg/services/SvgProviderService.ts ---
+
+--- FILE: svg/lib/animationUtils.ts ---
+import { interpolate, spring, SpringConfig } from 'remotion';
+
+export const DEFAULT_SPRING_CONFIG: SpringConfig = {
+  damping: 12,
+  stiffness: 100,
+  mass: 1,
+  overshootClamping: false,
+};
+
+/**
+ * Centered Animation Logic
+ * Reduces spring overhead by using interpolation for secondary elements.
+ */
+export const getEntranceProgress = (
+  frame: number,
+  fps: number,
+  startFrame: number = 0,
+  useSpring: boolean = false,
+  config: SpringConfig = DEFAULT_SPRING_CONFIG
+) => {
+  const relativeFrame = frame - startFrame;
+  if (relativeFrame < 0) return 0;
+
+  if (useSpring) {
+    return spring({
+      frame: relativeFrame,
+      fps,
+      config,
+    });
+  }
+
+  // Linear fallback/interpolation for efficiency
+  return interpolate(relativeFrame, [0, 20], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+};
+
+export const getScaleProgress = (
+  frame: number,
+  fps: number,
+  startFrame: number = 0,
+  useSpring: boolean = true
+) => {
+    const progress = getEntranceProgress(frame, fps, startFrame, useSpring);
+    return 0.8 + progress * 0.2;
+};
+
+export const getRevealProgress = (
+    frame: number,
+    fps: number,
+    startFrame: number = 0
+) => {
+    return interpolate(frame - startFrame, [0, 30], [0, 100], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp'
+    });
+};
+
+--- END OF svg/lib/animationUtils.ts ---
+
+--- FILE: svg/lib/compositionLibrary.ts ---
+import { CompositionType, SvgElement, InfographicLine, SvgProvider, AnimationType, SvgStyle, Importance } from '../types';
+
+export interface CompositionDefinition {
+  elements: {
+      id: string;
+      type: 'svg';
+      query: string;
+      width: number;
+      height: number;
+      offsetX: number;
+      offsetY: number;
+      importance?: Importance;
+      style?: SvgStyle;
+      animation?: AnimationType;
+      glow?: boolean;
+      provider?: SvgProvider;
+  }[];
+  lines?: { from: string, to: string, type?: string }[];
+}
+
+export const COMPOSITIONS: Record<CompositionType, CompositionDefinition> = {
+  suburban_home: {
+    elements: [
+      { id: 'house', type: 'svg', query: 'home', width: 200, height: 200, offsetX: 0, offsetY: 0, importance: 'primary', style: 'infographic' },
+      { id: 'tree1', type: 'svg', query: 'tree-pine', width: 80, height: 80, offsetX: -120, offsetY: 40, importance: 'decorative' },
+      { id: 'tree2', type: 'svg', query: 'tree-pine', width: 60, height: 60, offsetX: 130, offsetY: 50, importance: 'decorative' },
+      { id: 'car', type: 'svg', query: 'car', width: 100, height: 60, offsetX: -80, offsetY: 100, importance: 'secondary' }
+    ]
+  },
+  city_block: {
+    elements: [
+      { id: 'b1', type: 'svg', query: 'building-2', width: 150, height: 250, offsetX: -160, offsetY: 0, style: 'tech' },
+      { id: 'b2', type: 'svg', query: 'building', width: 200, height: 350, offsetX: 0, offsetY: -50, importance: 'primary', style: 'tech' },
+      { id: 'b3', type: 'svg', query: 'building-2', width: 150, height: 200, offsetX: 160, offsetY: 20, style: 'tech' }
+    ]
+  },
+  factory_cluster: {
+    elements: [
+      { id: 'f1', type: 'svg', query: 'factory', width: 180, height: 180, offsetX: -150, offsetY: 0, style: 'corporate' },
+      { id: 'f2', type: 'svg', query: 'factory', width: 180, height: 180, offsetX: 150, offsetY: 0, style: 'corporate' },
+      { id: 'truck', type: 'svg', query: 'truck', width: 100, height: 80, offsetX: 0, offsetY: 120, importance: 'secondary' }
+    ],
+    lines: [
+        { from: 'f1', to: 'truck', type: 'arrow' },
+        { from: 'f2', to: 'truck', type: 'arrow' }
+    ]
+  },
+  office_workspace: {
+    elements: [
+      { id: 'desk', type: 'svg', query: 'monitor', width: 150, height: 150, offsetX: 0, offsetY: 0, importance: 'primary' },
+      { id: 'chair', type: 'svg', query: 'armchair', width: 100, height: 100, offsetX: 0, offsetY: 100, importance: 'secondary' },
+      { id: 'lamp', type: 'svg', query: 'lamp', width: 60, height: 80, offsetX: 120, offsetY: -20, importance: 'decorative' }
+    ]
+  },
+  supply_chain: {
+    elements: [
+      { id: 'raw', type: 'svg', query: 'package-search', width: 120, height: 120, offsetX: -300, offsetY: 0 },
+      { id: 'factory', type: 'svg', query: 'factory', width: 150, height: 150, offsetX: 0, offsetY: 0, importance: 'primary' },
+      { id: 'dist', type: 'svg', query: 'truck', width: 120, height: 120, offsetX: 300, offsetY: 0 }
+    ],
+    lines: [
+        { from: 'raw', to: 'factory', type: 'arrow' },
+        { from: 'factory', to: 'dist', type: 'arrow' }
+    ]
+  },
+  transport_network: {
+    elements: [
+      { id: 'hub', type: 'svg', query: 'map-pin', width: 100, height: 100, offsetX: 0, offsetY: 0, importance: 'primary' },
+      { id: 'plane', type: 'svg', query: 'plane', width: 80, height: 80, offsetX: -200, offsetY: -150 },
+      { id: 'train', type: 'svg', query: 'train-front', width: 80, height: 80, offsetX: 200, offsetY: 150 },
+      { id: 'ship', type: 'svg', query: 'ship', width: 80, height: 80, offsetX: 200, offsetY: -150 }
+    ],
+    lines: [
+        { from: 'plane', to: 'hub', type: 'dotted' },
+        { from: 'train', to: 'hub', type: 'dotted' },
+        { from: 'ship', to: 'hub', type: 'dotted' }
+    ]
+  },
+  ecommerce_flow: {
+    elements: [
+      { id: 'cart', type: 'svg', query: 'shopping-cart', width: 120, height: 120, offsetX: -250, offsetY: 0 },
+      { id: 'card', type: 'svg', query: 'credit-card', width: 120, height: 120, offsetX: 0, offsetY: 0, importance: 'primary' },
+      { id: 'box', type: 'svg', query: 'box', width: 120, height: 120, offsetX: 250, offsetY: 0 }
+    ],
+    lines: [
+        { from: 'cart', to: 'card', type: 'arrow' },
+        { from: 'card', to: 'box', type: 'arrow' }
+    ]
+  },
+  cloud_infrastructure: {
+    elements: [
+      { id: 'cloud', type: 'svg', query: 'cloud', width: 250, height: 180, offsetX: 0, offsetY: -100, importance: 'primary', style: 'tech', glow: true },
+      { id: 's1', type: 'svg', query: 'server', width: 100, height: 100, offsetX: -180, offsetY: 120, style: 'tech' },
+      { id: 's2', type: 'svg', query: 'server', width: 100, height: 100, offsetX: 0, offsetY: 120, style: 'tech' },
+      { id: 's3', type: 'svg', query: 'server', width: 100, height: 100, offsetX: 180, offsetY: 120, style: 'tech' }
+    ],
+    lines: [
+        { from: 's1', to: 'cloud', type: 'dotted' },
+        { from: 's2', to: 'cloud', type: 'dotted' },
+        { from: 's3', to: 'cloud', type: 'dotted' }
+    ]
+  },
+  server_cluster: {
+    elements: [
+      { id: 'rack1', type: 'svg', query: 'server', width: 120, height: 150, offsetX: -140, offsetY: -80, style: 'tech' },
+      { id: 'rack2', type: 'svg', query: 'server', width: 120, height: 150, offsetX: 140, offsetY: -80, style: 'tech' },
+      { id: 'rack3', type: 'svg', query: 'server', width: 120, height: 150, offsetX: -140, offsetY: 80, style: 'tech' },
+      { id: 'rack4', type: 'svg', query: 'server', width: 120, height: 150, offsetX: 140, offsetY: 80, style: 'tech' }
+    ]
+  },
+  ai_pipeline: {
+    elements: [
+      { id: 'data', type: 'svg', query: 'database', width: 100, height: 100, offsetX: -300, offsetY: 0 },
+      { id: 'brain', type: 'svg', query: 'cpu', width: 180, height: 180, offsetX: 0, offsetY: 0, importance: 'primary', style: 'tech', glow: true },
+      { id: 'output', type: 'svg', query: 'sparkles', width: 120, height: 120, offsetX: 300, offsetY: 0, style: 'tech' }
+    ],
+    lines: [
+        { from: 'data', to: 'brain', type: 'arrow' },
+        { from: 'brain', to: 'output', type: 'arrow' }
+    ]
+  },
+  healthcare_system: {
+    elements: [
+      { id: 'hosp', type: 'svg', query: 'hospital', width: 200, height: 200, offsetX: 0, offsetY: 0, importance: 'primary' },
+      { id: 'pulse', type: 'svg', query: 'activity', width: 80, height: 80, offsetX: -200, offsetY: 0 },
+      { id: 'doc', type: 'svg', query: 'user-round-check', width: 80, height: 80, offsetX: 200, offsetY: 0 }
+    ],
+    lines: [
+        { from: 'pulse', to: 'hosp', type: 'solid' },
+        { from: 'doc', to: 'hosp', type: 'solid' }
+    ]
+  },
+  education_system: {
+    elements: [
+      { id: 'school', type: 'svg', query: 'school', width: 200, height: 200, offsetX: 0, offsetY: 0, importance: 'primary' },
+      { id: 'book', type: 'svg', query: 'book-open', width: 100, height: 100, offsetX: -220, offsetY: 100 },
+      { id: 'grad', type: 'svg', query: 'graduation-cap', width: 100, height: 100, offsetX: 220, offsetY: 100 }
+    ]
+  },
+  financial_flow: {
+    elements: [
+      { id: 'bank', type: 'svg', query: 'landmark', width: 180, height: 180, offsetX: 0, offsetY: 0, importance: 'primary', style: 'corporate' },
+      { id: 'wallet', type: 'svg', query: 'wallet', width: 100, height: 100, offsetX: -280, offsetY: 50 },
+      { id: 'coins', type: 'svg', query: 'coins', width: 100, height: 100, offsetX: 280, offsetY: 50 }
+    ],
+    lines: [
+        { from: 'bank', to: 'wallet', type: 'arrow' },
+        { from: 'wallet', to: 'coins', type: 'arrow' }
+    ]
+  }
+};
+
+--- END OF svg/lib/compositionLibrary.ts ---
+
+--- FILE: svg/lib/themes.ts ---
+import { InfographicTheme } from '../types';
+
+export interface ThemeConfig {
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  backgroundColor: string;
+  gridColor: string;
+  glowIntensity: number;
+  glassOpacity: number;
+  lineStyle: 'solid' | 'dotted' | 'dashed';
+  fontFamily: string;
+}
+
+export const INFOGRAPHIC_THEMES: Record<InfographicTheme, ThemeConfig> = {
+  tech: {
+    primaryColor: '#00F5FF', // Cyan
+    secondaryColor: '#7B68EE', // Iris
+    accentColor: '#00FFAB', // Neon Mint
+    backgroundColor: '#050505',
+    gridColor: 'rgba(0, 245, 255, 0.1)',
+    glowIntensity: 0.8,
+    glassOpacity: 0.1,
+    lineStyle: 'dashed',
+    fontFamily: 'Inter, sans-serif'
+  },
+  corporate: {
+    primaryColor: '#2563eb', // Blue
+    secondaryColor: '#64748b', // Slate
+    accentColor: '#f59e0b', // Amber
+    backgroundColor: '#ffffff',
+    gridColor: 'rgba(0, 0, 0, 0.05)',
+    glowIntensity: 0.3,
+    glassOpacity: 0.05,
+    lineStyle: 'solid',
+    fontFamily: 'Inter, sans-serif'
+  },
+  finance: {
+    primaryColor: '#10b981', // Emerald
+    secondaryColor: '#064e3b', // Deep Green
+    accentColor: '#fbbf24', // Gold
+    backgroundColor: '#022c22',
+    gridColor: 'rgba(16, 185, 129, 0.1)',
+    glowIntensity: 0.6,
+    glassOpacity: 0.15,
+    lineStyle: 'solid',
+    fontFamily: 'Roboto Mono, monospace'
+  },
+  documentary: {
+    primaryColor: '#ffffff',
+    secondaryColor: '#a1a1aa',
+    accentColor: '#ef4444', // Red
+    backgroundColor: '#18181b',
+    gridColor: 'rgba(255, 255, 255, 0.05)',
+    glowIntensity: 0.4,
+    glassOpacity: 0.2,
+    lineStyle: 'dotted',
+    fontFamily: 'Playfair Display, serif'
+  },
+  education: {
+    primaryColor: '#8b5cf6', // Violet
+    secondaryColor: '#ec4899', // Pink
+    accentColor: '#f97316', // Orange
+    backgroundColor: '#fafafa',
+    gridColor: 'rgba(139, 92, 246, 0.05)',
+    glowIntensity: 0.5,
+    glassOpacity: 0.1,
+    lineStyle: 'solid',
+    fontFamily: 'Quicksand, sans-serif'
+  },
+  healthcare: {
+    primaryColor: '#0ea5e9', // Sky
+    secondaryColor: '#2dd4bf', // Teal
+    accentColor: '#f43f5e', // Rose
+    backgroundColor: '#f0f9ff',
+    gridColor: 'rgba(14, 165, 233, 0.1)',
+    glowIntensity: 0.7,
+    glassOpacity: 0.08,
+    lineStyle: 'solid',
+    fontFamily: 'Inter, sans-serif'
+  }
+};
+
+export const getTheme = (themeName?: InfographicTheme): ThemeConfig => {
+  return INFOGRAPHIC_THEMES[themeName || 'tech'];
+};
+
+--- END OF svg/lib/themes.ts ---
+
+--- FILE: svg/lib/svgUtils.ts ---
+import { random } from 'remotion';
+
+/**
+ * Generate a unique ID for SVG markers, gradients, etc.
+ * Prevents DOM collisions when many instances are rendered.
+ */
+export const generateSvgId = (base: string, seed: any) => {
+    // We use Remotion's random() for determinism
+    const unique = Math.floor(random(seed) * 1000000);
+    return `${base}-${unique}`;
+};
+
+--- END OF svg/lib/svgUtils.ts ---
+
+--- FILE: svg/styles/svgAnimations.css ---
+/**
+ * Professional SVG Motion Graphics Animations
+ * Optimized for Remotion Storytelling Engine
+ */
+
+.svg-motion-container svg path,
+.svg-motion-container svg rect,
+.svg-motion-container svg circle,
+.svg-motion-container svg ellipse,
+.svg-motion-container svg line,
+.svg-motion-container svg polyline,
+.svg-motion-container svg polygon {
+    stroke-dasharray: var(--path-length, 5000);
+    stroke-dashoffset: calc(var(--path-length, 5000) * (1 - var(--draw-progress, 1)));
+    transition: stroke-dashoffset 0.1s linear;
+}
+
+.svg-motion-container.trace svg path,
+.svg-motion-container.trace svg rect,
+.svg-motion-container.trace svg circle {
+    stroke-width: 4px;
+    filter: drop-shadow(0 0 10px currentColor);
+}
+
+.svg-motion-container.glowPulse > div {
+    filter: drop-shadow(0 0 calc(var(--glow-pulse, 0) * 30px) var(--glow-color, #00F5FF));
+    opacity: calc(0.6 + var(--glow-pulse, 0) * 0.4);
+}
+
+.infographic-glass-panel {
+    background-color: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+--- END OF svg/styles/svgAnimations.css ---

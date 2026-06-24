@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
-import { HubNetworkElement } from '../types';
+import { HubNetworkElement, SvgProvider } from '../types';
 import { AnimatedSvg } from './AnimatedSvg';
 import { ConnectionLine, OrbitRing, GlowNode } from './InfographicElements';
 
-export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?: any }> = ({ element, sceneIconTheme }) => {
-  const { x, y, radius, nodes, centerSvg, provider, connectionStyle = 'arrow', animation = 'pop' } = element;
+export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
+  const { x, y, radius, nodes, centerSvg, provider, connectionStyle = 'arrow', animation = 'pop', startFrame = 0 } = element;
 
   const nodePositions = useMemo(() => {
     return nodes.map((_, i) => {
@@ -19,7 +19,7 @@ export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?:
   return (
     <>
       {/* 1. Orbit Ring */}
-      <OrbitRing x={x} y={y} radius={radius} startFrame={0} color="rgba(255,255,255,0.05)" />
+      <OrbitRing x={x} y={y} radius={radius} startFrame={startFrame} color="rgba(255,255,255,0.05)" />
 
       {/* 2. Connection Lines */}
       {nodePositions.map((pos, i) => (
@@ -27,7 +27,7 @@ export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?:
           key={`${element.id}_line_${i}`}
           start={{ x, y }}
           end={pos}
-          startFrame={30 + (i * 5)}
+          startFrame={startFrame + 15 + (i * 5)}
           duration={60}
           type={connectionStyle as any}
         />
@@ -45,7 +45,7 @@ export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?:
           width={100}
           height={100}
           animation={animation}
-          startFrame={45 + (i * 10)}
+          startFrame={startFrame + 30 + (i * 10)}
           durationInFrames={120}
           importance="secondary"
         />
@@ -65,7 +65,7 @@ export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?:
         importance="primary"
         glow={true}
         container="glass_panel"
-        startFrame={15}
+        startFrame={startFrame}
         durationInFrames={150}
       />
 
@@ -75,7 +75,7 @@ export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?:
             key={`${element.id}_glow_${i}`}
             x={pos.x}
             y={pos.y}
-            startFrame={60 + (i * 10)}
+            startFrame={startFrame + 45 + (i * 10)}
             type="pulse"
             color="rgba(255,255,255,0.2)"
         />

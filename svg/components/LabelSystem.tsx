@@ -1,15 +1,16 @@
 import React from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { LabelElement } from '../types';
+import { getEntranceProgress } from '../lib/animationUtils';
 
 export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
-  const { text, position = 'bottom', fontSize = 32, color = 'white', animation = 'slideUp' } = element;
+  const { text, position = 'bottom', fontSize = 32, color = 'white', animation = 'slideUp', startFrame = 0 } = element;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   if (!targetPos) return null;
 
-  const spr = spring({ frame: frame - 45, fps, config: { damping: 12 } });
+  const spr = getEntranceProgress(frame, fps, startFrame, false);
 
   const offsets = {
     top: { x: 0, y: -80 },
@@ -29,7 +30,7 @@ export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: num
       case 'slideUp': return { opacity: spr, transform: `translateY(${(1-spr)*20}px)` };
       case 'slideDown': return { opacity: spr, transform: `translateY(${(spr-1)*20}px)` };
       case 'reveal': return { clipPath: `inset(0 ${100-spr*100}% 0 0)` };
-      case 'typewriter': return { opacity: 1 }; // Fallback
+      case 'typewriter': return { opacity: spr }; // Fallback
       default: return { opacity: spr };
     }
   };

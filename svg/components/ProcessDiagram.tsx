@@ -1,10 +1,11 @@
 import React, { useMemo } from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
-import { ProcessElement } from '../types';
+import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
+import { ProcessElement, SvgProvider } from '../types';
 import { AnimatedSvg } from './AnimatedSvg';
+import { getEntranceProgress } from '../lib/animationUtils';
 
-export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?: any }> = ({ element, sceneIconTheme }) => {
-  const { x, y, steps } = element;
+export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
+  const { x, y, steps, startFrame = 0 } = element;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -36,8 +37,8 @@ export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?
           if (i === 0) return null;
           const prevX = nodePositions[i - 1].x;
           const nextX = nodePositions[i].x;
-          const start = 60 + (i * 30);
-          const progress = spring({ frame: frame - start, fps, config: { damping: 20 } });
+          const start = startFrame + 45 + (i * 30);
+          const progress = getEntranceProgress(frame, fps, start, false);
 
           return (
             <div key={`progress_${i}`} style={{
@@ -56,46 +57,51 @@ export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?
       })}
 
       {/* 3. Steps */}
-      {steps.map((query, i) => (
-        <div key={`step_${i}`} style={{ position: 'absolute', left: nodePositions[i].x, top: nodePositions[i].y, transform: 'translate(-50%, -50%)' }}>
-            {/* Number Bubble */}
-            <div style={{
-                position: 'absolute',
-                top: -80,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: 40,
-                height: 40,
-                borderRadius: '50%',
-                border: '2px solid #00F5FF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: 18,
-                fontWeight: 'bold',
-                backgroundColor: 'rgba(0, 245, 255, 0.1)',
-                opacity: spring({ frame: frame - (15 + i * 30), fps })
-            }}>
-                {i + 1}
-            </div>
+      {steps.map((query, i) => {
+        const stepStart = startFrame + (i * 30);
+        const spr = getEntranceProgress(frame, fps, stepStart, true);
 
-            <AnimatedSvg
-                id={`${element.id}_node_${i}`}
-                query={query}
-                provider={sceneIconTheme || 'lucide'}
-                x={0}
-                y={0}
-                width={140}
-                height={140}
-                animation="scale"
-                startFrame={30 + (i * 30)}
-                durationInFrames={120}
-                style="tech"
-                importance="primary"
-            />
-        </div>
-      ))}
+        return (
+            <div key={`step_${i}`} style={{ position: 'absolute', left: nodePositions[i].x, top: nodePositions[i].y, transform: 'translate(-50%, -50%)' }}>
+                {/* Number Bubble */}
+                <div style={{
+                    position: 'absolute',
+                    top: -80,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    border: '2px solid #00F5FF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontSize: 18,
+                    fontWeight: 'bold',
+                    backgroundColor: 'rgba(0, 245, 255, 0.1)',
+                    opacity: spr
+                }}>
+                    {i + 1}
+                </div>
+
+                <AnimatedSvg
+                    id={`${element.id}_node_${i}`}
+                    query={query}
+                    provider={sceneIconTheme || 'lucide'}
+                    x={0}
+                    y={0}
+                    width={140}
+                    height={140}
+                    animation="scale"
+                    startFrame={stepStart + 15}
+                    durationInFrames={120}
+                    style="tech"
+                    importance="primary"
+                />
+            </div>
+        );
+      })}
     </>
   );
 };

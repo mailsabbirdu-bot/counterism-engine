@@ -1,15 +1,20 @@
 import React, { useMemo, useState } from 'react';
-import { interpolate, useCurrentFrame, spring, useVideoConfig } from 'remotion';
+import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 import { LayeredSvg } from './LayeredSvg';
-import { AnimationType, SvgProvider, SvgStyle, Importance, GlowConfig, GradientConfig } from '../types';
+import { AnimationType, SvgProvider, SvgStyle, Importance, GlowConfig, GradientConfig, LayerType } from '../types';
 import { GlassPanel } from './GlassPanel';
+import { getEntranceProgress } from '../lib/animationUtils';
 
-interface AnimatedSvgProps {
+// Import CSS once in the composition root or here for individual components
+// but standardizing on a single stylesheet helps performance.
+import '../styles/svgAnimations.css';
+
+export interface AnimatedSvgProps {
   query: string;
   provider: SvgProvider;
-  animation: AnimationType;
-  startFrame: number;
-  durationInFrames: number;
+  animation?: AnimationType;
+  startFrame?: number;
+  durationInFrames?: number;
   width: number;
   height: number;
   x: number;
@@ -25,6 +30,7 @@ interface AnimatedSvgProps {
   container?: 'glass_panel';
   gradient?: GradientConfig;
   id?: string;
+  layer?: LayerType;
 
   // Grouping/Composition support
   groupOffset?: { x: number, y: number };
@@ -33,9 +39,9 @@ interface AnimatedSvgProps {
 export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
   query,
   provider,
-  animation,
-  startFrame,
-  durationInFrames,
+  animation = 'fade',
+  startFrame = 0,
+  durationInFrames = 150,
   width,
   height,
   x,
@@ -57,22 +63,18 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
 
   const relativeFrame = frame - startFrame;
 
+  // 1. OPTIMIZATION: Conditional Spring vs Interpolation
+  // High importance or center hub objects get smooth springs
+  const isHighImportance = importance === 'primary' || container === 'glass_panel';
+  const spr = getEntranceProgress(frame, fps, startFrame, isHighImportance);
+
   // Automatic importance-based scaling and opacity
   const baseScale = importance === 'primary' ? 1.2 : importance === 'decorative' ? 0.7 : 1;
   const baseOpacity = importance === 'decorative' ? 0.4 : 1;
   const importanceGlow = importance === 'primary' && !glow ? { color, intensity: 0.4, radius: 30 } : glow;
 
-  // Base entrance spring
-  const spr = spring({
-    frame: relativeFrame,
-    fps,
-    config: { damping: 12 },
-  });
-
   const animationStyles = useMemo(() => {
     if (relativeFrame < 0) return { opacity: 0 };
-
-    const progress = Math.min(1, Math.max(0, relativeFrame / durationInFrames));
 
     switch (animation) {
       case 'fade':
@@ -82,10 +84,7 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
       case 'pop':
         return { opacity: spr * baseOpacity, transform: `scale(${spr * 1.1 * baseScale})` };
       case 'rotate':
-        return { opacity: spr * baseOpacity, transform: `rotate(${spr * 360}deg) scale(${spr * baseScale})` };
-      case 'bounce':
-        const bounce = spring({ frame: relativeFrame, fps, config: { mass: 0.5, damping: 5 } });
-        return { opacity: baseOpacity, transform: `scale(${bounce * baseScale})` };
+        return { opacity: spr * baseOpacity, transform: `rotate(${(spr * 360) % 360}deg) scale(${spr * baseScale})` };
       case 'slideUp':
         return { opacity: spr * baseOpacity, transform: `translateY(${(1 - spr) * 100}px) scale(${baseScale})` };
       case 'slideDown':
@@ -102,25 +101,20 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
         return { opacity: spr * baseOpacity, transform: `translate(${orbitX}px, ${orbitY}px) scale(${spr * baseScale})` };
       case 'reveal':
         return { opacity: 1, clipPath: `inset(0 ${100 - spr * 100}% 0 0)`, transform: `scale(${baseScale})` };
-      case 'draw':
-      case 'trace':
-        return { opacity: 1, transform: `scale(${baseScale})` };
-      case 'glowPulse':
-        return { opacity: 1, transform: `scale(${baseScale})` };
       default:
-        return { opacity: baseOpacity, transform: `scale(${baseScale})` };
+        return { opacity: spr * baseOpacity, transform: `scale(${baseScale})` };
     }
-  }, [animation, relativeFrame, spr, baseScale, baseOpacity, durationInFrames, fps]);
+  }, [animation, relativeFrame, spr, baseScale, baseOpacity]);
 
-  const customAnimStyles = useMemo(() => {
-    if (animation !== 'draw' && animation !== 'trace' && animation !== 'glowPulse') return {};
-
+  // 2. HARDENING: Use inline styles for variables only, shared CSS for rules
+  const variableStyles = useMemo(() => {
     return {
         '--draw-progress': spr,
         '--path-length': pathLength,
         '--glow-pulse': 0.5 + Math.sin(relativeFrame / 15) * 0.5,
-    };
-  }, [animation, spr, pathLength, relativeFrame]);
+        '--glow-color': color
+    } as React.CSSProperties;
+  }, [spr, pathLength, relativeFrame, color]);
 
   const content = (
     <div
@@ -132,7 +126,7 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
         height,
         transform: 'translate(-50%, -50%)',
         ...animationStyles,
-        ...customAnimStyles as any
+        ...variableStyles
       }}
       className={`svg-motion-container ${animation}`}
     >
@@ -150,28 +144,10 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
         id={id}
         onLoad={(_, lengths) => {
             if (lengths.length > 0) {
-                // We use the max length of all paths for the CSS animation
                 setPathLength(Math.max(...lengths));
             }
         }}
       />
-
-      <style dangerouslySetInnerHTML={{ __html: `
-        .svg-motion-container.draw svg path,
-        .svg-motion-container.trace svg path {
-          stroke-dasharray: var(--path-length, 5000);
-          stroke-dashoffset: calc(var(--path-length, 5000) * (1 - var(--draw-progress, 1)));
-          transition: stroke-dashoffset 0.1s linear;
-        }
-        .svg-motion-container.trace svg path {
-          stroke-width: 4px;
-          filter: drop-shadow(0 0 10px currentColor);
-        }
-        .svg-motion-container.glowPulse > div {
-           filter: drop-shadow(0 0 calc(var(--glow-pulse) * 30px) ${color});
-           opacity: calc(0.6 + var(--glow-pulse) * 0.4);
-        }
-      `}} />
     </div>
   );
 

@@ -1,19 +1,23 @@
-import React from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
-import { KpiElement } from '../types';
+import React, { useMemo } from 'react';
+import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
+import { KpiElement, SvgProvider } from '../types';
 import { RemoteSvg } from './RemoteSvg';
+import { getEntranceProgress } from '../lib/animationUtils';
 
-export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: any }> = ({ element, sceneIconTheme }) => {
-  const { title, value, trend, subtitle, icon, x, y } = element;
+export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
+  const { title, value, trend, subtitle, icon, x, y, startFrame = 0 } = element;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const spr = spring({ frame: frame - 15, fps, config: { damping: 12 } });
+  const spr = getEntranceProgress(frame, fps, startFrame, true);
 
   // Value animation (numeric only)
   const displayValue = useMemo(() => {
+    const rel = frame - (startFrame + 15);
+    if (rel < 0) return typeof value === 'number' ? '0' : value;
+
     if (typeof value === 'number') {
-        const count = interpolate(frame - 30, [0, 60], [0, value], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+        const count = interpolate(rel, [0, 60], [0, value], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
         return Math.round(count).toLocaleString();
     }
     // Handle strings like "170M"
@@ -21,11 +25,11 @@ export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: any }> = 
     if (match) {
         const num = parseFloat(match[1]);
         const suffix = match[2] || '';
-        const count = interpolate(frame - 30, [0, 60], [0, num], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+        const count = interpolate(rel, [0, 60], [0, num], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
         return `${count.toFixed(match[1].includes('.') ? 1 : 0)}${suffix}`;
     }
     return value;
-  }, [value, frame]);
+  }, [value, frame, startFrame]);
 
   return (
     <div style={{
@@ -77,6 +81,3 @@ export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: any }> = 
     </div>
   );
 };
-
-// Add useMemo to imports
-import { useMemo } from 'react';

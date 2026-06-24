@@ -1,41 +1,35 @@
-import React from 'react';
-import { spring, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import React, { useMemo } from 'react';
+import { useCurrentFrame, useVideoConfig } from 'remotion';
+import { ConnectionLineProps } from '../types';
+import { generateSvgId } from '../lib/svgUtils';
+import { getEntranceProgress } from '../lib/animationUtils';
 
-interface ConnectionLineProps {
-  start: { x: number; y: number };
-  end: { x: number; y: number };
-  startFrame: number;
-  duration: number;
-  color?: string;
-  type?: 'solid' | 'dotted' | 'arrow';
-}
-
-export const ConnectionLine: React.FC<ConnectionLineProps> = ({
+export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, y:number}, end: {x:number, y:number} }> = ({
   start,
   end,
-  startFrame,
-  duration,
+  startFrame = 0,
+  duration = 60,
   color = 'rgba(255,255,255,0.2)',
   type = 'dotted'
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const progress = spring({
-    frame: frame - startFrame,
-    fps,
-    config: { damping: 20 },
-  });
+  // OPTIMIZATION: Use interpolation for lines
+  const progress = getEntranceProgress(frame, fps, startFrame, false);
+
+  // HARDENING: Unique Marker IDs to prevent collisions
+  const markerId = useMemo(() => generateSvgId('arrowhead', `${start.x}-${start.y}-${end.x}-${end.y}`), [start, end]);
 
   if (frame < startFrame) return null;
 
-  const currentX = interpolate(progress, [0, 1], [start.x, end.x]);
-  const currentY = interpolate(progress, [0, 1], [start.y, end.y]);
+  const currentX = start.x + (end.x - start.x) * progress;
+  const currentY = start.y + (end.y - start.y) * progress;
 
   return (
     <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
       <defs>
-        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <marker id={markerId} markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
           <polygon points="0 0, 10 3.5, 0 7" fill={color} />
         </marker>
       </defs>
@@ -47,24 +41,20 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
         stroke={color}
         strokeWidth="2"
         strokeDasharray={type === 'dotted' ? "4 4" : "0"}
-        markerEnd={type === 'arrow' ? "url(#arrowhead)" : ""}
+        markerEnd={type === 'arrow' ? `url(#${markerId})` : ""}
       />
     </svg>
   );
 };
 
-export const GlowNode: React.FC<{ x: number, y: number, startFrame: number, color?: string, type?: 'glow' | 'pulse' | 'signal' }> = ({
-  x, y, startFrame, color = '#3b82f6', type = 'glow'
+export const GlowNode: React.FC<{ x: number, y: number, startFrame?: number, color?: string, type?: 'glow' | 'pulse' | 'signal' }> = ({
+  x, y, startFrame = 0, color = '#3b82f6', type = 'glow'
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const relativeFrame = frame - startFrame;
-  const progress = spring({
-    frame: relativeFrame,
-    fps,
-    config: { damping: 10, stiffness: 100 },
-  });
+  const progress = getEntranceProgress(frame, fps, startFrame, false);
 
   if (frame < startFrame) return null;
 
@@ -91,20 +81,23 @@ export const GlowNode: React.FC<{ x: number, y: number, startFrame: number, colo
           inset: -20,
           border: `2px solid ${color}`,
           borderRadius: '50%',
-          opacity: interpolate(relativeFrame % 30, [0, 30], [0.6, 0]),
-          transform: `scale(${interpolate(relativeFrame % 30, [0, 30], [0.5, 2])})`
+          opacity: (1 - (relativeFrame % 30) / 30) * 0.6,
+          transform: `scale(${0.5 + ((relativeFrame % 30) / 30) * 1.5})`
         }} />
       )}
     </div>
   );
 };
 
-export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFrame: number, color?: string }> = ({
-    x, y, radius, startFrame, color = 'rgba(255,255,255,0.1)'
+export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFrame?: number, color?: string, orbitSpeed?: number }> = ({
+    x, y, radius, startFrame = 0, color = 'rgba(255,255,255,0.1)', orbitSpeed = 1
 }) => {
     const frame = useCurrentFrame();
     const relativeFrame = frame - startFrame;
     if (frame < startFrame) return null;
+
+    // HARDENING: Clamp rotation
+    const rotation = (relativeFrame * orbitSpeed) % 360;
 
     return (
         <div style={{
@@ -115,7 +108,7 @@ export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFr
             height: radius * 2,
             border: `1px solid ${color}`,
             borderRadius: '50%',
-            transform: `translate(-50%, -50%) rotate(${relativeFrame}deg)`,
+            transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
             zIndex: 1
         }}>
             <div style={{
