@@ -134,8 +134,8 @@ export const CameraEngine: React.FC<{
   const frame = useCurrentFrame();
   const { width, height, durationInFrames } = useVideoConfig();
 
-  const start = Number((config as any).start) || 0;
-  const duration = Number((config as any).duration) || durationInFrames;
+  const start = Number((config as any)?.start) || 0;
+  const duration = Number((config as any)?.duration) || durationInFrames;
 
   const mergedKeyframes = useMemo(() => {
     const keys: CameraKeyframe[] = [{ frame: 0, zoom: 1, x: 0, y: 0, rotationZ: 0 }];

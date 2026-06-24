@@ -37,6 +37,7 @@ manifest = {
       "duration_in_frames": 150,
       "background_type": "procedural",
       "procedural_config": { "variant": "neon_grid" },
+      "camera": { "enabled": true, "shots": [] },
       "overlays": [
         {
           "id": "icon1",
