@@ -116,11 +116,11 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
         }}
       />
 
-      {/* Global CSS for Draw Animation */}
+      {/* Global CSS for Draw Animation - Support large/complex paths */}
       <style dangerouslySetInnerHTML={{ __html: `
         .svg-draw-container svg path {
-          stroke-dasharray: 1000;
-          stroke-dashoffset: calc(1000 * (1 - var(--draw-progress, 1)));
+          stroke-dasharray: 5000;
+          stroke-dashoffset: calc(5000 * (1 - var(--draw-progress, 1)));
           transition: stroke-dashoffset 0.1s linear;
         }
       `}} />

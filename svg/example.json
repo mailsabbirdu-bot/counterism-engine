@@ -1,47 +1,87 @@
 {
-  "elements": [
+  "project_name": "Ultra Powerful SVG Showcase",
+  "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
+  "scenes": [
     {
-      "id": "house-draw",
-      "type": "svg",
-      "query": "house",
-      "provider": "lucide",
-      "animation": "draw",
-      "startFrame": 0,
-      "durationInFrames": 90,
-      "x": 480,
-      "y": 540,
-      "width": 300,
-      "height": 300,
-      "color": "#3b82f6",
-      "strokeWidth": 2
+      "scene_id": "SCENE_01_LARGE_HOUSE",
+      "duration_in_frames": 180,
+      "background_type": "procedural",
+      "procedural_config": { "variant": "neon_grid", "primaryColor": "#0f172a" },
+      "camera": { "enabled": true, "shots": [] },
+      "overlays": [
+        {
+          "id": "house-main",
+          "type": "svg",
+          "query": "home",
+          "provider": "lucide",
+          "animation": "draw",
+          "start": 15,
+          "duration": 150,
+          "position": { "x": 960, "y": 540 },
+          "width": 950,
+          "height": 950,
+          "color": "#3b82f6",
+          "strokeWidth": 4
+        },
+        {
+          "id": "txt-label",
+          "type": "text",
+          "content": "SMART ARCHITECTURE",
+          "font": "Orbitron",
+          "fontSize": "60px",
+          "position": { "x": 960, "y": 950 },
+          "start": 90,
+          "duration": 90
+        }
+      ]
     },
     {
-      "id": "star-pop",
-      "type": "svg",
-      "query": "star",
-      "provider": "iconify",
-      "animation": "pop",
-      "startFrame": 30,
-      "durationInFrames": 60,
-      "x": 960,
-      "y": 540,
-      "width": 200,
-      "height": 200,
-      "color": "#eab308"
-    },
-    {
-      "id": "bell-bounce",
-      "type": "svg",
-      "query": "bell",
-      "provider": "tabler",
-      "animation": "bounce",
-      "startFrame": 60,
-      "durationInFrames": 60,
-      "x": 1440,
-      "y": 540,
-      "width": 250,
-      "height": 250,
-      "color": "#ef4444"
+      "scene_id": "SCENE_02_SVG_GALLERY",
+      "duration_in_frames": 240,
+      "background_type": "procedural",
+      "procedural_config": { "variant": "dark_particles" },
+      "camera": { "enabled": true, "shots": [] },
+      "overlays": [
+        {
+          "id": "icon-lucide",
+          "type": "svg",
+          "query": "cpu",
+          "provider": "lucide",
+          "animation": "bounce",
+          "start": 10,
+          "duration": 100,
+          "position": { "x": 480, "y": 540 },
+          "width": 400,
+          "height": 400,
+          "color": "#6366f1"
+        },
+        {
+          "id": "icon-iconify",
+          "type": "svg",
+          "query": "mdi:robot-industrial",
+          "provider": "iconify",
+          "animation": "pop",
+          "start": 60,
+          "duration": 100,
+          "position": { "x": 960, "y": 540 },
+          "width": 450,
+          "height": 450,
+          "color": "#10b881"
+        },
+        {
+          "id": "icon-tabler",
+          "type": "svg",
+          "query": "drone",
+          "provider": "tabler",
+          "animation": "rotate",
+          "start": 110,
+          "duration": 100,
+          "position": { "x": 1440, "y": 540 },
+          "width": 400,
+          "height": 400,
+          "color": "#f43f5e"
+        }
+      ]
     }
   ]
 }
