@@ -5,6 +5,7 @@ import { ProceduralBackground } from './engines/ProceduralBackground';
 import { CameraEngine } from './engines/CameraEngine';
 import { resolveAsset } from './lib/resolveAsset';
 import { AudioEngine } from './engines/AudioEngine';
+import { InfographicComposer } from '../svg/components/InfographicComposer';
 
 export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
   const { durationInFrames } = useVideoConfig();
@@ -54,6 +55,7 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
         overlays={sceneData.overlays || []}
         backgroundLayer={renderBackground()}
       >
+        <InfographicComposer sceneData={sceneData} />
         <OverlayManager overlays={sceneData.overlays || []} />
       </CameraEngine>
     </AbsoluteFill>

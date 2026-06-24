@@ -173,9 +173,10 @@ class RemotionJsonMaker:
             'video': (900, 700)
         }
 
-        # Rigid Minimalist Overlay Budget per Scene
+        # Advanced Motion Graphics Budget
         MAX_TEXT_PER_SCENE = 1
-        MAX_FOCAL_PER_SCENE = 1 # Chart/UI/KPI
+        MAX_FOCAL_PER_SCENE = 1
+        MAX_SVG_PER_SCENE = 5
 
         # Logical sectors (Safe Zones)
         SECTORS = {
@@ -351,6 +352,10 @@ class RemotionJsonMaker:
                     elif ov_type in ['chart', 'ui_panel', 'data_indicator', 'shadcn_chart', 'shadcn_indicator']:
                         if focal_count >= MAX_FOCAL_PER_SCENE: continue
                         focal_count += 1
+
+                    elif ov_type == 'svg':
+                        # Allow multiple SVGs for infographic storytelling
+                        pass
 
                         # LLM Repair: kind -> indicator_type / chart_type
                         if 'kind' in ov:
@@ -1184,33 +1189,34 @@ class RemotionJsonMaker:
         ]
 
         full_prompt = (
-            "ACT AS REMOTION JSON ENGINE. OUTPUT RAW MINIFIED JSON ONLY. NO PREAMBLE. NO MARKDOWN. NO CONVERSATION.\n"
+            "ACT AS REMOTION MOTION GRAPHICS ENGINE. OUTPUT RAW MINIFIED JSON ONLY.\n"
+            "GOAL: BUILD COMPLEX INFOGRAPHIC SCENES WITH MULTIPLE LAYERS.\n"
             "STRICT SCHEMA:\n"
-            "- 'scenes': [ { 'scene_id', 'duration', 'video_path', 'overlays': [], 'camera': { 'shots': [] } } ]\n"
-            "- 'overlays': [ { 'id', 'type': 'text'|'chart'|'data_indicator', 'content', 'font', 'start', 'duration', 'position' } ]\n"
-            "- 'camera': { 'enabled': true, 'shots': [ { 'targetId', 'style', 'zoom', 'startFrame', 'duration' } ] }\n"
-            "VISUAL LIBRARY (CHOOSE SLEEK/ULTRA-MODERN PRESETS):\n"
-            "- 'svg' (type: 'svg'): provider ('iconify'|'lucide'|'tabler'), query (icon name), animation ('draw'|'pop'|'bounce'|'fade'). Use 'draw' for outline icons.\n"
-            "- 'chart_type' (for 'chart'): line, area, forecast, bar, horizontalBar, verticalBar, groupedBar, stackedBar, pie, donut, bump, areaBump, heatmap, radar, radialBar, stream, swarmplot, waffle, funnel, marimekko, circlePacking, calendar, parallelCoordinates, treemap, sunburst, scatter, network, chord, violinPlot.\n"
-            "- 'indicator_type' (for 'data_indicator'): kpiNumber, percentageCounter, comparisonKPI, deltaIndicator, countdown, progressBar, circularProgress, semiGauge, milestoneTracker, dashboardCard, statGrid, techMetric, dataWave, scoreCard, batteryLevel, pulseRadar, multiProgress, speedometer, ringChart, statusBadge, metricRing, floatingTag, stepIndicator, eventTimeline, milestoneTimeline.\n"
-            "- SHADCN LIBRARY (type: 'shadcn_chart' | 'shadcn_indicator'):\n"
-            "  - 'chart_type' (shadcn_chart): glass_area, neon_bar, stacked_line, radial_score, radar_web, composed_tech, pie_donut_glass, scatter_bubble, horizontal_pill_bar, step_area, multi_bar_stack, curved_edge_line, double_radar.\n"
-            "  - 'indicator_type' (shadcn_indicator): metric_tile, tech_badge, activity_ring, crypto_card, server_status, user_profile_stat, weather_glass, storage_pill, upload_cloud, score_board, notification_stack, data_ticker, network_ping, step_indicator_glass.\n"
+            "- 'scenes': [ { 'scene_id', 'duration', 'video_path', 'overlays': [], 'infographic_lines': [], 'infographic_nodes': [], 'camera': { 'shots': [] } } ]\n"
+            "- 'overlays': [ { 'id', 'type': 'svg'|'text'|'chart'|'shadcn_chart'|'shadcn_indicator', 'query'?, 'provider'?, 'animation', 'start', 'duration', 'position' } ]\n"
+            "- 'infographic_lines': [ { 'start_pos': {x,y}, 'end_pos': {x,y}, 'start', 'duration', 'color' } ]\n"
+            "- 'infographic_nodes': [ { 'x', 'y', 'start', 'color' } ]\n"
+            "MOTION GRAPHICS RULES:\n"
+            "1. NOUN HIERARCHY: Never render a noun directly. Instead of 1 'house' icon, use multiple SVGs (house, family, location) and connect them with 'infographic_lines'.\n"
+            "2. COMPOSITION: Use 3-5 SVGs per scene to build a concept. Compose them spatially (e.g. icons orbiting a central text/chart).\n"
+            "3. INFOGRAPHIC ELEMENTS: Use 'infographic_lines' (dashed) and 'infographic_nodes' (glowing dots) to show relationships and data flow between overlays.\n"
+            "4. SVG ANIMATION: Prioritize 'draw' for outline icons (provider: lucide/tabler). Use 'bounce' or 'pop' for filled icons.\n"
+            "VISUAL LIBRARY:\n"
+            "- 'svg' (type: 'svg'): provider ('lucide'|'tabler'|'iconify'), query (icon name), animation ('draw'|'pop'|'bounce'|'fade').\n"
+            "- 'chart_type' (chart/shadcn_chart): glass_area, neon_bar, radial_score, radar_web, bump, heatmap, etc.\n"
+            "- 'indicator_type' (shadcn_indicator): metric_tile, crypto_card, tech_badge, data_ticker, etc.\n"
             "CORE RULES:\n"
             "1. NO TRANSLATION. If Story is Bangla, Content MUST be Bangla.\n"
             "2. SYNC: Use provided TIMESTAMPS for 'start' frames. Intro MUST be synced.\n"
-            "3. MINIMALISM: Exactly 1 text + 1 focal (chart/indicator) per scene.\n"
-            "4. MANDATORY NIVO: Visualize EVERY number or statistic from story using KPI/Chart/Indicator.\n"
-            "5. DATA INTEGRITY: Ensure 'chart' has 'data' array/object and 'title'. Ensure 'indicator' has 'label' and 'value'.\n"
-            "6. FONTS: Use Bangla list for Bangla text, English list for English.\n"
-            "7. PACING: Ensure focal elements have 90f+ resting time.\n"
+            "3. MANDATORY NIVO: Visualize EVERY number or statistic from story using KPI/Chart/Indicator.\n"
+            "4. FONTS: Use Bangla list for Bangla text, English list for English.\n"
             f"FONTS: {local_fonts}\n"
             f"SFX: {self.camera_files}\n"
             f"DURATIONS: {duration_context}\n"
             f"TIMESTAMPS: {compact_ts}\n"
             f"STORY: \n{story_context}\n"
             f"REFERENCE: {schema_ref}\n"
-            "TASK: Generate the master JSON for ALL scenes. Start with '{' and end with '}'."
+            "TASK: Generate the infographic master JSON for ALL scenes. Maximize information density."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
