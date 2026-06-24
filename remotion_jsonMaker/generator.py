@@ -307,6 +307,12 @@ class RemotionJsonMaker:
                     if ov_type == 'ui' or ov_type == 'ui_panel': ov['type'] = 'ui_panel'
                     if ov_type == 'indicator' or ov_type == 'data_indicator': ov['type'] = 'data_indicator'
 
+                    # SHADCN REDIRECTION: If AI hallucinated type but matched shadcn keys
+                    if 'chart_type' in ov and ov.get('chart_type') in ['glass_area', 'neon_bar', 'stacked_line', 'radial_score', 'radar_web']:
+                        ov['type'] = 'shadcn_chart'
+                    if 'indicator_type' in ov and ov.get('indicator_type') in ['metric_tile', 'tech_badge', 'activity_ring', 'crypto_card']:
+                        ov['type'] = 'shadcn_indicator'
+
                     # Final re-resolve for branching
                     ov_type = ov.get('type', 'text')
 
@@ -339,7 +345,7 @@ class RemotionJsonMaker:
                         # Sanitize font names (ensure no weird characters or extensions)
                         if ov.get('font'):
                             ov['font'] = re.sub(r'\.(ttf|otf|woff|woff2)$', '', str(ov['font']), flags=re.I)
-                    elif ov_type in ['chart', 'ui_panel', 'data_indicator']:
+                    elif ov_type in ['chart', 'ui_panel', 'data_indicator', 'shadcn_chart', 'shadcn_indicator']:
                         if focal_count >= MAX_FOCAL_PER_SCENE: continue
                         focal_count += 1
 
@@ -394,7 +400,7 @@ class RemotionJsonMaker:
                         ov['id'] = f"OV_{scene_idx+1}_{i+1}_{ov.get('type', 'element').upper()}"
 
                     ov_type = ov.get('type', 'text')
-                    if ov_type in ['text', 'chart', 'ui_panel', 'data_indicator']:
+                    if ov_type in ['text', 'chart', 'ui_panel', 'data_indicator', 'shadcn_chart', 'shadcn_indicator']:
                         focal_ids.append(ov['id'])
 
                     ov_type = ov.get('type', 'text')
@@ -1183,6 +1189,9 @@ class RemotionJsonMaker:
             "VISUAL LIBRARY (CHOOSE SLEEK/ULTRA-MODERN PRESETS):\n"
             "- 'chart_type' (for 'chart'): line, area, forecast, bar, horizontalBar, verticalBar, groupedBar, stackedBar, pie, donut, bump, areaBump, heatmap, radar, radialBar, stream, swarmplot, waffle, funnel, marimekko, circlePacking, calendar, parallelCoordinates, treemap, sunburst, scatter, network, chord, violinPlot.\n"
             "- 'indicator_type' (for 'data_indicator'): kpiNumber, percentageCounter, comparisonKPI, deltaIndicator, countdown, progressBar, circularProgress, semiGauge, milestoneTracker, dashboardCard, statGrid, techMetric, dataWave, scoreCard, batteryLevel, pulseRadar, multiProgress, speedometer, ringChart, statusBadge, metricRing, floatingTag, stepIndicator, eventTimeline, milestoneTimeline.\n"
+            "- SHADCN LIBRARY (type: 'shadcn_chart' | 'shadcn_indicator'):\n"
+            "  - 'chart_type' (shadcn_chart): glass_area, neon_bar, stacked_line, radial_score, radar_web, composed_tech, pie_donut_glass, scatter_bubble, horizontal_pill_bar, step_area, multi_bar_stack, curved_edge_line, double_radar.\n"
+            "  - 'indicator_type' (shadcn_indicator): metric_tile, tech_badge, activity_ring, crypto_card, server_status, user_profile_stat, weather_glass, storage_pill, upload_cloud, score_board, notification_stack, data_ticker, network_ping, step_indicator_glass.\n"
             "CORE RULES:\n"
             "1. NO TRANSLATION. If Story is Bangla, Content MUST be Bangla.\n"
             "2. SYNC: Use provided TIMESTAMPS for 'start' frames. Intro MUST be synced.\n"

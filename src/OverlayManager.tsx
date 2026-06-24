@@ -7,6 +7,7 @@ import { ChartsEngine } from './engines/ChartsEngine';
 import { GraphsEngine } from './engines/GraphsEngine';
 import { MediaEngine } from './engines/MediaEngine';
 import { DataIndicatorEngine } from './engines/DataIndicatorEngine';
+import { ShadcnEngine } from './engines/ShadcnEngine';
 
 interface OverlayManagerProps {
   overlays: any[];
@@ -40,6 +41,9 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays }) => {
             case 'video':
             case 'image':
               return <MediaEngine overlay={overlay} />;
+            case 'shadcn_chart':
+            case 'shadcn_indicator':
+              return <ShadcnEngine overlay={overlay} />;
             default:
               return null;
           }

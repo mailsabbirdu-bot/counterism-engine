@@ -1,0 +1,29 @@
+{
+  "project_name": "Studio V4 - Shadcn Visual Showcase",
+  "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
+  "scenes": [
+    {
+      "scene_id": "SCENE_01_SHADCN_CHARTS",
+      "duration_in_frames": 600,
+      "background_type": "video",
+      "video_path": "renders/scene_SC_01.mp4",
+      "overlays": [
+        { "id": "s_c1", "type": "shadcn_chart", "chart_type": "glass_area", "title": "Glass Analytics", "subtitle": "Cloud Performance", "start": 30, "duration": 200, "position": { "x": 480, "y": 540 }, "width": 800, "height": 500, "color": "#3b82f6", "data": [{"name": "Jan", "value": 400}, {"name": "Feb", "value": 300}, {"name": "Mar", "value": 600}] },
+        { "id": "s_c2", "type": "shadcn_chart", "chart_type": "radar_web", "title": "Neural Radar", "start": 250, "duration": 200, "position": { "x": 1440, "y": 540 }, "width": 700, "height": 500, "color": "#8b5cf6", "data": [{"name": "Speed", "value": 80}, {"name": "Memory", "value": 95}, {"name": "Disk", "value": 70}] }
+      ],
+      "camera": { "enabled": true, "shots": [{ "targetId": "s_c1", "startFrame": 30, "duration": 200 }, { "targetId": "s_c2", "startFrame": 250, "duration": 200 }] }
+    },
+    {
+      "scene_id": "SCENE_02_SHADCN_INDICATORS",
+      "duration_in_frames": 600,
+      "background_type": "video",
+      "video_path": "renders/scene_SC_02.mp4",
+      "overlays": [
+        { "id": "s_i1", "type": "shadcn_indicator", "indicator_type": "metric_tile", "label": "Network Activity", "value": 8420, "start": 30, "duration": 200, "position": { "x": 480, "y": 350 } },
+        { "id": "s_i2", "type": "shadcn_indicator", "indicator_type": "crypto_card", "label": "Bitcoin", "value": "64,281", "start": 60, "duration": 200, "position": { "x": 1440, "y": 350 } },
+        { "id": "s_i3", "type": "shadcn_indicator", "indicator_type": "user_profile_stat", "start": 250, "duration": 200, "position": { "x": 960, "y": 700 } }
+      ],
+      "camera": { "enabled": true, "shots": [{ "targetId": "s_i1", "startFrame": 30, "duration": 200 }, { "targetId": "s_i3", "startFrame": 250, "duration": 200 }] }
+    }
+  ]
+}
