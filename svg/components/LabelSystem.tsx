@@ -1,0 +1,55 @@
+import React from 'react';
+import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import { LabelElement } from '../types';
+
+export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
+  const { text, position = 'bottom', fontSize = 32, color = 'white', animation = 'slideUp' } = element;
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  if (!targetPos) return null;
+
+  const spr = spring({ frame: frame - 45, fps, config: { damping: 12 } });
+
+  const offsets = {
+    top: { x: 0, y: -80 },
+    bottom: { x: 0, y: 80 },
+    left: { x: -120, y: 0 },
+    right: { x: 120, y: 0 },
+    center: { x: 0, y: 0 }
+  };
+
+  const offset = offsets[position];
+  const x = targetPos.x + offset.x;
+  const y = targetPos.y + offset.y;
+
+  const animationStyles = () => {
+    switch (animation) {
+      case 'fade': return { opacity: spr };
+      case 'slideUp': return { opacity: spr, transform: `translateY(${(1-spr)*20}px)` };
+      case 'slideDown': return { opacity: spr, transform: `translateY(${(spr-1)*20}px)` };
+      case 'reveal': return { clipPath: `inset(0 ${100-spr*100}% 0 0)` };
+      case 'typewriter': return { opacity: 1 }; // Fallback
+      default: return { opacity: spr };
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'absolute',
+      left: x,
+      top: y,
+      transform: 'translate(-50%, -50%)',
+      color,
+      fontSize,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+      letterSpacing: '2px',
+      whiteSpace: 'nowrap',
+      textShadow: '0 4px 20px rgba(0,0,0,0.5)',
+      ...animationStyles()
+    }}>
+      {text}
+    </div>
+  );
+};

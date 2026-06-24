@@ -202,7 +202,214 @@ export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
 
   return content;
 };
+
 --- END OF svg/components/AnimatedSvg.tsx ---
+
+--- FILE: svg/components/CalloutSystem.tsx ---
+import React from 'react';
+import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import { CalloutElement } from '../types';
+
+export const CalloutSystem: React.FC<{ element: CalloutElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
+  const { title, body, direction = 'right' } = element;
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  if (!targetPos) return null;
+
+  const spr = spring({ frame: frame - 60, fps, config: { damping: 15 } });
+
+  const lineLength = 150;
+  const boxWidth = 300;
+
+  const offsets = {
+    right: { lx: 30, ly: 0, ex: lineLength, ey: 0, bx: lineLength, by: 0, align: 'left' },
+    left: { lx: -30, ly: 0, ex: -lineLength, ey: 0, bx: -lineLength - boxWidth, by: 0, align: 'right' },
+    top: { lx: 0, ly: -30, ex: 0, ey: -lineLength, bx: -boxWidth/2, by: -lineLength - 100, align: 'center' },
+    bottom: { lx: 0, ly: 30, ex: 0, ey: lineLength, bx: -boxWidth/2, by: lineLength, align: 'center' }
+  };
+
+  const off = offsets[direction];
+
+  return (
+    <div style={{ position: 'absolute', left: targetPos.x, top: targetPos.y }}>
+      {/* 1. Leader Line */}
+      <svg style={{ position: 'absolute', overflow: 'visible', pointerEvents: 'none' }}>
+        <line
+          x1={off.lx} y1={off.ly}
+          x2={off.lx + (off.ex - off.lx) * spr}
+          y2={off.ly + (off.ey - off.ly) * spr}
+          stroke="white" strokeWidth="2" strokeDasharray="4 4"
+        />
+        <circle cx={off.lx} cy={off.ly} r="4" fill="white" opacity={spr} />
+      </svg>
+
+      {/* 2. Callout Box */}
+      <div style={{
+        position: 'absolute',
+        left: off.bx,
+        top: off.by,
+        width: boxWidth,
+        padding: '20px',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255,255,255,0.2)',
+        borderRadius: '12px',
+        opacity: spr,
+        transform: `translateY(${(1-spr)*20}px)`,
+        textAlign: off.align as any
+      }}>
+        <h4 style={{ color: '#00F5FF', fontSize: '18px', fontWeight: 'bold', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{title}</h4>
+        <p style={{ color: 'white', fontSize: '14px', margin: 0, opacity: 0.8, lineHeight: '1.4' }}>{body}</p>
+      </div>
+    </div>
+  );
+};
+
+--- END OF svg/components/CalloutSystem.tsx ---
+
+--- FILE: svg/components/CompositionEngine.tsx ---
+import React, { useMemo } from 'react';
+import { CompositionElement, SvgElement, SvgProvider } from '../types';
+import { COMPOSITIONS } from '../lib/compositionLibrary';
+import { AnimatedSvg } from './AnimatedSvg';
+import { ConnectionLine } from './InfographicElements';
+
+export const CompositionEngine: React.FC<{
+  element: CompositionElement,
+  sceneIconTheme?: SvgProvider
+}> = ({ element, sceneIconTheme }) => {
+  const definition = COMPOSITIONS[element.compositionType];
+
+  if (!definition) {
+    return null;
+  }
+
+  const { x: baseX, y: baseY, scale = 1, enterAnimation = 'scale' } = element;
+
+  // 1. Expand elements with base coordinates
+  const expandedElements = useMemo(() => {
+    return definition.elements.map((el: any) => ({
+      ...el,
+      id: `${element.id}_${el.id}`,
+      x: baseX + (el.offsetX * scale),
+      y: baseY + (el.offsetY * scale),
+      width: el.width * scale,
+      height: el.height * scale,
+      animation: el.animation || enterAnimation,
+      provider: el.provider || sceneIconTheme || 'lucide',
+      startFrame: el.startFrame || 0,
+      durationInFrames: el.durationInFrames || 150
+    })) as SvgElement[];
+  }, [definition, baseX, baseY, scale, enterAnimation, sceneIconTheme, element.id]);
+
+  // 2. Map for line resolution
+  const posMap = useMemo(() => {
+    const map: Record<string, { x: number, y: number }> = {};
+    expandedElements.forEach(el => {
+      map[el.id.replace(`${element.id}_`, '')] = { x: el.x, y: el.y };
+    });
+    return map;
+  }, [expandedElements, element.id]);
+
+  return (
+    <>
+      {/* Render Lines */}
+      {definition.lines?.map((line, i) => {
+        const start = posMap[line.from];
+        const end = posMap[line.to];
+        if (!start || !end) return null;
+
+        return (
+          <ConnectionLine
+            key={`${element.id}_line_${i}`}
+            start={start}
+            end={end}
+            startFrame={30} // Staggered start
+            duration={60}
+            type={line.type as any}
+          />
+        );
+      })}
+
+      {/* Render SVGs */}
+      {expandedElements.map(el => (
+        <AnimatedSvg
+          key={el.id}
+          {...el}
+          provider={el.provider as SvgProvider}
+          animation={el.animation || 'fade'}
+          startFrame={el.startFrame || 0}
+          durationInFrames={el.durationInFrames || 150}
+        />
+      ))}
+    </>
+  );
+};
+
+--- END OF svg/components/CompositionEngine.tsx ---
+
+--- FILE: svg/components/FlowDiagram.tsx ---
+import React, { useMemo } from 'react';
+import { FlowDiagramElement } from '../types';
+import { AnimatedSvg } from './AnimatedSvg';
+import { ConnectionLine } from './InfographicElements';
+
+export const FlowDiagram: React.FC<{ element: FlowDiagramElement, sceneIconTheme?: any }> = ({ element, sceneIconTheme }) => {
+  const { x, y, steps, layout = 'horizontal', arrowStyle = 'arrow', spacing = 250 } = element;
+
+  const nodePositions = useMemo(() => {
+    return steps.map((_, i) => {
+      const offset = (i - (steps.length - 1) / 2) * spacing;
+      return {
+        x: layout === 'horizontal' ? x + offset : x,
+        y: layout === 'vertical' ? y + offset : y
+      };
+    });
+  }, [x, y, steps, layout, spacing]);
+
+  return (
+    <>
+      {/* 1. Connection Arrows */}
+      {nodePositions.map((pos, i) => {
+        if (i === 0) return null;
+        const prevPos = nodePositions[i - 1];
+        return (
+          <ConnectionLine
+            key={`${element.id}_flow_${i}`}
+            start={prevPos}
+            end={pos}
+            startFrame={30 + (i * 20)}
+            duration={45}
+            type={arrowStyle === 'glow' ? 'solid' : arrowStyle as any}
+            color={arrowStyle === 'glow' ? '#00F5FF' : undefined}
+          />
+        );
+      })}
+
+      {/* 2. Nodes */}
+      {steps.map((query, i) => (
+        <AnimatedSvg
+          key={`${element.id}_step_${i}`}
+          id={`${element.id}_step_${i}`}
+          query={query}
+          provider={sceneIconTheme || 'lucide'}
+          x={nodePositions[i].x}
+          y={nodePositions[i].y}
+          width={120}
+          height={120}
+          animation="pop"
+          startFrame={15 + (i * 20)}
+          durationInFrames={120}
+          style="infographic"
+          importance={i === 0 || i === steps.length - 1 ? 'primary' : 'secondary'}
+        />
+      ))}
+    </>
+  );
+};
+
+--- END OF svg/components/FlowDiagram.tsx ---
 
 --- FILE: svg/components/GlassPanel.tsx ---
 import React from 'react';
@@ -260,7 +467,97 @@ export const GlassPanel: React.FC<GlassPanelProps> = ({ children, width, height,
     </div>
   );
 };
+
 --- END OF svg/components/GlassPanel.tsx ---
+
+--- FILE: svg/components/HubNetwork.tsx ---
+import React, { useMemo } from 'react';
+import { HubNetworkElement } from '../types';
+import { AnimatedSvg } from './AnimatedSvg';
+import { ConnectionLine, OrbitRing, GlowNode } from './InfographicElements';
+
+export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?: any }> = ({ element, sceneIconTheme }) => {
+  const { x, y, radius, nodes, centerSvg, provider, connectionStyle = 'arrow', animation = 'pop' } = element;
+
+  const nodePositions = useMemo(() => {
+    return nodes.map((_, i) => {
+      const angle = (i / nodes.length) * Math.PI * 2;
+      return {
+        x: x + Math.cos(angle) * radius,
+        y: y + Math.sin(angle) * radius
+      };
+    });
+  }, [x, y, radius, nodes]);
+
+  return (
+    <>
+      {/* 1. Orbit Ring */}
+      <OrbitRing x={x} y={y} radius={radius} startFrame={0} color="rgba(255,255,255,0.05)" />
+
+      {/* 2. Connection Lines */}
+      {nodePositions.map((pos, i) => (
+        <ConnectionLine
+          key={`${element.id}_line_${i}`}
+          start={{ x, y }}
+          end={pos}
+          startFrame={30 + (i * 5)}
+          duration={60}
+          type={connectionStyle as any}
+        />
+      ))}
+
+      {/* 3. Outer Nodes */}
+      {nodes.map((query, i) => (
+        <AnimatedSvg
+          key={`${element.id}_node_${i}`}
+          id={`${element.id}_node_${i}`}
+          query={query}
+          provider={provider || sceneIconTheme || 'lucide'}
+          x={nodePositions[i].x}
+          y={nodePositions[i].y}
+          width={100}
+          height={100}
+          animation={animation}
+          startFrame={45 + (i * 10)}
+          durationInFrames={120}
+          importance="secondary"
+        />
+      ))}
+
+      {/* 4. Center Node */}
+      <AnimatedSvg
+        id={`${element.id}_center`}
+        query={centerSvg}
+        provider={provider || sceneIconTheme || 'lucide'}
+        x={x}
+        y={y}
+        width={180}
+        height={180}
+        animation="trace"
+        style="tech"
+        importance="primary"
+        glow={true}
+        container="glass_panel"
+        startFrame={15}
+        durationInFrames={150}
+      />
+
+      {/* 5. Node Pulsars */}
+      {nodePositions.map((pos, i) => (
+        <GlowNode
+            key={`${element.id}_glow_${i}`}
+            x={pos.x}
+            y={pos.y}
+            startFrame={60 + (i * 10)}
+            type="pulse"
+            color="rgba(255,255,255,0.2)"
+        />
+      ))}
+    </>
+  );
+};
+
+--- END OF svg/components/HubNetwork.tsx ---
 
 --- FILE: svg/components/InfographicBackgrounds.tsx ---
 import React from 'react';
@@ -334,6 +631,7 @@ export const InfographicBackground: React.FC<InfographicBackgroundProps> = ({ ty
     </AbsoluteFill>
   );
 };
+
 --- END OF svg/components/InfographicBackgrounds.tsx ---
 
 --- FILE: svg/components/InfographicComposer.tsx ---
@@ -342,11 +640,21 @@ import { AbsoluteFill, spring, useCurrentFrame, useVideoConfig } from 'remotion'
 import { ConnectionLine, GlowNode, OrbitRing } from './InfographicElements';
 import { InfographicBackground } from './InfographicBackgrounds';
 import { AnimatedSvg } from './AnimatedSvg';
-import { SvgGroup, SvgElement } from '../types';
+import { HubNetwork } from './HubNetwork';
+import { FlowDiagram } from './FlowDiagram';
+import { ProcessDiagram } from './ProcessDiagram';
+import { LabelSystem } from './LabelSystem';
+import { CalloutSystem } from './CalloutSystem';
+import { KpiCard } from './KpiCard';
+import { Timeline } from './Timeline';
+import { CompositionEngine } from './CompositionEngine';
+import { SvgGroup, StorytellingElement, LayerType } from '../types';
 
 interface InfographicComposerProps {
   sceneData: any;
 }
+
+const LAYER_ORDER: LayerType[] = ['background', 'decorative', 'secondary', 'primary', 'foreground', 'overlay'];
 
 export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneData }) => {
   const frame = useCurrentFrame();
@@ -354,24 +662,24 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
 
   if (!sceneData) return null;
 
-  const elements = sceneData.elements || [];
+  const elements: StorytellingElement[] = sceneData.elements || [];
   const groups: SvgGroup[] = sceneData.groups || [];
   const lines = sceneData.infographic_lines || [];
   const nodes = sceneData.infographic_nodes || [];
   const background = sceneData.background;
+  const sceneIconTheme = sceneData.sceneIconTheme;
 
   // 1. Resolve element positions (including group-based layouts)
   const resolvedElements = useMemo(() => {
-      // Create a deep copy to avoid mutating original data
-      const result = elements.map((el: any) => ({ ...el }));
+      const result = elements.map(el => ({ ...el }));
 
       groups.forEach(group => {
-          const children = result.filter(el => el.groupId === group.id);
+          const children = result.filter((el: any) => el.groupId === group.id);
           const groupX = group.x ?? 960;
           const groupY = group.y ?? 540;
           const spacing = group.spacing ?? 200;
 
-          children.forEach((child, index) => {
+          children.forEach((child: any, index) => {
               if (group.layout === 'horizontal') {
                   const offset = (index - (children.length - 1) / 2) * spacing;
                   child.x = groupX + offset;
@@ -390,6 +698,10 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
                   const col = index % cols;
                   child.x = groupX + (col - (cols - 1) / 2) * spacing;
                   child.y = groupY + (row - (Math.ceil(children.length / cols) - 1) / 2) * spacing;
+              } else if (group.layout === 'radial') {
+                  const angle = (index / children.length) * Math.PI * 2;
+                  child.x = groupX + Math.cos(angle) * spacing;
+                  child.y = groupY + Math.sin(angle) * spacing;
               }
           });
       });
@@ -397,21 +709,30 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
       return result;
   }, [elements, groups]);
 
-  // 2. Map ID to resolved position for lines
+  // 2. Map ID to resolved position for lines and relative components
   const positionMap = useMemo(() => {
       const map: Record<string, { x: number, y: number }> = {};
-      resolvedElements.forEach(el => {
+      resolvedElements.forEach((el: any) => {
           if (el.id) map[el.id] = { x: el.x, y: el.y };
       });
       return map;
   }, [resolvedElements]);
 
+  // 3. Sorting by Layer
+  const sortedElements = useMemo(() => {
+      return [...resolvedElements].sort((a: any, b: any) => {
+          const idxA = LAYER_ORDER.indexOf(a.layer || 'primary');
+          const idxB = LAYER_ORDER.indexOf(b.layer || 'primary');
+          return idxA - idxB;
+      });
+  }, [resolvedElements]);
+
   return (
     <AbsoluteFill className="pointer-events-none">
-      {/* Background System */}
+      {/* 1. Background System */}
       <InfographicBackground type={background} />
 
-      {/* Orbit Rings (Behind elements) */}
+      {/* 2. Orbit Rings */}
       {nodes.filter((n: any) => n.radius).map((node: any, i: number) => (
         <OrbitRing
           key={`orbit-${i}`}
@@ -423,13 +744,23 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
         />
       ))}
 
-      {/* Connection Lines (Resolved by ID) */}
+      {/* 3. Group background rings */}
+      {groups.filter(g => g.backgroundRing).map((group, i) => (
+          <OrbitRing
+            key={`group-ring-${i}`}
+            x={group.x ?? 960}
+            y={group.y ?? 540}
+            radius={group.spacing ?? 200}
+            startFrame={0}
+            color="rgba(255,255,255,0.05)"
+          />
+      ))}
+
+      {/* 4. Connection Lines (Resolved by ID) */}
       {lines.map((line: any, i: number) => {
           const start = line.from ? positionMap[line.from] : line.start_pos;
           const end = line.to ? positionMap[line.to] : line.end_pos;
-
           if (!start || !end) return null;
-
           return (
             <ConnectionLine
               key={`line-${i}`}
@@ -443,7 +774,33 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
           );
       })}
 
-      {/* Glow Nodes & Primitives */}
+      {/* 5. Components Rendering */}
+      {sortedElements.map((el: any) => {
+          const commonProps = { key: el.id, sceneIconTheme };
+
+          switch(el.type) {
+              case 'svg':
+                  const group = groups.find(g => g.id === el.groupId);
+                  let groupOffset = { x: 0, y: 0 };
+                  if (group && group.enterAnimation) {
+                      const spr = spring({ frame: frame - (el.startFrame || 0), fps, config: { damping: 15 } });
+                      if (group.enterAnimation === 'slideUp') groupOffset.y = (1 - spr) * 50;
+                  }
+                  return <AnimatedSvg {...el} {...commonProps} groupOffset={groupOffset} provider={el.provider || sceneIconTheme || 'lucide'} />;
+
+              case 'hub_network': return <HubNetwork element={el} {...commonProps} />;
+              case 'flow_diagram': return <FlowDiagram element={el} {...commonProps} />;
+              case 'process': return <ProcessDiagram element={el} {...commonProps} />;
+              case 'label': return <LabelSystem element={el} targetPos={positionMap[el.target]} key={el.id} />;
+              case 'callout': return <CalloutSystem element={el} targetPos={positionMap[el.target]} key={el.id} />;
+              case 'kpi': return <KpiCard element={el} {...commonProps} />;
+              case 'timeline': return <Timeline element={el} key={el.id} />;
+              case 'composition': return <CompositionEngine element={el} {...commonProps} />;
+              default: return null;
+          }
+      })}
+
+      {/* 6. Simple Nodes */}
       {nodes.filter((n: any) => !n.radius).map((node: any, i: number) => (
         <GlowNode
           key={`node-${i}`}
@@ -454,38 +811,10 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = ({ sceneD
           type={node.type}
         />
       ))}
-
-      {/* Group Animations & Elements */}
-      {resolvedElements.filter((el: any) => el.type === 'svg').map((el: any) => {
-          const group = groups.find(g => g.id === el.groupId);
-
-          // Group-level animation logic (staggered entrance offset)
-          let groupOffset = { x: 0, y: 0 };
-          if (group && group.animation) {
-              const spr = spring({
-                  frame: frame - (el.startFrame || 0),
-                  fps,
-                  config: { damping: 15 }
-              });
-
-              if (group.animation === 'slideUp') groupOffset.y = (1 - spr) * 50;
-              if (group.animation === 'scale') {
-                  // Handled via groupOffset doesn't make sense for scale,
-                  // but we could support group-level properties in the future
-              }
-          }
-
-          return (
-            <AnimatedSvg
-              key={el.id}
-              {...el}
-              groupOffset={groupOffset}
-            />
-          );
-      })}
     </AbsoluteFill>
   );
 };
+
 --- END OF svg/components/InfographicComposer.tsx ---
 
 --- FILE: svg/components/InfographicElements.tsx ---
@@ -622,6 +951,7 @@ export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFr
         </div>
     );
 };
+
 --- END OF svg/components/InfographicElements.tsx ---
 
 --- FILE: svg/components/JsonSceneRenderer.tsx ---
@@ -662,7 +992,153 @@ export const JsonSceneRenderer: React.FC<JsonSceneRendererProps> = ({ sceneData 
     </AbsoluteFill>
   );
 };
+
 --- END OF svg/components/JsonSceneRenderer.tsx ---
+
+--- FILE: svg/components/KpiCard.tsx ---
+import React from 'react';
+import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import { KpiElement } from '../types';
+import { RemoteSvg } from './RemoteSvg';
+
+export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: any }> = ({ element, sceneIconTheme }) => {
+  const { title, value, trend, subtitle, icon, x, y } = element;
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const spr = spring({ frame: frame - 15, fps, config: { damping: 12 } });
+
+  // Value animation (numeric only)
+  const displayValue = useMemo(() => {
+    if (typeof value === 'number') {
+        const count = interpolate(frame - 30, [0, 60], [0, value], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+        return Math.round(count).toLocaleString();
+    }
+    // Handle strings like "170M"
+    const match = String(value).match(/^([\d.]+)([A-Z%]+)?$/);
+    if (match) {
+        const num = parseFloat(match[1]);
+        const suffix = match[2] || '';
+        const count = interpolate(frame - 30, [0, 60], [0, num], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+        return `${count.toFixed(match[1].includes('.') ? 1 : 0)}${suffix}`;
+    }
+    return value;
+  }, [value, frame]);
+
+  return (
+    <div style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        transform: `translate(-50%, -50%) scale(${0.8 + spr * 0.2})`,
+        opacity: spr,
+        width: 320,
+        padding: '24px',
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        backdropFilter: 'blur(30px)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '32px',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px'
+    }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '2px' }}>{title}</span>
+                <h2 style={{ color: 'white', fontSize: '48px', fontWeight: '900', margin: '4px 0 0 0', letterSpacing: '-2px' }}>{displayValue}</h2>
+            </div>
+            {icon && (
+                <div style={{ width: 48, height: 48, backgroundColor: 'rgba(0, 245, 255, 0.1)', borderRadius: '12px', padding: '8px' }}>
+                    <RemoteSvg query={icon} provider={sceneIconTheme || 'lucide'} color="#00F5FF" />
+                </div>
+            )}
+        </div>
+
+        {(trend || subtitle) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {trend && (
+                    <span style={{
+                        color: trend.startsWith('+') ? '#10b981' : '#ef4444',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        backgroundColor: trend.startsWith('+') ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                        padding: '4px 8px',
+                        borderRadius: '8px'
+                    }}>
+                        {trend}
+                    </span>
+                )}
+                {subtitle && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: 'medium' }}>{subtitle}</span>}
+            </div>
+        )}
+    </div>
+  );
+};
+
+// Add useMemo to imports
+import { useMemo } from 'react';
+
+--- END OF svg/components/KpiCard.tsx ---
+
+--- FILE: svg/components/LabelSystem.tsx ---
+import React from 'react';
+import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import { LabelElement } from '../types';
+
+export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
+  const { text, position = 'bottom', fontSize = 32, color = 'white', animation = 'slideUp' } = element;
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  if (!targetPos) return null;
+
+  const spr = spring({ frame: frame - 45, fps, config: { damping: 12 } });
+
+  const offsets = {
+    top: { x: 0, y: -80 },
+    bottom: { x: 0, y: 80 },
+    left: { x: -120, y: 0 },
+    right: { x: 120, y: 0 },
+    center: { x: 0, y: 0 }
+  };
+
+  const offset = offsets[position];
+  const x = targetPos.x + offset.x;
+  const y = targetPos.y + offset.y;
+
+  const animationStyles = () => {
+    switch (animation) {
+      case 'fade': return { opacity: spr };
+      case 'slideUp': return { opacity: spr, transform: `translateY(${(1-spr)*20}px)` };
+      case 'slideDown': return { opacity: spr, transform: `translateY(${(spr-1)*20}px)` };
+      case 'reveal': return { clipPath: `inset(0 ${100-spr*100}% 0 0)` };
+      case 'typewriter': return { opacity: 1 }; // Fallback
+      default: return { opacity: spr };
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'absolute',
+      left: x,
+      top: y,
+      transform: 'translate(-50%, -50%)',
+      color,
+      fontSize,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+      letterSpacing: '2px',
+      whiteSpace: 'nowrap',
+      textShadow: '0 4px 20px rgba(0,0,0,0.5)',
+      ...animationStyles()
+    }}>
+      {text}
+    </div>
+  );
+};
+
+--- END OF svg/components/LabelSystem.tsx ---
 
 --- FILE: svg/components/LayeredSvg.tsx ---
 import React from 'react';
@@ -762,7 +1238,113 @@ export const LayeredSvg: React.FC<LayeredSvgProps> = ({
     </div>
   );
 };
+
 --- END OF svg/components/LayeredSvg.tsx ---
+
+--- FILE: svg/components/ProcessDiagram.tsx ---
+import React, { useMemo } from 'react';
+import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import { ProcessElement } from '../types';
+import { AnimatedSvg } from './AnimatedSvg';
+
+export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?: any }> = ({ element, sceneIconTheme }) => {
+  const { x, y, steps } = element;
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const spacing = 350;
+
+  const nodePositions = useMemo(() => {
+    return steps.map((_, i) => ({
+      x: x + (i - (steps.length - 1) / 2) * spacing,
+      y: y
+    }));
+  }, [x, y, steps, spacing]);
+
+  return (
+    <>
+      {/* 1. Progress Line Background */}
+      <div style={{
+          position: 'absolute',
+          left: nodePositions[0].x,
+          top: y,
+          width: nodePositions[steps.length - 1].x - nodePositions[0].x,
+          height: 4,
+          backgroundColor: 'rgba(255,255,255,0.1)',
+          transform: 'translateY(-50%)',
+          borderRadius: 2
+      }} />
+
+      {/* 2. Animated Progress Line */}
+      {steps.map((_, i) => {
+          if (i === 0) return null;
+          const prevX = nodePositions[i - 1].x;
+          const nextX = nodePositions[i].x;
+          const start = 60 + (i * 30);
+          const progress = spring({ frame: frame - start, fps, config: { damping: 20 } });
+
+          return (
+            <div key={`progress_${i}`} style={{
+                position: 'absolute',
+                left: prevX,
+                top: y,
+                width: (nextX - prevX) * progress,
+                height: 4,
+                backgroundColor: '#00F5FF',
+                transform: 'translateY(-50%)',
+                boxShadow: '0 0 10px #00F5FF',
+                borderRadius: 2,
+                zIndex: 1
+            }} />
+          );
+      })}
+
+      {/* 3. Steps */}
+      {steps.map((query, i) => (
+        <div key={`step_${i}`} style={{ position: 'absolute', left: nodePositions[i].x, top: nodePositions[i].y, transform: 'translate(-50%, -50%)' }}>
+            {/* Number Bubble */}
+            <div style={{
+                position: 'absolute',
+                top: -80,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                border: '2px solid #00F5FF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: 18,
+                fontWeight: 'bold',
+                backgroundColor: 'rgba(0, 245, 255, 0.1)',
+                opacity: spring({ frame: frame - (15 + i * 30), fps })
+            }}>
+                {i + 1}
+            </div>
+
+            <AnimatedSvg
+                id={`${element.id}_node_${i}`}
+                query={query}
+                provider={sceneIconTheme || 'lucide'}
+                x={0}
+                y={0}
+                width={140}
+                height={140}
+                animation="scale"
+                startFrame={30 + (i * 30)}
+                durationInFrames={120}
+                style="tech"
+                importance="primary"
+            />
+        </div>
+      ))}
+    </>
+  );
+};
+
+--- END OF svg/components/ProcessDiagram.tsx ---
 
 --- FILE: svg/components/RemoteSvg.tsx ---
 import React, { useEffect, useState, useMemo, useRef } from 'react';
@@ -928,7 +1510,89 @@ export const RemoteSvg: React.FC<RemoteSvgProps> = ({
     />
   );
 };
+
 --- END OF svg/components/RemoteSvg.tsx ---
+
+--- FILE: svg/components/Timeline.tsx ---
+import React from 'react';
+import { interpolate, useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import { TimelineElement } from '../types';
+
+export const Timeline: React.FC<{ element: TimelineElement }> = ({ element }) => {
+  const { events, x, y } = element;
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const totalWidth = 1200;
+  const stepX = totalWidth / (events.length - 1);
+
+  const overallProgress = spring({ frame: frame - 15, fps, config: { damping: 20 } });
+
+  return (
+    <div style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -50%)' }}>
+      {/* 1. Base Line */}
+      <div style={{
+          position: 'absolute',
+          left: -totalWidth / 2,
+          top: 0,
+          width: totalWidth * overallProgress,
+          height: 2,
+          backgroundColor: 'rgba(255,255,255,0.2)',
+          borderRadius: 1
+      }} />
+
+      {/* 2. Events */}
+      {events.map((ev, i) => {
+          const eventX = (-totalWidth / 2) + (i * stepX);
+          const start = 30 + (i * 30);
+          const spr = spring({ frame: frame - start, fps, config: { damping: 12 } });
+
+          if (frame < start) return null;
+
+          return (
+            <div key={`event_${i}`} style={{ position: 'absolute', left: eventX, top: 0 }}>
+                {/* Node */}
+                <div style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    backgroundColor: '#00F5FF',
+                    border: '4px solid #000',
+                    transform: `translate(-50%, -50%) scale(${spr})`,
+                    boxShadow: '0 0 15px #00F5FF'
+                }} />
+
+                {/* Label */}
+                <div style={{
+                    position: 'absolute',
+                    top: i % 2 === 0 ? 40 : -100,
+                    left: 0,
+                    transform: `translateX(-50%) translateY(${(1-spr)*10}px)`,
+                    opacity: spr,
+                    textAlign: 'center',
+                    width: 200
+                }}>
+                    <span style={{ color: '#00F5FF', fontSize: '18px', fontWeight: '900', display: 'block' }}>{ev.year}</span>
+                    <span style={{ color: 'white', fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>{ev.label}</span>
+                </div>
+
+                {/* Connector vertical */}
+                <div style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: i % 2 === 0 ? 0 : -40,
+                    width: 1,
+                    height: 40 * spr,
+                    backgroundColor: 'rgba(0, 245, 255, 0.4)'
+                }} />
+            </div>
+          );
+      })}
+    </div>
+  );
+};
+
+--- END OF svg/components/Timeline.tsx ---
 
 --- FILE: svg/services/SvgCacheService.ts ---
 import { SvgProvider } from '../types';
@@ -948,6 +1612,7 @@ export class SvgCacheService {
     return fetchPromise;
   }
 }
+
 --- END OF svg/services/SvgCacheService.ts ---
 
 --- FILE: svg/services/SvgProviderService.ts ---
@@ -967,11 +1632,22 @@ export class SvgProviderService {
     let primaryUrl = '';
     switch (provider) {
       case 'lucide':
-        // Lucide on Iconify is more robust for aliases
         primaryUrl = `https://api.iconify.design/lucide/${cleanQuery}.svg`;
         break;
       case 'tabler':
         primaryUrl = `https://api.iconify.design/tabler/${cleanQuery}.svg`;
+        break;
+      case 'solar':
+        primaryUrl = `https://api.iconify.design/solar/${cleanQuery}-bold.svg`;
+        break;
+      case 'phosphor':
+        primaryUrl = `https://api.iconify.design/ph/${cleanQuery}-bold.svg`;
+        break;
+      case 'hugeicons':
+        primaryUrl = `https://api.iconify.design/hugeicons/${cleanQuery}.svg`;
+        break;
+      case 'material-symbols':
+        primaryUrl = `https://api.iconify.design/material-symbols/${cleanQuery}.svg`;
         break;
       case 'iconify':
       default:
@@ -984,8 +1660,8 @@ export class SvgProviderService {
         return await this.fetchWithRetry(primaryUrl);
     } catch (e) {
         // FALLBACK: Try standard MDI via Iconify if specific provider fails
-        console.warn(`Primary fetch failed for ${cleanQuery}, trying fallback...`);
-        const fallbackUrl = `https://api.iconify.design/mdi/${cleanQuery}.svg`;
+        console.warn(`Primary fetch failed for ${cleanQuery} (Provider: ${provider}), trying fallback...`);
+        const fallbackUrl = `https://api.iconify.design/mdi/${cleanQuery.split('-').pop()}.svg`;
         return this.fetchWithRetry(fallbackUrl);
     }
   }
@@ -1017,4 +1693,5 @@ export class SvgProviderService {
     }
   }
 }
+
 --- END OF svg/services/SvgProviderService.ts ---

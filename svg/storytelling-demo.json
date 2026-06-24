@@ -1,0 +1,72 @@
+{
+  "project_name": "Full_Storytelling_Engine_Demo",
+  "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
+  "scenes": [
+    {
+      "scene_id": "SCENE_01",
+      "theme": "tech",
+      "sceneIconTheme": "solar",
+      "background": "network_pattern",
+      "groups": [
+        {
+          "id": "main_group",
+          "layout": "horizontal",
+          "spacing": 400,
+          "x": 960,
+          "y": 540,
+          "enterAnimation": "slideUp"
+        }
+      ],
+      "elements": [
+        {
+          "id": "network",
+          "type": "hub_network",
+          "centerSvg": "cloud",
+          "nodes": ["server", "database", "cpu", "monitor"],
+          "radius": 300,
+          "x": 500,
+          "y": 540
+        },
+        {
+          "id": "kpi_1",
+          "type": "kpi",
+          "title": "Global Reach",
+          "value": "170M",
+          "trend": "+24%",
+          "icon": "globe",
+          "x": 1400,
+          "y": 300
+        },
+        {
+          "id": "callout_1",
+          "type": "callout",
+          "target": "network_center",
+          "title": "Central Hub",
+          "body": "Powered by advanced AI pipelines",
+          "direction": "top"
+        },
+        {
+          "id": "timeline_1",
+          "type": "timeline",
+          "events": [
+            { "year": "2020", "label": "Genesis" },
+            { "year": "2024", "label": "Expansion" }
+          ],
+          "x": 960,
+          "y": 900
+        }
+      ],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "network_center",
+            "zoom": 1.4,
+            "duration": 60,
+            "style": "slow_push"
+          }
+        ]
+      }
+    }
+  ]
+}

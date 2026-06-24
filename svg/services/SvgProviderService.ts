@@ -14,11 +14,22 @@ export class SvgProviderService {
     let primaryUrl = '';
     switch (provider) {
       case 'lucide':
-        // Lucide on Iconify is more robust for aliases
         primaryUrl = `https://api.iconify.design/lucide/${cleanQuery}.svg`;
         break;
       case 'tabler':
         primaryUrl = `https://api.iconify.design/tabler/${cleanQuery}.svg`;
+        break;
+      case 'solar':
+        primaryUrl = `https://api.iconify.design/solar/${cleanQuery}-bold.svg`;
+        break;
+      case 'phosphor':
+        primaryUrl = `https://api.iconify.design/ph/${cleanQuery}-bold.svg`;
+        break;
+      case 'hugeicons':
+        primaryUrl = `https://api.iconify.design/hugeicons/${cleanQuery}.svg`;
+        break;
+      case 'material-symbols':
+        primaryUrl = `https://api.iconify.design/material-symbols/${cleanQuery}.svg`;
         break;
       case 'iconify':
       default:
@@ -31,8 +42,8 @@ export class SvgProviderService {
         return await this.fetchWithRetry(primaryUrl);
     } catch (e) {
         // FALLBACK: Try standard MDI via Iconify if specific provider fails
-        console.warn(`Primary fetch failed for ${cleanQuery}, trying fallback...`);
-        const fallbackUrl = `https://api.iconify.design/mdi/${cleanQuery}.svg`;
+        console.warn(`Primary fetch failed for ${cleanQuery} (Provider: ${provider}), trying fallback...`);
+        const fallbackUrl = `https://api.iconify.design/mdi/${cleanQuery.split('-').pop()}.svg`;
         return this.fetchWithRetry(fallbackUrl);
     }
   }
