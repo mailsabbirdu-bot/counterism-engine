@@ -1,0 +1,47 @@
+{
+  "elements": [
+    {
+      "id": "house-draw",
+      "type": "svg",
+      "query": "house",
+      "provider": "lucide",
+      "animation": "draw",
+      "startFrame": 0,
+      "durationInFrames": 90,
+      "x": 480,
+      "y": 540,
+      "width": 300,
+      "height": 300,
+      "color": "#3b82f6",
+      "strokeWidth": 2
+    },
+    {
+      "id": "star-pop",
+      "type": "svg",
+      "query": "star",
+      "provider": "iconify",
+      "animation": "pop",
+      "startFrame": 30,
+      "durationInFrames": 60,
+      "x": 960,
+      "y": 540,
+      "width": 200,
+      "height": 200,
+      "color": "#eab308"
+    },
+    {
+      "id": "bell-bounce",
+      "type": "svg",
+      "query": "bell",
+      "provider": "tabler",
+      "animation": "bounce",
+      "startFrame": 60,
+      "durationInFrames": 60,
+      "x": 1440,
+      "y": 540,
+      "width": 250,
+      "height": 250,
+      "color": "#ef4444"
+    }
+  ]
+}

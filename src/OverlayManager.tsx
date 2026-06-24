@@ -8,6 +8,7 @@ import { GraphsEngine } from './engines/GraphsEngine';
 import { MediaEngine } from './engines/MediaEngine';
 import { DataIndicatorEngine } from './engines/DataIndicatorEngine';
 import { ShadcnEngine } from './engines/ShadcnEngine';
+import { AnimatedSvg } from '../svg/components/AnimatedSvg';
 
 interface OverlayManagerProps {
   overlays: any[];
@@ -44,6 +45,22 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays }) => {
             case 'shadcn_chart':
             case 'shadcn_indicator':
               return <ShadcnEngine overlay={overlay} />;
+            case 'svg':
+              return (
+                <AnimatedSvg
+                  query={overlay.query || overlay.content || 'house'}
+                  provider={overlay.provider || 'iconify'}
+                  animation={overlay.animation || 'draw'}
+                  startFrame={overlay.start || 0}
+                  durationInFrames={overlay.duration || 90}
+                  width={overlay.width || 300}
+                  height={overlay.height || 300}
+                  x={overlay.position?.x || 960}
+                  y={overlay.position?.y || 540}
+                  color={overlay.color}
+                  strokeWidth={overlay.strokeWidth}
+                />
+              );
             default:
               return null;
           }

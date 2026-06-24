@@ -167,6 +167,7 @@ class RemotionJsonMaker:
             'ui_panel': (700, 500),
             'data_indicator': (450, 400),
             'shadcn_indicator': (450, 400),
+            'svg': (300, 300),
             'media': (900, 700),
             'image': (900, 700),
             'video': (900, 700)
@@ -1189,6 +1190,7 @@ class RemotionJsonMaker:
             "- 'overlays': [ { 'id', 'type': 'text'|'chart'|'data_indicator', 'content', 'font', 'start', 'duration', 'position' } ]\n"
             "- 'camera': { 'enabled': true, 'shots': [ { 'targetId', 'style', 'zoom', 'startFrame', 'duration' } ] }\n"
             "VISUAL LIBRARY (CHOOSE SLEEK/ULTRA-MODERN PRESETS):\n"
+            "- 'svg' (type: 'svg'): provider ('iconify'|'lucide'|'tabler'), query (icon name), animation ('draw'|'pop'|'bounce'|'fade'). Use 'draw' for outline icons.\n"
             "- 'chart_type' (for 'chart'): line, area, forecast, bar, horizontalBar, verticalBar, groupedBar, stackedBar, pie, donut, bump, areaBump, heatmap, radar, radialBar, stream, swarmplot, waffle, funnel, marimekko, circlePacking, calendar, parallelCoordinates, treemap, sunburst, scatter, network, chord, violinPlot.\n"
             "- 'indicator_type' (for 'data_indicator'): kpiNumber, percentageCounter, comparisonKPI, deltaIndicator, countdown, progressBar, circularProgress, semiGauge, milestoneTracker, dashboardCard, statGrid, techMetric, dataWave, scoreCard, batteryLevel, pulseRadar, multiProgress, speedometer, ringChart, statusBadge, metricRing, floatingTag, stepIndicator, eventTimeline, milestoneTimeline.\n"
             "- SHADCN LIBRARY (type: 'shadcn_chart' | 'shadcn_indicator'):\n"

@@ -362,6 +362,7 @@ class RemotionRemaker:
                 f"AVAILABLE CAMERA STYLES: {', '.join(camera_style_list)}\n"
                 f"INSTRUCTION: {instruction if instruction else 'Enhance the design and visual impact while strictly following the narrative.'}\n"
                 f"VISUAL LIBRARY (CHOOSE SLEEK/ULTRA-MODERN PRESETS):\n"
+                f"- 'svg' (type: 'svg'): provider ('iconify'|'lucide'|'tabler'), query (icon name), animation ('draw'|'pop'|'bounce'|'fade'). Use 'draw' for outline icons.\n"
                 f"- 'chart_type' (for 'chart'): line, area, forecast, bar, horizontalBar, verticalBar, groupedBar, stackedBar, pie, donut, bump, areaBump, heatmap, radar, radialBar, stream, swarmplot, waffle, funnel, marimekko, circlePacking, calendar, parallelCoordinates, treemap, sunburst, scatter, network, chord, violinPlot.\n"
                 f"- 'indicator_type' (for 'data_indicator'): kpiNumber, percentageCounter, comparisonKPI, deltaIndicator, countdown, progressBar, circularProgress, semiGauge, milestoneTracker, dashboardCard, statGrid, techMetric, dataWave, scoreCard, batteryLevel, pulseRadar, multiProgress, speedometer, ringChart, statusBadge, metricRing, floatingTag, stepIndicator, eventTimeline, milestoneTimeline.\n"
                 f"- SHADCN LIBRARY (type: 'shadcn_chart' | 'shadcn_indicator'):\n"
