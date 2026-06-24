@@ -14,9 +14,9 @@ export interface ThemeConfig {
 
 export const INFOGRAPHIC_THEMES: Record<InfographicTheme, ThemeConfig> = {
   tech: {
-    primaryColor: '#00F5FF', // Cyan
-    secondaryColor: '#7B68EE', // Iris
-    accentColor: '#00FFAB', // Neon Mint
+    primaryColor: '#00F5FF',
+    secondaryColor: '#7B68EE',
+    accentColor: '#00FFAB',
     backgroundColor: '#050505',
     gridColor: 'rgba(0, 245, 255, 0.1)',
     glowIntensity: 0.8,
@@ -25,9 +25,9 @@ export const INFOGRAPHIC_THEMES: Record<InfographicTheme, ThemeConfig> = {
     fontFamily: 'Inter, sans-serif'
   },
   corporate: {
-    primaryColor: '#2563eb', // Blue
-    secondaryColor: '#64748b', // Slate
-    accentColor: '#f59e0b', // Amber
+    primaryColor: '#2563eb',
+    secondaryColor: '#64748b',
+    accentColor: '#f59e0b',
     backgroundColor: '#ffffff',
     gridColor: 'rgba(0, 0, 0, 0.05)',
     glowIntensity: 0.3,
@@ -36,9 +36,9 @@ export const INFOGRAPHIC_THEMES: Record<InfographicTheme, ThemeConfig> = {
     fontFamily: 'Inter, sans-serif'
   },
   finance: {
-    primaryColor: '#10b981', // Emerald
-    secondaryColor: '#064e3b', // Deep Green
-    accentColor: '#fbbf24', // Gold
+    primaryColor: '#10b981',
+    secondaryColor: '#064e3b',
+    accentColor: '#fbbf24',
     backgroundColor: '#022c22',
     gridColor: 'rgba(16, 185, 129, 0.1)',
     glowIntensity: 0.6,
@@ -49,7 +49,7 @@ export const INFOGRAPHIC_THEMES: Record<InfographicTheme, ThemeConfig> = {
   documentary: {
     primaryColor: '#ffffff',
     secondaryColor: '#a1a1aa',
-    accentColor: '#ef4444', // Red
+    accentColor: '#ef4444',
     backgroundColor: '#18181b',
     gridColor: 'rgba(255, 255, 255, 0.05)',
     glowIntensity: 0.4,
@@ -58,9 +58,9 @@ export const INFOGRAPHIC_THEMES: Record<InfographicTheme, ThemeConfig> = {
     fontFamily: 'Playfair Display, serif'
   },
   education: {
-    primaryColor: '#8b5cf6', // Violet
-    secondaryColor: '#ec4899', // Pink
-    accentColor: '#f97316', // Orange
+    primaryColor: '#8b5cf6',
+    secondaryColor: '#ec4899',
+    accentColor: '#f97316',
     backgroundColor: '#fafafa',
     gridColor: 'rgba(139, 92, 246, 0.05)',
     glowIntensity: 0.5,
@@ -69,15 +69,48 @@ export const INFOGRAPHIC_THEMES: Record<InfographicTheme, ThemeConfig> = {
     fontFamily: 'Quicksand, sans-serif'
   },
   healthcare: {
-    primaryColor: '#0ea5e9', // Sky
-    secondaryColor: '#2dd4bf', // Teal
-    accentColor: '#f43f5e', // Rose
+    primaryColor: '#0ea5e9',
+    secondaryColor: '#2dd4bf',
+    accentColor: '#f43f5e',
     backgroundColor: '#f0f9ff',
     gridColor: 'rgba(14, 165, 233, 0.1)',
     glowIntensity: 0.7,
     glassOpacity: 0.08,
     lineStyle: 'solid',
     fontFamily: 'Inter, sans-serif'
+  },
+  medical: {
+    primaryColor: '#f43f5e',
+    secondaryColor: '#fda4af',
+    accentColor: '#3b82f6',
+    backgroundColor: '#fff1f2',
+    gridColor: 'rgba(244, 63, 94, 0.1)',
+    glowIntensity: 0.6,
+    glassOpacity: 0.1,
+    lineStyle: 'solid',
+    fontFamily: 'Inter, sans-serif'
+  },
+  cyberpunk: {
+    primaryColor: '#fde047', // Yellow
+    secondaryColor: '#db2777', // Pink
+    accentColor: '#06b6d4', // Cyan
+    backgroundColor: '#0f172a',
+    gridColor: 'rgba(253, 224, 71, 0.15)',
+    glowIntensity: 1.0,
+    glassOpacity: 0.2,
+    lineStyle: 'dashed',
+    fontFamily: 'Orbitron, sans-serif'
+  },
+  minimal: {
+    primaryColor: '#000000',
+    secondaryColor: '#4b5563',
+    accentColor: '#9ca3af',
+    backgroundColor: '#ffffff',
+    gridColor: 'rgba(0, 0, 0, 0.02)',
+    glowIntensity: 0.1,
+    glassOpacity: 0.02,
+    lineStyle: 'solid',
+    fontFamily: 'Helvetica, sans-serif'
   }
 };
 

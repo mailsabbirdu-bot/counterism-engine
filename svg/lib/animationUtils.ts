@@ -29,8 +29,8 @@ export const getEntranceProgress = (
     });
   }
 
-  // Linear fallback/interpolation for efficiency
-  return interpolate(relativeFrame, [0, 20], [0, 1], {
+  // Linear fallback/interpolation for efficiency - P0-4 Centralization
+  return interpolate(relativeFrame, [0, 25], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });

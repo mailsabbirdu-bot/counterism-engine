@@ -1,10 +1,11 @@
-import React, { useRef } from 'react';
-import { AbsoluteFill, OffthreadVideo, useVideoConfig } from 'remotion';
+import React from 'react';
+import { AbsoluteFill, useVideoConfig } from 'remotion';
 import { OverlayManager } from './OverlayManager';
 import { ProceduralBackground } from './engines/ProceduralBackground';
 import { CameraEngine } from './engines/CameraEngine';
 import { resolveAsset } from './lib/resolveAsset';
 import { AudioEngine } from './engines/AudioEngine';
+import { AnimationProvider } from '../svg/components/AnimationContext';
 import { InfographicComposer } from '../svg/components/InfographicComposer';
 
 export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
@@ -19,7 +20,6 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
       case 'video':
         if (!sceneData.video_path) return null;
         const bgUrl = resolveAsset(sceneData.video_path);
-        console.log(`[Scene Background] Path: ${sceneData.video_path} -> Resolved URL: ${bgUrl}`);
         return (
           <OffthreadVideo
             src={bgUrl}
@@ -32,7 +32,6 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
       case 'none':
         return null;
       default:
-        // Fallback to video if video_path is present, otherwise none
         if (sceneData.video_path) {
           const fallbackUrl = resolveAsset(sceneData.video_path);
           return (
@@ -49,15 +48,19 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
 
   return (
     <AbsoluteFill className="bg-black">
-      <AudioEngine sceneId={sceneData.scene_id} />
-      <CameraEngine
-        config={sceneData.camera}
-        overlays={sceneData.overlays || []}
-        backgroundLayer={renderBackground()}
-      >
-        <InfographicComposer sceneData={sceneData} />
-        <OverlayManager overlays={sceneData.overlays || []} />
-      </CameraEngine>
+      <AnimationProvider>
+        <AudioEngine sceneId={sceneData.scene_id} />
+        <CameraEngine
+          config={sceneData.camera}
+          overlays={sceneData.overlays || []}
+          backgroundLayer={renderBackground()}
+        >
+          <InfographicComposer sceneData={sceneData} />
+          <OverlayManager overlays={sceneData.overlays || []} />
+        </CameraEngine>
+      </AnimationProvider>
     </AbsoluteFill>
   );
 };
+
+import { OffthreadVideo } from 'remotion';

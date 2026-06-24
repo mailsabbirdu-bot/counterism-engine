@@ -2,19 +2,16 @@ import React, { useMemo } from 'react';
 import { FlowDiagramElement, SvgProvider } from '../types';
 import { AnimatedSvg } from './AnimatedSvg';
 import { ConnectionLine } from './InfographicElements';
+import { calculateLinearPosition } from '../lib/layoutUtils';
+import { ENGINE_CONSTANTS } from '../lib/constants';
 
 export const FlowDiagram: React.FC<{ element: FlowDiagramElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
-  const { x, y, steps, layout = 'horizontal', arrowStyle = 'arrow', spacing = 250, startFrame = 0 } = element;
+  const { x, y, steps, layout = 'horizontal', arrowStyle = 'arrow', spacing = ENGINE_CONSTANTS.DEFAULT_SPACING, startFrame = 0 } = element;
 
+  const nodeCount = steps.length;
   const nodePositions = useMemo(() => {
-    return steps.map((_, i) => {
-      const offset = (i - (steps.length - 1) / 2) * spacing;
-      return {
-        x: layout === 'horizontal' ? x + offset : x,
-        y: layout === 'vertical' ? y + offset : y
-      };
-    });
-  }, [x, y, steps, layout, spacing]);
+    return steps.map((_, i) => calculateLinearPosition(i, nodeCount, x, y, spacing, layout as 'horizontal' | 'vertical'));
+  }, [x, y, steps, layout, spacing, nodeCount]);
 
   return (
     <>

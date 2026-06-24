@@ -33,7 +33,7 @@ export type Importance = 'primary' | 'secondary' | 'decorative';
 
 export type LayerType = 'background' | 'decorative' | 'secondary' | 'primary' | 'foreground' | 'overlay';
 
-export type InfographicTheme = 'tech' | 'corporate' | 'finance' | 'documentary' | 'education' | 'healthcare';
+export type InfographicTheme = 'tech' | 'corporate' | 'finance' | 'documentary' | 'education' | 'healthcare' | 'medical' | 'cyberpunk' | 'minimal';
 
 export type BackgroundType = 'tech_grid' | 'blueprint_grid' | 'dotted_pattern' | 'network_pattern' | 'radial_glow';
 
@@ -51,6 +51,16 @@ export type CompositionType =
   | 'healthcare_system'
   | 'education_system'
   | 'financial_flow';
+
+export type NarrativeStoryType =
+  | 'hub_explanation'
+  | 'process_breakdown'
+  | 'timeline_story'
+  | 'comparison'
+  | 'cause_effect'
+  | 'ecosystem'
+  | 'funnel'
+  | 'roadmap';
 
 export interface GradientConfig {
   start: string;
@@ -107,6 +117,7 @@ export interface SvgGroup {
 }
 
 export interface InfographicLine {
+  id?: string;
   start_pos?: { x: number; y: number };
   end_pos?: { x: number; y: number };
   from?: string; // element ID
@@ -115,6 +126,7 @@ export interface InfographicLine {
   duration?: number;
   color?: string;
   type?: 'solid' | 'dotted' | 'arrow';
+  layer?: LayerType;
 }
 
 export interface ConnectionLineProps {
@@ -125,12 +137,14 @@ export interface ConnectionLineProps {
 }
 
 export interface InfographicNode {
+  id?: string;
   x: number;
   y: number;
   start?: number;
   color?: string;
   type?: 'glow' | 'pulse' | 'signal';
   radius?: number;
+  layer?: LayerType;
 }
 
 // --- NEW HIGH-LEVEL ELEMENTS ---
@@ -147,6 +161,7 @@ export interface HubNetworkElement {
   connectionStyle?: 'solid' | 'dotted' | 'arrow';
   animation?: AnimationType;
   startFrame?: number;
+  layer?: LayerType;
 }
 
 export interface FlowDiagramElement {
@@ -159,6 +174,7 @@ export interface FlowDiagramElement {
   x: number;
   y: number;
   startFrame?: number;
+  layer?: LayerType;
 }
 
 export interface ProcessElement {
@@ -168,6 +184,7 @@ export interface ProcessElement {
   x: number;
   y: number;
   startFrame?: number;
+  layer?: LayerType;
 }
 
 export interface LabelElement {
@@ -180,6 +197,7 @@ export interface LabelElement {
   color?: string;
   animation?: AnimationType;
   startFrame?: number;
+  layer?: LayerType;
 }
 
 export interface CalloutElement {
@@ -192,6 +210,7 @@ export interface CalloutElement {
   x?: number;
   y?: number;
   startFrame?: number;
+  layer?: LayerType;
 }
 
 export interface KpiElement {
@@ -205,6 +224,7 @@ export interface KpiElement {
   x: number;
   y: number;
   startFrame?: number;
+  layer?: LayerType;
 }
 
 export interface ChartElement {
@@ -216,6 +236,7 @@ export interface ChartElement {
   height: number;
   data: any[];
   startFrame?: number;
+  layer?: LayerType;
 }
 
 export interface TimelineEvent {
@@ -230,6 +251,7 @@ export interface TimelineElement {
   x: number;
   y: number;
   startFrame?: number;
+  layer?: LayerType;
 }
 
 export interface CompositionElement {
@@ -242,6 +264,7 @@ export interface CompositionElement {
   enterAnimation?: AnimationType;
   theme?: InfographicTheme;
   startFrame?: number;
+  layer?: LayerType;
 }
 
 export type StorytellingElement =
@@ -264,4 +287,6 @@ export interface SvgScene {
   background?: BackgroundType;
   theme?: InfographicTheme;
   sceneIconTheme?: SvgProvider;
+  story?: NarrativeStoryType;
+  startFrame?: number;
 }

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { AbsoluteFill, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, spring, useVideoConfig } from 'remotion';
 import { ConnectionLine, GlowNode, OrbitRing } from './InfographicElements';
 import { InfographicBackground } from './InfographicBackgrounds';
 import { AnimatedSvg } from './AnimatedSvg';
@@ -12,7 +12,9 @@ import { KpiCard } from './KpiCard';
 import { Timeline } from './Timeline';
 import { CompositionEngine } from './CompositionEngine';
 import { NarrativeTemplate } from './NarrativeTemplates';
+import { useAnimation } from './AnimationContext';
 import { SvgGroup, StorytellingElement, LayerType, SvgProvider } from '../types';
+import { ENGINE_CONSTANTS } from '../lib/constants';
 
 interface InfographicComposerProps {
   sceneData: any;
@@ -20,9 +22,12 @@ interface InfographicComposerProps {
 
 const LAYER_ORDER: LayerType[] = ['background', 'decorative', 'secondary', 'primary', 'foreground', 'overlay'];
 
+/**
+ * Infographic Composer
+ * Renders complex multi-layered visual storytelling compositions from JSON.
+ */
 export const InfographicComposer: React.FC<InfographicComposerProps> = React.memo(({ sceneData }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { frame, fps } = useAnimation();
 
   if (!sceneData) return null;
 
@@ -39,9 +44,9 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = React.mem
 
       groups.forEach(group => {
           const children = result.filter((el: any) => el.groupId === group.id);
-          const groupX = group.x ?? 960;
-          const groupY = group.y ?? 540;
-          const spacing = group.spacing ?? 200;
+          const groupX = group.x ?? ENGINE_CONSTANTS.CENTER_X;
+          const groupY = group.y ?? ENGINE_CONSTANTS.CENTER_Y;
+          const spacing = group.spacing ?? ENGINE_CONSTANTS.DEFAULT_SPACING;
 
           children.forEach((child: any, index) => {
               if (group.layout === 'horizontal') {
@@ -98,8 +103,13 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = React.mem
 
   return (
     <AbsoluteFill className="pointer-events-none">
-      {/* Narrative Templates (Phase 15) */}
-      <NarrativeTemplate story={sceneData.story} startFrame={sceneData.startFrame || 0} sceneIconTheme={sceneIconTheme} />
+      {/* Narrative Templates */}
+      <NarrativeTemplate
+        story={sceneData.story}
+        startFrame={sceneData.startFrame || 0}
+        sceneIconTheme={sceneIconTheme}
+        positionMap={positionMap}
+      />
 
       {/* Background System */}
       <InfographicBackground type={background} />
