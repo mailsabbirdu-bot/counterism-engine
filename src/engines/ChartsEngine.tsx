@@ -101,7 +101,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
 
     const type = overlay.chart_type;
 
-    if (['line', 'area', 'forecast'].includes(type)) {
+    if (['line', 'area', 'forecast', 'multiLine', 'stackedArea'].includes(type)) {
       const isFlat = Array.isArray(overlay.data) && overlay.data.length > 0 && !overlay.data[0].data;
       const seriesArray = isFlat ? [{ id: overlay.title || 'Data', data: overlay.data }] : (Array.isArray(overlay.data) ? overlay.data : []);
 
@@ -122,9 +122,9 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
           {...commonProps}
           data={animatedData}
           xScale={{ type: 'point' }}
-          yScale={{ type: 'linear', min: overlay.minY ?? 0, max: overlay.maxY ?? 'auto' }}
+          yScale={{ type: 'linear', min: overlay.minY ?? 0, max: overlay.maxY ?? 'auto', stacked: type === 'stackedArea' }}
           curve={overlay.curve || "monotoneX"}
-          enableArea={['area', 'forecast'].includes(type)}
+          enableArea={['area', 'forecast', 'stackedArea'].includes(type)}
           areaOpacity={0.25}
           pointSize={type === 'forecast' ? 0 : 8}
           pointColor="#09090b"
@@ -137,7 +137,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       );
     }
 
-    if (['bar', 'horizontalBar', 'verticalBar', 'groupedBar', 'stackedBar'].includes(type)) {
+    if (['bar', 'horizontalBar', 'verticalBar', 'groupedBar', 'stackedBar', 'barRace'].includes(type)) {
        if (!Array.isArray(overlay.data)) return null;
        const keys = overlay.keys || ['value'];
        const animatedData = overlay.data.map((item: any) => {
@@ -171,7 +171,7 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         if (!Array.isArray(overlay.data)) return null;
         const animatedData = overlay.data.map((series: any) => ({
             ...series,
-            data: series.data.map((p: any, i: number) => {
+            data: (series.data || []).map((p: any, i: number) => {
                 const reveal = interpolate(dataProgress * series.data.length, [i, i + 0.8], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
                 return { ...p, y: (p.y || 0) * reveal };
             })
@@ -183,10 +183,9 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         if (!Array.isArray(overlay.data)) return null;
         const animatedData = overlay.data.map((row: any) => ({
             ...row,
-            data: row.data.map((d: any) => ({ ...d, value: (d.value || 0) * dataProgress }))
+            data: (row.data || []).map((d: any) => ({ ...d, value: (d.value || 0) * dataProgress }))
         }));
-        // Fix for HeatMap color scale issue
-        return <ResponsiveHeatMap {...commonProps} data={animatedData} colors={{ type: 'sequential', scheme: 'blues' }} />;
+        return <ResponsiveHeatMap {...commonProps} data={animatedData} colors="blues" />;
     }
 
     if (type === 'radar') {
@@ -301,6 +300,16 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         return <ResponsiveChord {...commonProps} data={animatedData} keys={overlay.keys || []} />;
     }
 
+    if (type === 'sankey') {
+        if (!overlay.data?.nodes || !overlay.data?.links) return null;
+        return <ResponsiveSankey {...commonProps} data={overlay.data} />;
+    }
+
+    if (type === 'boxplot') {
+        if (!Array.isArray(overlay.data)) return null;
+        return <ResponsiveBoxPlot {...commonProps} data={overlay.data} />;
+    }
+
     if (type === 'violinPlot') return <ViolinPlot overlay={overlay} dataProgress={dataProgress} commonProps={commonProps} />;
 
     return null;
@@ -321,9 +330,9 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         filter: progress < 1 ? `blur(${(1 - progress) * 10}px)` : 'none'
       }}
     >
-      <div className="flex justify-between items-center mb-10">
+      <div className="flex justify-between items-center mb-10 text-left">
         <div>
-          <h3 className="text-white font-black text-3xl tracking-tighter leading-tight">{overlay.title || 'Data Analysis'}</h3>
+          <h3 className="text-white font-black text-3xl tracking-tighter leading-tight uppercase">{overlay.title || 'Data Analysis'}</h3>
           <p className="text-white/60 text-sm font-mono uppercase tracking-[0.4em] mt-2 font-bold">{overlay.subtitle || 'System Telemetry'}</p>
         </div>
         <div className="px-6 py-3 bg-blue-500/10 rounded-2xl border-2 border-blue-500/20 text-sm text-blue-400 font-mono font-black shadow-xl uppercase tracking-widest">Telemetry Active</div>
