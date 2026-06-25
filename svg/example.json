@@ -6,7 +6,8 @@
       "procedural_config": {
         "variant": "dark_particles",
         "primaryColor": "#0F172A",
-        "secondaryColor": "#1E293B"
+        "secondaryColor": "#1E293B",
+        "accentColor": "#00F5FF"
       },
       "duration_in_frames": 300,
       "camera": {
@@ -95,8 +96,7 @@
       ],
       "background": "tech_grid",
       "theme": "tech",
-      "sceneIconTheme": "lucide",
-      "overlays": []
+      "sceneIconTheme": "lucide"
     }
   ],
   "global_settings": {
