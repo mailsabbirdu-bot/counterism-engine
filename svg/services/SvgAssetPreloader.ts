@@ -2,6 +2,7 @@ import { SvgScene, SvgProvider, StorytellingElement } from '../types';
 import { SvgProviderService } from './SvgProviderService';
 import { SvgRegistry } from '../lib/svgRegistry';
 import { COMPOSITIONS } from '../lib/compositionLibrary';
+import { BUNDLED_ICONS } from '../lib/bundledIcons';
 
 /**
  * SVG Asset Preloader
@@ -33,7 +34,10 @@ export class SvgAssetPreloader {
 
     const promises = Array.from(queries).map(async ({ query, provider }) => {
       try {
-        const markup = await SvgProviderService.fetchSvg(query, provider);
+        // LOCAL FIRST RESOLUTION
+        const localMarkup = BUNDLED_ICONS[query.toLowerCase()];
+        const markup = localMarkup || await SvgProviderService.fetchSvg(query, provider);
+
         let totalLength = 5000; // Default fallback
 
         if (parser) {
