@@ -10,6 +10,26 @@ export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?:
 
   // HARDENING: Guard zero-node case (BUG-4)
   const nodeCount = nodes.length;
+  if (nodeCount === 0) {
+      return (
+        <AnimatedSvg
+            id={`${element.id}_center`}
+            query={centerSvg}
+            provider={provider || sceneIconTheme || 'lucide'}
+            x={x}
+            y={y}
+            width={180}
+            height={180}
+            animation="trace"
+            style="tech"
+            importance="primary"
+            glow={true}
+            container="glass_panel"
+            startFrame={startFrame}
+            durationInFrames={ENGINE_CONSTANTS.DEFAULT_ANIMATION_DURATION}
+        />
+      );
+  }
 
   const nodePositions = useMemo(() => {
     return nodes.map((_, i) => calculateRadialPosition(i, nodeCount, x, y, radius));
@@ -28,7 +48,7 @@ export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?:
           end={pos}
           startFrame={startFrame + 15 + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL / 2)}
           duration={60}
-          type={connectionStyle as any}
+          type={connectionStyle as 'solid' | 'dotted' | 'arrow'}
         />
       ))}
 

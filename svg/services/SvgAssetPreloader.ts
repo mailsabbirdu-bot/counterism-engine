@@ -27,30 +27,39 @@ export class SvgAssetPreloader {
     function queryToKey(q: string) { return q; }
 
     // 3. Download and process
-    const parser = new DOMParser();
+    // Note: DOMParser is used here in the preprocessing stage (pre-render).
+    // This is acceptable as long as it's not in the main render loop.
+    const parser = typeof DOMParser !== 'undefined' ? new DOMParser() : null;
+
     const promises = Array.from(queries).map(async ({ query, provider }) => {
       try {
         const markup = await SvgProviderService.fetchSvg(query, provider);
-        const doc = parser.parseFromString(markup, 'image/svg+xml');
-        const svg = doc.querySelector('svg');
+        let totalLength = 5000; // Default fallback
 
-        if (!svg) throw new Error('Invalid SVG');
+        if (parser) {
+            const doc = parser.parseFromString(markup, 'image/svg+xml');
+            const svg = doc.querySelector('svg');
 
-        // Extract total path length (approximation or measurement)
-        let totalLength = 0;
-        const paths = svg.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon');
-        paths.forEach((p: any) => {
-            if (p.getTotalLength) {
-                totalLength = Math.max(totalLength, p.getTotalLength());
-            } else {
-                const bbox = p.getBBox();
-                totalLength = Math.max(totalLength, (bbox.width + bbox.height) * 2);
+            if (svg) {
+                // Extract total path length (approximation or measurement)
+                let maxPathLength = 0;
+                const paths = svg.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon');
+                paths.forEach((p: any) => {
+                    if (p.getTotalLength) {
+                        maxPathLength = Math.max(maxPathLength, p.getTotalLength());
+                    } else {
+                        // Fallback measurement if getTotalLength is not available
+                        const bbox = p.getBBox ? p.getBBox() : { width: 100, height: 100 };
+                        maxPathLength = Math.max(maxPathLength, (bbox.width + bbox.height) * 2);
+                    }
+                });
+                totalLength = maxPathLength || 5000;
             }
-        });
+        }
 
         SvgRegistry.register(query, provider, {
           markup,
-          pathLength: totalLength || 5000
+          pathLength: totalLength
         });
       } catch (e) {
         console.error(`Failed to preload SVG: ${query}`, e);

@@ -1,12 +1,11 @@
 import React from 'react';
-import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { LabelElement } from '../types';
 import { getEntranceProgress } from '../lib/animationUtils';
+import { useAnimation } from './AnimationContext';
 
 export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
   const { text, position = 'bottom', fontSize = 32, color = 'white', animation = 'slideUp', startFrame = 0 } = element;
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { frame, fps } = useAnimation();
 
   if (!targetPos) return null;
 

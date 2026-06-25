@@ -4,9 +4,11 @@ import { AnimatedSvg } from './AnimatedSvg';
 import { ConnectionLine } from './InfographicElements';
 import { calculateLinearPosition } from '../lib/layoutUtils';
 import { ENGINE_CONSTANTS } from '../lib/constants';
+import { useAnimation } from './AnimationContext';
 
 export const FlowDiagram: React.FC<{ element: FlowDiagramElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
   const { x, y, steps, layout = 'horizontal', arrowStyle = 'arrow', spacing = ENGINE_CONSTANTS.DEFAULT_SPACING, startFrame = 0 } = element;
+  const { frame, fps } = useAnimation();
 
   const nodeCount = steps.length;
   const nodePositions = useMemo(() => {
@@ -26,7 +28,7 @@ export const FlowDiagram: React.FC<{ element: FlowDiagramElement, sceneIconTheme
             end={pos}
             startFrame={startFrame + 15 + (i * 20)}
             duration={45}
-            type={arrowStyle === 'glow' ? 'solid' : arrowStyle as any}
+            type={(arrowStyle === 'glow' ? 'solid' : arrowStyle) as 'solid' | 'dotted' | 'arrow'}
             color={arrowStyle === 'glow' ? '#00F5FF' : undefined}
           />
         );

@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
-import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { ConnectionLineProps } from '../types';
 import { generateSvgId } from '../lib/svgUtils';
 import { getEntranceProgress } from '../lib/animationUtils';
+import { useAnimation } from './AnimationContext';
 
 export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, y:number}, end: {x:number, y:number} }> = ({
   start,
@@ -12,8 +12,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, 
   color = 'rgba(255,255,255,0.2)',
   type = 'dotted'
 }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { frame, fps } = useAnimation();
 
   // OPTIMIZATION: Use interpolation for lines
   const progress = getEntranceProgress(frame, fps, startFrame, false);
@@ -50,8 +49,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, 
 export const GlowNode: React.FC<{ x: number, y: number, startFrame?: number, color?: string, type?: 'glow' | 'pulse' | 'signal' }> = ({
   x, y, startFrame = 0, color = '#3b82f6', type = 'glow'
 }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { frame, fps } = useAnimation();
 
   const relativeFrame = frame - startFrame;
   const progress = getEntranceProgress(frame, fps, startFrame, false);
@@ -92,7 +90,7 @@ export const GlowNode: React.FC<{ x: number, y: number, startFrame?: number, col
 export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFrame?: number, color?: string, orbitSpeed?: number }> = ({
     x, y, radius, startFrame = 0, color = 'rgba(255,255,255,0.1)', orbitSpeed = 1
 }) => {
-    const frame = useCurrentFrame();
+    const { frame } = useAnimation();
     const relativeFrame = frame - startFrame;
     if (frame < startFrame) return null;
 

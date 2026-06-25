@@ -1,15 +1,18 @@
 import React, { useMemo } from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 import { ProcessElement, SvgProvider } from '../types';
 import { AnimatedSvg } from './AnimatedSvg';
 import { getEntranceProgress } from '../lib/animationUtils';
+import { useAnimation } from './AnimationContext';
+import { ENGINE_CONSTANTS } from '../lib/constants';
 
 export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
   const { x, y, steps, startFrame = 0 } = element;
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { frame, fps } = useAnimation();
 
-  const spacing = 350;
+  // HARDENING: Guard empty steps (BUG-3)
+  if (!steps || steps.length === 0) return null;
+
+  const spacing = ENGINE_CONSTANTS.DEFAULT_SPACING;
 
   const nodePositions = useMemo(() => {
     return steps.map((_, i) => ({
@@ -37,7 +40,7 @@ export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?
           if (i === 0) return null;
           const prevX = nodePositions[i - 1].x;
           const nextX = nodePositions[i].x;
-          const start = startFrame + 45 + (i * 30);
+          const start = startFrame + 45 + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL * 3);
           const progress = getEntranceProgress(frame, fps, start, false);
 
           return (
@@ -58,7 +61,7 @@ export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?
 
       {/* 3. Steps */}
       {steps.map((query, i) => {
-        const stepStart = startFrame + (i * 30);
+        const stepStart = startFrame + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL * 3);
         const spr = getEntranceProgress(frame, fps, stepStart, true);
 
         return (
