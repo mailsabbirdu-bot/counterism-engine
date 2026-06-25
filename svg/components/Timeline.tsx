@@ -1,5 +1,4 @@
 import React from 'react';
-import { useVideoConfig } from 'remotion';
 import { TimelineElement } from '../types';
 import { getEntranceProgress } from '../lib/animationUtils';
 import { useAnimation } from './AnimationContext';
@@ -14,7 +13,7 @@ export const Timeline: React.FC<{ element: TimelineElement }> = ({ element }) =>
   if (totalEvents === 0) return null;
 
   const totalWidth = ENGINE_CONSTANTS.TIMELINE_WIDTH;
-  const stepX = totalEvents > 1 ? totalWidth / (totalEvents - 1) : 0;
+  const stepX = totalEvents > 1 ? totalWidth / Math.max(totalEvents - 1, 1) : 0;
 
   const overallProgress = getEntranceProgress(frame, fps, startFrame, false);
 

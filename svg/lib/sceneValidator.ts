@@ -29,5 +29,16 @@ export const validateScene = (scene: SvgScene): string[] => {
         }
     });
 
+    // 4. Check for Empty Container Elements
+    scene.elements.forEach(el => {
+        if (el.type === 'hub_network' && el.nodes.length === 0) {
+            // This is handled in the component now, but good to validate.
+            // errors.push(`Hub Network "${el.id}" has no nodes.`);
+        }
+        if (el.type === 'process' && el.steps.length === 0) {
+            errors.push(`Process Diagram "${el.id}" has no steps.`);
+        }
+    });
+
     return errors;
 };

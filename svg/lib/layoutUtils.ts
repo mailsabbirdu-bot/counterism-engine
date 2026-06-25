@@ -17,6 +17,8 @@ export const calculateRadialPosition = (
     angleOffset: number = 0
 ) => {
     if (total <= 0) return { x: baseX, y: baseY };
+    // HARDENING (P2-5): Shared radial layout logic.
+    // This now serves orbit, radial, and cluster.
     const angle = (index / total) * Math.PI * 2 + angleOffset;
     return {
         x: baseX + Math.cos(angle) * radius,

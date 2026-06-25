@@ -1,5 +1,6 @@
 import React from 'react';
-import { spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { spring } from 'remotion';
+import { useAnimation } from './AnimationContext';
 
 interface GlassPanelProps {
   children: React.ReactNode;
@@ -9,8 +10,7 @@ interface GlassPanelProps {
 }
 
 export const GlassPanel: React.FC<GlassPanelProps> = ({ children, width, height, startFrame }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { frame, fps } = useAnimation();
 
   const spr = spring({
     frame: frame - startFrame,

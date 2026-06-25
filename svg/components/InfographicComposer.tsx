@@ -15,6 +15,7 @@ import { NarrativeTemplate } from './NarrativeTemplates';
 import { useAnimation } from './AnimationContext';
 import { SvgGroup, StorytellingElement, LayerType, SvgProvider } from '../types';
 import { ENGINE_CONSTANTS } from '../lib/constants';
+import { calculateRadialPosition, calculateLinearPosition, calculateGridPosition } from '../lib/layoutUtils';
 
 interface InfographicComposerProps {
   sceneData: any;
@@ -49,29 +50,19 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = React.mem
           const spacing = group.spacing ?? ENGINE_CONSTANTS.DEFAULT_SPACING;
 
           children.forEach((child: any, index) => {
-              if (group.layout === 'horizontal') {
-                  const offset = (index - (children.length - 1) / 2) * spacing;
-                  child.x = groupX + offset;
-                  child.y = groupY;
-              } else if (group.layout === 'vertical') {
-                  const offset = (index - (children.length - 1) / 2) * spacing;
-                  child.x = groupX;
-                  child.y = groupY + offset;
-              } else if (group.layout === 'orbit') {
-                  const angle = (index / children.length) * Math.PI * 2;
-                  child.x = groupX + Math.cos(angle) * spacing;
-                  child.y = groupY + Math.sin(angle) * spacing;
+              // HARDENING (P2-5): Use centralized layout utilities
+              let pos = { x: child.x, y: child.y };
+
+              if (group.layout === 'horizontal' || group.layout === 'vertical') {
+                  pos = calculateLinearPosition(index, children.length, groupX, groupY, spacing, group.layout);
+              } else if (group.layout === 'orbit' || group.layout === 'radial') {
+                  pos = calculateRadialPosition(index, children.length, groupX, groupY, spacing);
               } else if (group.layout === 'grid') {
-                  const cols = Math.ceil(Math.sqrt(children.length));
-                  const row = Math.floor(index / cols);
-                  const col = index % cols;
-                  child.x = groupX + (col - (cols - 1) / 2) * spacing;
-                  child.y = groupY + (row - (Math.ceil(children.length / cols) - 1) / 2) * spacing;
-              } else if (group.layout === 'radial') {
-                  const angle = (index / children.length) * Math.PI * 2;
-                  child.x = groupX + Math.cos(angle) * spacing;
-                  child.y = groupY + Math.sin(angle) * spacing;
+                  pos = calculateGridPosition(index, children.length, groupX, groupY, spacing);
               }
+
+              child.x = pos.x;
+              child.y = pos.y;
           });
       });
 

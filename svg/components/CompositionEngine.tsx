@@ -56,7 +56,7 @@ export const CompositionEngine: React.FC<{
             end={end}
             startFrame={startFrame + 30} // Staggered start
             duration={60}
-            type={line.type as any}
+            type={line.type as 'solid' | 'dotted' | 'arrow'}
           />
         );
       })}

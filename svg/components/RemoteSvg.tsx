@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { SvgProvider, SvgStyle, GradientConfig } from '../types';
 import { SvgRegistry } from '../lib/svgRegistry';
 import { ENGINE_CONSTANTS } from '../lib/constants';
@@ -27,7 +27,16 @@ export const RemoteSvg: React.FC<RemoteSvgProps> = ({
   // HARDENING: Render from registry ONLY. No runtime fetching or DOM parsing.
   const asset = SvgRegistry.get(query, provider);
 
-  const gradientId = useMemo(() => `grad-${query.replace(/[^a-z0-9]/gi, '')}-${id}`, [query, id]);
+  const gradientId = useMemo(() => {
+    // HARDENING (BUG-5): Use hashed IDs to prevent oversized IDs from long query strings
+    let hash = 0;
+    const str = `${query}-${id}`;
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0;
+    }
+    return `grad-${Math.abs(hash).toString(16)}`;
+  }, [query, id]);
 
   const processedMarkup = useMemo(() => {
       if (!asset) return null;
@@ -75,7 +84,7 @@ export const RemoteSvg: React.FC<RemoteSvgProps> = ({
   }, [asset, color, strokeWidth, style, gradient, gradientId]);
 
   // Notify parent of path length for animations
-  useMemo(() => {
+  useEffect(() => {
       if (asset && onLoad) {
           onLoad(asset.pathLength);
       }

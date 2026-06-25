@@ -1,19 +1,19 @@
 import React, { useMemo } from 'react';
-import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { CalloutElement } from '../types';
 import { getEntranceProgress } from '../lib/animationUtils';
+import { useAnimation } from './AnimationContext';
+import { ENGINE_CONSTANTS } from '../lib/constants';
 
 export const CalloutSystem: React.FC<{ element: CalloutElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
   const { title, body, direction = 'right', startFrame = 0 } = element;
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { frame, fps } = useAnimation();
 
   if (!targetPos) return null;
 
   const spr = getEntranceProgress(frame, fps, startFrame, true);
 
-  const lineLength = 150;
-  const boxWidth = 300;
+  const lineLength = ENGINE_CONSTANTS.CALLOUT_LINE_LENGTH;
+  const boxWidth = ENGINE_CONSTANTS.CALLOUT_BOX_WIDTH;
 
   const offsets = {
     right: { lx: 30, ly: 0, ex: lineLength, ey: 0, bx: lineLength, by: 0, align: 'left' },
@@ -50,7 +50,7 @@ export const CalloutSystem: React.FC<{ element: CalloutElement, targetPos?: { x:
         borderRadius: '12px',
         opacity: spr,
         transform: `translateY(${(1-spr)*20}px)`,
-        textAlign: off.align as any
+        textAlign: off.align as 'left' | 'right' | 'center'
       }}>
         <h4 style={{ color: '#00F5FF', fontSize: '18px', fontWeight: 'bold', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{title}</h4>
         <p style={{ color: 'white', fontSize: '14px', margin: 0, opacity: 0.8, lineHeight: '1.4' }}>{body}</p>

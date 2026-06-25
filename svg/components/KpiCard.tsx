@@ -1,13 +1,14 @@
 import React, { useMemo } from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
+import { interpolate } from 'remotion';
 import { KpiElement, SvgProvider } from '../types';
 import { RemoteSvg } from './RemoteSvg';
 import { getEntranceProgress } from '../lib/animationUtils';
+import { useAnimation } from './AnimationContext';
+import { ENGINE_CONSTANTS } from '../lib/constants';
 
 export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
   const { title, value, trend, subtitle, icon, x, y, startFrame = 0 } = element;
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { frame, fps } = useAnimation();
 
   const spr = getEntranceProgress(frame, fps, startFrame, true);
 
@@ -38,7 +39,7 @@ export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: SvgProvid
         top: y,
         transform: `translate(-50%, -50%) scale(${0.8 + spr * 0.2})`,
         opacity: spr,
-        width: 320,
+        width: ENGINE_CONSTANTS.KPI_CARD_WIDTH,
         padding: '24px',
         backgroundColor: 'rgba(255,255,255,0.03)',
         backdropFilter: 'blur(30px)',
