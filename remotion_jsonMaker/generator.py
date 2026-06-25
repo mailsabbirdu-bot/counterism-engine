@@ -24,6 +24,7 @@ class RemotionJsonMaker:
         self.in_files = []
         self.out_files = []
         self.camera_files = []
+        self.narration_files = []
         self.raw_timestamps = ""
 
     def load_fps_update(self, filepath: str):
@@ -137,12 +138,14 @@ class RemotionJsonMaker:
         self.in_files = []
         self.out_files = []
         self.camera_files = []
+        self.narration_files = []
         if os.path.exists(audio_dir):
             all_files = os.listdir(audio_dir)
             self.in_files = sorted([f for f in all_files if re.match(r'^(in[_\-]?\d*|intro|enter)', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
             self.out_files = sorted([f for f in all_files if re.match(r'^(out[_\-]?\d*|outro|exit)', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
             self.camera_files = sorted([f for f in all_files if re.match(r'^camera[_\-]?\d*', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
-            print(f"🎵 SFX Detection: {len(self.in_files)} intro, {len(self.out_files)} outro, {len(self.camera_files)} camera sounds.")
+            self.narration_files = sorted([f for f in all_files if re.match(r'^SC_\d+', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
+            print(f"🎵 SFX Detection: {len(self.in_files)} intro, {len(self.out_files)} outro, {len(self.camera_files)} camera, {len(self.narration_files)} narrations.")
         else:
             print(f"⚠️ SFX directory not found: {audio_dir}")
 
@@ -244,28 +247,50 @@ class RemotionJsonMaker:
                 for k in ['background_type', 'video_path', 'audio_enabled']:
                     if k in bg and k not in scene: scene[k] = bg[k]
 
-            # 2. Strict Background Enforcement
-            scene['background_type'] = 'video'
+            # 2. Background Handling (Studio V4 SVG Integration)
+            if not scene.get('background_type'):
+                scene['background_type'] = 'video'
             scene['audio_enabled'] = True
 
             # Smart Indexing: Try to get scene number from ID (e.g. SCENE_05 -> 5)
             id_match = re.search(r'(\d+)', s_id)
             id_num = int(id_match.group(1)) if id_match else (scene_idx + 1)
 
-            # Preserve existing valid render paths (important for Remake project)
-            current_vpath = scene.get('video_path', '')
-            if not current_vpath or not current_vpath.startswith('renders/'):
-                scene['video_path'] = f"renders/scene_SC_{id_num:02d}.mp4"
-                print(f"      🎬 Assigned background: {scene['video_path']} (derived from ID '{s_id}')")
+            if scene['background_type'] == 'video':
+                # Preserve existing valid render paths (important for Remake project)
+                current_vpath = scene.get('video_path', '')
+                if not current_vpath or not current_vpath.startswith('renders/'):
+                    scene['video_path'] = f"renders/scene_SC_{id_num:02d}.mp4"
+                    print(f"      🎬 Assigned background: {scene['video_path']} (derived from ID '{s_id}')")
+            elif scene['background_type'] == 'procedural':
+                if not scene.get('procedural_config'):
+                    scene['procedural_config'] = {"variant": "neon_grid"}
+                scene['video_path'] = None
+                print(f"      🎨 SVG Mode: Using procedural background '{scene['procedural_config']['variant']}'")
 
             # 3. Authoritative Duration Resolution
             scene_duration = scene.get('duration_in_frames', 180)
-            vpath = scene['video_path'].lstrip('/')
-            filename = os.path.basename(vpath)
-            if filename in self.fps_cache:
-                scene_duration = self.fps_cache[filename]
+            vpath = scene.get('video_path')
+            if vpath:
+                vpath = vpath.lstrip('/')
+                filename = os.path.basename(vpath)
+                if filename in self.fps_cache:
+                    scene_duration = self.fps_cache[filename]
 
             scene['duration_in_frames'] = scene_duration
+
+            # 3b. MAPPING NARRATION AUDIO (SC_XX naming convention)
+            pattern = f"SC_{id_num:02d}"
+            narration_file = next((f for f in self.narration_files if pattern in f), None)
+            if narration_file:
+                sfx_manifest.append({
+                    "scene_id": s_id,
+                    "file": narration_file,
+                    "start": 0,
+                    "end": scene_duration,
+                    "volume": 1.0
+                })
+                print(f"      🎙️ Mapped narration: {narration_file}")
 
             placed_overlays = []
             focal_ids = []
@@ -1192,16 +1217,18 @@ class RemotionJsonMaker:
             "ACT AS REMOTION MOTION GRAPHICS ENGINE. OUTPUT RAW MINIFIED JSON ONLY.\n"
             "GOAL: BUILD COMPLEX INFOGRAPHIC SCENES WITH MULTIPLE LAYERS.\n"
             "STRICT SCHEMA:\n"
-            "- 'scenes': [ { 'scene_id', 'duration', 'video_path', 'overlays': [], 'infographic_lines': [], 'infographic_nodes': [], 'camera': { 'shots': [] } } ]\n"
+            "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config'?: { 'variant' }, 'video_path'?, 'overlays': [], 'infographic_lines': [], 'infographic_nodes': [], 'camera': { 'shots': [] } } ]\n"
             "- 'overlays': [ { 'id', 'type': 'svg'|'text'|'chart'|'shadcn_chart'|'shadcn_indicator', 'query'?, 'provider'?, 'animation', 'start', 'duration', 'position' } ]\n"
-            "- 'infographic_lines': [ { 'start_pos': {x,y}, 'end_pos': {x,y}, 'start', 'duration', 'color' } ]\n"
-            "- 'infographic_nodes': [ { 'x', 'y', 'start', 'color' } ]\n"
+            "- 'infographic_lines': [ { 'from': 'id', 'to': 'id', 'start', 'duration', 'color', 'type': 'solid'|'dotted'|'arrow' } ]\n"
+            "- 'infographic_nodes': [ { 'x', 'y', 'start', 'color', 'type': 'glow'|'pulse'|'signal' } ]\n"
             "MOTION GRAPHICS RULES:\n"
-            "1. NOUN HIERARCHY: Never render a noun directly. Instead of 1 'house' icon, use multiple SVGs (house, family, location) and connect them with 'infographic_lines'.\n"
-            "2. COMPOSITION: Use 3-5 SVGs per scene to build a concept. Compose them spatially (e.g. icons orbiting a central text/chart).\n"
-            "3. INFOGRAPHIC ELEMENTS: Use 'infographic_lines' (dashed) and 'infographic_nodes' (glowing dots) to show relationships and data flow between overlays.\n"
-            "4. SVG ANIMATION: Prioritize 'draw' for outline icons (provider: lucide/tabler). Use 'bounce' or 'pop' for filled icons.\n"
+            "1. BACKGROUND SELECTION: Analyze STORY context. Use 'procedural' background for scenes that are best explained through motion graphics/SVG infographics. Use 'video' for realistic scenes.\n"
+            "2. NOUN HIERARCHY: Never render a noun directly. Instead of 1 'house' icon, use multiple SVGs (house, family, location) and connect them with 'infographic_lines'.\n"
+            "3. COMPOSITION: Use 3-5 SVGs per scene to build a concept. Compose them spatially (e.g. icons orbiting a central text/chart).\n"
+            "4. INFOGRAPHIC ELEMENTS: Use 'infographic_lines' (dashed) and 'infographic_nodes' (glowing dots) to show relationships and data flow between overlays.\n"
+            "5. SVG ANIMATION: Prioritize 'draw' for outline icons (provider: lucide/tabler). Use 'bounce' or 'pop' for filled icons.\n"
             "VISUAL LIBRARY:\n"
+            "- 'procedural_config': variants: 'dark_particles', 'liquid_gradient', 'neon_grid'.\n"
             "- 'svg' (type: 'svg'): provider ('lucide'|'tabler'|'iconify'), query (icon name), animation ('draw'|'pop'|'bounce'|'fade').\n"
             "- 'chart_type' (chart/shadcn_chart): glass_area, neon_bar, radial_score, radar_web, bump, heatmap, etc.\n"
             "- 'indicator_type' (shadcn_indicator): metric_tile, crypto_card, tech_badge, data_ticker, etc.\n"
