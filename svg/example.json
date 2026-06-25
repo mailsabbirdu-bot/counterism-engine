@@ -1,102 +1,183 @@
 {
   "scenes": [
     {
-      "scene_id": "SCENE_01_AMAZON",
-      "background_type": "procedural",
-      "procedural_config": {
-        "variant": "neon_grid",
-        "primaryColor": "#0F172A",
-        "secondaryColor": "#1E293B",
-        "accentColor": "#00F5FF"
-      },
-      "duration_in_frames": 300,
+      "scene_id": "SCENE_DHAKA_POPULATION",
+      "duration_in_frames": 360,
+      "background": "network_pattern",
+      "theme": "tech",
+      "sceneIconTheme": "lucide",
       "camera": {
         "enabled": true,
-        "motionBlur": { "enabled": true, "intensity": 0.8 },
-        "shake": { "enabled": false },
+        "motionBlur": {
+          "enabled": true,
+          "intensity": 0.8
+        },
+        "shake": {
+          "enabled": false
+        },
         "shots": [
           {
-            "targetId": "global_network_center",
+            "targetId": "city_hub",
             "startFrame": 0,
-            "duration": 90,
-            "zoom": 1.4,
+            "duration": 100,
+            "zoom": 1.5,
             "style": "dramatic_reveal"
           },
           {
-            "targetId": "global_network_node_0",
-            "startFrame": 100,
-            "duration": 60,
-            "zoom": 1.8,
+            "targetId": "population_kpi",
+            "startFrame": 110,
+            "duration": 90,
+            "zoom": 1.9,
             "style": "push_in"
           },
           {
-            "targetId": "label_supply_chain",
-            "startFrame": 170,
-            "duration": 130,
-            "zoom": 1.1,
+            "targetId": "builders_kpi",
+            "startFrame": 210,
+            "duration": 70,
+            "zoom": 1.7,
+            "style": "push_in"
+          },
+          {
+            "targetId": "city_hub",
+            "startFrame": 280,
+            "duration": 80,
+            "zoom": 1.05,
             "style": "slow_pull"
           }
         ]
       },
       "elements": [
         {
-          "id": "global_network",
+          "id": "city_hub",
           "type": "hub_network",
-          "centerSvg": "amazon",
-          "provider": "simple-icons",
+          "centerSvg": "building-2",
+          "provider": "lucide",
           "nodes": [
-            "truck",
-            "plane",
-            "ship",
-            "warehouse",
-            "package",
-            "shopping-cart"
+            "users",
+            "hard-hat",
+            "construction",
+            "building",
+            "home",
+            "briefcase",
+            "factory",
+            "landmark"
           ],
           "x": 960,
           "y": 540,
-          "radius": 420,
+          "radius": 320,
           "connectionStyle": "arrow",
           "animation": "pop",
           "startFrame": 0
         },
         {
-          "id": "label_supply_chain",
-          "type": "label",
-          "target": "global_network_center",
-          "text": "AMAZON GLOBAL\nSUPPLY CHAIN",
-          "position": "bottom",
-          "fontSize": 80,
-          "color": "#FFB800",
-          "startFrame": 60
-        },
-        {
-          "id": "kpi_reach",
+          "id": "population_kpi",
           "type": "kpi",
-          "title": "Global Presence",
-          "value": 200,
+          "title": "মানুষ",
+          "value": 20000000,
           "suffix": "+",
-          "subtitle": "Market Regions",
-          "icon": "globe",
-          "x": 380,
-          "y": 280,
-          "startFrame": 90
+          "trend": "Growing",
+          "icon": "users",
+          "x": 340,
+          "y": 260,
+          "startFrame": 40
         },
         {
-          "id": "kpi_volume",
+          "id": "struggle_kpi",
           "type": "kpi",
-          "title": "Daily Throughput",
-          "value": 1.6,
-          "suffix": "M",
-          "subtitle": "Global Parcels",
-          "icon": "package",
-          "x": 1540,
-          "y": 280,
-          "startFrame": 120
+          "title": "লড়াই",
+          "value": 24,
+          "suffix": "ঘণ্টা",
+          "trend": "Daily",
+          "icon": "zap",
+          "x": 1580,
+          "y": 260,
+          "startFrame": 55
+        },
+        {
+          "id": "builders_kpi",
+          "type": "kpi",
+          "title": "নির্মাণ",
+          "value": 1000,
+          "suffix": "+",
+          "trend": "Active",
+          "icon": "building",
+          "x": 1580,
+          "y": 800,
+          "startFrame": 70
+        },
+        {
+          "id": "growth_kpi",
+          "type": "kpi",
+          "title": "দালান",
+          "value": 500,
+          "suffix": "+",
+          "trend": "Rising",
+          "icon": "landmark",
+          "x": 340,
+          "y": 800,
+          "startFrame": 85
+        },
+        {
+          "id": "label_main",
+          "type": "label",
+          "target": "city_hub_center",
+          "text": "দুই কোটিরও বেশি মানুষ\nএই শহরে বাঁচছে",
+          "position": "top",
+          "fontSize": 84,
+          "color": "#00F5FF",
+          "startFrame": 95
+        },
+        {
+          "id": "label_bottom",
+          "type": "label",
+          "target": "city_hub_center",
+          "text": "লড়ছে আর বড় বড়\nদালান বানাচ্ছে",
+          "position": "bottom",
+          "fontSize": 76,
+          "color": "#FFFFFF",
+          "startFrame": 115
         }
       ],
-      "background": "tech_grid",
-      "theme": "tech",
-      "sceneIconTheme": "lucide"
+      "groups": [
+        {
+          "id": "city_orbit",
+          "layout": "orbit",
+          "x": 960,
+          "y": 540,
+          "spacing": 620,
+          "backgroundRing": true
+        }
+      ],
+      "infographic_lines": [
+        {
+          "from": "population_kpi",
+          "to": "city_hub",
+          "type": "dotted",
+          "color": "#00F5FF",
+          "start": 120
+        },
+        {
+          "from": "struggle_kpi",
+          "to": "city_hub",
+          "type": "dotted",
+          "color": "#FFD400",
+          "start": 130
+        },
+        {
+          "from": "builders_kpi",
+          "to": "city_hub",
+          "type": "dotted",
+          "color": "#FF7A00",
+          "start": 140
+        },
+        {
+          "from": "growth_kpi",
+          "to": "city_hub",
+          "type": "dotted",
+          "color": "#00FF88",
+          "start": 150
+        }
+      ]
     }
   ],
   "global_settings": {
