@@ -69,20 +69,20 @@ export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?
                 {/* Number Bubble */}
                 <div style={{
                     position: 'absolute',
-                    top: -80,
+                    top: -100,
                     left: '50%',
                     transform: 'translateX(-50%)',
-                    width: 40,
-                    height: 40,
+                    width: 50,
+                    height: 50,
                     borderRadius: '50%',
-                    border: '2px solid #00F5FF',
+                    border: '3px solid #00D1FF',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: 'white',
-                    fontSize: 18,
+                    fontSize: 24,
                     fontWeight: 'bold',
-                    backgroundColor: 'rgba(0, 245, 255, 0.1)',
+                    backgroundColor: 'rgba(0, 209, 255, 0.1)',
                     opacity: spr
                 }}>
                     {i + 1}

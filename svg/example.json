@@ -4,9 +4,9 @@
       "scene_id": "SCENE_01_AMAZON",
       "background_type": "procedural",
       "procedural_config": {
-        "variant": "neon_grid",
-        "primaryColor": "#0f172a",
-        "secondaryColor": "#FF9900"
+        "variant": "dark_particles",
+        "primaryColor": "#0A0A0B",
+        "secondaryColor": "#1E293B"
       },
       "duration_in_frames": 300,
       "elements": [
@@ -17,8 +17,8 @@
           "provider": "simple-icons",
           "x": 960,
           "y": 540,
-          "width": 200,
-          "height": 200,
+          "width": 180,
+          "height": 180,
           "animation": "pop",
           "style": "tech",
           "importance": "primary",
@@ -39,7 +39,7 @@
           ],
           "x": 960,
           "y": 540,
-          "radius": 350,
+          "radius": 380,
           "connectionStyle": "arrow",
           "animation": "orbit",
           "startFrame": 30
@@ -48,9 +48,9 @@
           "id": "label_supply_chain",
           "type": "label",
           "target": "amazon_hq",
-          "text": "Global Supply Chain",
+          "text": "Amazon Global\nSupply Chain",
           "position": "bottom",
-          "fontSize": 48,
+          "fontSize": 56,
           "color": "#FF9900",
           "startFrame": 60
         },
@@ -58,29 +58,30 @@
           "id": "kpi_reach",
           "type": "kpi",
           "title": "Global Reach",
-          "value": "200+",
+          "value": 200,
+          "suffix": "+",
           "subtitle": "Countries Served",
           "icon": "map-pin",
-          "x": 300,
-          "y": 200,
+          "x": 380,
+          "y": 250,
           "startFrame": 90
         },
         {
           "id": "kpi_volume",
           "type": "kpi",
-          "title": "Daily Shipments",
-          "value": "1.6M",
-          "subtitle": "Packages per Day",
+          "title": "Daily Deliveries",
+          "value": 1.6,
+          "suffix": "M",
+          "subtitle": "Packages Daily",
           "icon": "package",
-          "x": 1620,
-          "y": 200,
+          "x": 1540,
+          "y": 250,
           "startFrame": 120
         }
       ],
       "background": "tech_grid",
       "theme": "tech",
-      "sceneIconTheme": "lucide",
-      "overlays": []
+      "sceneIconTheme": "lucide"
     }
   ],
   "global_settings": {

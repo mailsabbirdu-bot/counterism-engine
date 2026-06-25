@@ -32,9 +32,9 @@ export const CalloutSystem: React.FC<{ element: CalloutElement, targetPos?: { x:
           x1={off.lx} y1={off.ly}
           x2={off.lx + (off.ex - off.lx) * spr}
           y2={off.ly + (off.ey - off.ly) * spr}
-          stroke="white" strokeWidth="2" strokeDasharray="4 4"
+          stroke="white" strokeWidth="4" strokeDasharray="8 8"
         />
-        <circle cx={off.lx} cy={off.ly} r="4" fill="white" opacity={spr} />
+        <circle cx={off.lx} cy={off.ly} r="6" fill="white" opacity={spr} />
       </svg>
 
       {/* 2. Callout Box */}
@@ -42,18 +42,18 @@ export const CalloutSystem: React.FC<{ element: CalloutElement, targetPos?: { x:
         position: 'absolute',
         left: off.bx,
         top: off.by,
-        width: boxWidth,
-        padding: '20px',
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        backdropFilter: 'blur(10px)',
+        width: boxWidth + 100, // Larger box
+        padding: '24px',
+        backgroundColor: 'rgba(0,0,0,0.8)', // Darker for readability
+        backdropFilter: 'blur(20px)',
         border: '1px solid rgba(255,255,255,0.2)',
         borderRadius: '12px',
         opacity: spr,
         transform: `translateY(${(1-spr)*20}px)`,
         textAlign: off.align as 'left' | 'right' | 'center'
       }}>
-        <h4 style={{ color: '#00F5FF', fontSize: '18px', fontWeight: 'bold', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{title}</h4>
-        <p style={{ color: 'white', fontSize: '14px', margin: 0, opacity: 0.8, lineHeight: '1.4' }}>{body}</p>
+        <h4 style={{ color: '#00D1FF', fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px 0', textTransform: 'uppercase' }}>{title}</h4>
+        <p style={{ color: 'white', fontSize: '18px', margin: 0, opacity: 0.9, lineHeight: '1.5' }}>{body}</p>
       </div>
     </div>
   );

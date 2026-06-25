@@ -322,7 +322,7 @@ export const ENGINE_CONSTANTS = {
 
   // Visuals
   MAX_SVG_PATH_LENGTH: 5000,
-  DEFAULT_STROKE_WIDTH: 2,
+  DEFAULT_STROKE_WIDTH: 4, // Increased for visibility
   GLASS_PANEL_BLUR: 20,
   GLOW_RADIUS: 20,
   CALLOUT_LINE_LENGTH: 150,
@@ -565,24 +565,24 @@ export interface ThemeConfig {
 
 export const INFOGRAPHIC_THEMES: Record<InfographicTheme, ThemeConfig> = {
   tech: {
-    primaryColor: '#00F5FF',
-    secondaryColor: '#7B68EE',
-    accentColor: '#00FFAB',
-    backgroundColor: '#050505',
-    gridColor: 'rgba(0, 245, 255, 0.1)',
-    glowIntensity: 0.8,
-    glassOpacity: 0.1,
-    lineStyle: 'dashed',
+    primaryColor: '#00D1FF', // Professional Cyan
+    secondaryColor: '#FF9900', // Amazon Orange / Accent
+    accentColor: '#39FF14', // Neon Green
+    backgroundColor: '#0A0A0B', // Deep Charcoal (Better than pure black)
+    gridColor: 'rgba(0, 209, 255, 0.05)',
+    glowIntensity: 0.6,
+    glassOpacity: 0.12,
+    lineStyle: 'solid',
     fontFamily: 'Inter, sans-serif'
   },
   corporate: {
-    primaryColor: '#2563eb',
-    secondaryColor: '#64748b',
-    accentColor: '#f59e0b',
-    backgroundColor: '#ffffff',
-    gridColor: 'rgba(0, 0, 0, 0.05)',
+    primaryColor: '#3B82F6',
+    secondaryColor: '#1E293B',
+    accentColor: '#F59E0B',
+    backgroundColor: '#F8FAFC',
+    gridColor: 'rgba(59, 130, 246, 0.03)',
     glowIntensity: 0.3,
-    glassOpacity: 0.05,
+    glassOpacity: 0.08,
     lineStyle: 'solid',
     fontFamily: 'Inter, sans-serif'
   },
@@ -902,9 +902,9 @@ export const CalloutSystem: React.FC<{ element: CalloutElement, targetPos?: { x:
           x1={off.lx} y1={off.ly}
           x2={off.lx + (off.ex - off.lx) * spr}
           y2={off.ly + (off.ey - off.ly) * spr}
-          stroke="white" strokeWidth="2" strokeDasharray="4 4"
+          stroke="white" strokeWidth="4" strokeDasharray="8 8"
         />
-        <circle cx={off.lx} cy={off.ly} r="4" fill="white" opacity={spr} />
+        <circle cx={off.lx} cy={off.ly} r="6" fill="white" opacity={spr} />
       </svg>
 
       {/* 2. Callout Box */}
@@ -912,18 +912,18 @@ export const CalloutSystem: React.FC<{ element: CalloutElement, targetPos?: { x:
         position: 'absolute',
         left: off.bx,
         top: off.by,
-        width: boxWidth,
-        padding: '20px',
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        backdropFilter: 'blur(10px)',
+        width: boxWidth + 100, // Larger box
+        padding: '24px',
+        backgroundColor: 'rgba(0,0,0,0.8)', // Darker for readability
+        backdropFilter: 'blur(20px)',
         border: '1px solid rgba(255,255,255,0.2)',
         borderRadius: '12px',
         opacity: spr,
         transform: `translateY(${(1-spr)*20}px)`,
         textAlign: off.align as 'left' | 'right' | 'center'
       }}>
-        <h4 style={{ color: '#00F5FF', fontSize: '18px', fontWeight: 'bold', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{title}</h4>
-        <p style={{ color: 'white', fontSize: '14px', margin: 0, opacity: 0.8, lineHeight: '1.4' }}>{body}</p>
+        <h4 style={{ color: '#00D1FF', fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px 0', textTransform: 'uppercase' }}>{title}</h4>
+        <p style={{ color: 'white', fontSize: '18px', margin: 0, opacity: 0.9, lineHeight: '1.5' }}>{body}</p>
       </div>
     </div>
   );
@@ -1532,8 +1532,8 @@ export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, 
   return (
     <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
       <defs>
-        <marker id={markerId} markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-          <polygon points="0 0, 10 3.5, 0 7" fill={color} />
+        <marker id={markerId} markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto">
+          <polygon points="0 0, 12 5, 0 10" fill={color} />
         </marker>
       </defs>
       <line
@@ -1542,9 +1542,10 @@ export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, 
         x2={currentX}
         y2={currentY}
         stroke={color}
-        strokeWidth="2"
-        strokeDasharray={type === 'dotted' ? "4 4" : "0"}
+        strokeWidth="4" // Thicker lines
+        strokeDasharray={type === 'dotted' ? "8 8" : "0"}
         markerEnd={type === 'arrow' ? `url(#${markerId})` : ""}
+        strokeLinecap="round"
       />
     </svg>
   );
@@ -1592,13 +1593,13 @@ export const GlowNode: React.FC<{ x: number, y: number, startFrame?: number, col
 };
 
 export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFrame?: number, color?: string, orbitSpeed?: number }> = ({
-    x, y, radius, startFrame = 0, color = 'rgba(255,255,255,0.1)', orbitSpeed = 1
+    x, y, radius, startFrame = 0, color = 'rgba(255,255,255,0.1)', orbitSpeed = 0.5 // Slower, more subtle
 }) => {
     const { frame } = useAnimation();
     const relativeFrame = frame - startFrame;
     if (frame < startFrame) return null;
 
-    // HARDENING: Clamp rotation
+    // rotation is slower and more cinematic
     const rotation = (relativeFrame * orbitSpeed) % 360;
 
     return (
@@ -1608,22 +1609,11 @@ export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFr
             top: y,
             width: radius * 2,
             height: radius * 2,
-            border: `1px solid ${color}`,
+            border: `2px solid ${color}`, // Thicker ring
             borderRadius: '50%',
-            transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+            transform: `translate(-50%, -50%)`, // Removed rotation if confusing
             zIndex: 1
-        }}>
-            <div style={{
-                position: 'absolute',
-                top: -4,
-                left: '50%',
-                width: 8,
-                height: 8,
-                backgroundColor: color,
-                borderRadius: '50%',
-                boxShadow: `0 0 10px ${color}`
-            }} />
-        </div>
+        }} />
     );
 };
 
@@ -1710,8 +1700,8 @@ export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: SvgProvid
         top: y,
         transform: `translate(-50%, -50%) scale(${0.8 + spr * 0.2})`,
         opacity: spr,
-        width: ENGINE_CONSTANTS.KPI_CARD_WIDTH,
-        padding: '24px',
+        width: ENGINE_CONSTANTS.KPI_CARD_WIDTH + 80, // Larger card
+        padding: '32px',
         backgroundColor: 'rgba(255,255,255,0.03)',
         backdropFilter: 'blur(30px)',
         border: '1px solid rgba(255,255,255,0.1)',
@@ -1723,12 +1713,12 @@ export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: SvgProvid
     }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '2px' }}>{title}</span>
-                <h2 style={{ color: 'white', fontSize: '48px', fontWeight: '900', margin: '4px 0 0 0', letterSpacing: '-2px' }}>{displayValue}</h2>
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '2px' }}>{title}</span>
+                <h2 style={{ color: 'white', fontSize: '64px', fontWeight: '900', margin: '8px 0 0 0', letterSpacing: '-2px' }}>{displayValue}</h2>
             </div>
             {icon && (
-                <div style={{ width: 48, height: 48, backgroundColor: 'rgba(0, 245, 255, 0.1)', borderRadius: '12px', padding: '8px' }}>
-                    <RemoteSvg query={icon} provider={sceneIconTheme || 'lucide'} color="#00F5FF" />
+                <div style={{ width: 64, height: 64, backgroundColor: 'rgba(0, 245, 255, 0.1)', borderRadius: '16px', padding: '12px' }}>
+                    <RemoteSvg query={icon} provider={sceneIconTheme || 'lucide'} color="#00D1FF" />
                 </div>
             )}
         </div>
@@ -1747,7 +1737,7 @@ export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: SvgProvid
                         {trend}
                     </span>
                 )}
-                {subtitle && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: 'medium' }}>{subtitle}</span>}
+                {subtitle && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '16px', fontWeight: 'medium' }}>{subtitle}</span>}
             </div>
         )}
     </div>
@@ -1762,7 +1752,7 @@ import { getEntranceProgress } from '../lib/animationUtils';
 import { useAnimation } from './AnimationContext';
 
 export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
-  const { text, position = 'bottom', fontSize = 32, color = 'white', animation = 'slideUp', startFrame = 0 } = element;
+  const { text, position = 'bottom', fontSize = 42, color = 'white', animation = 'slideUp', startFrame = 0 } = element;
   const { frame, fps } = useAnimation();
 
   if (!targetPos) return null;
@@ -1802,8 +1792,9 @@ export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: num
       fontSize,
       fontWeight: '900',
       textTransform: 'uppercase',
-      letterSpacing: '2px',
-      whiteSpace: 'nowrap',
+      letterSpacing: '1px',
+      whiteSpace: 'pre-wrap',
+      textAlign: 'center',
       textShadow: '0 4px 20px rgba(0,0,0,0.5)',
       ...animationStyles()
     }}>
@@ -2079,20 +2070,20 @@ export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?
                 {/* Number Bubble */}
                 <div style={{
                     position: 'absolute',
-                    top: -80,
+                    top: -100,
                     left: '50%',
                     transform: 'translateX(-50%)',
-                    width: 40,
-                    height: 40,
+                    width: 50,
+                    height: 50,
                     borderRadius: '50%',
-                    border: '2px solid #00F5FF',
+                    border: '3px solid #00D1FF',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: 'white',
-                    fontSize: 18,
+                    fontSize: 24,
                     fontWeight: 'bold',
-                    backgroundColor: 'rgba(0, 245, 255, 0.1)',
+                    backgroundColor: 'rgba(0, 209, 255, 0.1)',
                     opacity: spr
                 }}>
                     {i + 1}
@@ -2258,9 +2249,9 @@ export const Timeline: React.FC<{ element: TimelineElement }> = ({ element }) =>
           left: -totalWidth / 2,
           top: 0,
           width: totalWidth * overallProgress,
-          height: 2,
+          height: 4,
           backgroundColor: 'rgba(255,255,255,0.2)',
-          borderRadius: 1
+          borderRadius: 2
       }} />
 
       {/* 2. Events */}
@@ -2275,37 +2266,37 @@ export const Timeline: React.FC<{ element: TimelineElement }> = ({ element }) =>
             <div key={`event_${i}`} style={{ position: 'absolute', left: eventX, top: 0 }}>
                 {/* Node */}
                 <div style={{
-                    width: 16,
-                    height: 16,
+                    width: 24,
+                    height: 24,
                     borderRadius: '50%',
-                    backgroundColor: '#00F5FF',
-                    border: '4px solid #000',
+                    backgroundColor: '#00D1FF',
+                    border: '6px solid #000',
                     transform: `translate(-50%, -50%) scale(${spr})`,
-                    boxShadow: '0 0 15px #00F5FF'
+                    boxShadow: '0 0 20px #00D1FF'
                 }} />
 
                 {/* Label */}
                 <div style={{
                     position: 'absolute',
-                    top: i % 2 === 0 ? 40 : -100,
+                    top: i % 2 === 0 ? 50 : -130,
                     left: 0,
-                    transform: `translateX(-50%) translateY(${(1-spr)*10}px)`,
+                    transform: `translateX(-50%) translateY(${(1-spr)*15}px)`,
                     opacity: spr,
                     textAlign: 'center',
-                    width: 200
+                    width: 300
                 }}>
-                    <span style={{ color: '#00F5FF', fontSize: '18px', fontWeight: '900', display: 'block' }}>{ev.year}</span>
-                    <span style={{ color: 'white', fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>{ev.label}</span>
+                    <span style={{ color: '#00D1FF', fontSize: '28px', fontWeight: '900', display: 'block' }}>{ev.year}</span>
+                    <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>{ev.label}</span>
                 </div>
 
                 {/* Connector vertical */}
                 <div style={{
                     position: 'absolute',
                     left: 0,
-                    top: i % 2 === 0 ? 0 : -40,
-                    width: 1,
-                    height: 40 * spr,
-                    backgroundColor: 'rgba(0, 245, 255, 0.4)'
+                    top: i % 2 === 0 ? 0 : -50,
+                    width: 2,
+                    height: 50 * spr,
+                    backgroundColor: 'rgba(0, 209, 255, 0.4)'
                 }} />
             </div>
           );
@@ -2521,6 +2512,9 @@ export class SvgProviderService {
         break;
       case 'material-symbols':
         primaryUrl = `https://api.iconify.design/material-symbols/${cleanQuery}.svg`;
+        break;
+      case 'simple-icons':
+        primaryUrl = `https://api.iconify.design/simple-icons/${cleanQuery}.svg`;
         break;
       case 'iconify':
       default:

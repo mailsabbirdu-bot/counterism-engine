@@ -28,8 +28,8 @@ export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, 
   return (
     <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
       <defs>
-        <marker id={markerId} markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-          <polygon points="0 0, 10 3.5, 0 7" fill={color} />
+        <marker id={markerId} markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto">
+          <polygon points="0 0, 12 5, 0 10" fill={color} />
         </marker>
       </defs>
       <line
@@ -38,9 +38,10 @@ export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, 
         x2={currentX}
         y2={currentY}
         stroke={color}
-        strokeWidth="2"
-        strokeDasharray={type === 'dotted' ? "4 4" : "0"}
+        strokeWidth="4" // Thicker lines
+        strokeDasharray={type === 'dotted' ? "8 8" : "0"}
         markerEnd={type === 'arrow' ? `url(#${markerId})` : ""}
+        strokeLinecap="round"
       />
     </svg>
   );
@@ -88,13 +89,13 @@ export const GlowNode: React.FC<{ x: number, y: number, startFrame?: number, col
 };
 
 export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFrame?: number, color?: string, orbitSpeed?: number }> = ({
-    x, y, radius, startFrame = 0, color = 'rgba(255,255,255,0.1)', orbitSpeed = 1
+    x, y, radius, startFrame = 0, color = 'rgba(255,255,255,0.1)', orbitSpeed = 0.5 // Slower, more subtle
 }) => {
     const { frame } = useAnimation();
     const relativeFrame = frame - startFrame;
     if (frame < startFrame) return null;
 
-    // HARDENING: Clamp rotation
+    // rotation is slower and more cinematic
     const rotation = (relativeFrame * orbitSpeed) % 360;
 
     return (
@@ -104,21 +105,10 @@ export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFr
             top: y,
             width: radius * 2,
             height: radius * 2,
-            border: `1px solid ${color}`,
+            border: `2px solid ${color}`, // Thicker ring
             borderRadius: '50%',
-            transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+            transform: `translate(-50%, -50%)`, // Removed rotation if confusing
             zIndex: 1
-        }}>
-            <div style={{
-                position: 'absolute',
-                top: -4,
-                left: '50%',
-                width: 8,
-                height: 8,
-                backgroundColor: color,
-                borderRadius: '50%',
-                boxShadow: `0 0 10px ${color}`
-            }} />
-        </div>
+        }} />
     );
 };

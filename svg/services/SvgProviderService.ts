@@ -31,6 +31,9 @@ export class SvgProviderService {
       case 'material-symbols':
         primaryUrl = `https://api.iconify.design/material-symbols/${cleanQuery}.svg`;
         break;
+      case 'simple-icons':
+        primaryUrl = `https://api.iconify.design/simple-icons/${cleanQuery}.svg`;
+        break;
       case 'iconify':
       default:
         const iconName = cleanQuery.includes(':') ? cleanQuery : `mdi:${cleanQuery}`;

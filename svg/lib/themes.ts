@@ -14,24 +14,24 @@ export interface ThemeConfig {
 
 export const INFOGRAPHIC_THEMES: Record<InfographicTheme, ThemeConfig> = {
   tech: {
-    primaryColor: '#00F5FF',
-    secondaryColor: '#7B68EE',
-    accentColor: '#00FFAB',
-    backgroundColor: '#050505',
-    gridColor: 'rgba(0, 245, 255, 0.1)',
-    glowIntensity: 0.8,
-    glassOpacity: 0.1,
-    lineStyle: 'dashed',
+    primaryColor: '#00D1FF', // Professional Cyan
+    secondaryColor: '#FF9900', // Amazon Orange / Accent
+    accentColor: '#39FF14', // Neon Green
+    backgroundColor: '#0A0A0B', // Deep Charcoal (Better than pure black)
+    gridColor: 'rgba(0, 209, 255, 0.05)',
+    glowIntensity: 0.6,
+    glassOpacity: 0.12,
+    lineStyle: 'solid',
     fontFamily: 'Inter, sans-serif'
   },
   corporate: {
-    primaryColor: '#2563eb',
-    secondaryColor: '#64748b',
-    accentColor: '#f59e0b',
-    backgroundColor: '#ffffff',
-    gridColor: 'rgba(0, 0, 0, 0.05)',
+    primaryColor: '#3B82F6',
+    secondaryColor: '#1E293B',
+    accentColor: '#F59E0B',
+    backgroundColor: '#F8FAFC',
+    gridColor: 'rgba(59, 130, 246, 0.03)',
     glowIntensity: 0.3,
-    glassOpacity: 0.05,
+    glassOpacity: 0.08,
     lineStyle: 'solid',
     fontFamily: 'Inter, sans-serif'
   },
