@@ -4,26 +4,52 @@ import { generateSvgId } from '../lib/svgUtils';
 import { getEntranceProgress } from '../lib/animationUtils';
 import { useAnimation } from './AnimationContext';
 
-export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, y:number}, end: {x:number, y:number} }> = ({
+export const ConnectionLine: React.FC<ConnectionLineProps & {
+    start: {x:number, y:number},
+    end: {x:number, y:number},
+    paddingStart?: number,
+    paddingEnd?: number
+}> = ({
   start,
   end,
   startFrame = 0,
   duration = 60,
   color = 'rgba(255,255,255,0.2)',
-  type = 'dotted'
+  type = 'dotted',
+  paddingStart = 0,
+  paddingEnd = 0
 }) => {
   const { frame, fps } = useAnimation();
 
   // OPTIMIZATION: Use interpolation for lines
   const progress = getEntranceProgress(frame, fps, startFrame, false);
 
+  // Calculate direction vector and distance
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  // Calculate padded points to prevent icon overlap
+  const unitX = dx / dist;
+  const unitY = dy / dist;
+
+  const paddedStart = {
+      x: start.x + unitX * paddingStart,
+      y: start.y + unitY * paddingStart
+  };
+
+  const paddedEnd = {
+      x: end.x - unitX * paddingEnd,
+      y: end.y - unitY * paddingEnd
+  };
+
   // HARDENING: Unique Marker IDs to prevent collisions
   const markerId = useMemo(() => generateSvgId('arrowhead', `${start.x}-${start.y}-${end.x}-${end.y}`), [start, end]);
 
   if (frame < startFrame) return null;
 
-  const currentX = start.x + (end.x - start.x) * progress;
-  const currentY = start.y + (end.y - start.y) * progress;
+  const currentX = paddedStart.x + (paddedEnd.x - paddedStart.x) * progress;
+  const currentY = paddedStart.y + (paddedEnd.y - paddedStart.y) * progress;
 
   return (
     <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
@@ -33,8 +59,8 @@ export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, 
         </marker>
       </defs>
       <line
-        x1={start.x}
-        y1={start.y}
+        x1={paddedStart.x}
+        y1={paddedStart.y}
         x2={currentX}
         y2={currentY}
         stroke={color}

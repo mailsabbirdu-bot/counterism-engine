@@ -15,19 +15,26 @@ export const animationRegistry: Record<string, (params: AnimationParams) => Anim
     }),
     scale: ({ spr, baseScale, baseOpacity }) => ({
         opacity: spr * baseOpacity,
-        transform: `scale(${spr * baseScale})`
+        transform: `scale(${0.8 + spr * 0.2 * baseScale})`
     }),
-    pop: ({ spr, baseScale, baseOpacity }) => ({
-        opacity: spr * baseOpacity,
-        transform: `scale(${spr * 1.1 * baseScale})`
-    }),
+    pop: ({ spr, baseScale, baseOpacity }) => {
+        // High-end pop with a slight bounce-back feel via interpolation
+        const scale = spr < 0.8
+            ? spr * 1.2
+            : 1.2 - (spr - 0.8) * 0.5;
+
+        return {
+            opacity: spr * baseOpacity,
+            transform: `scale(${scale * baseScale}) perspective(1000px) rotateX(${(1-spr)*10}deg)`
+        };
+    },
     rotate: ({ spr, baseScale, baseOpacity }) => ({
         opacity: spr * baseOpacity,
         transform: `rotate(${(spr * 360) % 360}deg) scale(${spr * baseScale})`
     }),
     slideUp: ({ spr, baseScale, baseOpacity }) => ({
         opacity: spr * baseOpacity,
-        transform: `translateY(${(1 - spr) * 100}px) scale(${baseScale})`
+        transform: `translateY(${(1 - spr) * 80}px) scale(${baseScale}) perspective(1000px) rotateX(${(1-spr)*20}deg)`
     }),
     slideDown: ({ spr, baseScale, baseOpacity }) => ({
         opacity: spr * baseOpacity,

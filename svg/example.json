@@ -9,6 +9,34 @@
         "secondaryColor": "#1E293B"
       },
       "duration_in_frames": 300,
+      "camera": {
+        "enabled": true,
+        "motionBlur": { "enabled": true, "intensity": 0.8 },
+        "shake": { "enabled": true, "intensity": 1.0 },
+        "shots": [
+          {
+            "targetId": "global_network_center",
+            "startFrame": 0,
+            "duration": 90,
+            "zoom": 1.4,
+            "style": "dramatic_reveal"
+          },
+          {
+            "targetId": "global_network_node_0",
+            "startFrame": 100,
+            "duration": 60,
+            "zoom": 1.8,
+            "style": "push_in"
+          },
+          {
+            "targetId": "label_supply_chain",
+            "startFrame": 170,
+            "duration": 130,
+            "zoom": 1.1,
+            "style": "slow_pull"
+          }
+        ]
+      },
       "elements": [
         {
           "id": "global_network",
@@ -67,7 +95,8 @@
       ],
       "background": "tech_grid",
       "theme": "tech",
-      "sceneIconTheme": "lucide"
+      "sceneIconTheme": "lucide",
+      "overlays": []
     }
   ],
   "global_settings": {
