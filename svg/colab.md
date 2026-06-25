@@ -1,6 +1,6 @@
 # 🚀 SVG Motion Graphics - Powerful Showcase
 
-Run this cell to render the SVG showcase defined in `svg/example.json`.
+Run this cell to render the SVG showcase defined in `svg/amazon_example.json`.
 
 ```python
 import os
@@ -27,11 +27,11 @@ print("🛠️ Installing dependencies...")
 
 # --- 3. PRELOAD ASSETS (Offline Rendering) ---
 print("📡 Preloading SVG assets for deterministic rendering...")
-!npx ts-node --esm svg/scripts/preloadAssets.ts svg/example.json
+!npx ts-node --esm svg/scripts/preloadAssets.ts svg/amazon_example.json
 
 # --- 4. LOAD MANIFEST ---
-print("📄 Loading SVG directions from svg/example.json...")
-example_path = "svg/example.json"
+print("📄 Loading SVG directions from svg/amazon_example.json...")
+example_path = "svg/amazon_example.json"
 if os.path.exists(example_path):
     with open(example_path, 'r') as f:
         manifest = json.load(f)
@@ -40,7 +40,7 @@ if os.path.exists(example_path):
         json.dump(manifest, f, indent=2)
     print("✅ Manifest loaded successfully.")
 else:
-    print("❌ ERROR: svg/example.json not found!")
+    print("❌ ERROR: svg/amazon_example.json not found!")
 
 # --- 5. RENDER ---
 print("🎬 Rendering Powerful SVG Video...")
