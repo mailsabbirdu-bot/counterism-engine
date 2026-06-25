@@ -5,30 +5,16 @@
       "background_type": "procedural",
       "procedural_config": {
         "variant": "dark_particles",
-        "primaryColor": "#0A0A0B",
+        "primaryColor": "#0F172A",
         "secondaryColor": "#1E293B"
       },
       "duration_in_frames": 300,
       "elements": [
         {
-          "id": "amazon_hq",
-          "type": "svg",
-          "query": "amazon",
-          "provider": "simple-icons",
-          "x": 960,
-          "y": 540,
-          "width": 180,
-          "height": 180,
-          "animation": "pop",
-          "style": "tech",
-          "importance": "primary",
-          "container": "glass_panel",
-          "startFrame": 0
-        },
-        {
           "id": "global_network",
           "type": "hub_network",
-          "centerSvg": "globe",
+          "centerSvg": "amazon",
+          "provider": "simple-icons",
           "nodes": [
             "truck",
             "plane",
@@ -39,43 +25,43 @@
           ],
           "x": 960,
           "y": 540,
-          "radius": 380,
+          "radius": 420,
           "connectionStyle": "arrow",
-          "animation": "orbit",
-          "startFrame": 30
+          "animation": "pop",
+          "startFrame": 0
         },
         {
           "id": "label_supply_chain",
           "type": "label",
-          "target": "amazon_hq",
-          "text": "Amazon Global\nSupply Chain",
+          "target": "global_network_center",
+          "text": "AMAZON GLOBAL\nSUPPLY CHAIN",
           "position": "bottom",
-          "fontSize": 56,
-          "color": "#FF9900",
+          "fontSize": 80,
+          "color": "#FFB800",
           "startFrame": 60
         },
         {
           "id": "kpi_reach",
           "type": "kpi",
-          "title": "Global Reach",
+          "title": "Global Presence",
           "value": 200,
           "suffix": "+",
-          "subtitle": "Countries Served",
-          "icon": "map-pin",
+          "subtitle": "Market Regions",
+          "icon": "globe",
           "x": 380,
-          "y": 250,
+          "y": 280,
           "startFrame": 90
         },
         {
           "id": "kpi_volume",
           "type": "kpi",
-          "title": "Daily Deliveries",
+          "title": "Daily Throughput",
           "value": 1.6,
           "suffix": "M",
-          "subtitle": "Packages Daily",
+          "subtitle": "Global Parcels",
           "icon": "package",
           "x": 1540,
-          "y": 250,
+          "y": 280,
           "startFrame": 120
         }
       ],

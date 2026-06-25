@@ -28,8 +28,8 @@ export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, 
   return (
     <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
       <defs>
-        <marker id={markerId} markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto">
-          <polygon points="0 0, 12 5, 0 10" fill={color} />
+        <marker id={markerId} markerWidth="14" markerHeight="12" refX="12" refY="6" orient="auto">
+          <polygon points="0 0, 14 6, 0 12" fill={color} />
         </marker>
       </defs>
       <line
@@ -38,8 +38,8 @@ export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, 
         x2={currentX}
         y2={currentY}
         stroke={color}
-        strokeWidth="4" // Thicker lines
-        strokeDasharray={type === 'dotted' ? "8 8" : "0"}
+        strokeWidth="6" // Thick, bold lines (Vox Style)
+        strokeDasharray={type === 'dotted' ? "12 12" : "0"}
         markerEnd={type === 'arrow' ? `url(#${markerId})` : ""}
         strokeLinecap="round"
       />

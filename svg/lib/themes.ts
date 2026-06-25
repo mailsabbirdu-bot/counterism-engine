@@ -14,13 +14,13 @@ export interface ThemeConfig {
 
 export const INFOGRAPHIC_THEMES: Record<InfographicTheme, ThemeConfig> = {
   tech: {
-    primaryColor: '#00D1FF', // Professional Cyan
-    secondaryColor: '#FF9900', // Amazon Orange / Accent
+    primaryColor: '#00F5FF', // Pure Cyan
+    secondaryColor: '#FFB800', // Premium Gold/Orange
     accentColor: '#39FF14', // Neon Green
-    backgroundColor: '#0A0A0B', // Deep Charcoal (Better than pure black)
-    gridColor: 'rgba(0, 209, 255, 0.05)',
-    glowIntensity: 0.6,
-    glassOpacity: 0.12,
+    backgroundColor: '#0F172A', // Slate/Navy (Vox Style)
+    gridColor: 'rgba(255, 255, 255, 0.05)',
+    glowIntensity: 0.5,
+    glassOpacity: 0.15,
     lineStyle: 'solid',
     fontFamily: 'Inter, sans-serif'
   },

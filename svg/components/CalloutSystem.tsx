@@ -42,18 +42,18 @@ export const CalloutSystem: React.FC<{ element: CalloutElement, targetPos?: { x:
         position: 'absolute',
         left: off.bx,
         top: off.by,
-        width: boxWidth + 100, // Larger box
-        padding: '24px',
-        backgroundColor: 'rgba(0,0,0,0.8)', // Darker for readability
+        width: boxWidth + 200, // Even larger box to prevent wrapping
+        padding: '32px',
+        backgroundColor: 'rgba(15, 23, 42, 0.9)', // Match theme background
         backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255,255,255,0.2)',
-        borderRadius: '12px',
+        border: '2px solid rgba(255,255,255,0.1)',
+        borderRadius: '24px',
         opacity: spr,
         transform: `translateY(${(1-spr)*20}px)`,
         textAlign: off.align as 'left' | 'right' | 'center'
       }}>
-        <h4 style={{ color: '#00D1FF', fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px 0', textTransform: 'uppercase' }}>{title}</h4>
-        <p style={{ color: 'white', fontSize: '18px', margin: 0, opacity: 0.9, lineHeight: '1.5' }}>{body}</p>
+        <h4 style={{ color: '#00F5FF', fontSize: '32px', fontWeight: 'bold', margin: '0 0 12px 0', textTransform: 'uppercase', letterSpacing: '2px' }}>{title}</h4>
+        <p style={{ color: 'white', fontSize: '22px', margin: 0, opacity: 0.9, lineHeight: '1.6' }}>{body}</p>
       </div>
     </div>
   );

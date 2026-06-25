@@ -4,7 +4,7 @@ import { getEntranceProgress } from '../lib/animationUtils';
 import { useAnimation } from './AnimationContext';
 
 export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
-  const { text, position = 'bottom', fontSize = 42, color = 'white', animation = 'slideUp', startFrame = 0 } = element;
+  const { text, position = 'bottom', fontSize = 72, color = 'white', animation = 'slideUp', startFrame = 0 } = element;
   const { frame, fps } = useAnimation();
 
   if (!targetPos) return null;
@@ -47,7 +47,8 @@ export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: num
       letterSpacing: '1px',
       whiteSpace: 'pre-wrap',
       textAlign: 'center',
-      textShadow: '0 4px 20px rgba(0,0,0,0.5)',
+      textShadow: '0 8px 30px rgba(0,0,0,0.8)',
+      lineHeight: '1.1',
       ...animationStyles()
     }}>
       {text}
