@@ -103,7 +103,9 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = React.mem
       />
 
       {/* Background System */}
-      <InfographicBackground type={background} />
+      {background && (
+          <InfographicBackground type={background} />
+      )}
 
       {/* Orbit Rings */}
       {nodes.filter((n: any) => n.radius).map((node: any, i: number) => (

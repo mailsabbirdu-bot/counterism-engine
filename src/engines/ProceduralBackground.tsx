@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
-import { AbsoluteFill, interpolate } from 'remotion';
-import { useAnimation } from '../../svg/components/AnimationContext';
+import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion';
 
 export const ProceduralBackground: React.FC<{ config: any }> = ({ config }) => {
-  const { frame } = useAnimation();
+  const frame = useCurrentFrame();
   const variant = config.variant || 'neon_grid';
   const primaryColor = config.primaryColor || '#0F172A';
   const secondaryColor = config.secondaryColor || '#1E293B';
