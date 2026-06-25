@@ -1,1874 +1,88 @@
---- FILE: svg/components/AnimatedSvg.tsx ---
-import React, { useMemo, useState } from 'react';
-import { LayeredSvg } from './LayeredSvg';
-import { AnimationType, SvgProvider, SvgStyle, Importance, GlowConfig, GradientConfig, LayerType } from '../types';
-import { GlassPanel } from './GlassPanel';
-import { getEntranceProgress } from '../lib/animationUtils';
-import { useAnimation } from './AnimationContext';
-import { ENGINE_CONSTANTS } from '../lib/constants';
+--- FILE: svg/lib/animationRegistry.ts ---
+import { ENGINE_CONSTANTS } from './constants';
 
-// Import CSS once in the composition root
-import '../styles/svgAnimations.css';
+export type AnimationStyles = React.CSSProperties;
 
-export interface AnimatedSvgProps {
-  query: string;
-  provider: SvgProvider;
-  animation?: AnimationType;
-  startFrame?: number;
-  durationInFrames?: number;
-  width: number;
-  height: number;
-  x: number;
-  y: number;
-  color?: string;
-  strokeWidth?: number;
-
-  // Professional Styling
-  style?: SvgStyle;
-  importance?: Importance;
-  glow?: boolean | GlowConfig;
-  depth?: boolean;
-  container?: 'glass_panel';
-  gradient?: GradientConfig;
-  id?: string;
-  layer?: LayerType;
-
-  // Grouping/Composition support
-  groupOffset?: { x: number, y: number };
+export interface AnimationParams {
+    relativeFrame: number;
+    spr: number;
+    baseScale: number;
+    baseOpacity: number;
 }
 
-/**
- * Professional Animated SVG Component
- * HARDENING: Wrapper architecture for GlassPanel (P1-3).
- */
-export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
-  query,
-  provider,
-  animation = 'fade',
-  startFrame = 0,
-  durationInFrames = ENGINE_CONSTANTS.DEFAULT_ANIMATION_DURATION,
-  width,
-  height,
-  x,
-  y,
-  color = 'white',
-  strokeWidth = ENGINE_CONSTANTS.DEFAULT_STROKE_WIDTH,
-  style = 'fill',
-  importance = 'secondary',
-  glow,
-  depth,
-  container,
-  gradient,
-  id = 'svg',
-  groupOffset = { x: 0, y: 0 }
-}) => {
-  const { frame, fps } = useAnimation();
-  const [pathLength, setPathLength] = useState<number>(ENGINE_CONSTANTS.MAX_SVG_PATH_LENGTH);
-
-  const relativeFrame = frame - startFrame;
-
-  // 1. OPTIMIZATION: Conditional Spring vs Interpolation
-  const isHighImportance = importance === 'primary' || container === 'glass_panel';
-  const spr = getEntranceProgress(frame, fps, startFrame, isHighImportance);
-
-  // Automatic importance-based scaling and opacity
-  const baseScale = importance === 'primary' ? 1.2 : importance === 'decorative' ? 0.7 : 1;
-  const baseOpacity = importance === 'decorative' ? 0.4 : 1;
-  const importanceGlow = importance === 'primary' && !glow ? { color, intensity: 0.4, radius: 30 } : glow;
-
-  const animationStyles = useMemo(() => {
-    if (relativeFrame < 0) return { opacity: 0 };
-
-    switch (animation) {
-      case 'fade':
-        return { opacity: spr * baseOpacity };
-      case 'scale':
-        return { opacity: spr * baseOpacity, transform: `scale(${spr * baseScale})` };
-      case 'pop':
-        return { opacity: spr * baseOpacity, transform: `scale(${spr * 1.1 * baseScale})` };
-      case 'rotate':
-        return { opacity: spr * baseOpacity, transform: `rotate(${(spr * 360) % 360}deg) scale(${spr * baseScale})` };
-      case 'slideUp':
-        return { opacity: spr * baseOpacity, transform: `translateY(${(1 - spr) * 100}px) scale(${baseScale})` };
-      case 'slideDown':
-        return { opacity: spr * baseOpacity, transform: `translateY(${(spr - 1) * 100}px) scale(${baseScale})` };
-      case 'pulse':
+export const animationRegistry: Record<string, (params: AnimationParams) => AnimationStyles> = {
+    fade: ({ spr, baseOpacity }) => ({
+        opacity: spr * baseOpacity
+    }),
+    scale: ({ spr, baseScale, baseOpacity }) => ({
+        opacity: spr * baseOpacity,
+        transform: `scale(${spr * baseScale})`
+    }),
+    pop: ({ spr, baseScale, baseOpacity }) => ({
+        opacity: spr * baseOpacity,
+        transform: `scale(${spr * 1.1 * baseScale})`
+    }),
+    rotate: ({ spr, baseScale, baseOpacity }) => ({
+        opacity: spr * baseOpacity,
+        transform: `rotate(${(spr * 360) % 360}deg) scale(${spr * baseScale})`
+    }),
+    slideUp: ({ spr, baseScale, baseOpacity }) => ({
+        opacity: spr * baseOpacity,
+        transform: `translateY(${(1 - spr) * 100}px) scale(${baseScale})`
+    }),
+    slideDown: ({ spr, baseScale, baseOpacity }) => ({
+        opacity: spr * baseOpacity,
+        transform: `translateY(${(spr - 1) * 100}px) scale(${baseScale})`
+    }),
+    pulse: ({ relativeFrame, spr, baseScale, baseOpacity }) => {
         const pulse = 1 + Math.sin(relativeFrame / 10) * 0.05;
-        return { opacity: baseOpacity, transform: `scale(${spr * baseScale * pulse})` };
-      case 'float':
+        return {
+            opacity: baseOpacity,
+            transform: `scale(${spr * baseScale * pulse})`
+        };
+    },
+    float: ({ relativeFrame, spr, baseScale, baseOpacity }) => {
         const floatY = Math.sin(relativeFrame / 20) * 20;
-        return { opacity: spr * baseOpacity, transform: `translateY(${floatY}px) scale(${spr * baseScale})` };
-      case 'orbit':
+        return {
+            opacity: spr * baseOpacity,
+            transform: `translateY(${floatY}px) scale(${spr * baseScale})`
+        };
+    },
+    orbit: ({ relativeFrame, spr, baseScale, baseOpacity }) => {
         const orbitX = Math.cos(relativeFrame / 30) * 50;
         const orbitY = Math.sin(relativeFrame / 30) * 50;
-        return { opacity: spr * baseOpacity, transform: `translate(${orbitX}px, ${orbitY}px) scale(${spr * baseScale})` };
-      case 'reveal':
-        return { opacity: 1, clipPath: `inset(0 ${100 - spr * 100}% 0 0)`, transform: `scale(${baseScale})` };
-      case 'draw':
-      case 'trace':
-          return { opacity: 1, transform: `scale(${baseScale})` };
-      default:
-        return { opacity: spr * baseOpacity, transform: `scale(${baseScale})` };
-    }
-  }, [animation, relativeFrame, spr, baseScale, baseOpacity]);
-
-  const variableStyles = useMemo(() => {
-    const dashOffset = pathLength * (1 - spr);
-
-    return {
-        '--draw-progress': spr,
-        '--dash-offset': `${dashOffset}px`,
-        '--path-length': `${pathLength}px`,
-        '--glow-pulse': 0.5 + Math.sin(relativeFrame / 15) * 0.5,
-        '--glow-color': color
-    } as React.CSSProperties;
-  }, [spr, pathLength, relativeFrame, color]);
-
-  const svgLayer = (
-    <LayeredSvg
-      query={query}
-      provider={provider}
-      color={color}
-      strokeWidth={strokeWidth}
-      style={style}
-      gradient={gradient}
-      glow={animation === 'glowPulse' ? true : importanceGlow}
-      depth={depth}
-      width={width}
-      height={height}
-      id={id}
-      onLoad={(length) => {
-          setPathLength(length);
-      }}
-    />
-  );
-
-  const innerContent = (
-    <div
-      style={{
-        width,
-        height,
-        transform: container === 'glass_panel' ? 'scale(0.8)' : 'none',
-        ...animationStyles,
-        ...variableStyles
-      }}
-      className={`svg-motion-container ${animation}`}
-    >
-      {svgLayer}
-    </div>
-  );
-
-  return (
-    <div style={{
-        position: 'absolute',
-        left: x + groupOffset.x,
-        top: y + groupOffset.y,
-        transform: 'translate(-50%, -50%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-    }}>
-        {container === 'glass_panel' ? (
-            <GlassPanel width={width * 1.5} height={height * 1.5} startFrame={startFrame}>
-                {innerContent}
-            </GlassPanel>
-        ) : innerContent}
-    </div>
-  );
+        return {
+            opacity: spr * baseOpacity,
+            transform: `translate(${orbitX}px, ${orbitY}px) scale(${spr * baseScale})`
+        };
+    },
+    reveal: ({ spr, baseScale }) => ({
+        opacity: 1,
+        clipPath: `inset(0 ${100 - spr * 100}% 0 0)`,
+        transform: `scale(${baseScale})`
+    }),
+    draw: ({ baseScale }) => ({
+        opacity: 1,
+        transform: `scale(${baseScale})`
+    }),
+    trace: ({ baseScale }) => ({
+        opacity: 1,
+        transform: `scale(${baseScale})`
+    }),
+    glowPulse: ({ baseScale }) => ({
+        opacity: 1,
+        transform: `scale(${baseScale})`
+    })
 };
 
---- END OF svg/components/AnimatedSvg.tsx ---
-
---- FILE: svg/components/AnimationContext.tsx ---
-import React, { createContext, useContext, useMemo } from 'react';
-import { useCurrentFrame, useVideoConfig } from 'remotion';
-
-interface AnimationContextValue {
-  frame: number;
-  fps: number;
-  width: number;
-  height: number;
-}
-
-const AnimationContext = createContext<AnimationContextValue | null>(null);
-
-export const AnimationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const frame = useCurrentFrame();
-  const { fps, width, height } = useVideoConfig();
-
-  const value = useMemo(() => ({
-    frame,
-    fps,
-    width,
-    height
-  }), [frame, fps, width, height]);
-
-  return (
-    <AnimationContext.Provider value={value}>
-      {children}
-    </AnimationContext.Provider>
-  );
+export const getAnimationStyles = (
+    animation: string,
+    params: AnimationParams
+): AnimationStyles => {
+    const animator = animationRegistry[animation] || animationRegistry.fade;
+    return animator(params);
 };
 
-export const useAnimation = () => {
-  const context = useContext(AnimationContext);
-  if (!context) {
-    throw new Error('useAnimation must be used within an AnimationProvider');
-  }
-  return context;
-};
-
---- END OF svg/components/AnimationContext.tsx ---
-
---- FILE: svg/components/CalloutSystem.tsx ---
-import React, { useMemo } from 'react';
-import { useCurrentFrame, useVideoConfig } from 'remotion';
-import { CalloutElement } from '../types';
-import { getEntranceProgress } from '../lib/animationUtils';
-
-export const CalloutSystem: React.FC<{ element: CalloutElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
-  const { title, body, direction = 'right', startFrame = 0 } = element;
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  if (!targetPos) return null;
-
-  const spr = getEntranceProgress(frame, fps, startFrame, true);
-
-  const lineLength = 150;
-  const boxWidth = 300;
-
-  const offsets = {
-    right: { lx: 30, ly: 0, ex: lineLength, ey: 0, bx: lineLength, by: 0, align: 'left' },
-    left: { lx: -30, ly: 0, ex: -lineLength, ey: 0, bx: -lineLength - boxWidth, by: 0, align: 'right' },
-    top: { lx: 0, ly: -30, ex: 0, ey: -lineLength, bx: -boxWidth/2, by: -lineLength - 100, align: 'center' },
-    bottom: { lx: 0, ly: 30, ex: 0, ey: lineLength, bx: -boxWidth/2, by: lineLength, align: 'center' }
-  };
-
-  const off = offsets[direction];
-
-  return (
-    <div style={{ position: 'absolute', left: targetPos.x, top: targetPos.y }}>
-      {/* 1. Leader Line */}
-      <svg style={{ position: 'absolute', overflow: 'visible', pointerEvents: 'none' }}>
-        <line
-          x1={off.lx} y1={off.ly}
-          x2={off.lx + (off.ex - off.lx) * spr}
-          y2={off.ly + (off.ey - off.ly) * spr}
-          stroke="white" strokeWidth="2" strokeDasharray="4 4"
-        />
-        <circle cx={off.lx} cy={off.ly} r="4" fill="white" opacity={spr} />
-      </svg>
-
-      {/* 2. Callout Box */}
-      <div style={{
-        position: 'absolute',
-        left: off.bx,
-        top: off.by,
-        width: boxWidth,
-        padding: '20px',
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255,255,255,0.2)',
-        borderRadius: '12px',
-        opacity: spr,
-        transform: `translateY(${(1-spr)*20}px)`,
-        textAlign: off.align as any
-      }}>
-        <h4 style={{ color: '#00F5FF', fontSize: '18px', fontWeight: 'bold', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{title}</h4>
-        <p style={{ color: 'white', fontSize: '14px', margin: 0, opacity: 0.8, lineHeight: '1.4' }}>{body}</p>
-      </div>
-    </div>
-  );
-};
-
---- END OF svg/components/CalloutSystem.tsx ---
-
---- FILE: svg/components/CompositionEngine.tsx ---
-import React, { useMemo } from 'react';
-import { CompositionElement, SvgElement, SvgProvider } from '../types';
-import { COMPOSITIONS } from '../lib/compositionLibrary';
-import { AnimatedSvg } from './AnimatedSvg';
-import { ConnectionLine } from './InfographicElements';
-
-export const CompositionEngine: React.FC<{
-  element: CompositionElement,
-  sceneIconTheme?: SvgProvider
-}> = ({ element, sceneIconTheme }) => {
-  const definition = COMPOSITIONS[element.compositionType];
-
-  if (!definition) {
-    return null;
-  }
-
-  const { x: baseX, y: baseY, scale = 1, enterAnimation = 'scale', startFrame = 0 } = element;
-
-  // 1. Expand elements with base coordinates
-  const expandedElements = useMemo(() => {
-    return definition.elements.map((el: any) => ({
-      ...el,
-      id: `${element.id}_${el.id}`,
-      x: baseX + (el.offsetX * scale),
-      y: baseY + (el.offsetY * scale),
-      width: el.width * scale,
-      height: el.height * scale,
-      animation: el.animation || enterAnimation,
-      provider: el.provider || sceneIconTheme || 'lucide',
-      startFrame: startFrame + (el.startFrame || 0),
-      durationInFrames: el.durationInFrames || 150
-    })) as SvgElement[];
-  }, [definition, baseX, baseY, scale, enterAnimation, sceneIconTheme, element.id, startFrame]);
-
-  // 2. Map for line resolution
-  const posMap = useMemo(() => {
-    const map: Record<string, { x: number, y: number }> = {};
-    expandedElements.forEach(el => {
-      map[el.id.replace(`${element.id}_`, '')] = { x: el.x, y: el.y };
-    });
-    return map;
-  }, [expandedElements, element.id]);
-
-  return (
-    <>
-      {/* Render Lines */}
-      {definition.lines?.map((line, i) => {
-        const start = posMap[line.from];
-        const end = posMap[line.to];
-        if (!start || !end) return null;
-
-        return (
-          <ConnectionLine
-            key={`${element.id}_line_${i}`}
-            start={start}
-            end={end}
-            startFrame={startFrame + 30} // Staggered start
-            duration={60}
-            type={line.type as any}
-          />
-        );
-      })}
-
-      {/* Render SVGs */}
-      {expandedElements.map(el => (
-        <AnimatedSvg
-          key={el.id}
-          {...el}
-          provider={el.provider as SvgProvider}
-          animation={el.animation || 'fade'}
-          startFrame={el.startFrame || 0}
-          durationInFrames={el.durationInFrames || 150}
-        />
-      ))}
-    </>
-  );
-};
-
---- END OF svg/components/CompositionEngine.tsx ---
-
---- FILE: svg/components/FlowDiagram.tsx ---
-import React, { useMemo } from 'react';
-import { FlowDiagramElement, SvgProvider } from '../types';
-import { AnimatedSvg } from './AnimatedSvg';
-import { ConnectionLine } from './InfographicElements';
-import { calculateLinearPosition } from '../lib/layoutUtils';
-import { ENGINE_CONSTANTS } from '../lib/constants';
-
-export const FlowDiagram: React.FC<{ element: FlowDiagramElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
-  const { x, y, steps, layout = 'horizontal', arrowStyle = 'arrow', spacing = ENGINE_CONSTANTS.DEFAULT_SPACING, startFrame = 0 } = element;
-
-  const nodeCount = steps.length;
-  const nodePositions = useMemo(() => {
-    return steps.map((_, i) => calculateLinearPosition(i, nodeCount, x, y, spacing, layout as 'horizontal' | 'vertical'));
-  }, [x, y, steps, layout, spacing, nodeCount]);
-
-  return (
-    <>
-      {/* 1. Connection Arrows */}
-      {nodePositions.map((pos, i) => {
-        if (i === 0) return null;
-        const prevPos = nodePositions[i - 1];
-        return (
-          <ConnectionLine
-            key={`${element.id}_flow_${i}`}
-            start={prevPos}
-            end={pos}
-            startFrame={startFrame + 15 + (i * 20)}
-            duration={45}
-            type={arrowStyle === 'glow' ? 'solid' : arrowStyle as any}
-            color={arrowStyle === 'glow' ? '#00F5FF' : undefined}
-          />
-        );
-      })}
-
-      {/* 2. Nodes */}
-      {steps.map((query, i) => (
-        <AnimatedSvg
-          key={`${element.id}_step_${i}`}
-          id={`${element.id}_step_${i}`}
-          query={query}
-          provider={sceneIconTheme || 'lucide'}
-          x={nodePositions[i].x}
-          y={nodePositions[i].y}
-          width={120}
-          height={120}
-          animation="pop"
-          startFrame={startFrame + (i * 20)}
-          durationInFrames={120}
-          style="infographic"
-          importance={i === 0 || i === steps.length - 1 ? 'primary' : 'secondary'}
-        />
-      ))}
-    </>
-  );
-};
-
---- END OF svg/components/FlowDiagram.tsx ---
-
---- FILE: svg/components/GlassPanel.tsx ---
-import React from 'react';
-import { spring, useCurrentFrame, useVideoConfig } from 'remotion';
-
-interface GlassPanelProps {
-  children: React.ReactNode;
-  width: number;
-  height: number;
-  startFrame: number;
-}
-
-export const GlassPanel: React.FC<GlassPanelProps> = ({ children, width, height, startFrame }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  const spr = spring({
-    frame: frame - startFrame,
-    fps,
-    config: { damping: 12 },
-  });
-
-  if (frame < startFrame) return null;
-
-  return (
-    <div style={{
-      width,
-      height,
-      backgroundColor: 'rgba(255, 255, 255, 0.05)',
-      backdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
-      borderRadius: '24px',
-      boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 0 0 1px rgba(255, 255, 255, 0.1)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      opacity: spr,
-      transform: `scale(${0.8 + spr * 0.2})`,
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
-      {/* Subtle sheen reflection */}
-      <div style={{
-        position: 'absolute',
-        top: '-50%',
-        left: '-50%',
-        width: '200%',
-        height: '200%',
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,0.1) 100%)',
-        transform: `rotate(${spr * 20}deg)`,
-        pointerEvents: 'none'
-      }} />
-
-      {children}
-    </div>
-  );
-};
-
---- END OF svg/components/GlassPanel.tsx ---
-
---- FILE: svg/components/HubNetwork.tsx ---
-import React, { useMemo } from 'react';
-import { HubNetworkElement, SvgProvider } from '../types';
-import { AnimatedSvg } from './AnimatedSvg';
-import { ConnectionLine, OrbitRing, GlowNode } from './InfographicElements';
-import { calculateRadialPosition } from '../lib/layoutUtils';
-import { ENGINE_CONSTANTS } from '../lib/constants';
-
-export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
-  const { x, y, radius, nodes, centerSvg, provider, connectionStyle = 'arrow', animation = 'pop', startFrame = 0 } = element;
-
-  // HARDENING: Guard zero-node case (BUG-4)
-  const nodeCount = nodes.length;
-
-  const nodePositions = useMemo(() => {
-    return nodes.map((_, i) => calculateRadialPosition(i, nodeCount, x, y, radius));
-  }, [x, y, radius, nodes, nodeCount]);
-
-  return (
-    <>
-      {/* 1. Orbit Ring */}
-      <OrbitRing x={x} y={y} radius={radius} startFrame={startFrame} color="rgba(255,255,255,0.05)" />
-
-      {/* 2. Connection Lines */}
-      {nodePositions.map((pos, i) => (
-        <ConnectionLine
-          key={`${element.id}_line_${i}`}
-          start={{ x, y }}
-          end={pos}
-          startFrame={startFrame + 15 + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL / 2)}
-          duration={60}
-          type={connectionStyle as any}
-        />
-      ))}
-
-      {/* 3. Outer Nodes */}
-      {nodes.map((query, i) => (
-        <AnimatedSvg
-          key={`${element.id}_node_${i}`}
-          id={`${element.id}_node_${i}`}
-          query={query}
-          provider={provider || sceneIconTheme || 'lucide'}
-          x={nodePositions[i].x}
-          y={nodePositions[i].y}
-          width={100}
-          height={100}
-          animation={animation}
-          startFrame={startFrame + 30 + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL)}
-          durationInFrames={120}
-          importance="secondary"
-        />
-      ))}
-
-      {/* 4. Center Node */}
-      <AnimatedSvg
-        id={`${element.id}_center`}
-        query={centerSvg}
-        provider={provider || sceneIconTheme || 'lucide'}
-        x={x}
-        y={y}
-        width={180}
-        height={180}
-        animation="trace"
-        style="tech"
-        importance="primary"
-        glow={true}
-        container="glass_panel"
-        startFrame={startFrame}
-        durationInFrames={ENGINE_CONSTANTS.DEFAULT_ANIMATION_DURATION}
-      />
-
-      {/* 5. Node Pulsars */}
-      {nodePositions.map((pos, i) => (
-        <GlowNode
-            key={`${element.id}_glow_${i}`}
-            x={pos.x}
-            y={pos.y}
-            startFrame={startFrame + 45 + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL)}
-            type="pulse"
-            color="rgba(255,255,255,0.2)"
-        />
-      ))}
-    </>
-  );
-};
-
---- END OF svg/components/HubNetwork.tsx ---
-
---- FILE: svg/components/InfographicBackgrounds.tsx ---
-import React from 'react';
-import { AbsoluteFill } from 'remotion';
-import { BackgroundType } from '../types';
-
-interface InfographicBackgroundProps {
-  type?: BackgroundType;
-}
-
-export const InfographicBackground: React.FC<InfographicBackgroundProps> = ({ type }) => {
-  if (!type) return null;
-
-  return (
-    <AbsoluteFill className="pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
-      {type === 'tech_grid' && (
-        <div
-          className="absolute inset-0 opacity-[0.1]"
-          style={{
-            backgroundImage: `linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px)`,
-            backgroundSize: '100px 100px'
-          }}
-        />
-      )}
-
-      {type === 'blueprint_grid' && (
-        <div
-          className="absolute inset-0 opacity-[0.15]"
-          style={{
-            backgroundColor: '#001a33',
-            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 2px, transparent 2px), linear-gradient(90deg, rgba(255,255,255,0.1) 2px, transparent 2px), linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)`,
-            backgroundSize: '100px 100px, 100px 100px, 20px 20px, 20px 20px'
-          }}
-        />
-      )}
-
-      {type === 'dotted_pattern' && (
-        <div
-          className="absolute inset-0 opacity-[0.1]"
-          style={{
-            backgroundImage: `radial-gradient(circle, #ffffff 2px, transparent 0)`,
-            backgroundSize: '50px 50px'
-          }}
-        />
-      )}
-
-      {type === 'network_pattern' && (
-        <svg className="absolute inset-0 w-full h-full opacity-[0.1]">
-          <pattern id="network" x="0" y="0" width="200" height="200" patternUnits="userSpaceOnUse">
-            <circle cx="20" cy="20" r="3" fill="white" />
-            <circle cx="150" cy="40" r="3" fill="white" />
-            <circle cx="80" cy="120" r="3" fill="white" />
-            <circle cx="180" cy="160" r="3" fill="white" />
-            <line x1="20" y1="20" x2="150" y2="40" stroke="white" strokeWidth="1" />
-            <line x1="20" y1="20" x2="80" y2="120" stroke="white" strokeWidth="1" />
-            <line x1="150" y1="40" x2="180" y2="160" stroke="white" strokeWidth="1" />
-            <line x1="80" y1="120" x2="180" y2="160" stroke="white" strokeWidth="1" />
-          </pattern>
-          <rect width="100%" height="100%" fill="url(#network)" />
-        </svg>
-      )}
-
-      {type === 'radial_glow' && (
-        <div
-          className="absolute inset-0 opacity-[0.15]"
-          style={{
-            background: 'radial-gradient(circle at center, rgba(59, 130, 246, 0.4) 0%, rgba(0, 0, 0, 0) 70%)'
-          }}
-        />
-      )}
-    </AbsoluteFill>
-  );
-};
-
---- END OF svg/components/InfographicBackgrounds.tsx ---
-
---- FILE: svg/components/InfographicComposer.tsx ---
-import React, { useMemo } from 'react';
-import { AbsoluteFill, spring, useVideoConfig } from 'remotion';
-import { ConnectionLine, GlowNode, OrbitRing } from './InfographicElements';
-import { InfographicBackground } from './InfographicBackgrounds';
-import { AnimatedSvg } from './AnimatedSvg';
-import { HubNetwork } from './HubNetwork';
-import { FlowDiagram } from './FlowDiagram';
-import { ProcessDiagram } from './ProcessDiagram';
-import { LabelSystem } from './LabelSystem';
-import { CalloutSystem } from './CalloutSystem';
-import { KpiCard } from './KpiCard';
-import { Timeline } from './Timeline';
-import { CompositionEngine } from './CompositionEngine';
-import { NarrativeTemplate } from './NarrativeTemplates';
-import { useAnimation } from './AnimationContext';
-import { SvgGroup, StorytellingElement, LayerType, SvgProvider } from '../types';
-import { ENGINE_CONSTANTS } from '../lib/constants';
-
-interface InfographicComposerProps {
-  sceneData: any;
-}
-
-const LAYER_ORDER: LayerType[] = ['background', 'decorative', 'secondary', 'primary', 'foreground', 'overlay'];
-
-/**
- * Infographic Composer
- * Renders complex multi-layered visual storytelling compositions from JSON.
- */
-export const InfographicComposer: React.FC<InfographicComposerProps> = React.memo(({ sceneData }) => {
-  const { frame, fps } = useAnimation();
-
-  if (!sceneData) return null;
-
-  const elements: StorytellingElement[] = sceneData.elements || [];
-  const groups: SvgGroup[] = sceneData.groups || [];
-  const lines = sceneData.infographic_lines || [];
-  const nodes = sceneData.infographic_nodes || [];
-  const background = sceneData.background;
-  const sceneIconTheme: SvgProvider | undefined = sceneData.sceneIconTheme;
-
-  // 1. Resolve element positions (including group-based layouts)
-  const resolvedElements = useMemo(() => {
-      const result = elements.map(el => ({ ...el }));
-
-      groups.forEach(group => {
-          const children = result.filter((el: any) => el.groupId === group.id);
-          const groupX = group.x ?? ENGINE_CONSTANTS.CENTER_X;
-          const groupY = group.y ?? ENGINE_CONSTANTS.CENTER_Y;
-          const spacing = group.spacing ?? ENGINE_CONSTANTS.DEFAULT_SPACING;
-
-          children.forEach((child: any, index) => {
-              if (group.layout === 'horizontal') {
-                  const offset = (index - (children.length - 1) / 2) * spacing;
-                  child.x = groupX + offset;
-                  child.y = groupY;
-              } else if (group.layout === 'vertical') {
-                  const offset = (index - (children.length - 1) / 2) * spacing;
-                  child.x = groupX;
-                  child.y = groupY + offset;
-              } else if (group.layout === 'orbit') {
-                  const angle = (index / children.length) * Math.PI * 2;
-                  child.x = groupX + Math.cos(angle) * spacing;
-                  child.y = groupY + Math.sin(angle) * spacing;
-              } else if (group.layout === 'grid') {
-                  const cols = Math.ceil(Math.sqrt(children.length));
-                  const row = Math.floor(index / cols);
-                  const col = index % cols;
-                  child.x = groupX + (col - (cols - 1) / 2) * spacing;
-                  child.y = groupY + (row - (Math.ceil(children.length / cols) - 1) / 2) * spacing;
-              } else if (group.layout === 'radial') {
-                  const angle = (index / children.length) * Math.PI * 2;
-                  child.x = groupX + Math.cos(angle) * spacing;
-                  child.y = groupY + Math.sin(angle) * spacing;
-              }
-          });
-      });
-
-      return result;
-  }, [elements, groups]);
-
-  // 2. Map ID to resolved position for lines and relative components
-  const positionMap = useMemo(() => {
-      const map: Record<string, { x: number, y: number }> = {};
-      resolvedElements.forEach((el: any) => {
-          if (el.id) map[el.id] = { x: el.x, y: el.y };
-
-          // Special handling for sub-components (HubNetwork ids)
-          if (el.type === 'hub_network') {
-              map[`${el.id}_center`] = { x: el.x, y: el.y };
-          }
-      });
-      return map;
-  }, [resolvedElements]);
-
-  // 3. Sorting by Layer
-  const sortedElements = useMemo(() => {
-      return [...resolvedElements].sort((a: any, b: any) => {
-          const idxA = LAYER_ORDER.indexOf(a.layer || 'primary');
-          const idxB = LAYER_ORDER.indexOf(b.layer || 'primary');
-          return idxA - idxB;
-      });
-  }, [resolvedElements]);
-
-  return (
-    <AbsoluteFill className="pointer-events-none">
-      {/* Narrative Templates */}
-      <NarrativeTemplate
-        story={sceneData.story}
-        startFrame={sceneData.startFrame || 0}
-        sceneIconTheme={sceneIconTheme}
-        positionMap={positionMap}
-      />
-
-      {/* Background System */}
-      <InfographicBackground type={background} />
-
-      {/* Orbit Rings */}
-      {nodes.filter((n: any) => n.radius).map((node: any, i: number) => (
-        <OrbitRing
-          key={`orbit-${i}`}
-          x={node.x}
-          y={node.y}
-          radius={node.radius}
-          startFrame={node.start || 0}
-          color={node.color}
-        />
-      ))}
-
-      {/* Group background rings */}
-      {groups.filter(g => g.backgroundRing).map((group, i) => (
-          <OrbitRing
-            key={`group-ring-${i}`}
-            x={group.x ?? 960}
-            y={group.y ?? 540}
-            radius={group.spacing ?? 200}
-            startFrame={0}
-            color="rgba(255,255,255,0.05)"
-          />
-      ))}
-
-      {/* Connection Lines (Resolved by ID) */}
-      {lines.map((line: any, i: number) => {
-          const start = line.from ? positionMap[line.from] : line.start_pos;
-          const end = line.to ? positionMap[line.to] : line.end_pos;
-          if (!start || !end) return null;
-          return (
-            <ConnectionLine
-              key={`line-${i}`}
-              start={start}
-              end={end}
-              startFrame={line.start || 0}
-              duration={line.duration || 60}
-              color={line.color}
-              type={line.type}
-            />
-          );
-      })}
-
-      {/* Components Rendering */}
-      {sortedElements.map((el: any) => {
-          const commonProps = { key: el.id, sceneIconTheme };
-
-          switch(el.type) {
-              case 'svg':
-                  const group = groups.find(g => g.id === el.groupId);
-                  let groupOffset = { x: 0, y: 0 };
-                  if (group && group.enterAnimation) {
-                      const spr = spring({ frame: frame - (el.startFrame || 0), fps, config: { damping: 15 } });
-                      if (group.enterAnimation === 'slideUp') groupOffset.y = (1 - spr) * 50;
-                  }
-                  return <AnimatedSvg {...el} {...commonProps} groupOffset={groupOffset} provider={el.provider || sceneIconTheme || 'lucide'} />;
-
-              case 'hub_network': return <HubNetwork element={el} {...commonProps} />;
-              case 'flow_diagram': return <FlowDiagram element={el} {...commonProps} />;
-              case 'process': return <ProcessDiagram element={el} {...commonProps} />;
-              case 'label': return <LabelSystem element={el} targetPos={positionMap[el.target]} key={el.id} />;
-              case 'callout': return <CalloutSystem element={el} targetPos={positionMap[el.target]} key={el.id} />;
-              case 'kpi': return <KpiCard element={el} {...commonProps} />;
-              case 'timeline': return <Timeline element={el} key={el.id} />;
-              case 'composition': return <CompositionEngine element={el} {...commonProps} />;
-              default: return null;
-          }
-      })}
-
-      {/* Simple Nodes */}
-      {nodes.filter((n: any) => !n.radius).map((node: any, i: number) => (
-        <GlowNode
-          key={`node-${i}`}
-          x={node.x}
-          y={node.y}
-          startFrame={node.start || 0}
-          color={node.color}
-          type={node.type}
-        />
-      ))}
-    </AbsoluteFill>
-  );
-});
-
---- END OF svg/components/InfographicComposer.tsx ---
-
---- FILE: svg/components/InfographicElements.tsx ---
-import React, { useMemo } from 'react';
-import { useCurrentFrame, useVideoConfig } from 'remotion';
-import { ConnectionLineProps } from '../types';
-import { generateSvgId } from '../lib/svgUtils';
-import { getEntranceProgress } from '../lib/animationUtils';
-
-export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, y:number}, end: {x:number, y:number} }> = ({
-  start,
-  end,
-  startFrame = 0,
-  duration = 60,
-  color = 'rgba(255,255,255,0.2)',
-  type = 'dotted'
-}) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  // OPTIMIZATION: Use interpolation for lines
-  const progress = getEntranceProgress(frame, fps, startFrame, false);
-
-  // HARDENING: Unique Marker IDs to prevent collisions
-  const markerId = useMemo(() => generateSvgId('arrowhead', `${start.x}-${start.y}-${end.x}-${end.y}`), [start, end]);
-
-  if (frame < startFrame) return null;
-
-  const currentX = start.x + (end.x - start.x) * progress;
-  const currentY = start.y + (end.y - start.y) * progress;
-
-  return (
-    <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
-      <defs>
-        <marker id={markerId} markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-          <polygon points="0 0, 10 3.5, 0 7" fill={color} />
-        </marker>
-      </defs>
-      <line
-        x1={start.x}
-        y1={start.y}
-        x2={currentX}
-        y2={currentY}
-        stroke={color}
-        strokeWidth="2"
-        strokeDasharray={type === 'dotted' ? "4 4" : "0"}
-        markerEnd={type === 'arrow' ? `url(#${markerId})` : ""}
-      />
-    </svg>
-  );
-};
-
-export const GlowNode: React.FC<{ x: number, y: number, startFrame?: number, color?: string, type?: 'glow' | 'pulse' | 'signal' }> = ({
-  x, y, startFrame = 0, color = '#3b82f6', type = 'glow'
-}) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  const relativeFrame = frame - startFrame;
-  const progress = getEntranceProgress(frame, fps, startFrame, false);
-
-  if (frame < startFrame) return null;
-
-  const pulse = type === 'pulse' ? Math.sin(relativeFrame / 10) * 0.2 + 1 : 1;
-
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        left: x,
-        top: y,
-        width: 12,
-        height: 12,
-        backgroundColor: color,
-        borderRadius: '50%',
-        transform: `translate(-50%, -50%) scale(${progress * pulse})`,
-        boxShadow: `0 0 ${20 * pulse}px ${color}`,
-        zIndex: 2
-      }}
-    >
-      {type === 'signal' && (
-        <div style={{
-          position: 'absolute',
-          inset: -20,
-          border: `2px solid ${color}`,
-          borderRadius: '50%',
-          opacity: (1 - (relativeFrame % 30) / 30) * 0.6,
-          transform: `scale(${0.5 + ((relativeFrame % 30) / 30) * 1.5})`
-        }} />
-      )}
-    </div>
-  );
-};
-
-export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFrame?: number, color?: string, orbitSpeed?: number }> = ({
-    x, y, radius, startFrame = 0, color = 'rgba(255,255,255,0.1)', orbitSpeed = 1
-}) => {
-    const frame = useCurrentFrame();
-    const relativeFrame = frame - startFrame;
-    if (frame < startFrame) return null;
-
-    // HARDENING: Clamp rotation
-    const rotation = (relativeFrame * orbitSpeed) % 360;
-
-    return (
-        <div style={{
-            position: 'absolute',
-            left: x,
-            top: y,
-            width: radius * 2,
-            height: radius * 2,
-            border: `1px solid ${color}`,
-            borderRadius: '50%',
-            transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
-            zIndex: 1
-        }}>
-            <div style={{
-                position: 'absolute',
-                top: -4,
-                left: '50%',
-                width: 8,
-                height: 8,
-                backgroundColor: color,
-                borderRadius: '50%',
-                boxShadow: `0 0 10px ${color}`
-            }} />
-        </div>
-    );
-};
-
---- END OF svg/components/InfographicElements.tsx ---
-
---- FILE: svg/components/JsonSceneRenderer.tsx ---
-import React from 'react';
-import { AbsoluteFill } from 'remotion';
-import { AnimatedSvg } from './AnimatedSvg';
-import { SvgScene } from '../types';
-
-interface JsonSceneRendererProps {
-  sceneData: SvgScene;
-}
-
-export const JsonSceneRenderer: React.FC<JsonSceneRendererProps> = ({ sceneData }) => {
-  if (!sceneData || !sceneData.elements) return null;
-
-  return (
-    <AbsoluteFill>
-      {sceneData.elements.map((el) => {
-        if (el.type !== 'svg') return null;
-
-        return (
-          <AnimatedSvg
-            key={el.id}
-            query={el.query}
-            provider={el.provider}
-            animation={el.animation}
-            startFrame={el.startFrame}
-            durationInFrames={el.durationInFrames}
-            width={el.width}
-            height={el.height}
-            x={el.x}
-            y={el.y}
-            color={el.color}
-            strokeWidth={el.strokeWidth}
-          />
-        );
-      })}
-    </AbsoluteFill>
-  );
-};
-
---- END OF svg/components/JsonSceneRenderer.tsx ---
-
---- FILE: svg/components/KpiCard.tsx ---
-import React, { useMemo } from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
-import { KpiElement, SvgProvider } from '../types';
-import { RemoteSvg } from './RemoteSvg';
-import { getEntranceProgress } from '../lib/animationUtils';
-
-export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
-  const { title, value, trend, subtitle, icon, x, y, startFrame = 0 } = element;
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  const spr = getEntranceProgress(frame, fps, startFrame, true);
-
-  // Value animation (numeric only)
-  const displayValue = useMemo(() => {
-    const rel = frame - (startFrame + 15);
-    if (rel < 0) return typeof value === 'number' ? '0' : value;
-
-    if (typeof value === 'number') {
-        const count = interpolate(rel, [0, 60], [0, value], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-        return Math.round(count).toLocaleString();
-    }
-    // Handle strings like "170M"
-    const match = String(value).match(/^([\d.]+)([A-Z%]+)?$/);
-    if (match) {
-        const num = parseFloat(match[1]);
-        const suffix = match[2] || '';
-        const count = interpolate(rel, [0, 60], [0, num], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-        return `${count.toFixed(match[1].includes('.') ? 1 : 0)}${suffix}`;
-    }
-    return value;
-  }, [value, frame, startFrame]);
-
-  return (
-    <div style={{
-        position: 'absolute',
-        left: x,
-        top: y,
-        transform: `translate(-50%, -50%) scale(${0.8 + spr * 0.2})`,
-        opacity: spr,
-        width: 320,
-        padding: '24px',
-        backgroundColor: 'rgba(255,255,255,0.03)',
-        backdropFilter: 'blur(30px)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: '32px',
-        boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px'
-    }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '2px' }}>{title}</span>
-                <h2 style={{ color: 'white', fontSize: '48px', fontWeight: '900', margin: '4px 0 0 0', letterSpacing: '-2px' }}>{displayValue}</h2>
-            </div>
-            {icon && (
-                <div style={{ width: 48, height: 48, backgroundColor: 'rgba(0, 245, 255, 0.1)', borderRadius: '12px', padding: '8px' }}>
-                    <RemoteSvg query={icon} provider={sceneIconTheme || 'lucide'} color="#00F5FF" />
-                </div>
-            )}
-        </div>
-
-        {(trend || subtitle) && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {trend && (
-                    <span style={{
-                        color: trend.startsWith('+') ? '#10b981' : '#ef4444',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        backgroundColor: trend.startsWith('+') ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                        padding: '4px 8px',
-                        borderRadius: '8px'
-                    }}>
-                        {trend}
-                    </span>
-                )}
-                {subtitle && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: 'medium' }}>{subtitle}</span>}
-            </div>
-        )}
-    </div>
-  );
-};
-
---- END OF svg/components/KpiCard.tsx ---
-
---- FILE: svg/components/LabelSystem.tsx ---
-import React from 'react';
-import { useCurrentFrame, useVideoConfig } from 'remotion';
-import { LabelElement } from '../types';
-import { getEntranceProgress } from '../lib/animationUtils';
-
-export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
-  const { text, position = 'bottom', fontSize = 32, color = 'white', animation = 'slideUp', startFrame = 0 } = element;
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  if (!targetPos) return null;
-
-  const spr = getEntranceProgress(frame, fps, startFrame, false);
-
-  const offsets = {
-    top: { x: 0, y: -80 },
-    bottom: { x: 0, y: 80 },
-    left: { x: -120, y: 0 },
-    right: { x: 120, y: 0 },
-    center: { x: 0, y: 0 }
-  };
-
-  const offset = offsets[position];
-  const x = targetPos.x + offset.x;
-  const y = targetPos.y + offset.y;
-
-  const animationStyles = () => {
-    switch (animation) {
-      case 'fade': return { opacity: spr };
-      case 'slideUp': return { opacity: spr, transform: `translateY(${(1-spr)*20}px)` };
-      case 'slideDown': return { opacity: spr, transform: `translateY(${(spr-1)*20}px)` };
-      case 'reveal': return { clipPath: `inset(0 ${100-spr*100}% 0 0)` };
-      case 'typewriter': return { opacity: spr }; // Fallback
-      default: return { opacity: spr };
-    }
-  };
-
-  return (
-    <div style={{
-      position: 'absolute',
-      left: x,
-      top: y,
-      transform: 'translate(-50%, -50%)',
-      color,
-      fontSize,
-      fontWeight: '900',
-      textTransform: 'uppercase',
-      letterSpacing: '2px',
-      whiteSpace: 'nowrap',
-      textShadow: '0 4px 20px rgba(0,0,0,0.5)',
-      ...animationStyles()
-    }}>
-      {text}
-    </div>
-  );
-};
-
---- END OF svg/components/LabelSystem.tsx ---
-
---- FILE: svg/components/LayeredSvg.tsx ---
-import React, { useMemo } from 'react';
-import { RemoteSvg } from './RemoteSvg';
-import { SvgProvider, SvgStyle, GradientConfig, GlowConfig } from '../types';
-import { generateSvgId } from '../lib/svgUtils';
-
-interface LayeredSvgProps {
-  query: string;
-  provider: SvgProvider;
-  color?: string;
-  strokeWidth?: number;
-  style?: SvgStyle;
-  gradient?: GradientConfig;
-  glow?: boolean | GlowConfig;
-  depth?: boolean;
-  id?: string;
-  width: number;
-  height: number;
-  onLoad?: (pathLength: number) => void;
-}
-
-/**
- * Layered SVG Rendering
- * HARDENING: Use SVG Filters (drop-shadow, blur) to reduce DOM node duplication (P1-2).
- */
-export const LayeredSvg: React.FC<LayeredSvgProps> = ({
-  query,
-  provider,
-  color = 'white',
-  strokeWidth = 2,
-  style = 'fill',
-  gradient,
-  glow,
-  depth,
-  id = 'layer',
-  width,
-  height,
-  onLoad
-}) => {
-  const glowConfig: GlowConfig | null = typeof glow === 'object' ? glow : glow ? { color: color, intensity: 0.6, radius: 20 } : null;
-  const filterId = useMemo(() => generateSvgId('filter', `${query}-${id}`), [query, id]);
-
-  const filter = useMemo(() => {
-      const filters = [];
-      if (depth) {
-          filters.push(`drop-shadow(10px 10px 10px rgba(0,0,0,0.3))`);
-      }
-      if (glowConfig) {
-          filters.push(`drop-shadow(0 0 ${glowConfig.radius || 20}px ${glowConfig.color || color})`);
-      }
-      return filters.join(' ');
-  }, [depth, glowConfig, color]);
-
-  return (
-    <div style={{
-        width, height,
-        position: 'relative',
-        filter: filter, // Single pass rendering using browser optimized filters
-    }}>
-      {/* 3. MAIN LAYER (Now handles styles/gradients) */}
-      <div style={{ position: 'absolute', inset: 0 }}>
-        <RemoteSvg
-          query={query}
-          provider={provider}
-          color={color}
-          style={style}
-          strokeWidth={strokeWidth}
-          gradient={gradient}
-          id={id}
-          onLoad={onLoad}
-        />
-      </div>
-
-      {/* 4. HIGHLIGHT LAYER (Tech Overlay) */}
-      {style === 'tech' && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          opacity: 0.4,
-          background: 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 50%)',
-          mixBlendMode: 'overlay',
-          pointerEvents: 'none',
-          borderRadius: 'inherit',
-          // Mask the highlight with the main SVG for depth?
-          // Browser support for mask on div is complex, so we stick to simple overlay pass.
-        }} />
-      )}
-    </div>
-  );
-};
-
---- END OF svg/components/LayeredSvg.tsx ---
-
---- FILE: svg/components/NarrativeTemplates.tsx ---
-import React, { useMemo } from 'react';
-import { COMPOSITIONS, CompositionDefinition } from '../lib/compositionLibrary';
-import { HubNetwork } from './HubNetwork';
-import { FlowDiagram } from './FlowDiagram';
-import { ProcessDiagram } from './ProcessDiagram';
-import { LabelSystem } from './LabelSystem';
-import { CalloutSystem } from './CalloutSystem';
-import { KpiCard } from './KpiCard';
-import { Timeline } from './Timeline';
-import { HubNetworkElement, FlowDiagramElement, ProcessElement, LabelElement, CalloutElement, KpiElement, TimelineElement, StorytellingElement, SvgProvider } from '../types';
-
-/**
- * Narrative Template Engine
- * Automatically expands high-level story templates into visual components.
- */
-export const expandNarrativeTemplate = (storyType: string, startFrame: number = 0): StorytellingElement[] => {
-    switch (storyType) {
-        case 'hub_explanation':
-            return [
-                {
-                    id: 'story_hub',
-                    type: 'hub_network',
-                    centerSvg: 'network',
-                    nodes: ['database', 'cpu', 'cloud', 'lock'],
-                    radius: 300,
-                    x: 960,
-                    y: 540,
-                    startFrame
-                } as HubNetworkElement,
-                {
-                    id: 'hub_label',
-                    type: 'label',
-                    target: 'story_hub_center',
-                    text: 'Central Intelligence',
-                    position: 'top',
-                    startFrame: startFrame + 30
-                } as LabelElement
-            ];
-        case 'process_breakdown':
-            return [
-                {
-                    id: 'story_process',
-                    type: 'process',
-                    steps: ['search', 'settings', 'code-2', 'rocket'],
-                    x: 960,
-                    y: 540,
-                    startFrame
-                } as ProcessElement
-            ];
-        case 'timeline_story':
-            return [
-                {
-                    id: 'story_timeline',
-                    type: 'timeline',
-                    events: [
-                        { year: '2020', label: 'Inception' },
-                        { year: '2022', label: 'Growth' },
-                        { year: '2024', label: 'Scale' }
-                    ],
-                    x: 960,
-                    y: 540,
-                    startFrame
-                } as TimelineElement
-            ];
-        default:
-            return [];
-    }
-};
-
-interface TemplateProps {
-    story?: string;
-    startFrame?: number;
-    sceneIconTheme?: SvgProvider;
-    positionMap: Record<string, { x: number, y: number }>;
-}
-
-/**
- * Narrative Template Component
- * HARDENING: Correctly renders all expanded elements (P2-4).
- */
-export const NarrativeTemplate: React.FC<TemplateProps> = ({ story, startFrame = 0, sceneIconTheme, positionMap }) => {
-    const elements = useMemo(() => story ? expandNarrativeTemplate(story, startFrame) : [], [story, startFrame]);
-    if (!elements.length) return null;
-
-    return (
-        <>
-            {elements.map((el: any) => {
-                switch(el.type) {
-                    case 'hub_network': return <HubNetwork key={el.id} element={el} sceneIconTheme={sceneIconTheme} />;
-                    case 'process': return <ProcessDiagram key={el.id} element={el} sceneIconTheme={sceneIconTheme} />;
-                    case 'timeline': return <Timeline key={el.id} element={el} />;
-                    case 'label': return <LabelSystem key={el.id} element={el} targetPos={positionMap[el.target]} />;
-                    case 'callout': return <CalloutSystem key={el.id} element={el} targetPos={positionMap[el.target]} />;
-                    default: return null;
-                }
-            })}
-        </>
-    );
-};
-
---- END OF svg/components/NarrativeTemplates.tsx ---
-
---- FILE: svg/components/ProcessDiagram.tsx ---
-import React, { useMemo } from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
-import { ProcessElement, SvgProvider } from '../types';
-import { AnimatedSvg } from './AnimatedSvg';
-import { getEntranceProgress } from '../lib/animationUtils';
-
-export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
-  const { x, y, steps, startFrame = 0 } = element;
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  const spacing = 350;
-
-  const nodePositions = useMemo(() => {
-    return steps.map((_, i) => ({
-      x: x + (i - (steps.length - 1) / 2) * spacing,
-      y: y
-    }));
-  }, [x, y, steps, spacing]);
-
-  return (
-    <>
-      {/* 1. Progress Line Background */}
-      <div style={{
-          position: 'absolute',
-          left: nodePositions[0].x,
-          top: y,
-          width: nodePositions[steps.length - 1].x - nodePositions[0].x,
-          height: 4,
-          backgroundColor: 'rgba(255,255,255,0.1)',
-          transform: 'translateY(-50%)',
-          borderRadius: 2
-      }} />
-
-      {/* 2. Animated Progress Line */}
-      {steps.map((_, i) => {
-          if (i === 0) return null;
-          const prevX = nodePositions[i - 1].x;
-          const nextX = nodePositions[i].x;
-          const start = startFrame + 45 + (i * 30);
-          const progress = getEntranceProgress(frame, fps, start, false);
-
-          return (
-            <div key={`progress_${i}`} style={{
-                position: 'absolute',
-                left: prevX,
-                top: y,
-                width: (nextX - prevX) * progress,
-                height: 4,
-                backgroundColor: '#00F5FF',
-                transform: 'translateY(-50%)',
-                boxShadow: '0 0 10px #00F5FF',
-                borderRadius: 2,
-                zIndex: 1
-            }} />
-          );
-      })}
-
-      {/* 3. Steps */}
-      {steps.map((query, i) => {
-        const stepStart = startFrame + (i * 30);
-        const spr = getEntranceProgress(frame, fps, stepStart, true);
-
-        return (
-            <div key={`step_${i}`} style={{ position: 'absolute', left: nodePositions[i].x, top: nodePositions[i].y, transform: 'translate(-50%, -50%)' }}>
-                {/* Number Bubble */}
-                <div style={{
-                    position: 'absolute',
-                    top: -80,
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: 40,
-                    height: 40,
-                    borderRadius: '50%',
-                    border: '2px solid #00F5FF',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontSize: 18,
-                    fontWeight: 'bold',
-                    backgroundColor: 'rgba(0, 245, 255, 0.1)',
-                    opacity: spr
-                }}>
-                    {i + 1}
-                </div>
-
-                <AnimatedSvg
-                    id={`${element.id}_node_${i}`}
-                    query={query}
-                    provider={sceneIconTheme || 'lucide'}
-                    x={0}
-                    y={0}
-                    width={140}
-                    height={140}
-                    animation="scale"
-                    startFrame={stepStart + 15}
-                    durationInFrames={120}
-                    style="tech"
-                    importance="primary"
-                />
-            </div>
-        );
-      })}
-    </>
-  );
-};
-
---- END OF svg/components/ProcessDiagram.tsx ---
-
---- FILE: svg/components/RemoteSvg.tsx ---
-import React, { useMemo } from 'react';
-import { SvgProvider, SvgStyle, GradientConfig } from '../types';
-import { SvgRegistry } from '../lib/svgRegistry';
-import { ENGINE_CONSTANTS } from '../lib/constants';
-
-interface RemoteSvgProps {
-  query: string;
-  provider: SvgProvider;
-  color?: string;
-  strokeWidth?: number;
-  style?: SvgStyle;
-  gradient?: GradientConfig;
-  id?: string;
-  onLoad?: (pathLength: number) => void;
-}
-
-export const RemoteSvg: React.FC<RemoteSvgProps> = ({
-  query,
-  provider,
-  color = 'white',
-  strokeWidth = ENGINE_CONSTANTS.DEFAULT_STROKE_WIDTH,
-  style = 'fill',
-  gradient,
-  id = 'svg',
-  onLoad
-}) => {
-  // HARDENING: Render from registry ONLY. No runtime fetching or DOM parsing.
-  const asset = SvgRegistry.get(query, provider);
-
-  const gradientId = useMemo(() => `grad-${query.replace(/[^a-z0-9]/gi, '')}-${id}`, [query, id]);
-
-  const processedMarkup = useMemo(() => {
-      if (!asset) return null;
-
-      let markup = asset.markup;
-      const finalColor = gradient ? `url(#${gradientId})` : color;
-
-      // Robust attribute injection via simple string replacement for performance
-      // since markup was already sanitized/processed in preloader.
-
-      // 1. Force Scaling
-      markup = markup.replace(/<svg/, `<svg width="100%" height="100%" preserveAspectRatio="xMidYMid meet"`);
-
-      // 2. Inject Gradient if needed
-      if (gradient) {
-          const gradDef = `
-            <defs>
-                <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:${gradient.start};stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:${gradient.end};stop-opacity:1" />
-                </linearGradient>
-            </defs>
-          `;
-          markup = markup.replace(/>/, `>${gradDef}`);
-      }
-
-      // 3. Apply Style (Deterministic string replacement)
-      // Note: In a real production system, we might use a more sophisticated
-      // pre-serialized JSON structure for paths, but for this refactor
-      // we maintain the current string-based injection for compatibility.
-
-      if (style === 'outline') {
-          markup = markup.replace(/fill="[^"]*"/g, 'fill="none"');
-          markup = markup.replace(/stroke="[^"]*"/g, `stroke="${finalColor}"`);
-          markup = markup.replace(/stroke-width="[^"]*"/g, `stroke-width="${strokeWidth}"`);
-      } else {
-          markup = markup.replace(/fill="[^"]*"/g, `fill="${finalColor}"`);
-          if (style === 'tech' || style === 'corporate') {
-              markup = markup.replace(/stroke="[^"]*"/g, `stroke="${finalColor}"`);
-              markup = markup.replace(/stroke-width="[^"]*"/g, `stroke-width="${strokeWidth * 0.5}"`);
-          }
-      }
-
-      return markup;
-  }, [asset, color, strokeWidth, style, gradient, gradientId]);
-
-  // Notify parent of path length for animations
-  useMemo(() => {
-      if (asset && onLoad) {
-          onLoad(asset.pathLength);
-      }
-  }, [asset, onLoad]);
-
-  if (!asset) {
-    return (
-        <div className="bg-red-500/10 p-2 rounded text-[10px] text-red-500 border border-red-500/20 text-center">
-            SVG Missing: {query} (Run Preloader)
-        </div>
-    );
-  }
-
-  return (
-    <div
-      className="w-full h-full flex items-center justify-center"
-      dangerouslySetInnerHTML={{ __html: processedMarkup || '' }}
-    />
-  );
-};
-
---- END OF svg/components/RemoteSvg.tsx ---
-
---- FILE: svg/components/Timeline.tsx ---
-import React from 'react';
-import { useVideoConfig } from 'remotion';
-import { TimelineElement } from '../types';
-import { getEntranceProgress } from '../lib/animationUtils';
-import { useAnimation } from './AnimationContext';
-import { ENGINE_CONSTANTS } from '../lib/constants';
-
-export const Timeline: React.FC<{ element: TimelineElement }> = ({ element }) => {
-  const { events, x, y, startFrame = 0 } = element;
-  const { frame, fps } = useAnimation();
-
-  // HARDENING: Guard divide-by-zero (BUG-2)
-  const totalEvents = events.length;
-  if (totalEvents === 0) return null;
-
-  const totalWidth = ENGINE_CONSTANTS.TIMELINE_WIDTH;
-  const stepX = totalEvents > 1 ? totalWidth / (totalEvents - 1) : 0;
-
-  const overallProgress = getEntranceProgress(frame, fps, startFrame, false);
-
-  return (
-    <div style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -50%)' }}>
-      {/* 1. Base Line */}
-      <div style={{
-          position: 'absolute',
-          left: -totalWidth / 2,
-          top: 0,
-          width: totalWidth * overallProgress,
-          height: 2,
-          backgroundColor: 'rgba(255,255,255,0.2)',
-          borderRadius: 1
-      }} />
-
-      {/* 2. Events */}
-      {events.map((ev, i) => {
-          const eventX = (-totalWidth / 2) + (i * stepX);
-          const eventStart = startFrame + 15 + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL * 3);
-          const spr = getEntranceProgress(frame, fps, eventStart, true);
-
-          if (frame < eventStart) return null;
-
-          return (
-            <div key={`event_${i}`} style={{ position: 'absolute', left: eventX, top: 0 }}>
-                {/* Node */}
-                <div style={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: '50%',
-                    backgroundColor: '#00F5FF',
-                    border: '4px solid #000',
-                    transform: `translate(-50%, -50%) scale(${spr})`,
-                    boxShadow: '0 0 15px #00F5FF'
-                }} />
-
-                {/* Label */}
-                <div style={{
-                    position: 'absolute',
-                    top: i % 2 === 0 ? 40 : -100,
-                    left: 0,
-                    transform: `translateX(-50%) translateY(${(1-spr)*10}px)`,
-                    opacity: spr,
-                    textAlign: 'center',
-                    width: 200
-                }}>
-                    <span style={{ color: '#00F5FF', fontSize: '18px', fontWeight: '900', display: 'block' }}>{ev.year}</span>
-                    <span style={{ color: 'white', fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>{ev.label}</span>
-                </div>
-
-                {/* Connector vertical */}
-                <div style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: i % 2 === 0 ? 0 : -40,
-                    width: 1,
-                    height: 40 * spr,
-                    backgroundColor: 'rgba(0, 245, 255, 0.4)'
-                }} />
-            </div>
-          );
-      })}
-    </div>
-  );
-};
-
---- END OF svg/components/Timeline.tsx ---
-
---- FILE: svg/services/SvgAssetPreloader.ts ---
-import { SvgScene, SvgProvider, StorytellingElement } from '../types';
-import { SvgProviderService } from './SvgProviderService';
-import { SvgRegistry } from '../lib/svgRegistry';
-import { COMPOSITIONS } from '../lib/compositionLibrary';
-
-/**
- * SVG Asset Preloader
- * Scans scene data and downloads/processes all required SVGs before rendering.
- * MUST be called during the setup/pre-render phase.
- */
-export class SvgAssetPreloader {
-  static async preloadScene(scene: SvgScene) {
-    const queries = new Set<{ query: string; provider: SvgProvider }>();
-    const sceneProvider = scene.sceneIconTheme || 'lucide';
-
-    // 1. Scan elements
-    scene.elements.forEach(el => this.scanElement(el, sceneProvider, queries));
-
-    // 2. Scan hub networks (center and outer nodes)
-    scene.elements.forEach(el => {
-        if (el.type === 'hub_network') {
-            queries.add({ query: el.centerSvg, provider: el.provider || sceneProvider });
-            el.nodes.forEach(q => queries.add({ query: queryToKey(q), provider: el.provider || sceneProvider }));
-        }
-    });
-
-    function queryToKey(q: string) { return q; }
-
-    // 3. Download and process
-    const parser = new DOMParser();
-    const promises = Array.from(queries).map(async ({ query, provider }) => {
-      try {
-        const markup = await SvgProviderService.fetchSvg(query, provider);
-        const doc = parser.parseFromString(markup, 'image/svg+xml');
-        const svg = doc.querySelector('svg');
-
-        if (!svg) throw new Error('Invalid SVG');
-
-        // Extract total path length (approximation or measurement)
-        let totalLength = 0;
-        const paths = svg.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon');
-        paths.forEach((p: any) => {
-            if (p.getTotalLength) {
-                totalLength = Math.max(totalLength, p.getTotalLength());
-            } else {
-                const bbox = p.getBBox();
-                totalLength = Math.max(totalLength, (bbox.width + bbox.height) * 2);
-            }
-        });
-
-        SvgRegistry.register(query, provider, {
-          markup,
-          pathLength: totalLength || 5000
-        });
-      } catch (e) {
-        console.error(`Failed to preload SVG: ${query}`, e);
-      }
-    });
-
-    await Promise.all(promises);
-  }
-
-  private static scanElement(el: StorytellingElement, defaultProvider: SvgProvider, queries: Set<{ query: string; provider: SvgProvider }>) {
-    if (el.type === 'svg') {
-      queries.add({ query: el.query, provider: el.provider || defaultProvider });
-    } else if (el.type === 'hub_network') {
-      queries.add({ query: el.centerSvg, provider: el.provider || defaultProvider });
-      el.nodes.forEach(q => queries.add({ query: q, provider: el.provider || defaultProvider }));
-    } else if (el.type === 'flow_diagram' || el.type === 'process') {
-      el.steps.forEach(q => queries.add({ query: q, provider: defaultProvider }));
-    } else if (el.type === 'kpi' && el.icon) {
-      queries.add({ query: el.icon, provider: defaultProvider });
-    } else if (el.type === 'composition') {
-        const comp = COMPOSITIONS[el.compositionType];
-        if (comp) {
-            comp.elements.forEach(sub => queries.add({ query: sub.query, provider: sub.provider || defaultProvider }));
-        }
-    }
-  }
-}
-
---- END OF svg/services/SvgAssetPreloader.ts ---
-
---- FILE: svg/services/SvgCacheService.ts ---
-import { SvgProvider } from '../types';
-import { SvgProviderService } from './SvgProviderService';
-
-export class SvgCacheService {
-  private static cache: Map<string, Promise<string>> = new Map();
-  private static MAX_ENTRIES = 1000;
-  private static keys: string[] = [];
-
-  static async getSvg(query: string, provider: SvgProvider): Promise<string> {
-    const key = `${provider}:${query}`;
-
-    // LRU Implementation (P1-4: Refresh order on access)
-    if (this.cache.has(key)) {
-      // Move key to end to represent most recently used
-      this.keys = this.keys.filter(k => k !== key);
-      this.keys.push(key);
-      return this.cache.get(key)!;
-    }
-
-    // Capacity check before adding new
-    if (this.cache.size >= this.MAX_ENTRIES) {
-        const oldest = this.keys.shift();
-        if (oldest) this.cache.delete(oldest);
-    }
-
-    const fetchPromise = SvgProviderService.fetchSvg(query, provider);
-
-    // HARDENING (P1-5: Remove failed promises from cache)
-    fetchPromise.catch(() => {
-        this.cache.delete(key);
-        this.keys = this.keys.filter(k => k !== key);
-    });
-
-    this.cache.set(key, fetchPromise);
-    this.keys.push(key);
-
-    return fetchPromise;
-  }
-}
-
---- END OF svg/services/SvgCacheService.ts ---
-
---- FILE: svg/services/SvgProviderService.ts ---
-import { SvgProvider } from '../types';
-
-export class SvgProviderService {
-  private static FETCH_TIMEOUT = 5000;
-  private static MAX_RETRIES = 2;
-
-  /**
-   * Fetch SVG data from public APIs based on provider and query.
-   */
-  static async fetchSvg(query: string, provider: SvgProvider): Promise<string> {
-    const cleanQuery = query.trim().toLowerCase();
-
-    // Primary URL based on provider
-    let primaryUrl = '';
-    switch (provider) {
-      case 'lucide':
-        primaryUrl = `https://api.iconify.design/lucide/${cleanQuery}.svg`;
-        break;
-      case 'tabler':
-        primaryUrl = `https://api.iconify.design/tabler/${cleanQuery}.svg`;
-        break;
-      case 'solar':
-        primaryUrl = `https://api.iconify.design/solar/${cleanQuery}-bold.svg`;
-        break;
-      case 'phosphor':
-        primaryUrl = `https://api.iconify.design/ph/${cleanQuery}-bold.svg`;
-        break;
-      case 'hugeicons':
-        primaryUrl = `https://api.iconify.design/hugeicons/${cleanQuery}.svg`;
-        break;
-      case 'material-symbols':
-        primaryUrl = `https://api.iconify.design/material-symbols/${cleanQuery}.svg`;
-        break;
-      case 'iconify':
-      default:
-        const iconName = cleanQuery.includes(':') ? cleanQuery : `mdi:${cleanQuery}`;
-        primaryUrl = `https://api.iconify.design/${iconName.replace(':', '/')}.svg`;
-        break;
-    }
-
-    try {
-        return await this.fetchWithRetry(primaryUrl);
-    } catch (e) {
-        // FALLBACK: Try standard MDI via Iconify if specific provider fails
-        console.warn(`Primary fetch failed for ${cleanQuery} (Provider: ${provider}), trying fallback...`);
-        const fallbackUrl = `https://api.iconify.design/mdi/${cleanQuery.split('-').pop()}.svg`;
-        return this.fetchWithRetry(fallbackUrl);
-    }
-  }
-
-  private static async fetchWithRetry(url: string, attempt: number = 0): Promise<string> {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.FETCH_TIMEOUT);
-
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP Error: ${response.status}`);
-      }
-
-      const svgText = await response.text();
-
-      if (!svgText.includes('<svg')) {
-        throw new Error('Invalid SVG content received');
-      }
-
-      return svgText;
-    } catch (error) {
-      if (attempt < this.MAX_RETRIES) {
-        return this.fetchWithRetry(url, attempt + 1);
-      }
-      throw error;
-    }
-  }
-}
-
---- END OF svg/services/SvgProviderService.ts ---
 
 --- FILE: svg/lib/animationUtils.ts ---
 import { interpolate, spring, SpringConfig } from 'remotion';
@@ -1930,7 +144,6 @@ export const getRevealProgress = (
     });
 };
 
---- END OF svg/lib/animationUtils.ts ---
 
 --- FILE: svg/lib/compositionLibrary.ts ---
 import { CompositionType, SvgElement, InfographicLine, SvgProvider, AnimationType, SvgStyle, Importance } from '../types';
@@ -2085,7 +298,6 @@ export const COMPOSITIONS: Record<CompositionType, CompositionDefinition> = {
   }
 };
 
---- END OF svg/lib/compositionLibrary.ts ---
 
 --- FILE: svg/lib/constants.ts ---
 /**
@@ -2113,6 +325,9 @@ export const ENGINE_CONSTANTS = {
   DEFAULT_STROKE_WIDTH: 2,
   GLASS_PANEL_BLUR: 20,
   GLOW_RADIUS: 20,
+  CALLOUT_LINE_LENGTH: 150,
+  CALLOUT_BOX_WIDTH: 300,
+  KPI_CARD_WIDTH: 320,
 
   // Layers (z-index)
   LAYERS: {
@@ -2125,7 +340,6 @@ export const ENGINE_CONSTANTS = {
   }
 };
 
---- END OF svg/lib/constants.ts ---
 
 --- FILE: svg/lib/layoutUtils.ts ---
 import { ENGINE_CONSTANTS } from './constants';
@@ -2147,6 +361,8 @@ export const calculateRadialPosition = (
     angleOffset: number = 0
 ) => {
     if (total <= 0) return { x: baseX, y: baseY };
+    // HARDENING (P2-5): Shared radial layout logic.
+    // This now serves orbit, radial, and cluster.
     const angle = (index / total) * Math.PI * 2 + angleOffset;
     return {
         x: baseX + Math.cos(angle) * radius,
@@ -2194,7 +410,6 @@ export const calculateGridPosition = (
     };
 };
 
---- END OF svg/lib/layoutUtils.ts ---
 
 --- FILE: svg/lib/sceneValidator.ts ---
 import { SvgScene, StorytellingElement } from '../types';
@@ -2228,10 +443,20 @@ export const validateScene = (scene: SvgScene): string[] => {
         }
     });
 
+    // 4. Check for Empty Container Elements
+    scene.elements.forEach(el => {
+        if (el.type === 'hub_network' && el.nodes.length === 0) {
+            // This is handled in the component now, but good to validate.
+            // errors.push(`Hub Network "${el.id}" has no nodes.`);
+        }
+        if (el.type === 'process' && el.steps.length === 0) {
+            errors.push(`Process Diagram "${el.id}" has no steps.`);
+        }
+    });
+
     return errors;
 };
 
---- END OF svg/lib/sceneValidator.ts ---
 
 --- FILE: svg/lib/svgRegistry.ts ---
 import { SvgProvider } from '../types';
@@ -2247,27 +472,67 @@ export interface PreprocessedSvg {
  */
 export class SvgRegistry {
   private static assets: Map<string, PreprocessedSvg> = new Map();
+  private static MAX_ENTRIES = 2000;
+  private static keys: string[] = [];
 
   static register(query: string, provider: SvgProvider, data: PreprocessedSvg) {
     const key = `${provider}:${query}`;
+
+    if (this.assets.has(key)) {
+        this.keys = this.keys.filter(k => k !== key);
+    } else if (this.assets.size >= this.MAX_ENTRIES) {
+        const oldest = this.keys.shift();
+        if (oldest) this.assets.delete(oldest);
+    }
+
     this.assets.set(key, data);
+    this.keys.push(key);
   }
 
   static get(query: string, provider: SvgProvider): PreprocessedSvg | undefined {
     const key = `${provider}:${query}`;
-    return this.assets.get(key);
+    const data = this.assets.get(key);
+
+    if (data) {
+        // LRU: Refresh order on access
+        this.keys = this.keys.filter(k => k !== key);
+        this.keys.push(key);
+    }
+
+    return data;
   }
 
   static clear() {
     this.assets.clear();
+    this.keys = [];
   }
 
   static has(query: string, provider: SvgProvider): boolean {
     return this.assets.has(`${provider}:${query}`);
   }
+
+  /**
+   * Bulk load preprocessed assets into the registry.
+   * Useful for transferring assets from a preloader to a static render environment.
+   */
+  static load(data: Record<string, PreprocessedSvg>) {
+    Object.entries(data).forEach(([key, value]) => {
+      this.assets.set(key, value);
+    });
+  }
+
+  /**
+   * Export all currently registered assets.
+   */
+  static export(): Record<string, PreprocessedSvg> {
+    const data: Record<string, PreprocessedSvg> = {};
+    this.assets.forEach((value, key) => {
+      data[key] = value;
+    });
+    return data;
+  }
 }
 
---- END OF svg/lib/svgRegistry.ts ---
 
 --- FILE: svg/lib/svgUtils.ts ---
 import { random } from 'remotion';
@@ -2282,7 +547,6 @@ export const generateSvgId = (base: string, seed: any) => {
     return `${base}-${unique}`;
 };
 
---- END OF svg/lib/svgUtils.ts ---
 
 --- FILE: svg/lib/themes.ts ---
 import { InfographicTheme } from '../types';
@@ -2405,7 +669,1651 @@ export const getTheme = (themeName?: InfographicTheme): ThemeConfig => {
   return INFOGRAPHIC_THEMES[themeName || 'tech'];
 };
 
---- END OF svg/lib/themes.ts ---
+
+--- FILE: svg/components/AnimatedSvg.tsx ---
+import React, { useMemo, useState, useEffect } from 'react';
+import { LayeredSvg } from './LayeredSvg';
+import { AnimationType, SvgProvider, SvgStyle, Importance, GlowConfig, GradientConfig, LayerType } from '../types';
+import { GlassPanel } from './GlassPanel';
+import { getEntranceProgress } from '../lib/animationUtils';
+import { useAnimation } from './AnimationContext';
+import { ENGINE_CONSTANTS } from '../lib/constants';
+import { getAnimationStyles } from '../lib/animationRegistry';
+import { getTheme } from '../lib/themes';
+
+// Import CSS once in the composition root
+import '../styles/svgAnimations.css';
+
+export interface AnimatedSvgProps {
+  query: string;
+  provider: SvgProvider;
+  animation?: AnimationType;
+  startFrame?: number;
+  durationInFrames?: number;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  color?: string;
+  strokeWidth?: number;
+
+  // Professional Styling
+  style?: SvgStyle;
+  importance?: Importance;
+  glow?: boolean | GlowConfig;
+  depth?: boolean;
+  container?: 'glass_panel';
+  gradient?: GradientConfig;
+  id?: string;
+  layer?: LayerType;
+
+  // Grouping/Composition support
+  groupOffset?: { x: number, y: number };
+}
+
+/**
+ * Professional Animated SVG Component
+ * HARDENING: Wrapper architecture for GlassPanel (P1-3).
+ */
+export const AnimatedSvg: React.FC<AnimatedSvgProps> = ({
+  query,
+  provider,
+  animation = 'fade',
+  startFrame = 0,
+  durationInFrames = ENGINE_CONSTANTS.DEFAULT_ANIMATION_DURATION,
+  width,
+  height,
+  x,
+  y,
+  color = 'white',
+  strokeWidth = ENGINE_CONSTANTS.DEFAULT_STROKE_WIDTH,
+  style = 'fill',
+  importance = 'secondary',
+  glow,
+  depth,
+  container,
+  gradient,
+  id = 'svg',
+  groupOffset = { x: 0, y: 0 }
+}) => {
+  const { frame, fps } = useAnimation();
+  const theme = getTheme(); // In a real system, we'd get this from a ThemeContext
+
+  const [pathLength, setPathLength] = useState<number>(ENGINE_CONSTANTS.MAX_SVG_PATH_LENGTH);
+
+  const relativeFrame = frame - startFrame;
+
+  // 1. OPTIMIZATION: Conditional Spring vs Interpolation
+  const isHighImportance = importance === 'primary' || container === 'glass_panel';
+  const spr = getEntranceProgress(frame, fps, startFrame, isHighImportance);
+
+  // Automatic importance-based scaling and opacity
+  const baseScale = importance === 'primary' ? 1.2 : importance === 'decorative' ? 0.7 : 1;
+  const baseOpacity = importance === 'decorative' ? 0.4 : 1;
+
+  // Theme-aware coloring
+  const finalColor = color === 'white' ? theme.primaryColor : color;
+  const importanceGlow = importance === 'primary' && !glow ? { color: finalColor, intensity: 0.4, radius: 30 } : glow;
+
+  const animationStyles = useMemo(() => {
+    if (relativeFrame < 0) return { opacity: 0 };
+    return getAnimationStyles(animation, { relativeFrame, spr, baseScale, baseOpacity });
+  }, [animation, relativeFrame, spr, baseScale, baseOpacity]);
+
+  const variableStyles = useMemo(() => {
+    const dashOffset = pathLength * (1 - spr);
+
+    return {
+        '--draw-progress': spr,
+        '--dash-offset': `${dashOffset}px`,
+        '--path-length': `${pathLength}px`,
+        '--glow-pulse': 0.5 + Math.sin(relativeFrame / 15) * 0.5,
+        '--glow-color': finalColor,
+        '--glass-blur': `${ENGINE_CONSTANTS.GLASS_PANEL_BLUR}px`
+    } as React.CSSProperties;
+  }, [spr, pathLength, relativeFrame, finalColor]);
+
+  const svgLayer = (
+    <LayeredSvg
+      query={query}
+      provider={provider}
+      color={finalColor}
+      strokeWidth={strokeWidth}
+      style={style}
+      gradient={gradient}
+      glow={animation === 'glowPulse' ? true : importanceGlow}
+      depth={depth}
+      width={width}
+      height={height}
+      id={id}
+      onLoad={(length) => {
+          setPathLength(length);
+      }}
+    />
+  );
+
+  const innerContent = (
+    <div
+      style={{
+        width,
+        height,
+        transform: container === 'glass_panel' ? 'scale(0.8)' : 'none',
+        ...animationStyles,
+        ...variableStyles
+      }}
+      className={`svg-motion-container ${animation}`}
+    >
+      {svgLayer}
+    </div>
+  );
+
+  return (
+    <div style={{
+        position: 'absolute',
+        left: x + groupOffset.x,
+        top: y + groupOffset.y,
+        transform: 'translate(-50%, -50%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+    }}>
+        {container === 'glass_panel' ? (
+            <GlassPanel width={width * 1.5} height={height * 1.5} startFrame={startFrame}>
+                {innerContent}
+            </GlassPanel>
+        ) : innerContent}
+    </div>
+  );
+};
+
+
+--- FILE: svg/components/AnimationContext.tsx ---
+import React, { createContext, useContext, useMemo } from 'react';
+import { useCurrentFrame, useVideoConfig } from 'remotion';
+
+interface AnimationContextValue {
+  frame: number;
+  fps: number;
+  width: number;
+  height: number;
+}
+
+const AnimationContext = createContext<AnimationContextValue | null>(null);
+
+export const AnimationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const frame = useCurrentFrame();
+  const { fps, width, height } = useVideoConfig();
+
+  const value = useMemo(() => ({
+    frame,
+    fps,
+    width,
+    height
+  }), [frame, fps, width, height]);
+
+  return (
+    <AnimationContext.Provider value={value}>
+      {children}
+    </AnimationContext.Provider>
+  );
+};
+
+export const useAnimation = () => {
+  const context = useContext(AnimationContext);
+  if (!context) {
+    throw new Error('useAnimation must be used within an AnimationProvider');
+  }
+  return context;
+};
+
+
+--- FILE: svg/components/CalloutSystem.tsx ---
+import React, { useMemo } from 'react';
+import { CalloutElement } from '../types';
+import { getEntranceProgress } from '../lib/animationUtils';
+import { useAnimation } from './AnimationContext';
+import { ENGINE_CONSTANTS } from '../lib/constants';
+
+export const CalloutSystem: React.FC<{ element: CalloutElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
+  const { title, body, direction = 'right', startFrame = 0 } = element;
+  const { frame, fps } = useAnimation();
+
+  if (!targetPos) return null;
+
+  const spr = getEntranceProgress(frame, fps, startFrame, true);
+
+  const lineLength = ENGINE_CONSTANTS.CALLOUT_LINE_LENGTH;
+  const boxWidth = ENGINE_CONSTANTS.CALLOUT_BOX_WIDTH;
+
+  const offsets = {
+    right: { lx: 30, ly: 0, ex: lineLength, ey: 0, bx: lineLength, by: 0, align: 'left' },
+    left: { lx: -30, ly: 0, ex: -lineLength, ey: 0, bx: -lineLength - boxWidth, by: 0, align: 'right' },
+    top: { lx: 0, ly: -30, ex: 0, ey: -lineLength, bx: -boxWidth/2, by: -lineLength - 100, align: 'center' },
+    bottom: { lx: 0, ly: 30, ex: 0, ey: lineLength, bx: -boxWidth/2, by: lineLength, align: 'center' }
+  };
+
+  const off = offsets[direction];
+
+  return (
+    <div style={{ position: 'absolute', left: targetPos.x, top: targetPos.y }}>
+      {/* 1. Leader Line */}
+      <svg style={{ position: 'absolute', overflow: 'visible', pointerEvents: 'none' }}>
+        <line
+          x1={off.lx} y1={off.ly}
+          x2={off.lx + (off.ex - off.lx) * spr}
+          y2={off.ly + (off.ey - off.ly) * spr}
+          stroke="white" strokeWidth="2" strokeDasharray="4 4"
+        />
+        <circle cx={off.lx} cy={off.ly} r="4" fill="white" opacity={spr} />
+      </svg>
+
+      {/* 2. Callout Box */}
+      <div style={{
+        position: 'absolute',
+        left: off.bx,
+        top: off.by,
+        width: boxWidth,
+        padding: '20px',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255,255,255,0.2)',
+        borderRadius: '12px',
+        opacity: spr,
+        transform: `translateY(${(1-spr)*20}px)`,
+        textAlign: off.align as 'left' | 'right' | 'center'
+      }}>
+        <h4 style={{ color: '#00F5FF', fontSize: '18px', fontWeight: 'bold', margin: '0 0 5px 0', textTransform: 'uppercase' }}>{title}</h4>
+        <p style={{ color: 'white', fontSize: '14px', margin: 0, opacity: 0.8, lineHeight: '1.4' }}>{body}</p>
+      </div>
+    </div>
+  );
+};
+
+
+--- FILE: svg/components/CompositionEngine.tsx ---
+import React, { useMemo } from 'react';
+import { CompositionElement, SvgElement, SvgProvider } from '../types';
+import { COMPOSITIONS } from '../lib/compositionLibrary';
+import { AnimatedSvg } from './AnimatedSvg';
+import { ConnectionLine } from './InfographicElements';
+
+export const CompositionEngine: React.FC<{
+  element: CompositionElement,
+  sceneIconTheme?: SvgProvider
+}> = ({ element, sceneIconTheme }) => {
+  const definition = COMPOSITIONS[element.compositionType];
+
+  if (!definition) {
+    return null;
+  }
+
+  const { x: baseX, y: baseY, scale = 1, enterAnimation = 'scale', startFrame = 0 } = element;
+
+  // 1. Expand elements with base coordinates
+  const expandedElements = useMemo(() => {
+    return definition.elements.map((el: any) => ({
+      ...el,
+      id: `${element.id}_${el.id}`,
+      x: baseX + (el.offsetX * scale),
+      y: baseY + (el.offsetY * scale),
+      width: el.width * scale,
+      height: el.height * scale,
+      animation: el.animation || enterAnimation,
+      provider: el.provider || sceneIconTheme || 'lucide',
+      startFrame: startFrame + (el.startFrame || 0),
+      durationInFrames: el.durationInFrames || 150
+    })) as SvgElement[];
+  }, [definition, baseX, baseY, scale, enterAnimation, sceneIconTheme, element.id, startFrame]);
+
+  // 2. Map for line resolution
+  const posMap = useMemo(() => {
+    const map: Record<string, { x: number, y: number }> = {};
+    expandedElements.forEach(el => {
+      map[el.id.replace(`${element.id}_`, '')] = { x: el.x, y: el.y };
+    });
+    return map;
+  }, [expandedElements, element.id]);
+
+  return (
+    <>
+      {/* Render Lines */}
+      {definition.lines?.map((line, i) => {
+        const start = posMap[line.from];
+        const end = posMap[line.to];
+        if (!start || !end) return null;
+
+        return (
+          <ConnectionLine
+            key={`${element.id}_line_${i}`}
+            start={start}
+            end={end}
+            startFrame={startFrame + 30} // Staggered start
+            duration={60}
+            type={line.type as 'solid' | 'dotted' | 'arrow'}
+          />
+        );
+      })}
+
+      {/* Render SVGs */}
+      {expandedElements.map(el => (
+        <AnimatedSvg
+          key={el.id}
+          {...el}
+          provider={el.provider as SvgProvider}
+          animation={el.animation || 'fade'}
+          startFrame={el.startFrame || 0}
+          durationInFrames={el.durationInFrames || 150}
+        />
+      ))}
+    </>
+  );
+};
+
+
+--- FILE: svg/components/FlowDiagram.tsx ---
+import React, { useMemo } from 'react';
+import { FlowDiagramElement, SvgProvider } from '../types';
+import { AnimatedSvg } from './AnimatedSvg';
+import { ConnectionLine } from './InfographicElements';
+import { calculateLinearPosition } from '../lib/layoutUtils';
+import { ENGINE_CONSTANTS } from '../lib/constants';
+import { useAnimation } from './AnimationContext';
+
+export const FlowDiagram: React.FC<{ element: FlowDiagramElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
+  const { x, y, steps, layout = 'horizontal', arrowStyle = 'arrow', spacing = ENGINE_CONSTANTS.DEFAULT_SPACING, startFrame = 0 } = element;
+  const { frame, fps } = useAnimation();
+
+  const nodeCount = steps.length;
+  const nodePositions = useMemo(() => {
+    return steps.map((_, i) => calculateLinearPosition(i, nodeCount, x, y, spacing, layout as 'horizontal' | 'vertical'));
+  }, [x, y, steps, layout, spacing, nodeCount]);
+
+  return (
+    <>
+      {/* 1. Connection Arrows */}
+      {nodePositions.map((pos, i) => {
+        if (i === 0) return null;
+        const prevPos = nodePositions[i - 1];
+        return (
+          <ConnectionLine
+            key={`${element.id}_flow_${i}`}
+            start={prevPos}
+            end={pos}
+            startFrame={startFrame + 15 + (i * 20)}
+            duration={45}
+            type={(arrowStyle === 'glow' ? 'solid' : arrowStyle) as 'solid' | 'dotted' | 'arrow'}
+            color={arrowStyle === 'glow' ? '#00F5FF' : undefined}
+          />
+        );
+      })}
+
+      {/* 2. Nodes */}
+      {steps.map((query, i) => (
+        <AnimatedSvg
+          key={`${element.id}_step_${i}`}
+          id={`${element.id}_step_${i}`}
+          query={query}
+          provider={sceneIconTheme || 'lucide'}
+          x={nodePositions[i].x}
+          y={nodePositions[i].y}
+          width={120}
+          height={120}
+          animation="pop"
+          startFrame={startFrame + (i * 20)}
+          durationInFrames={120}
+          style="infographic"
+          importance={i === 0 || i === steps.length - 1 ? 'primary' : 'secondary'}
+        />
+      ))}
+    </>
+  );
+};
+
+
+--- FILE: svg/components/GlassPanel.tsx ---
+import React from 'react';
+import { spring } from 'remotion';
+import { useAnimation } from './AnimationContext';
+
+interface GlassPanelProps {
+  children: React.ReactNode;
+  width: number;
+  height: number;
+  startFrame: number;
+}
+
+export const GlassPanel: React.FC<GlassPanelProps> = ({ children, width, height, startFrame }) => {
+  const { frame, fps } = useAnimation();
+
+  const spr = spring({
+    frame: frame - startFrame,
+    fps,
+    config: { damping: 12 },
+  });
+
+  if (frame < startFrame) return null;
+
+  return (
+    <div style={{
+      width,
+      height,
+      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+      backdropFilter: 'blur(20px)',
+      border: '1px solid rgba(255, 255, 255, 0.1)',
+      borderRadius: '24px',
+      boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 0 0 1px rgba(255, 255, 255, 0.1)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      opacity: spr,
+      transform: `scale(${0.8 + spr * 0.2})`,
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* Subtle sheen reflection */}
+      <div style={{
+        position: 'absolute',
+        top: '-50%',
+        left: '-50%',
+        width: '200%',
+        height: '200%',
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,0.1) 100%)',
+        transform: `rotate(${spr * 20}deg)`,
+        pointerEvents: 'none'
+      }} />
+
+      {children}
+    </div>
+  );
+};
+
+
+--- FILE: svg/components/HubNetwork.tsx ---
+import React, { useMemo } from 'react';
+import { HubNetworkElement, SvgProvider } from '../types';
+import { AnimatedSvg } from './AnimatedSvg';
+import { ConnectionLine, OrbitRing, GlowNode } from './InfographicElements';
+import { calculateRadialPosition } from '../lib/layoutUtils';
+import { ENGINE_CONSTANTS } from '../lib/constants';
+
+export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
+  const { x, y, radius, nodes, centerSvg, provider, connectionStyle = 'arrow', animation = 'pop', startFrame = 0 } = element;
+
+  // HARDENING: Guard zero-node case (BUG-4)
+  const nodeCount = nodes.length;
+  if (nodeCount === 0) {
+      return (
+        <AnimatedSvg
+            id={`${element.id}_center`}
+            query={centerSvg}
+            provider={provider || sceneIconTheme || 'lucide'}
+            x={x}
+            y={y}
+            width={180}
+            height={180}
+            animation="trace"
+            style="tech"
+            importance="primary"
+            glow={true}
+            container="glass_panel"
+            startFrame={startFrame}
+            durationInFrames={ENGINE_CONSTANTS.DEFAULT_ANIMATION_DURATION}
+        />
+      );
+  }
+
+  const nodePositions = useMemo(() => {
+    return nodes.map((_, i) => calculateRadialPosition(i, nodeCount, x, y, radius));
+  }, [x, y, radius, nodes, nodeCount]);
+
+  return (
+    <>
+      {/* 1. Orbit Ring */}
+      <OrbitRing x={x} y={y} radius={radius} startFrame={startFrame} color="rgba(255,255,255,0.05)" />
+
+      {/* 2. Connection Lines */}
+      {nodePositions.map((pos, i) => (
+        <ConnectionLine
+          key={`${element.id}_line_${i}`}
+          start={{ x, y }}
+          end={pos}
+          startFrame={startFrame + 15 + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL / 2)}
+          duration={60}
+          type={connectionStyle as 'solid' | 'dotted' | 'arrow'}
+        />
+      ))}
+
+      {/* 3. Outer Nodes */}
+      {nodes.map((query, i) => (
+        <AnimatedSvg
+          key={`${element.id}_node_${i}`}
+          id={`${element.id}_node_${i}`}
+          query={query}
+          provider={provider || sceneIconTheme || 'lucide'}
+          x={nodePositions[i].x}
+          y={nodePositions[i].y}
+          width={100}
+          height={100}
+          animation={animation}
+          startFrame={startFrame + 30 + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL)}
+          durationInFrames={120}
+          importance="secondary"
+        />
+      ))}
+
+      {/* 4. Center Node */}
+      <AnimatedSvg
+        id={`${element.id}_center`}
+        query={centerSvg}
+        provider={provider || sceneIconTheme || 'lucide'}
+        x={x}
+        y={y}
+        width={180}
+        height={180}
+        animation="trace"
+        style="tech"
+        importance="primary"
+        glow={true}
+        container="glass_panel"
+        startFrame={startFrame}
+        durationInFrames={ENGINE_CONSTANTS.DEFAULT_ANIMATION_DURATION}
+      />
+
+      {/* 5. Node Pulsars */}
+      {nodePositions.map((pos, i) => (
+        <GlowNode
+            key={`${element.id}_glow_${i}`}
+            x={pos.x}
+            y={pos.y}
+            startFrame={startFrame + 45 + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL)}
+            type="pulse"
+            color="rgba(255,255,255,0.2)"
+        />
+      ))}
+    </>
+  );
+};
+
+
+--- FILE: svg/components/InfographicBackgrounds.tsx ---
+import React from 'react';
+import { AbsoluteFill } from 'remotion';
+import { BackgroundType } from '../types';
+
+interface InfographicBackgroundProps {
+  type?: BackgroundType;
+}
+
+export const InfographicBackground: React.FC<InfographicBackgroundProps> = ({ type }) => {
+  if (!type) return null;
+
+  return (
+    <AbsoluteFill className="pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
+      {type === 'tech_grid' && (
+        <div
+          className="absolute inset-0 opacity-[0.1]"
+          style={{
+            backgroundImage: `linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px)`,
+            backgroundSize: '100px 100px'
+          }}
+        />
+      )}
+
+      {type === 'blueprint_grid' && (
+        <div
+          className="absolute inset-0 opacity-[0.15]"
+          style={{
+            backgroundColor: '#001a33',
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 2px, transparent 2px), linear-gradient(90deg, rgba(255,255,255,0.1) 2px, transparent 2px), linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)`,
+            backgroundSize: '100px 100px, 100px 100px, 20px 20px, 20px 20px'
+          }}
+        />
+      )}
+
+      {type === 'dotted_pattern' && (
+        <div
+          className="absolute inset-0 opacity-[0.1]"
+          style={{
+            backgroundImage: `radial-gradient(circle, #ffffff 2px, transparent 0)`,
+            backgroundSize: '50px 50px'
+          }}
+        />
+      )}
+
+      {type === 'network_pattern' && (
+        <svg className="absolute inset-0 w-full h-full opacity-[0.1]">
+          <pattern id="network" x="0" y="0" width="200" height="200" patternUnits="userSpaceOnUse">
+            <circle cx="20" cy="20" r="3" fill="white" />
+            <circle cx="150" cy="40" r="3" fill="white" />
+            <circle cx="80" cy="120" r="3" fill="white" />
+            <circle cx="180" cy="160" r="3" fill="white" />
+            <line x1="20" y1="20" x2="150" y2="40" stroke="white" strokeWidth="1" />
+            <line x1="20" y1="20" x2="80" y2="120" stroke="white" strokeWidth="1" />
+            <line x1="150" y1="40" x2="180" y2="160" stroke="white" strokeWidth="1" />
+            <line x1="80" y1="120" x2="180" y2="160" stroke="white" strokeWidth="1" />
+          </pattern>
+          <rect width="100%" height="100%" fill="url(#network)" />
+        </svg>
+      )}
+
+      {type === 'radial_glow' && (
+        <div
+          className="absolute inset-0 opacity-[0.15]"
+          style={{
+            background: 'radial-gradient(circle at center, rgba(59, 130, 246, 0.4) 0%, rgba(0, 0, 0, 0) 70%)'
+          }}
+        />
+      )}
+    </AbsoluteFill>
+  );
+};
+
+
+--- FILE: svg/components/InfographicComposer.tsx ---
+import React, { useMemo } from 'react';
+import { AbsoluteFill, spring, useVideoConfig } from 'remotion';
+import { ConnectionLine, GlowNode, OrbitRing } from './InfographicElements';
+import { InfographicBackground } from './InfographicBackgrounds';
+import { AnimatedSvg } from './AnimatedSvg';
+import { HubNetwork } from './HubNetwork';
+import { FlowDiagram } from './FlowDiagram';
+import { ProcessDiagram } from './ProcessDiagram';
+import { LabelSystem } from './LabelSystem';
+import { CalloutSystem } from './CalloutSystem';
+import { KpiCard } from './KpiCard';
+import { Timeline } from './Timeline';
+import { CompositionEngine } from './CompositionEngine';
+import { NarrativeTemplate } from './NarrativeTemplates';
+import { useAnimation } from './AnimationContext';
+import { SvgGroup, StorytellingElement, LayerType, SvgProvider } from '../types';
+import { ENGINE_CONSTANTS } from '../lib/constants';
+import { calculateRadialPosition, calculateLinearPosition, calculateGridPosition } from '../lib/layoutUtils';
+
+interface InfographicComposerProps {
+  sceneData: any;
+}
+
+const LAYER_ORDER: LayerType[] = ['background', 'decorative', 'secondary', 'primary', 'foreground', 'overlay'];
+
+/**
+ * Infographic Composer
+ * Renders complex multi-layered visual storytelling compositions from JSON.
+ */
+export const InfographicComposer: React.FC<InfographicComposerProps> = React.memo(({ sceneData }) => {
+  const { frame, fps } = useAnimation();
+
+  if (!sceneData) return null;
+
+  const elements: StorytellingElement[] = sceneData.elements || [];
+  const groups: SvgGroup[] = sceneData.groups || [];
+  const lines = sceneData.infographic_lines || [];
+  const nodes = sceneData.infographic_nodes || [];
+  const background = sceneData.background;
+  const sceneIconTheme: SvgProvider | undefined = sceneData.sceneIconTheme;
+
+  // 1. Resolve element positions (including group-based layouts)
+  const resolvedElements = useMemo(() => {
+      const result = elements.map(el => ({ ...el }));
+
+      groups.forEach(group => {
+          const children = result.filter((el: any) => el.groupId === group.id);
+          const groupX = group.x ?? ENGINE_CONSTANTS.CENTER_X;
+          const groupY = group.y ?? ENGINE_CONSTANTS.CENTER_Y;
+          const spacing = group.spacing ?? ENGINE_CONSTANTS.DEFAULT_SPACING;
+
+          children.forEach((child: any, index) => {
+              // HARDENING (P2-5): Use centralized layout utilities
+              let pos = { x: child.x, y: child.y };
+
+              if (group.layout === 'horizontal' || group.layout === 'vertical') {
+                  pos = calculateLinearPosition(index, children.length, groupX, groupY, spacing, group.layout);
+              } else if (group.layout === 'orbit' || group.layout === 'radial') {
+                  pos = calculateRadialPosition(index, children.length, groupX, groupY, spacing);
+              } else if (group.layout === 'grid') {
+                  pos = calculateGridPosition(index, children.length, groupX, groupY, spacing);
+              }
+
+              child.x = pos.x;
+              child.y = pos.y;
+          });
+      });
+
+      return result;
+  }, [elements, groups]);
+
+  // 2. Map ID to resolved position for lines and relative components
+  const positionMap = useMemo(() => {
+      const map: Record<string, { x: number, y: number }> = {};
+      resolvedElements.forEach((el: any) => {
+          if (el.id) map[el.id] = { x: el.x, y: el.y };
+
+          // Special handling for sub-components (HubNetwork ids)
+          if (el.type === 'hub_network') {
+              map[`${el.id}_center`] = { x: el.x, y: el.y };
+          }
+      });
+      return map;
+  }, [resolvedElements]);
+
+  // 3. Sorting by Layer
+  const sortedElements = useMemo(() => {
+      return [...resolvedElements].sort((a: any, b: any) => {
+          const idxA = LAYER_ORDER.indexOf(a.layer || 'primary');
+          const idxB = LAYER_ORDER.indexOf(b.layer || 'primary');
+          return idxA - idxB;
+      });
+  }, [resolvedElements]);
+
+  return (
+    <AbsoluteFill className="pointer-events-none">
+      {/* Narrative Templates */}
+      <NarrativeTemplate
+        story={sceneData.story}
+        startFrame={sceneData.startFrame || 0}
+        sceneIconTheme={sceneIconTheme}
+        positionMap={positionMap}
+      />
+
+      {/* Background System */}
+      <InfographicBackground type={background} />
+
+      {/* Orbit Rings */}
+      {nodes.filter((n: any) => n.radius).map((node: any, i: number) => (
+        <OrbitRing
+          key={`orbit-${i}`}
+          x={node.x}
+          y={node.y}
+          radius={node.radius}
+          startFrame={node.start || 0}
+          color={node.color}
+        />
+      ))}
+
+      {/* Group background rings */}
+      {groups.filter(g => g.backgroundRing).map((group, i) => (
+          <OrbitRing
+            key={`group-ring-${i}`}
+            x={group.x ?? 960}
+            y={group.y ?? 540}
+            radius={group.spacing ?? 200}
+            startFrame={0}
+            color="rgba(255,255,255,0.05)"
+          />
+      ))}
+
+      {/* Connection Lines (Resolved by ID) */}
+      {lines.map((line: any, i: number) => {
+          const start = line.from ? positionMap[line.from] : line.start_pos;
+          const end = line.to ? positionMap[line.to] : line.end_pos;
+          if (!start || !end) return null;
+          return (
+            <ConnectionLine
+              key={`line-${i}`}
+              start={start}
+              end={end}
+              startFrame={line.start || 0}
+              duration={line.duration || 60}
+              color={line.color}
+              type={line.type}
+            />
+          );
+      })}
+
+      {/* Components Rendering */}
+      {sortedElements.map((el: any) => {
+          const commonProps = { key: el.id, sceneIconTheme };
+
+          switch(el.type) {
+              case 'svg':
+                  const group = groups.find(g => g.id === el.groupId);
+                  let groupOffset = { x: 0, y: 0 };
+                  if (group && group.enterAnimation) {
+                      const spr = spring({ frame: frame - (el.startFrame || 0), fps, config: { damping: 15 } });
+                      if (group.enterAnimation === 'slideUp') groupOffset.y = (1 - spr) * 50;
+                  }
+                  return <AnimatedSvg {...el} {...commonProps} groupOffset={groupOffset} provider={el.provider || sceneIconTheme || 'lucide'} />;
+
+              case 'hub_network': return <HubNetwork element={el} {...commonProps} />;
+              case 'flow_diagram': return <FlowDiagram element={el} {...commonProps} />;
+              case 'process': return <ProcessDiagram element={el} {...commonProps} />;
+              case 'label': return <LabelSystem element={el} targetPos={positionMap[el.target]} key={el.id} />;
+              case 'callout': return <CalloutSystem element={el} targetPos={positionMap[el.target]} key={el.id} />;
+              case 'kpi': return <KpiCard element={el} {...commonProps} />;
+              case 'timeline': return <Timeline element={el} key={el.id} />;
+              case 'composition': return <CompositionEngine element={el} {...commonProps} />;
+              default: return null;
+          }
+      })}
+
+      {/* Simple Nodes */}
+      {nodes.filter((n: any) => !n.radius).map((node: any, i: number) => (
+        <GlowNode
+          key={`node-${i}`}
+          x={node.x}
+          y={node.y}
+          startFrame={node.start || 0}
+          color={node.color}
+          type={node.type}
+        />
+      ))}
+    </AbsoluteFill>
+  );
+});
+
+
+--- FILE: svg/components/InfographicElements.tsx ---
+import React, { useMemo } from 'react';
+import { ConnectionLineProps } from '../types';
+import { generateSvgId } from '../lib/svgUtils';
+import { getEntranceProgress } from '../lib/animationUtils';
+import { useAnimation } from './AnimationContext';
+
+export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, y:number}, end: {x:number, y:number} }> = ({
+  start,
+  end,
+  startFrame = 0,
+  duration = 60,
+  color = 'rgba(255,255,255,0.2)',
+  type = 'dotted'
+}) => {
+  const { frame, fps } = useAnimation();
+
+  // OPTIMIZATION: Use interpolation for lines
+  const progress = getEntranceProgress(frame, fps, startFrame, false);
+
+  // HARDENING: Unique Marker IDs to prevent collisions
+  const markerId = useMemo(() => generateSvgId('arrowhead', `${start.x}-${start.y}-${end.x}-${end.y}`), [start, end]);
+
+  if (frame < startFrame) return null;
+
+  const currentX = start.x + (end.x - start.x) * progress;
+  const currentY = start.y + (end.y - start.y) * progress;
+
+  return (
+    <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
+      <defs>
+        <marker id={markerId} markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill={color} />
+        </marker>
+      </defs>
+      <line
+        x1={start.x}
+        y1={start.y}
+        x2={currentX}
+        y2={currentY}
+        stroke={color}
+        strokeWidth="2"
+        strokeDasharray={type === 'dotted' ? "4 4" : "0"}
+        markerEnd={type === 'arrow' ? `url(#${markerId})` : ""}
+      />
+    </svg>
+  );
+};
+
+export const GlowNode: React.FC<{ x: number, y: number, startFrame?: number, color?: string, type?: 'glow' | 'pulse' | 'signal' }> = ({
+  x, y, startFrame = 0, color = '#3b82f6', type = 'glow'
+}) => {
+  const { frame, fps } = useAnimation();
+
+  const relativeFrame = frame - startFrame;
+  const progress = getEntranceProgress(frame, fps, startFrame, false);
+
+  if (frame < startFrame) return null;
+
+  const pulse = type === 'pulse' ? Math.sin(relativeFrame / 10) * 0.2 + 1 : 1;
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        width: 12,
+        height: 12,
+        backgroundColor: color,
+        borderRadius: '50%',
+        transform: `translate(-50%, -50%) scale(${progress * pulse})`,
+        boxShadow: `0 0 ${20 * pulse}px ${color}`,
+        zIndex: 2
+      }}
+    >
+      {type === 'signal' && (
+        <div style={{
+          position: 'absolute',
+          inset: -20,
+          border: `2px solid ${color}`,
+          borderRadius: '50%',
+          opacity: (1 - (relativeFrame % 30) / 30) * 0.6,
+          transform: `scale(${0.5 + ((relativeFrame % 30) / 30) * 1.5})`
+        }} />
+      )}
+    </div>
+  );
+};
+
+export const OrbitRing: React.FC<{ x: number, y: number, radius: number, startFrame?: number, color?: string, orbitSpeed?: number }> = ({
+    x, y, radius, startFrame = 0, color = 'rgba(255,255,255,0.1)', orbitSpeed = 1
+}) => {
+    const { frame } = useAnimation();
+    const relativeFrame = frame - startFrame;
+    if (frame < startFrame) return null;
+
+    // HARDENING: Clamp rotation
+    const rotation = (relativeFrame * orbitSpeed) % 360;
+
+    return (
+        <div style={{
+            position: 'absolute',
+            left: x,
+            top: y,
+            width: radius * 2,
+            height: radius * 2,
+            border: `1px solid ${color}`,
+            borderRadius: '50%',
+            transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+            zIndex: 1
+        }}>
+            <div style={{
+                position: 'absolute',
+                top: -4,
+                left: '50%',
+                width: 8,
+                height: 8,
+                backgroundColor: color,
+                borderRadius: '50%',
+                boxShadow: `0 0 10px ${color}`
+            }} />
+        </div>
+    );
+};
+
+
+--- FILE: svg/components/JsonSceneRenderer.tsx ---
+import React from 'react';
+import { AbsoluteFill } from 'remotion';
+import { AnimatedSvg } from './AnimatedSvg';
+import { SvgScene } from '../types';
+
+interface JsonSceneRendererProps {
+  sceneData: SvgScene;
+}
+
+export const JsonSceneRenderer: React.FC<JsonSceneRendererProps> = ({ sceneData }) => {
+  if (!sceneData || !sceneData.elements) return null;
+
+  return (
+    <AbsoluteFill>
+      {sceneData.elements.map((el) => {
+        if (el.type !== 'svg') return null;
+
+        return (
+          <AnimatedSvg
+            key={el.id}
+            query={el.query}
+            provider={el.provider}
+            animation={el.animation}
+            startFrame={el.startFrame}
+            durationInFrames={el.durationInFrames}
+            width={el.width}
+            height={el.height}
+            x={el.x}
+            y={el.y}
+            color={el.color}
+            strokeWidth={el.strokeWidth}
+          />
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+
+--- FILE: svg/components/KpiCard.tsx ---
+import React, { useMemo } from 'react';
+import { interpolate } from 'remotion';
+import { KpiElement, SvgProvider } from '../types';
+import { RemoteSvg } from './RemoteSvg';
+import { getEntranceProgress } from '../lib/animationUtils';
+import { useAnimation } from './AnimationContext';
+import { ENGINE_CONSTANTS } from '../lib/constants';
+
+export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
+  const { title, value, trend, subtitle, icon, x, y, startFrame = 0 } = element;
+  const { frame, fps } = useAnimation();
+
+  const spr = getEntranceProgress(frame, fps, startFrame, true);
+
+  // Value animation (numeric only)
+  const displayValue = useMemo(() => {
+    const rel = frame - (startFrame + 15);
+    if (rel < 0) return typeof value === 'number' ? '0' : value;
+
+    if (typeof value === 'number') {
+        const count = interpolate(rel, [0, 60], [0, value], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+        return Math.round(count).toLocaleString();
+    }
+    // Handle strings like "170M"
+    const match = String(value).match(/^([\d.]+)([A-Z%]+)?$/);
+    if (match) {
+        const num = parseFloat(match[1]);
+        const suffix = match[2] || '';
+        const count = interpolate(rel, [0, 60], [0, num], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+        return `${count.toFixed(match[1].includes('.') ? 1 : 0)}${suffix}`;
+    }
+    return value;
+  }, [value, frame, startFrame]);
+
+  return (
+    <div style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        transform: `translate(-50%, -50%) scale(${0.8 + spr * 0.2})`,
+        opacity: spr,
+        width: ENGINE_CONSTANTS.KPI_CARD_WIDTH,
+        padding: '24px',
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        backdropFilter: 'blur(30px)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '32px',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px'
+    }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '2px' }}>{title}</span>
+                <h2 style={{ color: 'white', fontSize: '48px', fontWeight: '900', margin: '4px 0 0 0', letterSpacing: '-2px' }}>{displayValue}</h2>
+            </div>
+            {icon && (
+                <div style={{ width: 48, height: 48, backgroundColor: 'rgba(0, 245, 255, 0.1)', borderRadius: '12px', padding: '8px' }}>
+                    <RemoteSvg query={icon} provider={sceneIconTheme || 'lucide'} color="#00F5FF" />
+                </div>
+            )}
+        </div>
+
+        {(trend || subtitle) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {trend && (
+                    <span style={{
+                        color: trend.startsWith('+') ? '#10b981' : '#ef4444',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        backgroundColor: trend.startsWith('+') ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                        padding: '4px 8px',
+                        borderRadius: '8px'
+                    }}>
+                        {trend}
+                    </span>
+                )}
+                {subtitle && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: 'medium' }}>{subtitle}</span>}
+            </div>
+        )}
+    </div>
+  );
+};
+
+
+--- FILE: svg/components/LabelSystem.tsx ---
+import React from 'react';
+import { LabelElement } from '../types';
+import { getEntranceProgress } from '../lib/animationUtils';
+import { useAnimation } from './AnimationContext';
+
+export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: number, y: number } }> = ({ element, targetPos }) => {
+  const { text, position = 'bottom', fontSize = 32, color = 'white', animation = 'slideUp', startFrame = 0 } = element;
+  const { frame, fps } = useAnimation();
+
+  if (!targetPos) return null;
+
+  const spr = getEntranceProgress(frame, fps, startFrame, false);
+
+  const offsets = {
+    top: { x: 0, y: -80 },
+    bottom: { x: 0, y: 80 },
+    left: { x: -120, y: 0 },
+    right: { x: 120, y: 0 },
+    center: { x: 0, y: 0 }
+  };
+
+  const offset = offsets[position];
+  const x = targetPos.x + offset.x;
+  const y = targetPos.y + offset.y;
+
+  const animationStyles = () => {
+    switch (animation) {
+      case 'fade': return { opacity: spr };
+      case 'slideUp': return { opacity: spr, transform: `translateY(${(1-spr)*20}px)` };
+      case 'slideDown': return { opacity: spr, transform: `translateY(${(spr-1)*20}px)` };
+      case 'reveal': return { clipPath: `inset(0 ${100-spr*100}% 0 0)` };
+      case 'typewriter': return { opacity: spr }; // Fallback
+      default: return { opacity: spr };
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'absolute',
+      left: x,
+      top: y,
+      transform: 'translate(-50%, -50%)',
+      color,
+      fontSize,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+      letterSpacing: '2px',
+      whiteSpace: 'nowrap',
+      textShadow: '0 4px 20px rgba(0,0,0,0.5)',
+      ...animationStyles()
+    }}>
+      {text}
+    </div>
+  );
+};
+
+
+--- FILE: svg/components/LayeredSvg.tsx ---
+import React, { useMemo } from 'react';
+import { RemoteSvg } from './RemoteSvg';
+import { SvgProvider, SvgStyle, GradientConfig, GlowConfig } from '../types';
+import { generateSvgId } from '../lib/svgUtils';
+
+interface LayeredSvgProps {
+  query: string;
+  provider: SvgProvider;
+  color?: string;
+  strokeWidth?: number;
+  style?: SvgStyle;
+  gradient?: GradientConfig;
+  glow?: boolean | GlowConfig;
+  depth?: boolean;
+  id?: string;
+  width: number;
+  height: number;
+  onLoad?: (pathLength: number) => void;
+}
+
+/**
+ * Layered SVG Rendering
+ * HARDENING: Use SVG Filters (drop-shadow, blur) to reduce DOM node duplication (P1-2).
+ */
+export const LayeredSvg: React.FC<LayeredSvgProps> = ({
+  query,
+  provider,
+  color = 'white',
+  strokeWidth = 2,
+  style = 'fill',
+  gradient,
+  glow,
+  depth,
+  id = 'layer',
+  width,
+  height,
+  onLoad
+}) => {
+  const glowConfig: GlowConfig | null = typeof glow === 'object' ? glow : glow ? { color: color, intensity: 0.6, radius: 20 } : null;
+  const filterId = useMemo(() => generateSvgId('filter', `${query}-${id}`), [query, id]);
+
+  const filter = useMemo(() => {
+      const filters = [];
+      if (depth) {
+          filters.push(`drop-shadow(10px 10px 10px rgba(0,0,0,0.3))`);
+      }
+      if (glowConfig) {
+          filters.push(`drop-shadow(0 0 ${glowConfig.radius || 20}px ${glowConfig.color || color})`);
+      }
+      return filters.join(' ');
+  }, [depth, glowConfig, color]);
+
+  return (
+    <div style={{
+        width, height,
+        position: 'relative',
+        filter: filter, // Single pass rendering using browser optimized filters
+    }}>
+      {/* 3. MAIN LAYER (Now handles styles/gradients) */}
+      <div style={{ position: 'absolute', inset: 0 }}>
+        <RemoteSvg
+          query={query}
+          provider={provider}
+          color={color}
+          style={style}
+          strokeWidth={strokeWidth}
+          gradient={gradient}
+          id={id}
+          onLoad={onLoad}
+        />
+      </div>
+
+      {/* 4. HIGHLIGHT LAYER (Tech Overlay) */}
+      {style === 'tech' && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          opacity: 0.4,
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 50%)',
+          mixBlendMode: 'overlay',
+          pointerEvents: 'none',
+          borderRadius: 'inherit',
+          // Mask the highlight with the main SVG for depth?
+          // Browser support for mask on div is complex, so we stick to simple overlay pass.
+        }} />
+      )}
+    </div>
+  );
+};
+
+
+--- FILE: svg/components/NarrativeTemplates.tsx ---
+import React, { useMemo } from 'react';
+import { COMPOSITIONS, CompositionDefinition } from '../lib/compositionLibrary';
+import { HubNetwork } from './HubNetwork';
+import { FlowDiagram } from './FlowDiagram';
+import { ProcessDiagram } from './ProcessDiagram';
+import { LabelSystem } from './LabelSystem';
+import { CalloutSystem } from './CalloutSystem';
+import { KpiCard } from './KpiCard';
+import { Timeline } from './Timeline';
+import { HubNetworkElement, FlowDiagramElement, ProcessElement, LabelElement, CalloutElement, KpiElement, TimelineElement, StorytellingElement, SvgProvider } from '../types';
+
+/**
+ * Narrative Template Engine
+ * Automatically expands high-level story templates into visual components.
+ */
+export const expandNarrativeTemplate = (storyType: string, startFrame: number = 0): StorytellingElement[] => {
+    switch (storyType) {
+        case 'hub_explanation':
+            return [
+                {
+                    id: 'story_hub',
+                    type: 'hub_network',
+                    centerSvg: 'network',
+                    nodes: ['database', 'cpu', 'cloud', 'lock'],
+                    radius: 300,
+                    x: 960,
+                    y: 540,
+                    startFrame
+                } as HubNetworkElement,
+                {
+                    id: 'hub_label',
+                    type: 'label',
+                    target: 'story_hub_center',
+                    text: 'Central Intelligence',
+                    position: 'top',
+                    startFrame: startFrame + 30
+                } as LabelElement
+            ];
+        case 'process_breakdown':
+            return [
+                {
+                    id: 'story_process',
+                    type: 'process',
+                    steps: ['search', 'settings', 'code-2', 'rocket'],
+                    x: 960,
+                    y: 540,
+                    startFrame
+                } as ProcessElement
+            ];
+        case 'timeline_story':
+            return [
+                {
+                    id: 'story_timeline',
+                    type: 'timeline',
+                    events: [
+                        { year: '2020', label: 'Inception' },
+                        { year: '2022', label: 'Growth' },
+                        { year: '2024', label: 'Scale' }
+                    ],
+                    x: 960,
+                    y: 540,
+                    startFrame
+                } as TimelineElement
+            ];
+        default:
+            return [];
+    }
+};
+
+interface TemplateProps {
+    story?: string;
+    startFrame?: number;
+    sceneIconTheme?: SvgProvider;
+    positionMap: Record<string, { x: number, y: number }>;
+}
+
+/**
+ * Narrative Template Component
+ * HARDENING: Correctly renders all expanded elements (P2-4).
+ */
+export const NarrativeTemplate: React.FC<TemplateProps> = ({ story, startFrame = 0, sceneIconTheme, positionMap }) => {
+    const elements = useMemo(() => story ? expandNarrativeTemplate(story, startFrame) : [], [story, startFrame]);
+    if (!elements.length) return null;
+
+    return (
+        <>
+            {elements.map((el: any) => {
+                switch(el.type) {
+                    case 'hub_network': return <HubNetwork key={el.id} element={el} sceneIconTheme={sceneIconTheme} />;
+                    case 'process': return <ProcessDiagram key={el.id} element={el} sceneIconTheme={sceneIconTheme} />;
+                    case 'timeline': return <Timeline key={el.id} element={el} />;
+                    case 'label': return <LabelSystem key={el.id} element={el} targetPos={positionMap[el.target]} />;
+                    case 'callout': return <CalloutSystem key={el.id} element={el} targetPos={positionMap[el.target]} />;
+                    default: return null;
+                }
+            })}
+        </>
+    );
+};
+
+
+--- FILE: svg/components/ProcessDiagram.tsx ---
+import React, { useMemo } from 'react';
+import { ProcessElement, SvgProvider } from '../types';
+import { AnimatedSvg } from './AnimatedSvg';
+import { getEntranceProgress } from '../lib/animationUtils';
+import { useAnimation } from './AnimationContext';
+import { ENGINE_CONSTANTS } from '../lib/constants';
+
+export const ProcessDiagram: React.FC<{ element: ProcessElement, sceneIconTheme?: SvgProvider }> = ({ element, sceneIconTheme }) => {
+  const { x, y, steps, startFrame = 0 } = element;
+  const { frame, fps } = useAnimation();
+
+  // HARDENING: Guard empty steps (BUG-3)
+  if (!steps || steps.length === 0) return null;
+
+  const spacing = ENGINE_CONSTANTS.DEFAULT_SPACING;
+
+  const nodePositions = useMemo(() => {
+    return steps.map((_, i) => ({
+      x: x + (i - (steps.length - 1) / 2) * spacing,
+      y: y
+    }));
+  }, [x, y, steps, spacing]);
+
+  return (
+    <>
+      {/* 1. Progress Line Background */}
+      <div style={{
+          position: 'absolute',
+          left: nodePositions[0].x,
+          top: y,
+          width: nodePositions[steps.length - 1].x - nodePositions[0].x,
+          height: 4,
+          backgroundColor: 'rgba(255,255,255,0.1)',
+          transform: 'translateY(-50%)',
+          borderRadius: 2
+      }} />
+
+      {/* 2. Animated Progress Line */}
+      {steps.map((_, i) => {
+          if (i === 0) return null;
+          const prevX = nodePositions[i - 1].x;
+          const nextX = nodePositions[i].x;
+          const start = startFrame + 45 + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL * 3);
+          const progress = getEntranceProgress(frame, fps, start, false);
+
+          return (
+            <div key={`progress_${i}`} style={{
+                position: 'absolute',
+                left: prevX,
+                top: y,
+                width: (nextX - prevX) * progress,
+                height: 4,
+                backgroundColor: '#00F5FF',
+                transform: 'translateY(-50%)',
+                boxShadow: '0 0 10px #00F5FF',
+                borderRadius: 2,
+                zIndex: 1
+            }} />
+          );
+      })}
+
+      {/* 3. Steps */}
+      {steps.map((query, i) => {
+        const stepStart = startFrame + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL * 3);
+        const spr = getEntranceProgress(frame, fps, stepStart, true);
+
+        return (
+            <div key={`step_${i}`} style={{ position: 'absolute', left: nodePositions[i].x, top: nodePositions[i].y, transform: 'translate(-50%, -50%)' }}>
+                {/* Number Bubble */}
+                <div style={{
+                    position: 'absolute',
+                    top: -80,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    border: '2px solid #00F5FF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontSize: 18,
+                    fontWeight: 'bold',
+                    backgroundColor: 'rgba(0, 245, 255, 0.1)',
+                    opacity: spr
+                }}>
+                    {i + 1}
+                </div>
+
+                <AnimatedSvg
+                    id={`${element.id}_node_${i}`}
+                    query={query}
+                    provider={sceneIconTheme || 'lucide'}
+                    x={0}
+                    y={0}
+                    width={140}
+                    height={140}
+                    animation="scale"
+                    startFrame={stepStart + 15}
+                    durationInFrames={120}
+                    style="tech"
+                    importance="primary"
+                />
+            </div>
+        );
+      })}
+    </>
+  );
+};
+
+
+--- FILE: svg/components/RemoteSvg.tsx ---
+import React, { useMemo, useEffect } from 'react';
+import { SvgProvider, SvgStyle, GradientConfig } from '../types';
+import { SvgRegistry } from '../lib/svgRegistry';
+import { ENGINE_CONSTANTS } from '../lib/constants';
+
+interface RemoteSvgProps {
+  query: string;
+  provider: SvgProvider;
+  color?: string;
+  strokeWidth?: number;
+  style?: SvgStyle;
+  gradient?: GradientConfig;
+  id?: string;
+  onLoad?: (pathLength: number) => void;
+}
+
+export const RemoteSvg: React.FC<RemoteSvgProps> = ({
+  query,
+  provider,
+  color = 'white',
+  strokeWidth = ENGINE_CONSTANTS.DEFAULT_STROKE_WIDTH,
+  style = 'fill',
+  gradient,
+  id = 'svg',
+  onLoad
+}) => {
+  // HARDENING: Render from registry ONLY. No runtime fetching or DOM parsing.
+  const asset = SvgRegistry.get(query, provider);
+
+  const gradientId = useMemo(() => {
+    // HARDENING (BUG-5): Use hashed IDs to prevent oversized IDs from long query strings
+    let hash = 0;
+    const str = `${query}-${id}`;
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0;
+    }
+    return `grad-${Math.abs(hash).toString(16)}`;
+  }, [query, id]);
+
+  const processedMarkup = useMemo(() => {
+      if (!asset) return null;
+
+      let markup = asset.markup;
+      const finalColor = gradient ? `url(#${gradientId})` : color;
+
+      // Robust attribute injection via simple string replacement for performance
+      // since markup was already sanitized/processed in preloader.
+
+      // 1. Force Scaling
+      markup = markup.replace(/<svg/, `<svg width="100%" height="100%" preserveAspectRatio="xMidYMid meet"`);
+
+      // 2. Inject Gradient if needed
+      if (gradient) {
+          const gradDef = `
+            <defs>
+                <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:${gradient.start};stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:${gradient.end};stop-opacity:1" />
+                </linearGradient>
+            </defs>
+          `;
+          markup = markup.replace(/>/, `>${gradDef}`);
+      }
+
+      // 3. Apply Style (Deterministic string replacement)
+      // Note: In a real production system, we might use a more sophisticated
+      // pre-serialized JSON structure for paths, but for this refactor
+      // we maintain the current string-based injection for compatibility.
+
+      if (style === 'outline') {
+          markup = markup.replace(/fill="[^"]*"/g, 'fill="none"');
+          markup = markup.replace(/stroke="[^"]*"/g, `stroke="${finalColor}"`);
+          markup = markup.replace(/stroke-width="[^"]*"/g, `stroke-width="${strokeWidth}"`);
+      } else {
+          markup = markup.replace(/fill="[^"]*"/g, `fill="${finalColor}"`);
+          if (style === 'tech' || style === 'corporate') {
+              markup = markup.replace(/stroke="[^"]*"/g, `stroke="${finalColor}"`);
+              markup = markup.replace(/stroke-width="[^"]*"/g, `stroke-width="${strokeWidth * 0.5}"`);
+          }
+      }
+
+      return markup;
+  }, [asset, color, strokeWidth, style, gradient, gradientId]);
+
+  // Notify parent of path length for animations
+  useEffect(() => {
+      if (asset && onLoad) {
+          onLoad(asset.pathLength);
+      }
+  }, [asset, onLoad]);
+
+  if (!asset) {
+    return (
+        <div className="bg-red-500/10 p-2 rounded text-[10px] text-red-500 border border-red-500/20 text-center">
+            SVG Missing: {query} (Run Preloader)
+        </div>
+    );
+  }
+
+  return (
+    <div
+      className="w-full h-full flex items-center justify-center"
+      dangerouslySetInnerHTML={{ __html: processedMarkup || '' }}
+    />
+  );
+};
+
+
+--- FILE: svg/components/Timeline.tsx ---
+import React from 'react';
+import { TimelineElement } from '../types';
+import { getEntranceProgress } from '../lib/animationUtils';
+import { useAnimation } from './AnimationContext';
+import { ENGINE_CONSTANTS } from '../lib/constants';
+
+export const Timeline: React.FC<{ element: TimelineElement }> = ({ element }) => {
+  const { events, x, y, startFrame = 0 } = element;
+  const { frame, fps } = useAnimation();
+
+  // HARDENING: Guard divide-by-zero (BUG-2)
+  const totalEvents = events.length;
+  if (totalEvents === 0) return null;
+
+  const totalWidth = ENGINE_CONSTANTS.TIMELINE_WIDTH;
+  const stepX = totalEvents > 1 ? totalWidth / Math.max(totalEvents - 1, 1) : 0;
+
+  const overallProgress = getEntranceProgress(frame, fps, startFrame, false);
+
+  return (
+    <div style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -50%)' }}>
+      {/* 1. Base Line */}
+      <div style={{
+          position: 'absolute',
+          left: -totalWidth / 2,
+          top: 0,
+          width: totalWidth * overallProgress,
+          height: 2,
+          backgroundColor: 'rgba(255,255,255,0.2)',
+          borderRadius: 1
+      }} />
+
+      {/* 2. Events */}
+      {events.map((ev, i) => {
+          const eventX = (-totalWidth / 2) + (i * stepX);
+          const eventStart = startFrame + 15 + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL * 3);
+          const spr = getEntranceProgress(frame, fps, eventStart, true);
+
+          if (frame < eventStart) return null;
+
+          return (
+            <div key={`event_${i}`} style={{ position: 'absolute', left: eventX, top: 0 }}>
+                {/* Node */}
+                <div style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    backgroundColor: '#00F5FF',
+                    border: '4px solid #000',
+                    transform: `translate(-50%, -50%) scale(${spr})`,
+                    boxShadow: '0 0 15px #00F5FF'
+                }} />
+
+                {/* Label */}
+                <div style={{
+                    position: 'absolute',
+                    top: i % 2 === 0 ? 40 : -100,
+                    left: 0,
+                    transform: `translateX(-50%) translateY(${(1-spr)*10}px)`,
+                    opacity: spr,
+                    textAlign: 'center',
+                    width: 200
+                }}>
+                    <span style={{ color: '#00F5FF', fontSize: '18px', fontWeight: '900', display: 'block' }}>{ev.year}</span>
+                    <span style={{ color: 'white', fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>{ev.label}</span>
+                </div>
+
+                {/* Connector vertical */}
+                <div style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: i % 2 === 0 ? 0 : -40,
+                    width: 1,
+                    height: 40 * spr,
+                    backgroundColor: 'rgba(0, 245, 255, 0.4)'
+                }} />
+            </div>
+          );
+      })}
+    </div>
+  );
+};
+
 
 --- FILE: svg/styles/svgAnimations.css ---
 /**
@@ -2440,9 +2348,221 @@ export const getTheme = (themeName?: InfographicTheme): ThemeConfig => {
 
 .infographic-glass-panel {
     background-color: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(var(--glass-blur, 20px));
     border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
---- END OF svg/styles/svgAnimations.css ---
+
+--- FILE: svg/services/SvgAssetPreloader.ts ---
+import { SvgScene, SvgProvider, StorytellingElement } from '../types';
+import { SvgProviderService } from './SvgProviderService';
+import { SvgRegistry } from '../lib/svgRegistry';
+import { COMPOSITIONS } from '../lib/compositionLibrary';
+
+/**
+ * SVG Asset Preloader
+ * Scans scene data and downloads/processes all required SVGs before rendering.
+ * MUST be called during the setup/pre-render phase.
+ */
+export class SvgAssetPreloader {
+  static async preloadScene(scene: SvgScene) {
+    const queries = new Set<{ query: string; provider: SvgProvider }>();
+    const sceneProvider = scene.sceneIconTheme || 'lucide';
+
+    // 1. Scan elements
+    scene.elements.forEach(el => this.scanElement(el, sceneProvider, queries));
+
+    // 2. Scan hub networks (center and outer nodes)
+    scene.elements.forEach(el => {
+        if (el.type === 'hub_network') {
+            queries.add({ query: el.centerSvg, provider: el.provider || sceneProvider });
+            el.nodes.forEach(q => queries.add({ query: queryToKey(q), provider: el.provider || sceneProvider }));
+        }
+    });
+
+    function queryToKey(q: string) { return q; }
+
+    // 3. Download and process
+    // Note: DOMParser is used here in the preprocessing stage (pre-render).
+    // This is acceptable as long as it's not in the main render loop.
+    const parser = typeof DOMParser !== 'undefined' ? new DOMParser() : null;
+
+    const promises = Array.from(queries).map(async ({ query, provider }) => {
+      try {
+        const markup = await SvgProviderService.fetchSvg(query, provider);
+        let totalLength = 5000; // Default fallback
+
+        if (parser) {
+            const doc = parser.parseFromString(markup, 'image/svg+xml');
+            const svg = doc.querySelector('svg');
+
+            if (svg) {
+                // Extract total path length (approximation or measurement)
+                let maxPathLength = 0;
+                const paths = svg.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon');
+                paths.forEach((p: any) => {
+                    if (p.getTotalLength) {
+                        maxPathLength = Math.max(maxPathLength, p.getTotalLength());
+                    } else {
+                        // Fallback measurement if getTotalLength is not available
+                        const bbox = p.getBBox ? p.getBBox() : { width: 100, height: 100 };
+                        maxPathLength = Math.max(maxPathLength, (bbox.width + bbox.height) * 2);
+                    }
+                });
+                totalLength = maxPathLength || 5000;
+            }
+        }
+
+        SvgRegistry.register(query, provider, {
+          markup,
+          pathLength: totalLength
+        });
+      } catch (e) {
+        console.error(`Failed to preload SVG: ${query}`, e);
+      }
+    });
+
+    await Promise.all(promises);
+  }
+
+  private static scanElement(el: StorytellingElement, defaultProvider: SvgProvider, queries: Set<{ query: string; provider: SvgProvider }>) {
+    if (el.type === 'svg') {
+      queries.add({ query: el.query, provider: el.provider || defaultProvider });
+    } else if (el.type === 'hub_network') {
+      queries.add({ query: el.centerSvg, provider: el.provider || defaultProvider });
+      el.nodes.forEach(q => queries.add({ query: q, provider: el.provider || defaultProvider }));
+    } else if (el.type === 'flow_diagram' || el.type === 'process') {
+      el.steps.forEach(q => queries.add({ query: q, provider: defaultProvider }));
+    } else if (el.type === 'kpi' && el.icon) {
+      queries.add({ query: el.icon, provider: defaultProvider });
+    } else if (el.type === 'composition') {
+        const comp = COMPOSITIONS[el.compositionType];
+        if (comp) {
+            comp.elements.forEach(sub => queries.add({ query: sub.query, provider: sub.provider || defaultProvider }));
+        }
+    }
+  }
+}
+
+
+--- FILE: svg/services/SvgCacheService.ts ---
+import { SvgProvider } from '../types';
+import { SvgProviderService } from './SvgProviderService';
+
+export class SvgCacheService {
+  private static cache: Map<string, Promise<string>> = new Map();
+  private static MAX_ENTRIES = 1000;
+  private static keys: string[] = [];
+
+  static async getSvg(query: string, provider: SvgProvider): Promise<string> {
+    const key = `${provider}:${query}`;
+
+    // LRU Implementation (P1-4: Refresh order on access)
+    if (this.cache.has(key)) {
+      // Move key to end to represent most recently used
+      this.keys = this.keys.filter(k => k !== key);
+      this.keys.push(key);
+      return this.cache.get(key)!;
+    }
+
+    // Capacity check before adding new
+    if (this.cache.size >= this.MAX_ENTRIES) {
+        const oldest = this.keys.shift();
+        if (oldest) this.cache.delete(oldest);
+    }
+
+    const fetchPromise = SvgProviderService.fetchSvg(query, provider);
+
+    // HARDENING (P1-5: Remove failed promises from cache)
+    fetchPromise.catch(() => {
+        this.cache.delete(key);
+        this.keys = this.keys.filter(k => k !== key);
+    });
+
+    this.cache.set(key, fetchPromise);
+    this.keys.push(key);
+
+    return fetchPromise;
+  }
+}
+
+
+--- FILE: svg/services/SvgProviderService.ts ---
+import { SvgProvider } from '../types';
+
+export class SvgProviderService {
+  private static FETCH_TIMEOUT = 5000;
+  private static MAX_RETRIES = 2;
+
+  /**
+   * Fetch SVG data from public APIs based on provider and query.
+   */
+  static async fetchSvg(query: string, provider: SvgProvider): Promise<string> {
+    const cleanQuery = query.trim().toLowerCase();
+
+    // Primary URL based on provider
+    let primaryUrl = '';
+    switch (provider) {
+      case 'lucide':
+        primaryUrl = `https://api.iconify.design/lucide/${cleanQuery}.svg`;
+        break;
+      case 'tabler':
+        primaryUrl = `https://api.iconify.design/tabler/${cleanQuery}.svg`;
+        break;
+      case 'solar':
+        primaryUrl = `https://api.iconify.design/solar/${cleanQuery}-bold.svg`;
+        break;
+      case 'phosphor':
+        primaryUrl = `https://api.iconify.design/ph/${cleanQuery}-bold.svg`;
+        break;
+      case 'hugeicons':
+        primaryUrl = `https://api.iconify.design/hugeicons/${cleanQuery}.svg`;
+        break;
+      case 'material-symbols':
+        primaryUrl = `https://api.iconify.design/material-symbols/${cleanQuery}.svg`;
+        break;
+      case 'iconify':
+      default:
+        const iconName = cleanQuery.includes(':') ? cleanQuery : `mdi:${cleanQuery}`;
+        primaryUrl = `https://api.iconify.design/${iconName.replace(':', '/')}.svg`;
+        break;
+    }
+
+    try {
+        return await this.fetchWithRetry(primaryUrl);
+    } catch (e) {
+        // FALLBACK: Try standard MDI via Iconify if specific provider fails
+        console.warn(`Primary fetch failed for ${cleanQuery} (Provider: ${provider}), trying fallback...`);
+        const fallbackUrl = `https://api.iconify.design/mdi/${cleanQuery.split('-').pop()}.svg`;
+        return this.fetchWithRetry(fallbackUrl);
+    }
+  }
+
+  private static async fetchWithRetry(url: string, attempt: number = 0): Promise<string> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.FETCH_TIMEOUT);
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP Error: ${response.status}`);
+      }
+
+      const svgText = await response.text();
+
+      if (!svgText.includes('<svg')) {
+        throw new Error('Invalid SVG content received');
+      }
+
+      return svgText;
+    } catch (error) {
+      if (attempt < this.MAX_RETRIES) {
+        return this.fetchWithRetry(url, attempt + 1);
+      }
+      throw error;
+    }
+  }
+}

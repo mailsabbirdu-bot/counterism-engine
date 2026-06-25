@@ -41,7 +41,8 @@ else:
 
 # --- 4. RENDER ---
 print("🎬 Rendering Powerful SVG Video...")
-!node --loader ts-node/esm render.ts --template=remotion_render.json --output=svg_powerful_showcase.mp4
+# Pass the manifest via the standard rendering pipeline
+!node --loader ts-node/esm render.ts --no-resume
 
-print("✅ DONE! Check the renders folder for 'svg_powerful_showcase.mp4'.")
+print("✅ DONE! Check the output directory for your rendered video.")
 ```

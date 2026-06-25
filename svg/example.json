@@ -1,89 +1,73 @@
 {
-  "project_name": "Ultra Robust SVG Showcase",
-  "global_settings": { "width": 1920, "height": 1080, "fps": 30 },
-  "scenes": [
+  "elements": [
     {
-      "scene_id": "SCENE_01_LARGE_HOUSE",
-      "duration_in_frames": 180,
-      "background_type": "procedural",
-      "procedural_config": { "variant": "neon_grid", "primaryColor": "#0f172a" },
-      "camera": { "enabled": true, "shots": [] },
-      "overlays": [
-        {
-          "id": "house-main",
-          "type": "svg",
-          "query": "house",
-          "provider": "lucide",
-          "animation": "draw",
-          "start": 15,
-          "duration": 150,
-          "position": { "x": 960, "y": 540 },
-          "width": 950,
-          "height": 950,
-          "color": "#3b82f6",
-          "strokeWidth": 4
-        },
-        {
-          "id": "txt-label",
-          "type": "text",
-          "content": "SMART ARCHITECTURE",
-          "font": "Orbitron",
-          "fontSize": "60px",
-          "position": { "x": 960, "y": 950 },
-          "start": 90,
-          "duration": 90
-        }
-      ]
+      "id": "amazon_hq",
+      "type": "svg",
+      "query": "amazon",
+      "provider": "simple-icons",
+      "x": 960,
+      "y": 540,
+      "width": 200,
+      "height": 200,
+      "animation": "pop",
+      "style": "tech",
+      "importance": "primary",
+      "container": "glass_panel",
+      "startFrame": 0
     },
     {
-      "scene_id": "SCENE_02_SVG_GALLERY",
-      "duration_in_frames": 240,
-      "background_type": "procedural",
-      "procedural_config": { "variant": "dark_particles" },
-      "camera": { "enabled": true, "shots": [] },
-      "overlays": [
-        {
-          "id": "icon-lucide",
-          "type": "svg",
-          "query": "cpu",
-          "provider": "lucide",
-          "animation": "draw",
-          "start": 10,
-          "duration": 100,
-          "position": { "x": 480, "y": 540 },
-          "width": 500,
-          "height": 500,
-          "color": "#6366f1",
-          "strokeWidth": 2
-        },
-        {
-          "id": "icon-iconify",
-          "type": "svg",
-          "query": "robot",
-          "provider": "iconify",
-          "animation": "draw",
-          "start": 60,
-          "duration": 100,
-          "position": { "x": 960, "y": 540 },
-          "width": 500,
-          "height": 500,
-          "color": "#10b881"
-        },
-        {
-          "id": "icon-tabler",
-          "type": "svg",
-          "query": "drone",
-          "provider": "tabler",
-          "animation": "draw",
-          "start": 110,
-          "duration": 100,
-          "position": { "x": 1440, "y": 540 },
-          "width": 450,
-          "height": 450,
-          "color": "#f43f5e",
-          "strokeWidth": 2
-        }
-      ]
+      "id": "global_network",
+      "type": "hub_network",
+      "centerSvg": "globe",
+      "nodes": [
+        "truck",
+        "plane",
+        "ship",
+        "warehouse",
+        "package",
+        "shopping-cart"
+      ],
+      "x": 960,
+      "y": 540,
+      "radius": 350,
+      "connectionStyle": "arrow",
+      "animation": "orbit",
+      "startFrame": 30
+    },
+    {
+      "id": "label_supply_chain",
+      "type": "label",
+      "target": "amazon_hq",
+      "text": "Global Supply Chain",
+      "position": "bottom",
+      "fontSize": 48,
+      "color": "#FF9900",
+      "startFrame": 60
+    },
+    {
+      "id": "kpi_reach",
+      "type": "kpi",
+      "title": "Global Reach",
+      "value": "200+",
+      "subtitle": "Countries Served",
+      "icon": "map-pin",
+      "x": 300,
+      "y": 200,
+      "startFrame": 90
+    },
+    {
+      "id": "kpi_volume",
+      "type": "kpi",
+      "title": "Daily Shipments",
+      "value": "1.6M",
+      "subtitle": "Packages per Day",
+      "icon": "package",
+      "x": 1620,
+      "y": 200,
+      "startFrame": 120
     }
-  ]
+  ],
+  "background": "tech_grid",
+  "theme": "tech",
+  "sceneIconTheme": "lucide"
 }
