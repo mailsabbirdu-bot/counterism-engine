@@ -1,4 +1,5 @@
 import { SvgProvider } from '../types';
+import { BUNDLED_ICONS } from './bundledIcons';
 
 export interface PreprocessedSvg {
   markup: string;
@@ -39,6 +40,26 @@ export class SvgRegistry {
     }
 
     return data;
+  }
+
+  /**
+   * Guaranteed SVG retrieval. Returns requested, fallback, or help icon.
+   */
+  static getSafe(query: string, provider: SvgProvider): PreprocessedSvg {
+      const asset = this.get(query, provider);
+      if (asset) return asset;
+
+      // Try local bundle
+      const local = BUNDLED_ICONS[query.toLowerCase()];
+      if (local) {
+          return { markup: local, pathLength: 5000 };
+      }
+
+      // Final help-circle fallback
+      return {
+          markup: BUNDLED_ICONS['help-circle'],
+          pathLength: 5000
+      };
   }
 
   static clear() {

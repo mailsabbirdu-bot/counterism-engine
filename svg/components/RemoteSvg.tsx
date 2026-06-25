@@ -24,8 +24,8 @@ export const RemoteSvg: React.FC<RemoteSvgProps> = ({
   id = 'svg',
   onLoad
 }) => {
-  // HARDENING: Render from registry ONLY. No runtime fetching or DOM parsing.
-  const asset = SvgRegistry.get(query, provider);
+  // HARDENING: getSafe() ensures no Red Box or missing SVGs.
+  const asset = SvgRegistry.getSafe(query, provider);
 
   const gradientId = useMemo(() => {
     // HARDENING (BUG-5): Use hashed IDs to prevent oversized IDs from long query strings
@@ -90,13 +90,6 @@ export const RemoteSvg: React.FC<RemoteSvgProps> = ({
       }
   }, [asset, onLoad]);
 
-  if (!asset) {
-    return (
-        <div className="bg-red-500/10 p-2 rounded text-[10px] text-red-500 border border-red-500/20 text-center">
-            SVG Missing: {query} (Run Preloader)
-        </div>
-    );
-  }
 
   return (
     <div
