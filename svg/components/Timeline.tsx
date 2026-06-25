@@ -25,9 +25,9 @@ export const Timeline: React.FC<{ element: TimelineElement }> = ({ element }) =>
           left: -totalWidth / 2,
           top: 0,
           width: totalWidth * overallProgress,
-          height: 2,
+          height: 4,
           backgroundColor: 'rgba(255,255,255,0.2)',
-          borderRadius: 1
+          borderRadius: 2
       }} />
 
       {/* 2. Events */}
@@ -42,37 +42,37 @@ export const Timeline: React.FC<{ element: TimelineElement }> = ({ element }) =>
             <div key={`event_${i}`} style={{ position: 'absolute', left: eventX, top: 0 }}>
                 {/* Node */}
                 <div style={{
-                    width: 16,
-                    height: 16,
+                    width: 24,
+                    height: 24,
                     borderRadius: '50%',
-                    backgroundColor: '#00F5FF',
-                    border: '4px solid #000',
+                    backgroundColor: '#00D1FF',
+                    border: '6px solid #000',
                     transform: `translate(-50%, -50%) scale(${spr})`,
-                    boxShadow: '0 0 15px #00F5FF'
+                    boxShadow: '0 0 20px #00D1FF'
                 }} />
 
                 {/* Label */}
                 <div style={{
                     position: 'absolute',
-                    top: i % 2 === 0 ? 40 : -100,
+                    top: i % 2 === 0 ? 50 : -130,
                     left: 0,
-                    transform: `translateX(-50%) translateY(${(1-spr)*10}px)`,
+                    transform: `translateX(-50%) translateY(${(1-spr)*15}px)`,
                     opacity: spr,
                     textAlign: 'center',
-                    width: 200
+                    width: 300
                 }}>
-                    <span style={{ color: '#00F5FF', fontSize: '18px', fontWeight: '900', display: 'block' }}>{ev.year}</span>
-                    <span style={{ color: 'white', fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>{ev.label}</span>
+                    <span style={{ color: '#00D1FF', fontSize: '28px', fontWeight: '900', display: 'block' }}>{ev.year}</span>
+                    <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>{ev.label}</span>
                 </div>
 
                 {/* Connector vertical */}
                 <div style={{
                     position: 'absolute',
                     left: 0,
-                    top: i % 2 === 0 ? 0 : -40,
-                    width: 1,
-                    height: 40 * spr,
-                    backgroundColor: 'rgba(0, 245, 255, 0.4)'
+                    top: i % 2 === 0 ? 0 : -50,
+                    width: 2,
+                    height: 50 * spr,
+                    backgroundColor: 'rgba(0, 209, 255, 0.4)'
                 }} />
             </div>
           );

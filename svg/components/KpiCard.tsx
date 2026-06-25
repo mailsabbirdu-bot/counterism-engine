@@ -39,8 +39,8 @@ export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: SvgProvid
         top: y,
         transform: `translate(-50%, -50%) scale(${0.8 + spr * 0.2})`,
         opacity: spr,
-        width: ENGINE_CONSTANTS.KPI_CARD_WIDTH,
-        padding: '24px',
+        width: ENGINE_CONSTANTS.KPI_CARD_WIDTH + 80, // Larger card
+        padding: '32px',
         backgroundColor: 'rgba(255,255,255,0.03)',
         backdropFilter: 'blur(30px)',
         border: '1px solid rgba(255,255,255,0.1)',
@@ -52,12 +52,12 @@ export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: SvgProvid
     }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '2px' }}>{title}</span>
-                <h2 style={{ color: 'white', fontSize: '48px', fontWeight: '900', margin: '4px 0 0 0', letterSpacing: '-2px' }}>{displayValue}</h2>
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '2px' }}>{title}</span>
+                <h2 style={{ color: 'white', fontSize: '64px', fontWeight: '900', margin: '8px 0 0 0', letterSpacing: '-2px' }}>{displayValue}</h2>
             </div>
             {icon && (
-                <div style={{ width: 48, height: 48, backgroundColor: 'rgba(0, 245, 255, 0.1)', borderRadius: '12px', padding: '8px' }}>
-                    <RemoteSvg query={icon} provider={sceneIconTheme || 'lucide'} color="#00F5FF" />
+                <div style={{ width: 64, height: 64, backgroundColor: 'rgba(0, 245, 255, 0.1)', borderRadius: '16px', padding: '12px' }}>
+                    <RemoteSvg query={icon} provider={sceneIconTheme || 'lucide'} color="#00D1FF" />
                 </div>
             )}
         </div>
@@ -76,7 +76,7 @@ export const KpiCard: React.FC<{ element: KpiElement, sceneIconTheme?: SvgProvid
                         {trend}
                     </span>
                 )}
-                {subtitle && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: 'medium' }}>{subtitle}</span>}
+                {subtitle && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '16px', fontWeight: 'medium' }}>{subtitle}</span>}
             </div>
         )}
     </div>
