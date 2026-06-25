@@ -305,9 +305,9 @@ export const CameraEngine: React.FC<{
   const cx = width / 2;
   const cy = height / 2;
 
-  // Cinematic Handheld Shake
+  // Cinematic Handheld Shake - Disabled by default
   let shakeX = 0, shakeY = 0, shakeRotZ = 0;
-  if (config.shake?.enabled) {
+  if (config?.shake?.enabled === true) {
     const intensity = config.shake.intensity || 1.5;
     const speed = config.shake.speed || 1.0;
     const f = frame * speed;

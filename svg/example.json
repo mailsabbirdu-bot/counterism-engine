@@ -13,7 +13,7 @@
       "camera": {
         "enabled": true,
         "motionBlur": { "enabled": true, "intensity": 0.8 },
-        "shake": { "enabled": true, "intensity": 1.0 },
+        "shake": { "enabled": false },
         "shots": [
           {
             "targetId": "global_network_center",
