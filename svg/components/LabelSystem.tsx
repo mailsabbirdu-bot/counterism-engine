@@ -12,10 +12,10 @@ export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: num
   const spr = getEntranceProgress(frame, fps, startFrame, false);
 
   const offsets = {
-    top: { x: 0, y: -80 },
-    bottom: { x: 0, y: 80 },
-    left: { x: -120, y: 0 },
-    right: { x: 120, y: 0 },
+    top: { x: 0, y: -120 },
+    bottom: { x: 0, y: 120 },
+    left: { x: -180, y: 0 },
+    right: { x: 180, y: 0 },
     center: { x: 0, y: 0 }
   };
 

@@ -16,19 +16,26 @@ export const animationRegistry: Record<string, (params: AnimationParams) => Anim
     }),
     scale: ({ spr, baseScale, baseOpacity }) => ({
         opacity: spr * baseOpacity,
-        transform: `scale(${spr * baseScale})`
+        transform: `scale(${0.8 + spr * 0.2 * baseScale})`
     }),
-    pop: ({ spr, baseScale, baseOpacity }) => ({
-        opacity: spr * baseOpacity,
-        transform: `scale(${spr * 1.1 * baseScale})`
-    }),
+    pop: ({ spr, baseScale, baseOpacity }) => {
+        // High-end pop with a slight bounce-back feel via interpolation
+        const scale = spr < 0.8
+            ? spr * 1.2
+            : 1.2 - (spr - 0.8) * 0.5;
+
+        return {
+            opacity: spr * baseOpacity,
+            transform: `scale(${scale * baseScale}) perspective(1000px) rotateX(${(1-spr)*10}deg)`
+        };
+    },
     rotate: ({ spr, baseScale, baseOpacity }) => ({
         opacity: spr * baseOpacity,
         transform: `rotate(${(spr * 360) % 360}deg) scale(${spr * baseScale})`
     }),
     slideUp: ({ spr, baseScale, baseOpacity }) => ({
         opacity: spr * baseOpacity,
-        transform: `translateY(${(1 - spr) * 100}px) scale(${baseScale})`
+        transform: `translateY(${(1 - spr) * 80}px) scale(${baseScale}) perspective(1000px) rotateX(${(1-spr)*20}deg)`
     }),
     slideDown: ({ spr, baseScale, baseOpacity }) => ({
         opacity: spr * baseOpacity,
@@ -85,7 +92,7 @@ export const getAnimationStyles = (
 
 
 --- FILE: svg/lib/animationUtils.ts ---
-import { interpolate, spring, SpringConfig } from 'remotion';
+import { interpolate, spring, SpringConfig, Easing } from 'remotion';
 
 export const DEFAULT_SPRING_CONFIG: SpringConfig = {
   damping: 12,
@@ -116,10 +123,11 @@ export const getEntranceProgress = (
     });
   }
 
-  // Linear fallback/interpolation for efficiency - P0-4 Centralization
-  return interpolate(relativeFrame, [0, 25], [0, 1], {
+  // Quintic Out Easing for ultra-sleek movement
+  return interpolate(relativeFrame, [0, 35], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
+    easing: Easing.bezier(0.23, 1, 0.32, 1)
   });
 };
 
@@ -1180,6 +1188,8 @@ export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?:
           key={`${element.id}_line_${i}`}
           start={{ x, y }}
           end={pos}
+          paddingStart={120} // Clear center icon
+          paddingEnd={80}   // Clear outer icons
           startFrame={startFrame + 15 + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL / 2)}
           duration={60}
           type={connectionStyle as 'solid' | 'dotted' | 'arrow'}
@@ -1511,26 +1521,52 @@ import { generateSvgId } from '../lib/svgUtils';
 import { getEntranceProgress } from '../lib/animationUtils';
 import { useAnimation } from './AnimationContext';
 
-export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, y:number}, end: {x:number, y:number} }> = ({
+export const ConnectionLine: React.FC<ConnectionLineProps & {
+    start: {x:number, y:number},
+    end: {x:number, y:number},
+    paddingStart?: number,
+    paddingEnd?: number
+}> = ({
   start,
   end,
   startFrame = 0,
   duration = 60,
   color = 'rgba(255,255,255,0.2)',
-  type = 'dotted'
+  type = 'dotted',
+  paddingStart = 0,
+  paddingEnd = 0
 }) => {
   const { frame, fps } = useAnimation();
 
   // OPTIMIZATION: Use interpolation for lines
   const progress = getEntranceProgress(frame, fps, startFrame, false);
 
+  // Calculate direction vector and distance
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  // Calculate padded points to prevent icon overlap
+  const unitX = dx / dist;
+  const unitY = dy / dist;
+
+  const paddedStart = {
+      x: start.x + unitX * paddingStart,
+      y: start.y + unitY * paddingStart
+  };
+
+  const paddedEnd = {
+      x: end.x - unitX * paddingEnd,
+      y: end.y - unitY * paddingEnd
+  };
+
   // HARDENING: Unique Marker IDs to prevent collisions
   const markerId = useMemo(() => generateSvgId('arrowhead', `${start.x}-${start.y}-${end.x}-${end.y}`), [start, end]);
 
   if (frame < startFrame) return null;
 
-  const currentX = start.x + (end.x - start.x) * progress;
-  const currentY = start.y + (end.y - start.y) * progress;
+  const currentX = paddedStart.x + (paddedEnd.x - paddedStart.x) * progress;
+  const currentY = paddedStart.y + (paddedEnd.y - paddedStart.y) * progress;
 
   return (
     <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
@@ -1540,8 +1576,8 @@ export const ConnectionLine: React.FC<ConnectionLineProps & { start: {x:number, 
         </marker>
       </defs>
       <line
-        x1={start.x}
-        y1={start.y}
+        x1={paddedStart.x}
+        y1={paddedStart.y}
         x2={currentX}
         y2={currentY}
         stroke={color}
@@ -1763,10 +1799,10 @@ export const LabelSystem: React.FC<{ element: LabelElement, targetPos?: { x: num
   const spr = getEntranceProgress(frame, fps, startFrame, false);
 
   const offsets = {
-    top: { x: 0, y: -80 },
-    bottom: { x: 0, y: 80 },
-    left: { x: -120, y: 0 },
-    right: { x: 120, y: 0 },
+    top: { x: 0, y: -120 },
+    bottom: { x: 0, y: 120 },
+    left: { x: -180, y: 0 },
+    right: { x: 180, y: 0 },
     center: { x: 0, y: 0 }
   };
 
@@ -2530,10 +2566,23 @@ export class SvgProviderService {
     try {
         return await this.fetchWithRetry(primaryUrl);
     } catch (e) {
-        // FALLBACK: Try standard MDI via Iconify if specific provider fails
-        console.warn(`Primary fetch failed for ${cleanQuery} (Provider: ${provider}), trying fallback...`);
-        const fallbackUrl = `https://api.iconify.design/mdi/${cleanQuery.split('-').pop()}.svg`;
-        return this.fetchWithRetry(fallbackUrl);
+        // FALLBACK chain
+        console.warn(`Primary fetch failed for ${cleanQuery} (Provider: ${provider}), trying fallbacks...`);
+
+        const fallbacks = [
+            `https://api.iconify.design/lucide/${cleanQuery}.svg`,
+            `https://api.iconify.design/mdi/${cleanQuery.split('-').pop()}.svg`,
+            `https://api.iconify.design/simple-icons/${cleanQuery}.svg`
+        ];
+
+        for (const url of fallbacks) {
+            if (url === primaryUrl) continue;
+            try {
+                return await this.fetchWithRetry(url);
+            } catch (err) {}
+        }
+
+        throw new Error(`All SVG fallbacks failed for ${cleanQuery}`);
     }
   }
 

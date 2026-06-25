@@ -44,10 +44,23 @@ export class SvgProviderService {
     try {
         return await this.fetchWithRetry(primaryUrl);
     } catch (e) {
-        // FALLBACK: Try standard MDI via Iconify if specific provider fails
-        console.warn(`Primary fetch failed for ${cleanQuery} (Provider: ${provider}), trying fallback...`);
-        const fallbackUrl = `https://api.iconify.design/mdi/${cleanQuery.split('-').pop()}.svg`;
-        return this.fetchWithRetry(fallbackUrl);
+        // FALLBACK chain
+        console.warn(`Primary fetch failed for ${cleanQuery} (Provider: ${provider}), trying fallbacks...`);
+
+        const fallbacks = [
+            `https://api.iconify.design/lucide/${cleanQuery}.svg`,
+            `https://api.iconify.design/mdi/${cleanQuery.split('-').pop()}.svg`,
+            `https://api.iconify.design/simple-icons/${cleanQuery}.svg`
+        ];
+
+        for (const url of fallbacks) {
+            if (url === primaryUrl) continue;
+            try {
+                return await this.fetchWithRetry(url);
+            } catch (err) {}
+        }
+
+        throw new Error(`All SVG fallbacks failed for ${cleanQuery}`);
     }
   }
 

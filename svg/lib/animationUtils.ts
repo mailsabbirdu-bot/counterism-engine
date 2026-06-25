@@ -1,4 +1,4 @@
-import { interpolate, spring, SpringConfig } from 'remotion';
+import { interpolate, spring, SpringConfig, Easing } from 'remotion';
 
 export const DEFAULT_SPRING_CONFIG: SpringConfig = {
   damping: 12,
@@ -29,10 +29,11 @@ export const getEntranceProgress = (
     });
   }
 
-  // Linear fallback/interpolation for efficiency - P0-4 Centralization
-  return interpolate(relativeFrame, [0, 25], [0, 1], {
+  // Quintic Out Easing for ultra-sleek movement
+  return interpolate(relativeFrame, [0, 35], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
+    easing: Easing.bezier(0.23, 1, 0.32, 1)
   });
 };
 

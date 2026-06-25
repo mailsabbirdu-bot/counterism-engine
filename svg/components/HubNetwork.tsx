@@ -46,6 +46,8 @@ export const HubNetwork: React.FC<{ element: HubNetworkElement, sceneIconTheme?:
           key={`${element.id}_line_${i}`}
           start={{ x, y }}
           end={pos}
+          paddingStart={120} // Clear center icon
+          paddingEnd={80}   // Clear outer icons
           startFrame={startFrame + 15 + (i * ENGINE_CONSTANTS.STAGGER_INTERVAL / 2)}
           duration={60}
           type={connectionStyle as 'solid' | 'dotted' | 'arrow'}
