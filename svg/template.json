@@ -1,0 +1,122 @@
+{
+  "scenes": [
+    {
+      "scene_id": "SCENE_ALL_FEATURES",
+      "duration_in_frames": 600,
+      "background": "tech_grid",
+      "theme": "tech",
+      "sceneIconTheme": "lucide",
+      "camera": {
+        "enabled": true,
+        "motionBlur": { "enabled": true, "intensity": 0.8 },
+        "shake": { "enabled": false },
+        "shots": [
+          { "targetId": "hub_1_center", "startFrame": 0, "duration": 120, "zoom": 1.4, "style": "dramatic_reveal" },
+          { "targetId": "kpi_1", "startFrame": 150, "duration": 90, "zoom": 1.8, "style": "push_in" },
+          { "targetId": "label_main", "startFrame": 260, "duration": 150, "zoom": 1.1, "style": "slow_pull" }
+        ]
+      },
+      "elements": [
+        {
+          "id": "hub_1",
+          "type": "hub_network",
+          "centerSvg": "cpu",
+          "provider": "lucide",
+          "nodes": ["database", "server", "shield", "globe", "zap"],
+          "x": 960,
+          "y": 540,
+          "radius": 350,
+          "connectionStyle": "arrow",
+          "animation": "pop",
+          "startFrame": 0
+        },
+        {
+          "id": "flow_1",
+          "type": "flow_diagram",
+          "steps": ["search", "settings", "code-2", "rocket"],
+          "layout": "horizontal",
+          "arrowStyle": "glow",
+          "x": 960,
+          "y": 850,
+          "spacing": 200,
+          "startFrame": 60
+        },
+        {
+          "id": "label_main",
+          "type": "label",
+          "target": "hub_1_center",
+          "text": "SYSTEM ARCHITECTURE",
+          "position": "top",
+          "fontSize": 72,
+          "color": "#00F5FF",
+          "startFrame": 90
+        },
+        {
+          "id": "kpi_1",
+          "type": "kpi",
+          "title": "Network Speed",
+          "value": 950,
+          "suffix": "Mbps",
+          "trend": "+12%",
+          "icon": "zap",
+          "x": 300,
+          "y": 250,
+          "startFrame": 120
+        },
+        {
+          "id": "callout_1",
+          "type": "callout",
+          "target": "hub_1_node_0",
+          "title": "Cloud Storage",
+          "body": "Scalable distributed database infrastructure.",
+          "direction": "left",
+          "startFrame": 180
+        },
+        {
+          "id": "timeline_1",
+          "type": "timeline",
+          "events": [
+            { "year": "2022", "label": "Dev" },
+            { "year": "2023", "label": "Beta" },
+            { "year": "2024", "label": "Launch" }
+          ],
+          "x": 960,
+          "y": 150,
+          "startFrame": 240
+        }
+      ],
+      "groups": [
+        {
+          "id": "decorative_group",
+          "layout": "orbit",
+          "x": 960,
+          "y": 540,
+          "spacing": 600,
+          "backgroundRing": true
+        }
+      ],
+      "infographic_lines": [
+        {
+          "from": "kpi_1",
+          "to": "hub_1",
+          "type": "dotted",
+          "color": "rgba(255,255,255,0.2)",
+          "start": 150
+        }
+      ]
+    }
+  ],
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "definitions": {
+    "providers": ["iconify", "lucide", "tabler", "solar", "phosphor", "hugeicons", "material-symbols", "simple-icons"],
+    "animations": ["fade", "scale", "pop", "slideUp", "slideDown", "rotate", "draw", "trace", "pulse", "float", "orbit", "reveal", "glowPulse"],
+    "styles": ["outline", "fill", "tech", "corporate", "infographic"],
+    "themes": ["tech", "corporate", "finance", "documentary", "education", "healthcare", "medical", "cyberpunk", "minimal"],
+    "backgrounds": ["tech_grid", "blueprint_grid", "dotted_pattern", "network_pattern", "radial_glow"],
+    "shot_styles": ["push_in", "pull_out", "whip_pan", "dramatic_reveal", "cinematic_drift", "dynamic_orbit", "vertical_sweep", "spiral_vortex", "glitch_snap", "low_angle_hero", "aerial_top_down", "shaky_handheld", "zoom_blur_reveal", "tilt_shift_focus", "power_zoom", "smooth_glide", "epic_scaling", "warp_speed", "rolling_horizon", "fisheye_distort", "dolly_zoom", "parallax_slide", "staccato_jump", "oblique_view", "macro_focus", "uprising_reveal", "descending_gaze", "infinity_loop", "kaleidoscope", "cyber_scan", "extreme_closeup", "wide_panorama", "pendulum_swing", "drunken_stumble", "floating_weightless", "rapid_fire", "gentle_breeze", "the_matrix", "heartbeat_zoom"]
+  }
+}
