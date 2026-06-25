@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill } from 'remotion';
+import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { BackgroundType } from '../types';
 
 interface InfographicBackgroundProps {
@@ -7,44 +7,48 @@ interface InfographicBackgroundProps {
 }
 
 export const InfographicBackground: React.FC<InfographicBackgroundProps> = ({ type }) => {
+  const frame = useCurrentFrame();
   if (!type) return null;
 
   return (
     <AbsoluteFill className="pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
       {type === 'tech_grid' && (
         <div
-          className="absolute inset-0 opacity-[0.1]"
+          className="absolute inset-0 opacity-[0.08]"
           style={{
             backgroundImage: `linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px)`,
-            backgroundSize: '100px 100px'
+            backgroundSize: '100px 100px',
+            backgroundPosition: `${frame * 0.5}px ${frame * 0.5}px` // Endless Scrolling
           }}
         />
       )}
 
       {type === 'blueprint_grid' && (
         <div
-          className="absolute inset-0 opacity-[0.15]"
+          className="absolute inset-0 opacity-[0.12]"
           style={{
             backgroundColor: '#001a33',
             backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 2px, transparent 2px), linear-gradient(90deg, rgba(255,255,255,0.1) 2px, transparent 2px), linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)`,
-            backgroundSize: '100px 100px, 100px 100px, 20px 20px, 20px 20px'
+            backgroundSize: '100px 100px, 100px 100px, 20px 20px, 20px 20px',
+            backgroundPosition: `${frame * 0.3}px ${frame * 0.3}px, ${frame * 0.3}px ${frame * 0.3}px, ${frame * 0.15}px ${frame * 0.15}px, ${frame * 0.15}px ${frame * 0.15}px`
           }}
         />
       )}
 
       {type === 'dotted_pattern' && (
         <div
-          className="absolute inset-0 opacity-[0.1]"
+          className="absolute inset-0 opacity-[0.08]"
           style={{
             backgroundImage: `radial-gradient(circle, #ffffff 2px, transparent 0)`,
-            backgroundSize: '50px 50px'
+            backgroundSize: '50px 50px',
+            backgroundPosition: `${frame * 0.4}px ${frame * 0.4}px`
           }}
         />
       )}
 
       {type === 'network_pattern' && (
-        <svg className="absolute inset-0 w-full h-full opacity-[0.1]">
-          <pattern id="network" x="0" y="0" width="200" height="200" patternUnits="userSpaceOnUse">
+        <svg className="absolute inset-0 w-full h-full opacity-[0.08]">
+          <pattern id="network" x={frame * 0.2} y={frame * 0.2} width="200" height="200" patternUnits="userSpaceOnUse">
             <circle cx="20" cy="20" r="3" fill="white" />
             <circle cx="150" cy="40" r="3" fill="white" />
             <circle cx="80" cy="120" r="3" fill="white" />

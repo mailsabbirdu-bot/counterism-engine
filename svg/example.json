@@ -4,7 +4,7 @@
       "scene_id": "SCENE_01_AMAZON",
       "background_type": "procedural",
       "procedural_config": {
-        "variant": "dark_particles",
+        "variant": "neon_grid",
         "primaryColor": "#0F172A",
         "secondaryColor": "#1E293B",
         "accentColor": "#00F5FF"
