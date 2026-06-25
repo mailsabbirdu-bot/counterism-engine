@@ -102,8 +102,8 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = React.mem
         positionMap={positionMap}
       />
 
-      {/* Background System */}
-      {background && (
+      {/* Background System - Only render if not using procedural background */}
+      {background && background !== 'none' && (
           <InfographicBackground type={background} />
       )}
 

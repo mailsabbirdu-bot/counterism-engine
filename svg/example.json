@@ -95,7 +95,7 @@
           "startFrame": 120
         }
       ],
-      "background": "tech_grid",
+      "background": "none",
       "theme": "tech",
       "sceneIconTheme": "lucide"
     }

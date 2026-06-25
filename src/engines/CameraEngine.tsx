@@ -324,9 +324,21 @@ export const CameraEngine: React.FC<{
   // Apply Smoothing to target positions to prevent jumps
   const smoothFactor = config.smoothing ?? 0.85; // 0.85 default for high stability
 
-  const tx = safeNumber(cameraState.tx + shakeX, cx);
-  const ty = safeNumber(cameraState.ty + shakeY, cy);
-  const zoom = safeNumber(cameraState.zoom, 1);
+  // Apply Smoothing to target positions to prevent jumps
+  // We look back a few frames to calculate a rolling average or lag
+  const lagFrames = 5;
+  const history = [];
+  for (let i = 0; i < lagFrames; i++) {
+      history.push(getCameraState(Math.max(0, frame - i), mergedKeyframes, overlays, width, height));
+  }
+
+  const avgTx = history.reduce((sum, s) => sum + s.tx, 0) / lagFrames;
+  const avgTy = history.reduce((sum, s) => sum + s.ty, 0) / lagFrames;
+  const avgZoom = history.reduce((sum, s) => sum + s.zoom, 0) / lagFrames;
+
+  const tx = safeNumber(avgTx + shakeX, cx);
+  const ty = safeNumber(avgTy + shakeY, cy);
+  const zoom = safeNumber(avgZoom, 1);
   const rotZ = safeNumber(cameraState.rotationZ + shakeRotZ, 0);
 
   if (frame % 30 === 0) {
