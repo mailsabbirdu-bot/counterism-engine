@@ -139,6 +139,7 @@ class RemotionJsonMaker:
         self.out_files = []
         self.camera_files = []
         self.narration_files = []
+        self.video_files = []
         if os.path.exists(audio_dir):
             all_files = os.listdir(audio_dir)
             self.in_files = sorted([f for f in all_files if re.match(r'^(in[_\-]?\d*|intro|enter)', f, re.I) and f.lower().endswith(('.mp3', '.wav', '.m4a', '.aac', '.ogg'))])
@@ -148,6 +149,12 @@ class RemotionJsonMaker:
             print(f"🎵 SFX Detection: {len(self.in_files)} intro, {len(self.out_files)} outro, {len(self.camera_files)} camera, {len(self.narration_files)} narrations.")
         else:
             print(f"⚠️ SFX directory not found: {audio_dir}")
+
+        # 3. Videos
+        video_dir = os.path.join(abs_public, "renders")
+        if os.path.exists(video_dir):
+            self.video_files = sorted([f for f in os.listdir(video_dir) if f.lower().endswith('.mp4')])
+            print(f"🎬 Video Detection: Found {len(self.video_files)} background videos.")
 
     def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
         if not data: return data
@@ -260,8 +267,18 @@ class RemotionJsonMaker:
                 # Preserve existing valid render paths (important for Remake project)
                 current_vpath = scene.get('video_path', '')
                 if not current_vpath or not current_vpath.startswith('renders/'):
-                    scene['video_path'] = f"renders/scene_SC_{id_num:02d}.mp4"
-                    print(f"      🎬 Assigned background: {scene['video_path']} (derived from ID '{s_id}')")
+                    # Check if matching video actually exists
+                    vname = f"scene_SC_{id_num:02d}.mp4"
+                    if vname in self.video_files:
+                        scene['video_path'] = f"renders/{vname}"
+                        print(f"      🎬 Assigned background: {scene['video_path']} (derived from ID '{s_id}')")
+                    else:
+                        # Fallback to procedural if video missing
+                        scene['background_type'] = 'procedural'
+                        if not scene.get('procedural_config'):
+                            scene['procedural_config'] = {"variant": "neon_grid"}
+                        scene['video_path'] = None
+                        print(f"      🎨 Video {vname} missing. Falling back to procedural background.")
             elif scene['background_type'] == 'procedural':
                 if not scene.get('procedural_config'):
                     scene['procedural_config'] = {"variant": "neon_grid"}
@@ -816,8 +833,13 @@ class RemotionJsonMaker:
                     if ov.get('content'):
                         ov['content'] = ov['content'].strip().rstrip('.। ')
 
-                    if not ov.get('content'):
-                        ov['content'] = "INSIGHT" # Safety fallback for empty text
+                    if not ov.get('content') or ov.get('content') == "INSIGHT":
+                        # Attempt to extract a meaningful phrase from the scene's narration
+                        story_text = self.story_scenes.get(scene_id, "") if hasattr(self, 'story_scenes') else ""
+                        if story_text:
+                            ov['content'] = story_text.split('.')[0][:50] # Take first sentence
+                        else:
+                            ov['content'] = "INSIGHT" # True fallback
 
                     # Modern Color
                     ov['color'] = modern_colors[idx % len(modern_colors)]
@@ -922,8 +944,13 @@ class RemotionJsonMaker:
                 resting_frames = 90
                 min_total = intro_frames + resting_frames + outro_frames # 120f
 
-                # Intro Sync: Use scene start frame if available
-                ov['start'] = self._get_scene_start_frame(scene_id)
+                # Intro Sync: Try word-level matching, fallback to scene start
+                word_sync = self._get_word_timestamp(scene_id, ov.get('content') or ov.get('title') or ov.get('label', ''))
+                if word_sync != -1:
+                    ov['start'] = word_sync
+                    print(f"      🔗 Word-Sync for {ov['id']}: {word_sync}f")
+                else:
+                    ov['start'] = self._get_scene_start_frame(scene_id)
 
                 # Ensure duration is at least enough for intro+resting+outro
                 ov['duration'] = max(min_total, min(ov.get('duration', min_total), duration - ov['start']))
@@ -1150,21 +1177,41 @@ class RemotionJsonMaker:
             return int(match.group(1))
         return 0
 
+    def _get_word_timestamp(self, scene_id: str, search_text: str) -> int:
+        if not self.raw_timestamps or not search_text: return -1
+        # Extract keywords from search_text
+        keywords = re.findall(r'[\u0980-\u09FF]+|[a-zA-Z0-9]{2,}', search_text)
+        if not keywords: return -1
+
+        # Look for matches in timestamps for this scene
+        pattern = fr'{scene_id}:.*?\[30fps:\s*(\d+)f\s*-\s*\d+f\]\s*"(.*?)"'
+        ts_words = re.findall(pattern, self.raw_timestamps)
+
+        for frame, word in ts_words:
+            word_clean = re.sub(r'[.।]', '', word)
+            if any(kw in word_clean for kw in keywords):
+                return int(frame)
+        return -1
+
     def _is_bangla(self, text: str) -> bool:
         return any('\u0980' <= c <= '\u09FF' for c in text)
 
     def generate(self, story: str, guidelines: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None) -> Dict[str, Any]:
         # Pre-process story into scenes for explicit language detection and context
-        pattern = r'দৃশ্য\s+[0-9০-৯]+'
+        # Support both 'Scene 1' and 'দৃশ্য ১' markers, handling optional colons
+        pattern = r'(?:Scene|দৃশ্য)\s+[0-9০-৯]+[:\s]*'
         story_parts = re.split(pattern, story)
-        if story_parts and not story_parts[0].strip():
-            story_parts = story_parts[1:]
+
+        # Filter out empty parts and strip whitespace/colons from the beginning of narrations
+        story_parts = [p.strip().lstrip(':').strip() for p in story_parts if p.strip()]
 
         scene_narrations = []
-        for i, text in enumerate(story_parts, 1):
-            narration = text.strip()
+        self.story_scenes = {} # Reset and populate
+        for i, narration in enumerate(story_parts, 1):
+            s_id = f"SCENE_{i:02d}"
             lang = "BANGLA" if self._is_bangla(narration) else "ENGLISH"
-            scene_narrations.append(f"SCENE_{i:02d} ({lang}): {narration}")
+            scene_narrations.append(f"{s_id} ({lang}): {narration}")
+            self.story_scenes[s_id] = narration
 
         story_context = "\n".join(scene_narrations)
 
@@ -1173,6 +1220,7 @@ class RemotionJsonMaker:
         compact_ts = self._compact_timestamps(timestamp_context)
 
         duration_context = "DURATIONS (30fps): " + ", ".join([f"SCENE_{i+1:02d}:{d}f" for i, d in enumerate(scene_durations)]) if scene_durations else ""
+
 
         print("\n📝 --- PROMPT CONTEXT ---")
         print(f"   ⏱️ {duration_context}")
@@ -1239,11 +1287,12 @@ class RemotionJsonMaker:
             "4. FONTS: Use Bangla list for Bangla text, English list for English.\n"
             f"FONTS: {local_fonts}\n"
             f"SFX: {self.camera_files}\n"
+            f"VIDEOS: {self.video_files}\n"
             f"DURATIONS: {duration_context}\n"
             f"TIMESTAMPS: {compact_ts}\n"
             f"STORY: \n{story_context}\n"
             f"REFERENCE: {schema_ref}\n"
-            "TASK: Generate the infographic master JSON for ALL scenes. Maximize information density."
+            f"TASK: Generate the master JSON for ALL {len(self.story_scenes)} scenes described in the STORY. DO NOT skip any scene. Use 'video_path' only if it exists in the VIDEOS list. NO 'INSIGHT' placeholders."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
