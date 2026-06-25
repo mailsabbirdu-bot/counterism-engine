@@ -20,7 +20,7 @@ export const ENGINE_CONSTANTS = {
 
   // Visuals
   MAX_SVG_PATH_LENGTH: 5000,
-  DEFAULT_STROKE_WIDTH: 4, // Increased for visibility
+  DEFAULT_STROKE_WIDTH: 6, // Thick for professional look
   GLASS_PANEL_BLUR: 20,
   GLOW_RADIUS: 20,
   CALLOUT_LINE_LENGTH: 150,

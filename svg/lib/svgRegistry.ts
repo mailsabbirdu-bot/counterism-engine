@@ -56,7 +56,10 @@ export class SvgRegistry {
    */
   static load(data: Record<string, PreprocessedSvg>) {
     Object.entries(data).forEach(([key, value]) => {
-      this.assets.set(key, value);
+      if (!this.assets.has(key)) {
+          this.assets.set(key, value);
+          this.keys.push(key);
+      }
     });
   }
 
