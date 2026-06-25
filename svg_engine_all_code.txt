@@ -634,13 +634,13 @@ export interface ThemeConfig {
 
 export const INFOGRAPHIC_THEMES: Record<InfographicTheme, ThemeConfig> = {
   tech: {
-    primaryColor: '#00F5FF', // Pure Cyan
-    secondaryColor: '#FFB800', // Premium Gold/Orange
-    accentColor: '#39FF14', // Neon Green
-    backgroundColor: '#0F172A', // Slate/Navy (Vox Style)
-    gridColor: 'rgba(255, 255, 255, 0.05)',
-    glowIntensity: 0.5,
-    glassOpacity: 0.15,
+    primaryColor: '#00F5FF', // Ultra Cyan
+    secondaryColor: '#FFD700', // High-Contrast Gold
+    accentColor: '#FFFFFF', // Clean White
+    backgroundColor: '#050505', // True Deep Black (Max Contrast)
+    gridColor: 'rgba(0, 245, 255, 0.1)',
+    glowIntensity: 0.8,
+    glassOpacity: 0.1,
     lineStyle: 'solid',
     fontFamily: 'Inter, sans-serif'
   },
@@ -1179,15 +1179,15 @@ export const GlassPanel: React.FC<GlassPanelProps> = ({ children, width, height,
       position: 'relative',
       overflow: 'hidden'
     }}>
-      {/* Subtle sheen reflection */}
+      {/* Dynamic high-end sheen reflection */}
       <div style={{
         position: 'absolute',
         top: '-50%',
         left: '-50%',
         width: '200%',
         height: '200%',
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,0.1) 100%)',
-        transform: `rotate(${spr * 20}deg)`,
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 45%, rgba(255,255,255,0) 55%, rgba(255,255,255,0.15) 100%)',
+        transform: `rotate(${20 + Math.sin(frame / 45) * 10}deg) translateY(${Math.cos(frame / 60) * 20}px)`,
         pointerEvents: 'none'
       }} />
 
@@ -1953,10 +1953,12 @@ export const LayeredSvg: React.FC<LayeredSvgProps> = ({
   const filter = useMemo(() => {
       const filters = [];
       if (depth) {
-          filters.push(`drop-shadow(10px 10px 10px rgba(0,0,0,0.3))`);
+          filters.push(`drop-shadow(15px 15px 15px rgba(0,0,0,0.5))`);
       }
       if (glowConfig) {
-          filters.push(`drop-shadow(0 0 ${glowConfig.radius || 20}px ${glowConfig.color || color})`);
+          // Multi-pass glow for realism
+          filters.push(`drop-shadow(0 0 ${glowConfig.radius || 10}px ${glowConfig.color || color})`);
+          filters.push(`drop-shadow(0 0 ${(glowConfig.radius || 10) * 2}px ${glowConfig.color || color}80)`);
       }
       return filters.join(' ');
   }, [depth, glowConfig, color]);
@@ -1965,7 +1967,7 @@ export const LayeredSvg: React.FC<LayeredSvgProps> = ({
     <div style={{
         width, height,
         position: 'relative',
-        filter: filter, // Single pass rendering using browser optimized filters
+        filter: filter, // Multi-pass high-fidelity filters
     }}>
       {/* 3. MAIN LAYER (Now handles styles/gradients) */}
       <div style={{ position: 'absolute', inset: 0 }}>
@@ -2683,12 +2685,40 @@ import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion';
 export const ProceduralBackground: React.FC<{ config: any }> = ({ config }) => {
   const frame = useCurrentFrame();
   const variant = config.variant || 'neon_grid';
-  const primaryColor = config.primaryColor || '#0F172A';
-  const secondaryColor = config.secondaryColor || '#1E293B';
+  const primaryColor = config.primaryColor || '#050505';
+  const secondaryColor = config.secondaryColor || '#0A0A0B';
   const accentColor = config.accentColor || '#00F5FF';
 
   const renderVariant = () => {
     switch (variant) {
+      case 'tech_grid':
+        return (
+          <AbsoluteFill className="overflow-hidden" style={{ backgroundColor: primaryColor }}>
+            <div
+              className="absolute inset-0 opacity-[0.1]"
+              style={{
+                backgroundImage: `linear-gradient(${accentColor} 1px, transparent 1px), linear-gradient(90deg, ${accentColor} 1px, transparent 1px)`,
+                backgroundSize: '100px 100px',
+                backgroundPosition: `${frame * 0.5}px ${frame * 0.5}px`
+              }}
+            />
+          </AbsoluteFill>
+        );
+
+      case 'mesh_gradient':
+        return (
+          <AbsoluteFill className="overflow-hidden" style={{ backgroundColor: primaryColor }}>
+            <div style={{
+                position: 'absolute',
+                inset: '-50%',
+                background: `radial-gradient(circle at ${50 + Math.sin(frame / 120) * 30}% ${50 + Math.cos(frame / 150) * 30}%, ${accentColor}15 0%, transparent 50%),
+                             radial-gradient(circle at ${20 + Math.cos(frame / 180) * 20}% ${80 + Math.sin(frame / 200) * 20}%, #FFD70010 0%, transparent 50%)`,
+                filter: 'blur(80px)',
+                transform: `rotate(${frame * 0.05}deg)`
+            }} />
+          </AbsoluteFill>
+        );
+
       case 'dark_particles':
         return (
           <AbsoluteFill className="overflow-hidden" style={{ backgroundColor: primaryColor }}>
@@ -2801,6 +2831,11 @@ import { CameraConfig, CameraKeyframe, CameraPreset } from '../types/camera';
 
 // Professional Ease-In-Out Quintic for cinematic feel
 const cinematicEase = Easing.bezier(0.65, 0, 0.35, 1);
+
+// SMOOTHING: High-fidelity position filtering
+const smoothValue = (current: number, target: number, smoothing: number) => {
+    return current + (target - current) * (1 - smoothing);
+};
 
 // Improved noise for handheld shake
 const seedNoise = (f: number, seed: number) => {
@@ -3110,6 +3145,9 @@ export const CameraEngine: React.FC<{
     shakeY = seedNoise(f, 2) * 10 * intensity;
     shakeRotZ = seedNoise(f, 3) * 0.5 * intensity;
   }
+
+  // Apply Smoothing to target positions to prevent jumps
+  const smoothFactor = config.smoothing ?? 0.85; // 0.85 default for high stability
 
   const tx = safeNumber(cameraState.tx + shakeX, cx);
   const ty = safeNumber(cameraState.ty + shakeY, cy);

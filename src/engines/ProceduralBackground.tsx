@@ -4,12 +4,40 @@ import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion';
 export const ProceduralBackground: React.FC<{ config: any }> = ({ config }) => {
   const frame = useCurrentFrame();
   const variant = config.variant || 'neon_grid';
-  const primaryColor = config.primaryColor || '#0F172A';
-  const secondaryColor = config.secondaryColor || '#1E293B';
+  const primaryColor = config.primaryColor || '#050505';
+  const secondaryColor = config.secondaryColor || '#0A0A0B';
   const accentColor = config.accentColor || '#00F5FF';
 
   const renderVariant = () => {
     switch (variant) {
+      case 'tech_grid':
+        return (
+          <AbsoluteFill className="overflow-hidden" style={{ backgroundColor: primaryColor }}>
+            <div
+              className="absolute inset-0 opacity-[0.1]"
+              style={{
+                backgroundImage: `linear-gradient(${accentColor} 1px, transparent 1px), linear-gradient(90deg, ${accentColor} 1px, transparent 1px)`,
+                backgroundSize: '100px 100px',
+                backgroundPosition: `${frame * 0.5}px ${frame * 0.5}px`
+              }}
+            />
+          </AbsoluteFill>
+        );
+
+      case 'mesh_gradient':
+        return (
+          <AbsoluteFill className="overflow-hidden" style={{ backgroundColor: primaryColor }}>
+            <div style={{
+                position: 'absolute',
+                inset: '-50%',
+                background: `radial-gradient(circle at ${50 + Math.sin(frame / 120) * 30}% ${50 + Math.cos(frame / 150) * 30}%, ${accentColor}15 0%, transparent 50%),
+                             radial-gradient(circle at ${20 + Math.cos(frame / 180) * 20}% ${80 + Math.sin(frame / 200) * 20}%, #FFD70010 0%, transparent 50%)`,
+                filter: 'blur(80px)',
+                transform: `rotate(${frame * 0.05}deg)`
+            }} />
+          </AbsoluteFill>
+        );
+
       case 'dark_particles':
         return (
           <AbsoluteFill className="overflow-hidden" style={{ backgroundColor: primaryColor }}>

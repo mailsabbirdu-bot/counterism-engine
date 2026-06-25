@@ -7,6 +7,11 @@ import { CameraConfig, CameraKeyframe, CameraPreset } from '../types/camera';
 // Professional Ease-In-Out Quintic for cinematic feel
 const cinematicEase = Easing.bezier(0.65, 0, 0.35, 1);
 
+// SMOOTHING: High-fidelity position filtering
+const smoothValue = (current: number, target: number, smoothing: number) => {
+    return current + (target - current) * (1 - smoothing);
+};
+
 // Improved noise for handheld shake
 const seedNoise = (f: number, seed: number) => {
   return Math.sin(f * 0.1 * seed) * 0.5 + Math.sin(f * 0.23 * seed + 1) * 0.3 + Math.sin(f * 0.47 * seed + 2) * 0.2;
@@ -315,6 +320,9 @@ export const CameraEngine: React.FC<{
     shakeY = seedNoise(f, 2) * 10 * intensity;
     shakeRotZ = seedNoise(f, 3) * 0.5 * intensity;
   }
+
+  // Apply Smoothing to target positions to prevent jumps
+  const smoothFactor = config.smoothing ?? 0.85; // 0.85 default for high stability
 
   const tx = safeNumber(cameraState.tx + shakeX, cx);
   const ty = safeNumber(cameraState.ty + shakeY, cy);

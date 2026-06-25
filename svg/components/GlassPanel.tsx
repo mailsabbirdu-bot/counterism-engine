@@ -37,15 +37,15 @@ export const GlassPanel: React.FC<GlassPanelProps> = ({ children, width, height,
       position: 'relative',
       overflow: 'hidden'
     }}>
-      {/* Subtle sheen reflection */}
+      {/* Dynamic high-end sheen reflection */}
       <div style={{
         position: 'absolute',
         top: '-50%',
         left: '-50%',
         width: '200%',
         height: '200%',
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,0.1) 100%)',
-        transform: `rotate(${spr * 20}deg)`,
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 45%, rgba(255,255,255,0) 55%, rgba(255,255,255,0.15) 100%)',
+        transform: `rotate(${20 + Math.sin(frame / 45) * 10}deg) translateY(${Math.cos(frame / 60) * 20}px)`,
         pointerEvents: 'none'
       }} />
 

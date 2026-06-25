@@ -42,10 +42,12 @@ export const LayeredSvg: React.FC<LayeredSvgProps> = ({
   const filter = useMemo(() => {
       const filters = [];
       if (depth) {
-          filters.push(`drop-shadow(10px 10px 10px rgba(0,0,0,0.3))`);
+          filters.push(`drop-shadow(15px 15px 15px rgba(0,0,0,0.5))`);
       }
       if (glowConfig) {
-          filters.push(`drop-shadow(0 0 ${glowConfig.radius || 20}px ${glowConfig.color || color})`);
+          // Multi-pass glow for realism
+          filters.push(`drop-shadow(0 0 ${glowConfig.radius || 10}px ${glowConfig.color || color})`);
+          filters.push(`drop-shadow(0 0 ${(glowConfig.radius || 10) * 2}px ${glowConfig.color || color}80)`);
       }
       return filters.join(' ');
   }, [depth, glowConfig, color]);
@@ -54,7 +56,7 @@ export const LayeredSvg: React.FC<LayeredSvgProps> = ({
     <div style={{
         width, height,
         position: 'relative',
-        filter: filter, // Single pass rendering using browser optimized filters
+        filter: filter, // Multi-pass high-fidelity filters
     }}>
       {/* 3. MAIN LAYER (Now handles styles/gradients) */}
       <div style={{ position: 'absolute', inset: 0 }}>
