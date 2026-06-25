@@ -94,6 +94,8 @@ class RemotionRemaker:
             print("8. Camera Zoom")
             print("9. KPI/Indicator Values")
             print("10. Background Video Path")
+            print("11. Background Type (video/procedural)")
+            print("12. Procedural Background Variant")
             print("0. Done with this scene")
 
             choice = input("\nEnter serial number to change: ").strip()
@@ -185,6 +187,21 @@ class RemotionRemaker:
             elif choice == '10':
                 new_val = input(f"Current: {scene.get('video_path')}\nNew Path: ").strip()
                 if new_val: scene['video_path'] = new_val
+
+            elif choice == '11':
+                print("1. video")
+                print("2. procedural")
+                type_choice = input("Choice (1/2): ").strip()
+                if type_choice == '1': scene['background_type'] = 'video'
+                elif type_choice == '2': scene['background_type'] = 'procedural'
+
+            elif choice == '12':
+                variants = ["dark_particles", "liquid_gradient", "neon_grid"]
+                print(f"Available: {variants}")
+                new_val = input(f"Current Variant: {scene.get('procedural_config', {}).get('variant')}\nNew Variant: ").strip()
+                if new_val in variants:
+                    scene['procedural_config'] = {"variant": new_val}
+                else: print("❌ Invalid variant")
 
             confirm = input("\nChange anything else? (y/n): ").lower()
             if confirm != 'y': break
@@ -313,6 +330,8 @@ class RemotionRemaker:
         # Simplify JSON to avoid confusing Gemini with internal engine props
         clean_scene = {
             "scene_id": scene.get("scene_id"),
+            "background_type": scene.get("background_type", "video"),
+            "procedural_config": scene.get("procedural_config"),
             "overlays": scene.get("overlays", []),
             "camera": scene.get("camera", {})
         }
@@ -372,6 +391,7 @@ class RemotionRemaker:
                 f"AVAILABLE HERO ANIMATIONS: {', '.join(hero_anim_list)}\n"
                 f"AVAILABLE CAMERA STYLES: {', '.join(camera_style_list)}\n"
                 f"INSTRUCTION: {instruction if instruction else 'Enhance the design and visual impact while strictly following the narrative.'}\n"
+                f"BACKGROUND SELECTION: Choose between 'video' (default) and 'procedural' (for SVG motion graphics).\n"
                 f"VISUAL LIBRARY (CHOOSE SLEEK/ULTRA-MODERN PRESETS):\n"
                 f"- 'svg' (type: 'svg'): provider ('iconify'|'lucide'|'tabler'), query (icon name).\n"
                 f"  - ANIMATIONS: {', '.join(svg_animation_list)}. Use 'draw' or 'trace' for professional infographics.\n"
@@ -446,8 +466,10 @@ class RemotionRemaker:
                     print(f"🔍 DEBUG: Extracted JSON keys: {list(extracted_data.keys()) if isinstance(extracted_data, dict) else 'Not a dict'}")
 
                     # Update entire scene if the response is a full scene object
-                    if isinstance(extracted_data, dict) and ('overlays' in extracted_data or 'camera' in extracted_data):
-                        print("✅ AI returned a full scene object. Merging camera and overlays.")
+                    if isinstance(extracted_data, dict) and ('overlays' in extracted_data or 'camera' in extracted_data or 'background_type' in extracted_data):
+                        print("✅ AI returned a full scene object. Merging background, camera and overlays.")
+                        if 'background_type' in extracted_data: scene['background_type'] = extracted_data['background_type']
+                        if 'procedural_config' in extracted_data: scene['procedural_config'] = extracted_data['procedural_config']
                         if 'overlays' in extracted_data: scene['overlays'] = extracted_data['overlays']
                         if 'camera' in extracted_data: scene['camera'] = extracted_data['camera']
                     else:
