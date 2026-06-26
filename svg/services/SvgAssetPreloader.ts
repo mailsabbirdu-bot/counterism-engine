@@ -13,12 +13,13 @@ export class SvgAssetPreloader {
   static async preloadScene(scene: SvgScene) {
     const queries = new Set<{ query: string; provider: SvgProvider }>();
     const sceneProvider = scene.sceneIconTheme || 'lucide';
+    const elements = scene.elements || scene.overlays || [];
 
     // 1. Scan elements
-    scene.elements.forEach(el => this.scanElement(el, sceneProvider, queries));
+    elements.forEach(el => this.scanElement(el, sceneProvider, queries));
 
     // 2. Scan hub networks (center and outer nodes)
-    scene.elements.forEach(el => {
+    elements.forEach(el => {
         if (el.type === 'hub_network') {
             queries.add({ query: el.centerSvg, provider: el.provider || sceneProvider });
             el.nodes.forEach(q => queries.add({ query: queryToKey(q), provider: el.provider || sceneProvider }));
@@ -74,12 +75,12 @@ export class SvgAssetPreloader {
   }
 
   private static scanElement(el: StorytellingElement, defaultProvider: SvgProvider, queries: Set<{ query: string; provider: SvgProvider }>) {
-    if (el.type === 'svg') {
+    if (el.type === 'svg' && el.query) {
       queries.add({ query: el.query, provider: el.provider || defaultProvider });
-    } else if (el.type === 'hub_network') {
+    } else if (el.type === 'hub_network' && el.centerSvg) {
       queries.add({ query: el.centerSvg, provider: el.provider || defaultProvider });
-      el.nodes.forEach(q => queries.add({ query: q, provider: el.provider || defaultProvider }));
-    } else if (el.type === 'flow_diagram' || el.type === 'process') {
+      if (el.nodes) el.nodes.forEach(q => queries.add({ query: q, provider: el.provider || defaultProvider }));
+    } else if ((el.type === 'flow_diagram' || el.type === 'process') && el.steps) {
       el.steps.forEach(q => queries.add({ query: q, provider: defaultProvider }));
     } else if (el.type === 'kpi' && el.icon) {
       queries.add({ query: el.icon, provider: defaultProvider });
