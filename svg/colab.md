@@ -42,7 +42,7 @@ else:
 # --- 4. RENDER ---
 print("🎬 Rendering Powerful SVG Video...")
 # Pass the manifest via the standard rendering pipeline
-!node --loader ts-node/esm render.ts --template=remotion_render.json --no-resume
+!node --no-warnings --loader ts-node/esm render.ts --template=remotion_render.json --no-resume
 
 print("✅ DONE! Check the output directory for your rendered video.")
 ```

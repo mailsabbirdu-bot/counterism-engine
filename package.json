@@ -7,7 +7,7 @@
   "scripts": {
     "start": "remotion preview",
     "build": "remotion bundle",
-    "render": "node --loader ts-node/esm render.ts",
+    "render": "node --no-warnings --loader ts-node/esm render.ts",
     "typecheck": "tsc"
   },
   "dependencies": {
