@@ -48,18 +48,18 @@ print_banner("🔗 LINKING DRIVE ASSETS")
 
 # 1. SFX Assets
 print("\n🎵 --- SYNCING SFX ASSETS ---")
+import glob
 for drive_sfx in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/renders/audio", f"{DRIVE_BASE_PATH}/render/audio", f"{DRIVE_BASE_PATH}/audio"]:
     if os.path.exists(drive_sfx):
-        print(f"🔍 Searching for SFX in: {drive_sfx}")
-        # Recursive find for common extensions and link them individually to avoid glob issues
-        !find "{drive_sfx}" -maxdepth 2 -type f \( -iname "*.mp3" -o -iname "*.wav" -o -iname "*.m4a" -o -iname "*.aac" -o -iname "*.ogg" \) -exec ln -sf '{}' public/renders/audios/ ';' 2>/dev/null
+        print(f"🔍 Linking assets from: {drive_sfx}")
+        for ext in ["*.mp3", "*.wav", "*.m4a", "*.aac", "*.ogg"]:
+            for f in glob.glob(os.path.join(drive_sfx, "**", ext), recursive=True):
+                !ln -sf "{f}" public/renders/audios/ 2>/dev/null
 
 s_count = !ls public/renders/audios/ | wc -l
 print(f"📦 Successfully linked {s_count[0]} files to public/renders/audios/")
 if int(s_count[0]) > 0:
     !ls -p public/renders/audios/ | head -n 20
-else:
-    print("⚠️ WARNING: No SFX folder found in common Drive locations.")
 
 # 2. Background Videos
 print("\n🎬 --- SYNCING BACKGROUND VIDEOS ---")

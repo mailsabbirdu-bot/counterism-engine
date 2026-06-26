@@ -365,13 +365,13 @@ class RemotionJsonMaker:
                     if ov_type == 'text':
                         if text_count >= MAX_TEXT_PER_SCENE: continue
                         text_count += 1
-                        # LLM Repair: text -> content
-                        if 'text' in ov and 'content' not in ov:
-                            ov['content'] = ov['text']
+                        # LLM Repair: text/query -> content
+                        if not ov.get('content'):
+                            ov['content'] = ov.get('text') or ov.get('query')
 
                         # Strip trailing punctuation
                         if ov.get('content'):
-                            ov['content'] = ov['content'].rstrip('.। ')
+                            ov['content'] = str(ov['content']).rstrip('.। ')
 
                         # Ensure fontSize has units
                         fs = ov.get('fontSize', 120)
@@ -833,11 +833,14 @@ class RemotionJsonMaker:
                     if ov.get('content'):
                         ov['content'] = ov['content'].strip().rstrip('.। ')
 
-                    if not ov.get('content') or ov.get('content') == "INSIGHT":
+                    if not ov.get('content') or str(ov.get('content')).upper() == "INSIGHT":
                         # Attempt to extract a meaningful phrase from the scene's narration
                         story_text = self.story_scenes.get(scene_id, "") if hasattr(self, 'story_scenes') else ""
                         if story_text:
-                            ov['content'] = story_text.split('.')[0][:50] # Take first sentence
+                            # Use first sentence or up to 6 words
+                            sentence = re.split(r'[.।]', story_text)[0]
+                            words = sentence.split()[:6]
+                            ov['content'] = " ".join(words)
                         else:
                             ov['content'] = "INSIGHT" # True fallback
 
@@ -885,6 +888,7 @@ class RemotionJsonMaker:
                         }
 
                 if o_type in ['chart', 'shadcn_chart']:
+                    # Force Bangla font if scene is Bangla
                     if is_scene_bangla and self.bangla_fonts:
                         ov['font'] = self.bangla_fonts[0]
                     # Robustness: ensure a font is always assigned
@@ -906,14 +910,15 @@ class RemotionJsonMaker:
                     # Robustness: ensure a font is always assigned
                     if not ov.get('font'):
                          ov['font'] = self.english_fonts[0] if self.english_fonts else "Arial"
+
+                    # Force Bangla font if scene is Bangla
+                    if is_scene_bangla and self.bangla_fonts:
+                        ov['font'] = self.bangla_fonts[0]
+
                     if not ov.get('indicator_type') or ov.get('indicator_type') == 'counter':
                         ov['indicator_type'] = "kpiNumber"
                     if not ov.get('label'): ov['label'] = "Insight"
                     if 'value' not in ov or ov['value'] is None: ov['value'] = 0
-
-                    # Bangla Font for Nivo if scene is Bangla
-                    if is_scene_bangla and self.bangla_fonts:
-                        ov['font'] = self.bangla_fonts[0]
 
                     # Modern Color
                     ov['color'] = modern_colors[(idx + 1) % len(modern_colors)]
@@ -1266,9 +1271,13 @@ class RemotionJsonMaker:
             "GOAL: BUILD COMPLEX INFOGRAPHIC SCENES WITH MULTIPLE LAYERS.\n"
             "STRICT SCHEMA:\n"
             "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config'?: { 'variant' }, 'video_path'?, 'overlays': [], 'infographic_lines': [], 'infographic_nodes': [], 'camera': { 'shots': [] } } ]\n"
-            "- 'overlays': [ { 'id', 'type': 'svg'|'text'|'chart'|'shadcn_chart'|'shadcn_indicator', 'query'?, 'provider'?, 'animation', 'start', 'duration', 'position' } ]\n"
+            "- 'overlays': [ { 'id', 'type': 'svg'|'text'|'chart'|'shadcn_chart'|'shadcn_indicator', 'content'?, 'query'?, 'provider'?, 'animation', 'start', 'duration', 'position' } ]\n"
             "- 'infographic_lines': [ { 'from': 'id', 'to': 'id', 'start', 'duration', 'color', 'type': 'solid'|'dotted'|'arrow' } ]\n"
             "- 'infographic_nodes': [ { 'x', 'y', 'start', 'color', 'type': 'glow'|'pulse'|'signal' } ]\n"
+            "COMPLETENESS CHECKLIST:\n"
+            f"1. GENERATE ALL {len(self.story_scenes)} SCENES. Target IDs: {list(self.story_scenes.keys())}.\n"
+            "2. NO SKIP. If you skip any scene, the render will fail.\n"
+            "3. NO GENERIC TEXT. Use actual narration keywords for 'content' fields.\n"
             "MOTION GRAPHICS RULES:\n"
             "1. BACKGROUND SELECTION: Analyze STORY context. Use 'procedural' background for scenes that are best explained through motion graphics/SVG infographics. Use 'video' for realistic scenes.\n"
             "2. NOUN HIERARCHY: Never render a noun directly. Instead of 1 'house' icon, use multiple SVGs (house, family, location) and connect them with 'infographic_lines'.\n"
