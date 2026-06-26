@@ -120,6 +120,18 @@ const start = async () => {
       }
     }
 
+    // Verify SFX
+    if (template.audio_sfx_manifest && Array.isArray(template.audio_sfx_manifest)) {
+        console.log('\n🎵 Verifying SFX Assets:');
+        for (const sfx of template.audio_sfx_manifest) {
+            const sfxPath = path.join(process.cwd(), 'public/renders/audios', sfx.file);
+            if (!fs.existsSync(sfxPath)) {
+                console.error(`❌ SFX Missing: ${sfx.file} (Expected in public/renders/audios/)`);
+                assetsMissing = true;
+            }
+        }
+    }
+
     if (assetsMissing) {
       console.warn('\n⚠️  WARNING: Some assets are missing. Rendering may fail or show placeholders.');
     } else {
