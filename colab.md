@@ -61,12 +61,15 @@ drive_audio = f"{DRIVE_BASE_PATH}/audio"
 if os.path.exists(drive_audio):
     !cp -r {drive_audio}/* public/audio/
 
-# Sync SFX (from multiple possible locations)
-print("📡 Searching for SFX assets...")
-for sfx_path in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/render/audio"]:
+# Sync SFX & Narration (Recursive sync from multiple Drive locations)
+print("📡 Searching for SFX and narration assets...")
+import glob
+for sfx_path in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/renders/audio", f"{DRIVE_BASE_PATH}/audio"]:
     if os.path.exists(sfx_path):
-        print(f"📦 Syncing SFX from: {sfx_path}")
-        !cp -ru {sfx_path}/* public/renders/audios/ 2>/dev/null || true
+        print(f"📦 Syncing audio from: {sfx_path}")
+        for ext in ["*.mp3", "*.wav", "*.m4a", "*.aac", "*.ogg"]:
+            for f in glob.glob(os.path.join(sfx_path, "**", ext), recursive=True):
+                shutil.copy(f, "public/renders/audios/")
 
 # Sync Fonts
 drive_fonts = f"{DRIVE_BASE_PATH}/fonts"

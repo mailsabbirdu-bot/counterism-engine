@@ -32,7 +32,7 @@ export const InfographicComposer: React.FC<InfographicComposerProps> = React.mem
 
   if (!sceneData) return null;
 
-  const elements: StorytellingElement[] = sceneData.elements || [];
+  const elements: StorytellingElement[] = sceneData.elements || sceneData.overlays || [];
   const groups: SvgGroup[] = sceneData.groups || [];
   const lines = sceneData.infographic_lines || [];
   const nodes = sceneData.infographic_nodes || [];
