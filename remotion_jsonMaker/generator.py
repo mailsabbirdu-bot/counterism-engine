@@ -300,14 +300,16 @@ class RemotionJsonMaker:
             pattern = f"SC_{id_num:02d}"
             narration_file = next((f for f in self.narration_files if pattern in f), None)
             if narration_file:
-                sfx_manifest.append({
-                    "scene_id": s_id,
-                    "file": narration_file,
-                    "start": 0,
-                    "end": scene_duration,
-                    "volume": 1.0
-                })
-                print(f"      🎙️ Mapped narration: {narration_file}")
+                # Check for existing narration in sfx_manifest to prevent duplication
+                if not any(s.get('scene_id') == s_id and s.get('volume') == 1.0 for s in sfx_manifest):
+                    sfx_manifest.append({
+                        "scene_id": s_id,
+                        "file": narration_file,
+                        "start": 0,
+                        "end": scene_duration,
+                        "volume": 1.0
+                    })
+                    print(f"      🎙️ Mapped narration: {narration_file}")
 
             placed_overlays = []
             focal_ids = []
@@ -1300,20 +1302,21 @@ class RemotionJsonMaker:
         scene_targets = "\n".join([f"{sid}: {self.story_scenes[sid]}" for sid in sorted(self.story_scenes.keys())])
 
         full_prompt = (
-            "ACT AS WORLD-CLASS DOCUMENTARY EDITOR & MOTION GRAPHICS ARCHITECT. OUTPUT RAW MINIFIED JSON ONLY.\n"
-            f"CRITICAL: YOU MUST GENERATE EXACTLY {len(self.story_scenes)} SCENES. NO PARTIAL RESPONSES.\n"
+            "ACT AS WORLD-CLASS DOCUMENTARY EDITOR & MOTION GRAPHICS ARCHITECT. OUTPUT RAW JSON ONLY.\n"
+            f"CRITICAL: GENERATE EXACTLY {len(self.story_scenes)} SCENES. NO PARTIAL RESPONSES. NO EXPLANATIONS.\n"
             "STRICT SCHEMA:\n"
             "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config'?: { 'variant' }, 'video_path'?, 'overlays': [], 'infographic_lines': [], 'infographic_nodes': [], 'camera': { 'shots': [] } } ]\n"
             "- 'overlays': [ { 'id', 'type': 'svg'|'text'|'chart'|'shadcn_chart'|'shadcn_indicator', 'content'?, 'query'?, 'provider'?, 'animation', 'start', 'duration', 'position' } ]\n"
             "- 'infographic_lines': [ { 'from': 'id', 'to': 'id', 'start', 'duration', 'color', 'type': 'solid'|'dotted'|'arrow' } ]\n"
             "- 'infographic_nodes': [ { 'x', 'y', 'start', 'color', 'type': 'glow'|'pulse'|'signal' } ]\n"
-            "COMPLETENESS CHECKLIST:\n"
-            f"1. SCENE COUNT: EXACTLY {len(self.story_scenes)} SCENES.\n"
-            f"2. TARGET SCENE IDs: {list(self.story_scenes.keys())}.\n"
-            f"3. FULL CONTENT: Read Narration for each ID and build unique layouts:\n{scene_targets}\n"
-            "4. UNIQUE IDs: Use descriptive IDs (e.g. 'txt_economy', 'svg_factory'). NO generic 't1', 'i1'.\n"
-            "5. NO PLACEHOLDERS: Use narration keywords for 'content' and 'title'. NO 'INSIGHT' or 'DATA'.\n"
-            "MOTION GRAPHICS RULES:\n"
+            "MANDATORY TARGETS:\n"
+            f"YOU MUST BUILD ALL {len(self.story_scenes)} SCENES IN ORDER:\n{list(self.story_scenes.keys())}.\n"
+            f"NARRATION CONTEXT:\n{scene_targets}\n"
+            "STRICT RULES:\n"
+            "1. NO SKIP: Every scene ID listed above MUST have its own object in the 'scenes' array.\n"
+            "2. UNIQUE IDs: Every element MUST have a descriptive ID (e.g. 'txt_economy', 'svg_gears').\n"
+            "3. NO PLACEHOLDERS: Use actual keywords from the narration for 'content'. NEVER use 'INSIGHT'.\n"
+            "4. MOTION GRAPHICS RULES:\n"
             "1. BACKGROUND SELECTION: Analyze STORY context. Use 'procedural' background for scenes that are best explained through motion graphics/SVG infographics. Use 'video' for realistic scenes.\n"
             "2. NOUN HIERARCHY: Never render a noun directly. Instead of 1 'house' icon, use multiple SVGs (house, family, location) and connect them with 'infographic_lines'.\n"
             "3. COMPOSITION: Use 3-5 SVGs per scene to build a concept. Compose them spatially (e.g. icons orbiting a central text/chart).\n"
@@ -1336,7 +1339,7 @@ class RemotionJsonMaker:
             f"TIMESTAMPS: {compact_ts}\n"
             f"STORY: \n{story_context}\n"
             f"REFERENCE: {schema_ref}\n"
-            f"TASK: GENERATE EVERY SINGLE SCENE: {list(self.story_scenes.keys())}. No partial responses. Use actual story text for 'content'. No 'INSIGHT' placeholders."
+            f"TASK: GENERATE EVERY SINGLE SCENE: {list(self.story_scenes.keys())}. No partial responses. Output RAW JSON block ONLY."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
