@@ -178,6 +178,11 @@ class RemotionJsonMaker:
             'data_indicator': (450, 400),
             'shadcn_indicator': (450, 400),
             'svg': (300, 300),
+            'kpi': (450, 400),
+            'timeline': (1000, 300),
+            'hub_network': (800, 800),
+            'flow_diagram': (1000, 400),
+            'process': (1000, 400),
             'media': (900, 700),
             'image': (900, 700),
             'video': (900, 700)
@@ -715,10 +720,33 @@ class RemotionJsonMaker:
                     shot['inDuration'] = min(shot.get('inDuration', 30), max_in)
 
             # 6. ID RESOLUTION SAFETY (Infographic Lines)
-            # Ensure AI didn't reference non-existent IDs
+            # Ensure AI didn't reference non-existent IDs with fuzzy matching for pluralization
             valid_ids = set([ov['id'] for ov in scene.get('overlays', [])])
             if scene.get('infographic_lines'):
-                scene['infographic_lines'] = [l for l in scene['infographic_lines'] if l.get('from') in valid_ids and l.get('to') in valid_ids]
+                safe_lines = []
+                for l in scene['infographic_lines']:
+                    f, t = l.get('from'), l.get('to')
+
+                    # Try direct match first
+                    if f in valid_ids and t in valid_ids:
+                        safe_lines.append(l)
+                        continue
+
+                    # Fuzzy match for common AI pluralization errors (e.g. svg_icons -> svg_icon)
+                    def find_fuzzy(target):
+                        if target in valid_ids: return target
+                        for vid in valid_ids:
+                            if target.rstrip('s') == vid or vid.rstrip('s') == target: return vid
+                        return None
+
+                    nf = find_fuzzy(f) if f else None
+                    nt = find_fuzzy(t) if t else None
+
+                    if nf and nt:
+                        l['from'], l['to'] = nf, nt
+                        safe_lines.append(l)
+
+                scene['infographic_lines'] = safe_lines
 
         data['audio_sfx_manifest'] = sfx_manifest
         print(f"✅ Finalization: Processed {len(data['scenes'])} scenes, {len(sfx_manifest)} SFX triggers mapped.")
@@ -863,18 +891,20 @@ class RemotionJsonMaker:
                 # --- GUIDELINE: TEXT AESTHETICS (STRIP PUNCTUATION) ---
                 if o_type == 'text':
                     if ov.get('content'):
-                        ov['content'] = ov['content'].strip().rstrip('.। ')
+                        ov['content'] = str(ov['content']).strip().rstrip('.। ')
 
-                    if not ov.get('content') or str(ov.get('content')).upper() == "INSIGHT":
+                    # Extreme Recovery for Hallucinations
+                    hallucinations = ["INSIGHT", "CITY", "MASTERCLASS", "REMOTION", "OVERVIEW", "DATA", "ANALYSIS"]
+                    if not ov.get('content') or str(ov.get('content')).upper() in hallucinations:
                         # Attempt to extract a meaningful phrase from the scene's narration
                         story_text = self.story_scenes.get(scene_id, "")
                         if story_text:
                             # Use first sentence or up to 6 words
-                            sentence = re.split(r'[.।]', story_text)[0]
+                            sentence = re.split(r'[.।]', story_text)[0].strip()
                             words = sentence.split()[:6]
                             ov['content'] = " ".join(words)
                         else:
-                            ov['content'] = "REMOTION" # Consistent fallback
+                            ov['content'] = "DYNAMIC CONTENT" # Final fallback
 
                     # Modern Color
                     ov['color'] = modern_colors[idx % len(modern_colors)]
@@ -949,7 +979,17 @@ class RemotionJsonMaker:
 
                     if not ov.get('indicator_type') or ov.get('indicator_type') == 'counter':
                         ov['indicator_type'] = "kpiNumber"
-                    if not ov.get('label'): ov['label'] = "Insight"
+
+                    # Label Recovery
+                    if not ov.get('label') or str(ov.get('label')).upper() in ["INSIGHT", "METRIC", "DATA"]:
+                        story_text = self.story_scenes.get(scene_id, "")
+                        if story_text:
+                            sentence = re.split(r'[.।]', story_text)[0].strip()
+                            words = sentence.split()[:4] # Shorter for indicators
+                            ov['label'] = " ".join(words)
+                        else:
+                            ov['label'] = "Insight"
+
                     if 'value' not in ov or ov['value'] is None: ov['value'] = 0
 
                     # Modern Color
@@ -980,6 +1020,10 @@ class RemotionJsonMaker:
                 outro_frames = 15
                 resting_frames = 90
                 min_total = intro_frames + resting_frames + outro_frames # 120f
+
+                # Force Bangla font for ALL overlay types if scene is Bangla
+                if is_scene_bangla and self.bangla_fonts:
+                    ov['font'] = self.bangla_fonts[0]
 
                 # Intro Sync: Try word-level matching, fallback to scene start
                 word_sync = self._get_word_timestamp(scene_id, ov.get('content') or ov.get('title') or ov.get('label', ''))
@@ -1316,39 +1360,35 @@ class RemotionJsonMaker:
         scene_targets = "\n".join([f"{sid}: {self.story_scenes[sid]}" for sid in sorted(self.story_scenes.keys())])
 
         full_prompt = (
-            "ACT AS WORLD-CLASS DOCUMENTARY EDITOR & MOTION GRAPHICS ARCHITECT. OUTPUT RAW JSON ONLY.\n"
+            "ACT AS ULTRA-MODERN MOTION GRAPHICS ARCHITECT. OUTPUT RAW JSON ONLY.\n"
             f"CRITICAL: GENERATE EXACTLY {len(self.story_scenes)} SCENES. NO PARTIAL RESPONSES. NO EXPLANATIONS.\n"
             "STRICT SCHEMA:\n"
             "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config', 'overlays': [], 'infographic_lines': [], 'infographic_nodes': [], 'groups': [], 'camera': { 'shots': [] } } ]\n"
             "- 'overlays': [\n"
-            "    { 'id', 'type': 'text', 'content', 'font', 'animation', 'start', 'duration', 'position' },\n"
-            "    { 'id', 'type': 'svg', 'query', 'provider': 'lucide'|'tabler'|'iconify', 'animation', 'start', 'duration', 'position', 'groupId'? },\n"
-            "    { 'id', 'type': 'hub_network', 'centerSvg', 'nodes': ['icon1', 'icon2'], 'start', 'duration', 'position' },\n"
-            "    { 'id', 'type': 'flow_diagram'|'process', 'steps': ['icon1', 'icon2'], 'start', 'duration', 'position' },\n"
-            "    { 'id', 'type': 'kpi'|'timeline', 'label', 'value'?, 'icon'?, 'start', 'duration', 'position' },\n"
-            "    { 'id', 'type': 'chart'|'shadcn_chart'|'shadcn_indicator', 'chart_type'|'indicator_type', 'title'|'label', 'data'|'value', 'start', 'duration', 'position' }\n"
+            "    { 'id', 'type': 'text', 'content', 'font', 'animation', 'start', 'duration', 'position': {x,y} },\n"
+            "    { 'id', 'type': 'svg', 'query', 'provider': 'lucide', 'animation', 'start', 'duration', 'position': {x,y}, 'groupId'? },\n"
+            "    { 'id', 'type': 'hub_network', 'centerSvg', 'nodes': ['icon1', 'icon2'], 'start', 'duration', 'position': {x,y} },\n"
+            "    { 'id', 'type': 'flow_diagram'|'process', 'steps': ['icon1', 'icon2'], 'start', 'duration', 'position': {x,y} },\n"
+            "    { 'id', 'type': 'kpi'|'timeline', 'label', 'value'?, 'icon'?, 'start', 'duration', 'position': {x,y} },\n"
+            "    { 'id', 'type': 'chart'|'shadcn_chart'|'shadcn_indicator', 'chart_type'|'indicator_type', 'title'|'label', 'data'|'value', 'start', 'duration', 'position': {x,y} }\n"
             "  ]\n"
             "- 'groups': [ { 'id', 'layout': 'horizontal'|'vertical'|'orbit'|'grid', 'spacing', 'x', 'y' } ]\n"
             "- 'infographic_lines': [ { 'from': 'id', 'to': 'id', 'start', 'duration', 'color', 'type': 'solid'|'dotted'|'arrow' } ]\n"
             "- 'infographic_nodes': [ { 'x', 'y', 'start', 'color', 'type': 'glow'|'pulse'|'signal', 'radius'? } ]\n"
             "MANDATORY TARGETS:\n"
-            f"YOU MUST BUILD ALL {len(self.story_scenes)} SCENES IN ORDER:\n{list(self.story_scenes.keys())}.\n"
+            f"GENERATE ALL {len(self.story_scenes)} SCENES:\n{list(self.story_scenes.keys())}.\n"
             f"NARRATION CONTEXT:\n{scene_targets}\n"
-            "STRICT RULES:\n"
-            "1. NO SKIP: Every scene ID listed above MUST have its own object in the 'scenes' array.\n"
-            "2. UNIQUE IDs: Every element MUST have a descriptive ID (e.g. 'txt_economy', 'svg_gears').\n"
-            "3. NO PLACEHOLDERS: Use actual keywords from the narration for 'content'. NEVER use 'INSIGHT'.\n"
-            "4. MOTION GRAPHICS RULES:\n"
-            "1. BACKGROUND SELECTION: Analyze STORY context. Use 'procedural' background for scenes that are best explained through motion graphics/SVG infographics. Use 'video' for realistic scenes.\n"
-            "2. NOUN HIERARCHY: Never render a noun directly. Instead of 1 'house' icon, use multiple SVGs (house, family, location) and connect them with 'infographic_lines'.\n"
-            "3. COMPOSITION: Use 3-5 SVGs per scene to build a concept. Compose them spatially (e.g. icons orbiting a central text/chart).\n"
-            "4. INFOGRAPHIC ELEMENTS: Use 'infographic_lines' (dashed) and 'infographic_nodes' (glowing dots) to show relationships and data flow between overlays.\n"
-            "5. SVG ANIMATION: Prioritize 'draw' for outline icons (provider: lucide/tabler). Use 'bounce' or 'pop' for filled icons.\n"
-            "VISUAL LIBRARY:\n"
+            "STRICT DESIGN RULES:\n"
+            "1. BALANCED LAYOUT: Use 3 columns. Place TEXT at x=480, focal components at x=1440, or central infographics at x=960. NEVER stack everything at 960,700.\n"
+            "2. NOUN HIERARCHY: NEVER render a noun directly. Instead of 1 'house' icon, use multiple SVGs connected with 'infographic_lines'.\n"
+            "3. ID PRECISION: If you define 'id': 'svg_factory', the line 'from' MUST be exactly 'svg_factory'. NO plural/singular mismatches.\n"
+            "4. NO PLACEHOLDERS: Use narration keywords for 'content' and 'title'. NO 'INSIGHT' or 'DATA'.\n"
+            "5. BACKGROUND: Use 'procedural' for complex diagrams, 'video' for cinematic story parts.\n"
+            "VISUAL LIBRARY (PRESETS):\n"
             "- 'procedural_config': variants: 'dark_particles', 'liquid_gradient', 'neon_grid'.\n"
-            "- 'svg' (type: 'svg'): provider ('lucide'|'tabler'|'iconify'), query (MUST USE STANDARD LUCIDE ICON NAMES like 'shield', 'trending-up', 'activity'), animation ('draw'|'pop'|'bounce'|'fade').\n"
-            "- 'chart_type' (chart/shadcn_chart): line, bar, pie, radial_score, radar_web, glass_area, neon_bar, heatmap, bump.\n"
-            "- 'indicator_type' (shadcn_indicator): metric_tile, tech_badge, activity_ring, crypto_card, data_ticker, kpiNumber.\n"
+            "- 'svg': Use standard Lucide names (e.g. 'cpu', 'shield', 'activity').\n"
+            "- 'chart_type': glass_area, neon_bar, radial_score, radar_web, step_area, multi_bar_stack, curved_edge_line, double_radar.\n"
+            "- 'indicator_type': metric_tile, tech_badge, activity_ring, crypto_card, server_status, user_profile_stat, data_ticker, network_ping, step_indicator_glass.\n"
             "- 'compositionType': 'corporate_overview', 'tech_stack', 'global_network', 'growth_metrics'.\n"
             "CORE RULES:\n"
             "1. NO TRANSLATION. If Story is Bangla, Content MUST be Bangla.\n"
