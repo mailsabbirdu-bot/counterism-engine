@@ -257,7 +257,10 @@ class RemotionJsonMaker:
             # 2. Background Handling (Studio V4 SVG Integration)
             if not scene.get('background_type'):
                 scene['background_type'] = 'video'
-            scene['audio_enabled'] = True
+
+            # STUDIO V4 FIX: Always mute background video to avoid double narration.
+            # Drive-based narration mapping in 3b will handle ALL voiceover audio.
+            scene['audio_enabled'] = False
 
             # Smart Indexing: Try to get scene number from ID (e.g. SCENE_05 -> 5)
             id_match = re.search(r'(\d+)', s_id)
@@ -286,7 +289,14 @@ class RemotionJsonMaker:
                 print(f"      🎨 SVG Mode: Using procedural background '{scene['procedural_config']['variant']}'")
 
             # 3. Authoritative Duration Resolution
-            scene_duration = scene.get('duration_in_frames', 180)
+            raw_dur = scene.get('duration_in_frames') or scene.get('duration', 180)
+
+            # STUDIO V4 FIX: Detect if duration is in seconds (small float) or frames
+            if isinstance(raw_dur, (float, int)) and raw_dur < 60:
+                scene_duration = int(raw_dur * 30)
+            else:
+                scene_duration = int(raw_dur)
+
             vpath = scene.get('video_path')
             if vpath:
                 vpath = vpath.lstrip('/')
@@ -297,8 +307,8 @@ class RemotionJsonMaker:
             scene['duration_in_frames'] = scene_duration
 
             # 3b. MAPPING NARRATION AUDIO (SC_XX naming convention)
-            pattern = f"SC_{id_num:02d}"
-            narration_file = next((f for f in self.narration_files if pattern in f), None)
+            pattern = f"SC_{id_num:02d}".lower()
+            narration_file = next((f for f in self.narration_files if pattern in f.lower()), None)
             if narration_file:
                 # Check for existing narration in sfx_manifest to prevent duplication
                 if not any(s.get('scene_id') == s_id and s.get('volume') == 1.0 for s in sfx_manifest):
@@ -1324,7 +1334,7 @@ class RemotionJsonMaker:
             "5. SVG ANIMATION: Prioritize 'draw' for outline icons (provider: lucide/tabler). Use 'bounce' or 'pop' for filled icons.\n"
             "VISUAL LIBRARY:\n"
             "- 'procedural_config': variants: 'dark_particles', 'liquid_gradient', 'neon_grid'.\n"
-            "- 'svg' (type: 'svg'): provider ('lucide'|'tabler'|'iconify'), query (icon name), animation ('draw'|'pop'|'bounce'|'fade').\n"
+            "- 'svg' (type: 'svg'): provider ('lucide'|'tabler'|'iconify'), query (MUST USE STANDARD LUCIDE ICON NAMES like 'shield', 'trending-up', 'activity'), animation ('draw'|'pop'|'bounce'|'fade').\n"
             "- 'chart_type' (chart/shadcn_chart): glass_area, neon_bar, radial_score, radar_web, bump, heatmap, etc.\n"
             "- 'indicator_type' (shadcn_indicator): metric_tile, crypto_card, tech_badge, data_ticker, etc.\n"
             "CORE RULES:\n"
@@ -1343,7 +1353,19 @@ class RemotionJsonMaker:
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
+
+        print("\n" + "="*50)
+        print("🚀 SENDING PROMPT TO GEMINI:")
+        print(full_prompt)
+        print("="*50 + "\n")
+
         raw_output = self._interact_with_gemini(full_prompt)
+
+        print("\n" + "="*50)
+        print("📥 RAW GEMINI RESPONSE:")
+        print(raw_output)
+        print("="*50 + "\n")
+
         print(f"📊 Raw Gemini output length: {len(raw_output)} chars.")
         if len(raw_output.strip()) < 50:
             print("❌ ERROR: Gemini returned an suspiciously short or empty response.")
