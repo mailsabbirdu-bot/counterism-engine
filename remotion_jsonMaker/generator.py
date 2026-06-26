@@ -366,8 +366,18 @@ class RemotionJsonMaker:
                         if text_count >= MAX_TEXT_PER_SCENE: continue
                         text_count += 1
                         # LLM Repair: text/query -> content
-                        if not ov.get('content'):
+                        if not ov.get('content') or str(ov.get('content')).upper() == "INSIGHT":
                             ov['content'] = ov.get('text') or ov.get('query')
+
+                        # Extreme Recovery from story if still missing or generic
+                        if not ov.get('content') or str(ov.get('content')).upper() == "INSIGHT":
+                            story_text = self.story_scenes.get(s_id, "")
+                            if story_text:
+                                sentence = re.split(r'[.।]', story_text)[0]
+                                words = sentence.split()[:6]
+                                ov['content'] = " ".join(words)
+                            else:
+                                ov['content'] = "REMOTION"
 
                         # Strip trailing punctuation
                         if ov.get('content'):
@@ -835,14 +845,14 @@ class RemotionJsonMaker:
 
                     if not ov.get('content') or str(ov.get('content')).upper() == "INSIGHT":
                         # Attempt to extract a meaningful phrase from the scene's narration
-                        story_text = self.story_scenes.get(scene_id, "") if hasattr(self, 'story_scenes') else ""
+                        story_text = self.story_scenes.get(scene_id, "")
                         if story_text:
                             # Use first sentence or up to 6 words
                             sentence = re.split(r'[.।]', story_text)[0]
                             words = sentence.split()[:6]
                             ov['content'] = " ".join(words)
                         else:
-                            ov['content'] = "INSIGHT" # True fallback
+                            ov['content'] = "REMOTION" # Consistent fallback
 
                     # Modern Color
                     ov['color'] = modern_colors[idx % len(modern_colors)]
@@ -1184,8 +1194,12 @@ class RemotionJsonMaker:
 
     def _get_word_timestamp(self, scene_id: str, search_text: str) -> int:
         if not self.raw_timestamps or not search_text: return -1
-        # Extract keywords from search_text
-        keywords = re.findall(r'[\u0980-\u09FF]+|[a-zA-Z0-9]{2,}', search_text)
+        # Normalize search text: lowercase and strip punctuation
+        search_text = str(search_text).lower()
+        search_text = re.sub(r'[.।?,!]', '', search_text)
+
+        # Extract keywords from normalized search_text
+        keywords = re.findall(r'[\u0980-\u09FF]+|[a-z0-9]{2,}', search_text)
         if not keywords: return -1
 
         # Look for matches in timestamps for this scene
@@ -1193,8 +1207,9 @@ class RemotionJsonMaker:
         ts_words = re.findall(pattern, self.raw_timestamps)
 
         for frame, word in ts_words:
-            word_clean = re.sub(r'[.।]', '', word)
-            if any(kw in word_clean for kw in keywords):
+            word_clean = re.sub(r'[.।?,!]', '', word).lower()
+            # Direct match or partial match for longer words
+            if any(kw == word_clean or (len(kw) > 4 and kw in word_clean) or (len(word_clean) > 4 and word_clean in kw) for kw in keywords):
                 return int(frame)
         return -1
 
@@ -1266,18 +1281,22 @@ class RemotionJsonMaker:
             "gentle_breeze", "the_matrix", "heartbeat_zoom"
         ]
 
+        # Build the scene target list for the prompt
+        scene_targets = "\n".join([f"{sid}: {self.story_scenes[sid]}" for sid in sorted(self.story_scenes.keys())])
+
         full_prompt = (
             "ACT AS REMOTION MOTION GRAPHICS ENGINE. OUTPUT RAW MINIFIED JSON ONLY.\n"
-            "GOAL: BUILD COMPLEX INFOGRAPHIC SCENES WITH MULTIPLE LAYERS.\n"
+            "CRITICAL: YOU MUST GENERATE EVERY SCENE LISTED BELOW. NO EXCEPTIONS.\n"
             "STRICT SCHEMA:\n"
             "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config'?: { 'variant' }, 'video_path'?, 'overlays': [], 'infographic_lines': [], 'infographic_nodes': [], 'camera': { 'shots': [] } } ]\n"
             "- 'overlays': [ { 'id', 'type': 'svg'|'text'|'chart'|'shadcn_chart'|'shadcn_indicator', 'content'?, 'query'?, 'provider'?, 'animation', 'start', 'duration', 'position' } ]\n"
             "- 'infographic_lines': [ { 'from': 'id', 'to': 'id', 'start', 'duration', 'color', 'type': 'solid'|'dotted'|'arrow' } ]\n"
             "- 'infographic_nodes': [ { 'x', 'y', 'start', 'color', 'type': 'glow'|'pulse'|'signal' } ]\n"
             "COMPLETENESS CHECKLIST:\n"
-            f"1. GENERATE ALL {len(self.story_scenes)} SCENES. Target IDs: {list(self.story_scenes.keys())}.\n"
-            "2. NO SKIP. If you skip any scene, the render will fail.\n"
-            "3. NO GENERIC TEXT. Use actual narration keywords for 'content' fields.\n"
+            f"1. GENERATE ALL {len(self.story_scenes)} SCENES. NO SKIP.\n"
+            f"2. TARGET SCENES:\n{scene_targets}\n"
+            "3. USE UNIQUE DESCRIPTIVE IDs (e.g. 'txt_economy_intro', 'chart_population'). NO 't1', 'i1'.\n"
+            "4. NO GENERIC TEXT. Use actual narration keywords for 'content' fields. NO 'INSIGHT' placeholders.\n"
             "MOTION GRAPHICS RULES:\n"
             "1. BACKGROUND SELECTION: Analyze STORY context. Use 'procedural' background for scenes that are best explained through motion graphics/SVG infographics. Use 'video' for realistic scenes.\n"
             "2. NOUN HIERARCHY: Never render a noun directly. Instead of 1 'house' icon, use multiple SVGs (house, family, location) and connect them with 'infographic_lines'.\n"
@@ -1301,7 +1320,7 @@ class RemotionJsonMaker:
             f"TIMESTAMPS: {compact_ts}\n"
             f"STORY: \n{story_context}\n"
             f"REFERENCE: {schema_ref}\n"
-            f"TASK: Generate the master JSON for ALL {len(self.story_scenes)} scenes described in the STORY. DO NOT skip any scene. Use 'video_path' only if it exists in the VIDEOS list. NO 'INSIGHT' placeholders."
+            f"TASK: GENERATE EVERY SINGLE SCENE: {list(self.story_scenes.keys())}. No partial responses. Use actual story text for 'content'. No 'INSIGHT' placeholders."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
