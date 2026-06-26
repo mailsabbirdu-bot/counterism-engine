@@ -188,20 +188,23 @@ class RemotionJsonMaker:
             'video': (900, 700)
         }
 
-        # Advanced Motion Graphics Budget
-        MAX_TEXT_PER_SCENE = 1
-        MAX_FOCAL_PER_SCENE = 1
-        MAX_SVG_PER_SCENE = 5
+        # Expert Motion Graphics Budget (High Fidelity)
+        MAX_TEXT_PER_SCENE = 2
+        MAX_FOCAL_PER_SCENE = 2
+        MAX_SVG_PER_SCENE = 8
 
-        # Logical sectors (Safe Zones)
+        # Expert 3-Column Anchors (Wide)
         SECTORS = {
-            "TOP_LEFT": {"x": 480, "y": 270},
-            "TOP_RIGHT": {"x": 1440, "y": 270},
-            "BOTTOM_LEFT": {"x": 480, "y": 810},
-            "BOTTOM_RIGHT": {"x": 1440, "y": 810},
+            "TOP_LEFT": {"x": 400, "y": 270},
+            "TOP_RIGHT": {"x": 1520, "y": 270},
+            "BOTTOM_LEFT": {"x": 400, "y": 810},
+            "BOTTOM_RIGHT": {"x": 1520, "y": 810},
             "CENTER_FOCAL": {"x": 960, "y": 540},
-            "MID_LEFT": {"x": 480, "y": 540},
-            "MID_RIGHT": {"x": 1440, "y": 540}
+            "MID_LEFT": {"x": 400, "y": 540},
+            "MID_RIGHT": {"x": 1520, "y": 540},
+            "LEFT_COL": {"x": 400, "y": 540},
+            "CENTER_COL": {"x": 960, "y": 540},
+            "RIGHT_COL": {"x": 1520, "y": 540}
         }
 
         sfx_manifest = []
@@ -498,8 +501,8 @@ class RemotionJsonMaker:
                         # Increase the estimated footprint to prevent collisions with other elements.
                         footprint_scale = 1.4 if ov.get('hero_config') else 1.0
 
-                        # Minimalist constraint often results in single lines; use safer width
-                        w = min(1500, len(max(content.split('\n'), key=len)) * (fs * (1.0 if is_bangla else 0.8)) * footprint_scale)
+                        # Expert Layout: allow wider text blocks for cinematic feel
+                        w = min(1600, len(max(content.split('\n'), key=len)) * (fs * (1.0 if is_bangla else 0.8)) * footprint_scale)
                         h = lines * (fs * (1.8 if is_bangla else 1.5)) * footprint_scale
 
                     elif ov_type == 'chart':
@@ -507,7 +510,7 @@ class RemotionJsonMaker:
                         h = ov.get('height', 600) + 100
 
                     # 1. Professional Slot Alignment & De-confliction
-                    # Force Text and Charts into opposing quadrants for Minimalist Balance
+                    # Force Text and Charts into opposing quadrants for Expert Cinematic Balance
                     slot_name = ov.get('slot', ov.get('layout', ''))
                     if not isinstance(slot_name, str): slot_name = ''
                     slot_name = slot_name.upper()
@@ -590,33 +593,29 @@ class RemotionJsonMaker:
 
                     placed_overlays.append((ov, w, h))
 
-                    # 4. Cinematic Pacing (User Mandate) & Intro Sync
-                    # Every nivo and text layer should have short intro/outro and long resting period.
+                    # 4. Expert Cinematic Persistence & Intro Sync
+                    # Every nivo and text layer should persist until the end of the scene for expert feel.
                     # Sync start with the first word of the scene from timestamp.txt.
 
                     intro_frames = 15
                     outro_frames = 15
-                    resting_frames = 90 # Mandatory resting time
+                    min_total = 60 # Absolute minimum 2 seconds visibility
 
-                    # Intro Sync: Use the starting 30fps value from timestamp.txt
-                    start_f = self._get_scene_start_frame(s_id)
+                    # Intro Sync: Use word-specific timestamp if possible
+                    word_sync = self._get_word_timestamp(s_id, ov.get('content') or ov.get('label') or ov.get('title', ''))
+                    if word_sync != -1:
+                        start_f = word_sync
+                    else:
+                        start_f = self._get_scene_start_frame(s_id)
 
-                    # Ensure we have enough duration for intro + resting + outro
-                    target_total = intro_frames + resting_frames + outro_frames
-                    duration_f = max(target_total, ov.get('duration', target_total))
+                    # PERSISTENCE: Expert video editors keep graphics on screen until the scene changes
+                    duration_f = scene_duration - start_f
 
-                    # Safety check against scene duration
-                    if start_f + duration_f > scene_duration:
-                        # If it exceeds, we prioritize start_f and shorten duration down to target_total if possible
-                        if start_f + target_total <= scene_duration:
-                            duration_f = target_total
-                        else:
-                            # If even target_total doesn't fit, we must shift start earlier or just cap
-                            duration_f = scene_duration - start_f
-                            if duration_f < target_total:
-                                shift = min(start_f, target_total - duration_f)
-                                start_f -= shift
-                                duration_f += shift
+                    # Safety check: if start is too late, shift it back to allow minimum visibility
+                    if duration_f < min_total:
+                        shift = min(start_f, min_total - duration_f)
+                        start_f -= shift
+                        duration_f += shift
 
                     ov['start'] = start_f
                     ov['duration'] = duration_f
@@ -865,15 +864,17 @@ class RemotionJsonMaker:
                     "position": {"x": 1440, "y": 540} # Default to right
                 })
 
-            # --- GUIDELINE: MINIMALIST BUDGET (MAX 1 TEXT, 1 FOCAL) ---
+            # --- GUIDELINE: EXPERT HIGH-FIDELITY BUDGET (MAX 2 TEXT, 2 FOCAL, 8 SVG) ---
             # EXCEPTION: SVGs and infographic elements are allowed in bulk for rich storytelling.
             COMPLEX_SVG_TYPES = ['svg', 'hub_network', 'flow_diagram', 'process', 'label', 'callout', 'timeline', 'composition']
             texts = [o for o in scene.get('overlays', []) if o.get('type') == 'text']
             focals = [o for o in scene.get('overlays', []) if o.get('type') not in (['text'] + COMPLEX_SVG_TYPES)]
             svg_elements = [o for o in scene.get('overlays', []) if o.get('type') in COMPLEX_SVG_TYPES]
 
-            if len(texts) > 1: scene['overlays'] = [texts[0]] + focals + svg_elements
-            if len(focals) > 1: scene['overlays'] = texts + [focals[0]] + svg_elements
+            # Expert Cap
+            if len(texts) > 2: scene['overlays'] = texts[:2] + focals + svg_elements
+            if len(focals) > 2: scene['overlays'] = texts + focals[:2] + svg_elements
+            if len(svg_elements) > 8: scene['overlays'] = texts + focals + svg_elements[:8]
 
             # Detect Title+Content relation for stacking
             text_ov = next((o for o in scene['overlays'] if o.get('type') == 'text'), None)
@@ -1033,17 +1034,16 @@ class RemotionJsonMaker:
                 else:
                     ov['start'] = self._get_scene_start_frame(scene_id)
 
-                # Ensure duration is at least enough for intro+resting+outro
-                ov['duration'] = max(min_total, min(ov.get('duration', min_total), duration - ov['start']))
+                # --- GUIDELINE: PERSISTENCE (EXPERT DIRECTOR) ---
+                # Default duration should span until the end of the scene for expert feel
+                ov['duration'] = duration - ov['start']
 
-                # If still too long, cap it
-                if ov['start'] + ov['duration'] > duration:
-                    ov['duration'] = duration - ov['start']
-                    if ov['duration'] < min_total:
-                        # Shift start earlier if possible to accommodate min_total
-                        shift = min(ov['start'], min_total - ov['duration'])
-                        ov['start'] -= shift
-                        ov['duration'] += shift
+                # If duration is too short for an overlay to be readable, we must ensure min_total
+                if ov['duration'] < min_total:
+                    # Shift start earlier if possible to accommodate min_total
+                    shift = min(ov['start'], min_total - ov['duration'])
+                    ov['start'] -= shift
+                    ov['duration'] += shift
 
                 # --- GUIDELINE: TITLE+CONTENT ALIGNMENT ---
                 if has_relation:
@@ -1275,14 +1275,23 @@ class RemotionJsonMaker:
         pattern = fr'{scene_id}:.*?\[30fps:\s*(\d+)f\s*-\s*\d+f\]\s*"(.*?)"'
         ts_data = re.findall(pattern, self.raw_timestamps)
 
+        # 1. CRITICAL SYNC: Prioritize matching the START of the phrase
+        first_word = search_words[0] if search_words else ""
+        if first_word:
+            for frame, word in ts_data:
+                word_clean = normalize(word)
+                if word_clean == first_word or (len(word_clean) > 3 and word_clean in first_word):
+                    return int(frame)
+
+        # 2. Broad phrase match (if first word wasn't found)
         for frame, word in ts_data:
             word_clean = normalize(word)
             if not word_clean: continue
-
-            # 1. Direct whole-string match
             if word_clean in search_clean: return int(frame)
 
-            # 2. Word-by-word match
+        # 3. Fuzzy word match (last resort)
+        for frame, word in ts_data:
+            word_clean = normalize(word)
             if any(word_clean == sw or (len(word_clean) > 3 and word_clean in sw) or (len(sw) > 3 and sw in word_clean) for sw in search_words):
                 return int(frame)
 
@@ -1360,13 +1369,13 @@ class RemotionJsonMaker:
         scene_targets = "\n".join([f"{sid}: {self.story_scenes[sid]}" for sid in sorted(self.story_scenes.keys())])
 
         full_prompt = (
-            "ACT AS ULTRA-MODERN MOTION GRAPHICS ARCHITECT. OUTPUT RAW JSON ONLY.\n"
+            "ACT AS WORLD-CLASS MOTION GRAPHICS DIRECTOR & REMOTION ARCHITECT. OUTPUT RAW JSON ONLY.\n"
             f"CRITICAL: GENERATE EXACTLY {len(self.story_scenes)} SCENES. NO PARTIAL RESPONSES. NO EXPLANATIONS.\n"
             "STRICT SCHEMA:\n"
             "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config', 'overlays': [], 'infographic_lines': [], 'infographic_nodes': [], 'groups': [], 'camera': { 'shots': [] } } ]\n"
             "- 'overlays': [\n"
-            "    { 'id', 'type': 'text', 'content', 'font', 'animation', 'start', 'duration', 'position': {x,y} },\n"
-            "    { 'id', 'type': 'svg', 'query', 'provider': 'lucide', 'animation', 'start', 'duration', 'position': {x,y}, 'groupId'? },\n"
+            "    { 'id', 'type': 'text', 'content', 'font', 'animation': 'flicker_reveal'|'glitch'|'slide_up', 'start', 'duration', 'position': {x,y} },\n"
+            "    { 'id', 'type': 'svg', 'query', 'provider': 'lucide', 'animation': 'draw'|'trace'|'pop', 'style': 'outline'|'tech', 'start', 'duration', 'position': {x,y}, 'groupId'? },\n"
             "    { 'id', 'type': 'hub_network', 'centerSvg', 'nodes': ['icon1', 'icon2'], 'start', 'duration', 'position': {x,y} },\n"
             "    { 'id', 'type': 'flow_diagram'|'process', 'steps': ['icon1', 'icon2'], 'start', 'duration', 'position': {x,y} },\n"
             "    { 'id', 'type': 'kpi'|'timeline', 'label', 'value'?, 'icon'?, 'start', 'duration', 'position': {x,y} },\n"
@@ -1378,22 +1387,24 @@ class RemotionJsonMaker:
             "MANDATORY TARGETS:\n"
             f"GENERATE ALL {len(self.story_scenes)} SCENES:\n{list(self.story_scenes.keys())}.\n"
             f"NARRATION CONTEXT:\n{scene_targets}\n"
-            "STRICT DESIGN RULES:\n"
-            "1. BALANCED LAYOUT: Use 3 columns. Place TEXT at x=480, focal components at x=1440, or central infographics at x=960. NEVER stack everything at 960,700.\n"
-            "2. NOUN HIERARCHY: NEVER render a noun directly. Instead of 1 'house' icon, use multiple SVGs connected with 'infographic_lines'.\n"
-            "3. ID PRECISION: If you define 'id': 'svg_factory', the line 'from' MUST be exactly 'svg_factory'. NO plural/singular mismatches.\n"
-            "4. NO PLACEHOLDERS: Use narration keywords for 'content' and 'title'. NO 'INSIGHT' or 'DATA'.\n"
-            "5. BACKGROUND: Use 'procedural' for complex diagrams, 'video' for cinematic story parts.\n"
+            "EXPERT DIRECTOR RULES:\n"
+            "1. BUILD THE SCENE: Do not just drop icons. Every scene MUST be a story. Use 'hub_network' to show relationships, 'flow_diagram' for processes, and 'infographic_lines' to connect related SVGs.\n"
+            "2. LAYERED COMPLEXITY: Every 'procedural' scene MUST have at least 3 SVGs connected by lines, 1 Chart/KPI, and 1 main Title.\n"
+            "3. CINEMATIC TIMING: Overlays MUST NOT appear all at once. Stagger 'start' frames by 10-20f. Use TIMESTAMPS for precise word-sync.\n"
+            "4. PERSISTENCE: Overlays should stay until the end of the scene unless they are temporary callouts.\n"
+            "5. NOUN-TO-INFOGRAPHIC: Never just show a 'factory' icon. Show a 'factory' (hub) connected to 'output' and 'labor' icons via 'infographic_lines'.\n"
+            "6. 3-COLUMN ANCHORS: TEXT at x=400 (Left), Diagrams/Hubs at x=960 (Center), Stats/Charts at x=1520 (Right).\n"
+            "7. CAMERA MOVEMENT: Always include 'camera': { 'shots': [...] }. Use 'slow_push' towards the most important focal element.\n"
             "VISUAL LIBRARY (PRESETS):\n"
             "- 'procedural_config': variants: 'dark_particles', 'liquid_gradient', 'neon_grid'.\n"
-            "- 'svg': Use standard Lucide names (e.g. 'cpu', 'shield', 'activity').\n"
+            "- 'svg': Use standard Lucide names (e.g. 'cpu', 'shield', 'activity', 'factory', 'users', 'trending-up').\n"
             "- 'chart_type': glass_area, neon_bar, radial_score, radar_web, step_area, multi_bar_stack, curved_edge_line, double_radar.\n"
             "- 'indicator_type': metric_tile, tech_badge, activity_ring, crypto_card, server_status, user_profile_stat, data_ticker, network_ping, step_indicator_glass.\n"
             "- 'compositionType': 'corporate_overview', 'tech_stack', 'global_network', 'growth_metrics'.\n"
-            "CORE RULES:\n"
+            "CORE TECHNICAL RULES:\n"
             "1. NO TRANSLATION. If Story is Bangla, Content MUST be Bangla.\n"
-            "2. SYNC: Use provided TIMESTAMPS for 'start' frames. Intro MUST be synced.\n"
-            "3. MANDATORY NIVO: Visualize EVERY number or statistic from story using KPI/Chart/Indicator.\n"
+            "2. EXACT SYNC: Match 'start' to TIMESTAMPS. If the word 'Apple' is at 45f, the 'Apple' icon/text MUST start at 45f.\n"
+            "3. MANDATORY STATS: Visualize EVERY number/percentage from the narration.\n"
             "4. FONTS: Use Bangla list for Bangla text, English list for English.\n"
             f"FONTS: {local_fonts}\n"
             f"SFX: {self.camera_files}\n"
