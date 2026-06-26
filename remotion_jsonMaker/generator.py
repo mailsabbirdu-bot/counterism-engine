@@ -838,10 +838,14 @@ class RemotionJsonMaker:
                 })
 
             # --- GUIDELINE: MINIMALIST BUDGET (MAX 1 TEXT, 1 FOCAL) ---
+            # EXCEPTION: SVGs and infographic elements are allowed in bulk for rich storytelling.
+            COMPLEX_SVG_TYPES = ['svg', 'hub_network', 'flow_diagram', 'process', 'label', 'callout', 'timeline', 'composition']
             texts = [o for o in scene.get('overlays', []) if o.get('type') == 'text']
-            focals = [o for o in scene.get('overlays', []) if o.get('type') != 'text']
-            if len(texts) > 1: scene['overlays'] = [texts[0]] + focals
-            if len(focals) > 1: scene['overlays'] = texts + [focals[0]]
+            focals = [o for o in scene.get('overlays', []) if o.get('type') not in (['text'] + COMPLEX_SVG_TYPES)]
+            svg_elements = [o for o in scene.get('overlays', []) if o.get('type') in COMPLEX_SVG_TYPES]
+
+            if len(texts) > 1: scene['overlays'] = [texts[0]] + focals + svg_elements
+            if len(focals) > 1: scene['overlays'] = texts + [focals[0]] + svg_elements
 
             # Detect Title+Content relation for stacking
             text_ov = next((o for o in scene['overlays'] if o.get('type') == 'text'), None)
@@ -1315,10 +1319,18 @@ class RemotionJsonMaker:
             "ACT AS WORLD-CLASS DOCUMENTARY EDITOR & MOTION GRAPHICS ARCHITECT. OUTPUT RAW JSON ONLY.\n"
             f"CRITICAL: GENERATE EXACTLY {len(self.story_scenes)} SCENES. NO PARTIAL RESPONSES. NO EXPLANATIONS.\n"
             "STRICT SCHEMA:\n"
-            "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config'?: { 'variant' }, 'video_path'?, 'overlays': [], 'infographic_lines': [], 'infographic_nodes': [], 'camera': { 'shots': [] } } ]\n"
-            "- 'overlays': [ { 'id', 'type': 'svg'|'text'|'chart'|'shadcn_chart'|'shadcn_indicator', 'content'?, 'query'?, 'provider'?, 'animation', 'start', 'duration', 'position' } ]\n"
+            "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config', 'overlays': [], 'infographic_lines': [], 'infographic_nodes': [], 'groups': [], 'camera': { 'shots': [] } } ]\n"
+            "- 'overlays': [\n"
+            "    { 'id', 'type': 'text', 'content', 'font', 'animation', 'start', 'duration', 'position' },\n"
+            "    { 'id', 'type': 'svg', 'query', 'provider': 'lucide'|'tabler'|'iconify', 'animation', 'start', 'duration', 'position', 'groupId'? },\n"
+            "    { 'id', 'type': 'hub_network', 'centerSvg', 'nodes': ['icon1', 'icon2'], 'start', 'duration', 'position' },\n"
+            "    { 'id', 'type': 'flow_diagram'|'process', 'steps': ['icon1', 'icon2'], 'start', 'duration', 'position' },\n"
+            "    { 'id', 'type': 'kpi'|'timeline', 'label', 'value'?, 'icon'?, 'start', 'duration', 'position' },\n"
+            "    { 'id', 'type': 'chart'|'shadcn_chart'|'shadcn_indicator', 'chart_type'|'indicator_type', 'title'|'label', 'data'|'value', 'start', 'duration', 'position' }\n"
+            "  ]\n"
+            "- 'groups': [ { 'id', 'layout': 'horizontal'|'vertical'|'orbit'|'grid', 'spacing', 'x', 'y' } ]\n"
             "- 'infographic_lines': [ { 'from': 'id', 'to': 'id', 'start', 'duration', 'color', 'type': 'solid'|'dotted'|'arrow' } ]\n"
-            "- 'infographic_nodes': [ { 'x', 'y', 'start', 'color', 'type': 'glow'|'pulse'|'signal' } ]\n"
+            "- 'infographic_nodes': [ { 'x', 'y', 'start', 'color', 'type': 'glow'|'pulse'|'signal', 'radius'? } ]\n"
             "MANDATORY TARGETS:\n"
             f"YOU MUST BUILD ALL {len(self.story_scenes)} SCENES IN ORDER:\n{list(self.story_scenes.keys())}.\n"
             f"NARRATION CONTEXT:\n{scene_targets}\n"
@@ -1335,8 +1347,9 @@ class RemotionJsonMaker:
             "VISUAL LIBRARY:\n"
             "- 'procedural_config': variants: 'dark_particles', 'liquid_gradient', 'neon_grid'.\n"
             "- 'svg' (type: 'svg'): provider ('lucide'|'tabler'|'iconify'), query (MUST USE STANDARD LUCIDE ICON NAMES like 'shield', 'trending-up', 'activity'), animation ('draw'|'pop'|'bounce'|'fade').\n"
-            "- 'chart_type' (chart/shadcn_chart): glass_area, neon_bar, radial_score, radar_web, bump, heatmap, etc.\n"
-            "- 'indicator_type' (shadcn_indicator): metric_tile, crypto_card, tech_badge, data_ticker, etc.\n"
+            "- 'chart_type' (chart/shadcn_chart): line, bar, pie, radial_score, radar_web, glass_area, neon_bar, heatmap, bump.\n"
+            "- 'indicator_type' (shadcn_indicator): metric_tile, tech_badge, activity_ring, crypto_card, data_ticker, kpiNumber.\n"
+            "- 'compositionType': 'corporate_overview', 'tech_stack', 'global_network', 'growth_metrics'.\n"
             "CORE RULES:\n"
             "1. NO TRANSLATION. If Story is Bangla, Content MUST be Bangla.\n"
             "2. SYNC: Use provided TIMESTAMPS for 'start' frames. Intro MUST be synced.\n"
