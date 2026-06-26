@@ -20,9 +20,10 @@ export class SvgAssetPreloader {
 
     // 2. Scan hub networks (center and outer nodes)
     elements.forEach(el => {
-        if (el.type === 'hub_network') {
-            if (el.centerSvg) queries.add({ query: el.centerSvg, provider: el.provider || sceneProvider });
-            if (el.nodes) el.nodes.forEach(q => queries.add({ query: queryToKey(q), provider: el.provider || sceneProvider }));
+        if ((el as any).type === 'hub_network') {
+            const hub = el as any;
+            if (hub.centerSvg) queries.add({ query: hub.centerSvg, provider: hub.provider || sceneProvider });
+            if (hub.nodes) hub.nodes.forEach((q: string) => queries.add({ query: queryToKey(q), provider: hub.provider || sceneProvider }));
         }
     });
 

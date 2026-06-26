@@ -208,7 +208,7 @@ class RemotionRemaker:
 
     def find_overlays(self, data: Any) -> List[dict]:
         """Deep search for an overlay list in potentially nested/wrapped Gemini responses."""
-        VALID_TYPES = ['text', 'chart', 'data_indicator', 'ui_panel', 'indicator', 'kpi', 'media']
+        VALID_TYPES = ['text', 'chart', 'data_indicator', 'ui_panel', 'indicator', 'kpi', 'media', 'svg', 'hub_network', 'flow_diagram', 'process', 'label', 'callout', 'timeline', 'composition', 'shadcn_chart', 'shadcn_indicator']
         CAMERA_KEYS = ['targetId', 'style', 'shots', 'motionBlur']
 
         if isinstance(data, list):
