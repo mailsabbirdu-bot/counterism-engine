@@ -702,6 +702,12 @@ class RemotionJsonMaker:
                     max_in = max(15, shot['duration'] - target_resting)
                     shot['inDuration'] = min(shot.get('inDuration', 30), max_in)
 
+            # 6. ID RESOLUTION SAFETY (Infographic Lines)
+            # Ensure AI didn't reference non-existent IDs
+            valid_ids = set([ov['id'] for ov in scene.get('overlays', [])])
+            if scene.get('infographic_lines'):
+                scene['infographic_lines'] = [l for l in scene['infographic_lines'] if l.get('from') in valid_ids and l.get('to') in valid_ids]
+
         data['audio_sfx_manifest'] = sfx_manifest
         print(f"✅ Finalization: Processed {len(data['scenes'])} scenes, {len(sfx_manifest)} SFX triggers mapped.")
         return self.validate_and_fix_manifest(data)
@@ -1194,23 +1200,32 @@ class RemotionJsonMaker:
 
     def _get_word_timestamp(self, scene_id: str, search_text: str) -> int:
         if not self.raw_timestamps or not search_text: return -1
-        # Normalize search text: lowercase and strip punctuation
-        search_text = str(search_text).lower()
-        search_text = re.sub(r'[.।?,!]', '', search_text)
 
-        # Extract keywords from normalized search_text
-        keywords = re.findall(r'[\u0980-\u09FF]+|[a-z0-9]{2,}', search_text)
-        if not keywords: return -1
+        def normalize(t):
+            # Keep only alphanumeric and Bangla characters
+            return re.sub(r'[^\w\u0980-\u09FF]', '', str(t)).lower()
+
+        search_clean = normalize(search_text)
+        # Extract individual words from search text for broad matching
+        search_words = [normalize(w) for w in str(search_text).split() if len(normalize(w)) > 1]
+
+        if not search_clean and not search_words: return -1
 
         # Look for matches in timestamps for this scene
         pattern = fr'{scene_id}:.*?\[30fps:\s*(\d+)f\s*-\s*\d+f\]\s*"(.*?)"'
-        ts_words = re.findall(pattern, self.raw_timestamps)
+        ts_data = re.findall(pattern, self.raw_timestamps)
 
-        for frame, word in ts_words:
-            word_clean = re.sub(r'[.।?,!]', '', word).lower()
-            # Direct match or partial match for longer words
-            if any(kw == word_clean or (len(kw) > 4 and kw in word_clean) or (len(word_clean) > 4 and word_clean in kw) for kw in keywords):
+        for frame, word in ts_data:
+            word_clean = normalize(word)
+            if not word_clean: continue
+
+            # 1. Direct whole-string match
+            if word_clean in search_clean: return int(frame)
+
+            # 2. Word-by-word match
+            if any(word_clean == sw or (len(word_clean) > 3 and word_clean in sw) or (len(sw) > 3 and sw in word_clean) for sw in search_words):
                 return int(frame)
+
         return -1
 
     def _is_bangla(self, text: str) -> bool:
@@ -1285,18 +1300,19 @@ class RemotionJsonMaker:
         scene_targets = "\n".join([f"{sid}: {self.story_scenes[sid]}" for sid in sorted(self.story_scenes.keys())])
 
         full_prompt = (
-            "ACT AS REMOTION MOTION GRAPHICS ENGINE. OUTPUT RAW MINIFIED JSON ONLY.\n"
-            "CRITICAL: YOU MUST GENERATE EVERY SCENE LISTED BELOW. NO EXCEPTIONS.\n"
+            "ACT AS WORLD-CLASS DOCUMENTARY EDITOR & MOTION GRAPHICS ARCHITECT. OUTPUT RAW MINIFIED JSON ONLY.\n"
+            f"CRITICAL: YOU MUST GENERATE EXACTLY {len(self.story_scenes)} SCENES. NO PARTIAL RESPONSES.\n"
             "STRICT SCHEMA:\n"
             "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config'?: { 'variant' }, 'video_path'?, 'overlays': [], 'infographic_lines': [], 'infographic_nodes': [], 'camera': { 'shots': [] } } ]\n"
             "- 'overlays': [ { 'id', 'type': 'svg'|'text'|'chart'|'shadcn_chart'|'shadcn_indicator', 'content'?, 'query'?, 'provider'?, 'animation', 'start', 'duration', 'position' } ]\n"
             "- 'infographic_lines': [ { 'from': 'id', 'to': 'id', 'start', 'duration', 'color', 'type': 'solid'|'dotted'|'arrow' } ]\n"
             "- 'infographic_nodes': [ { 'x', 'y', 'start', 'color', 'type': 'glow'|'pulse'|'signal' } ]\n"
             "COMPLETENESS CHECKLIST:\n"
-            f"1. GENERATE ALL {len(self.story_scenes)} SCENES. NO SKIP.\n"
-            f"2. TARGET SCENES:\n{scene_targets}\n"
-            "3. USE UNIQUE DESCRIPTIVE IDs (e.g. 'txt_economy_intro', 'chart_population'). NO 't1', 'i1'.\n"
-            "4. NO GENERIC TEXT. Use actual narration keywords for 'content' fields. NO 'INSIGHT' placeholders.\n"
+            f"1. SCENE COUNT: EXACTLY {len(self.story_scenes)} SCENES.\n"
+            f"2. TARGET SCENE IDs: {list(self.story_scenes.keys())}.\n"
+            f"3. FULL CONTENT: Read Narration for each ID and build unique layouts:\n{scene_targets}\n"
+            "4. UNIQUE IDs: Use descriptive IDs (e.g. 'txt_economy', 'svg_factory'). NO generic 't1', 'i1'.\n"
+            "5. NO PLACEHOLDERS: Use narration keywords for 'content' and 'title'. NO 'INSIGHT' or 'DATA'.\n"
             "MOTION GRAPHICS RULES:\n"
             "1. BACKGROUND SELECTION: Analyze STORY context. Use 'procedural' background for scenes that are best explained through motion graphics/SVG infographics. Use 'video' for realistic scenes.\n"
             "2. NOUN HIERARCHY: Never render a noun directly. Instead of 1 'house' icon, use multiple SVGs (house, family, location) and connect them with 'infographic_lines'.\n"
