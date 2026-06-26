@@ -32,7 +32,8 @@ print("📡 Syncing Assets from Drive...")
 # Sync Renders
 !cp -f /content/drive/MyDrive/Counterism_Studio_V4/renders/*.mp4 public/renders/ 2>/dev/null || true
 # Sync SFX
-!cp -rf /content/drive/MyDrive/Counterism_Studio_V4/renders/audios/* public/renders/audios/ 2>/dev/null || true
+!find /content/drive/MyDrive/Counterism_Studio_V4/renders/audios -maxdepth 2 -type f \( -iname "*.mp3" -o -iname "*.wav" -o -iname "*.m4a" -o -iname "*.aac" -o -iname "*.ogg" \) -exec cp -f '{}' public/renders/audios/ ';' 2>/dev/null || true
+!find /content/drive/MyDrive/Counterism_Studio_V4/audio -maxdepth 2 -type f \( -iname "*.mp3" -o -iname "*.wav" -o -iname "*.m4a" -o -iname "*.aac" -o -iname "*.ogg" \) -exec cp -f '{}' public/renders/audios/ ';' 2>/dev/null || true
 # Sync Fonts
 !cp -f /content/drive/MyDrive/Counterism_Studio_V4/*.ttf public/fonts/ 2>/dev/null || true
 !cp -f /content/drive/MyDrive/Counterism_Studio_V4/fonts/*.ttf public/fonts/ 2>/dev/null || true

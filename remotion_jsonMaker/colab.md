@@ -51,15 +51,13 @@ print("\n🎵 --- SYNCING SFX ASSETS ---")
 for drive_sfx in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/renders/audio", f"{DRIVE_BASE_PATH}/render/audio", f"{DRIVE_BASE_PATH}/audio"]:
     if os.path.exists(drive_sfx):
         print(f"🔍 Searching for SFX in: {drive_sfx}")
-        # Link everything found in the audio folder
-        !ln -sf {drive_sfx}/* public/renders/audios/ 2>/dev/null
-        # Recursive find for common extensions
-        !find {drive_sfx} -maxdepth 2 -type f \( -iname "*.mp3" -o -iname "*.wav" -o -iname "*.m4a" -o -iname "*.aac" -o -iname "*.ogg" \) -exec ln -sf '{}' public/renders/audios/ ';' 2>/dev/null
-        s_count = !ls public/renders/audios/ | wc -l
-        print(f"📦 Successfully linked {s_count[0]} files to public/renders/audios/")
-        if int(s_count[0]) > 0:
-            !ls -p public/renders/audios/
-        break
+        # Recursive find for common extensions and link them individually to avoid glob issues
+        !find "{drive_sfx}" -maxdepth 2 -type f \( -iname "*.mp3" -o -iname "*.wav" -o -iname "*.m4a" -o -iname "*.aac" -o -iname "*.ogg" \) -exec ln -sf '{}' public/renders/audios/ ';' 2>/dev/null
+
+s_count = !ls public/renders/audios/ | wc -l
+print(f"📦 Successfully linked {s_count[0]} files to public/renders/audios/")
+if int(s_count[0]) > 0:
+    !ls -p public/renders/audios/ | head -n 20
 else:
     print("⚠️ WARNING: No SFX folder found in common Drive locations.")
 
