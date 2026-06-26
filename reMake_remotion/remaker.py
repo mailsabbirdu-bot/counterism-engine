@@ -381,10 +381,10 @@ class RemotionRemaker:
             print(f"\n🔄 Gemini Interaction Attempt {attempt + 1}/3...")
 
             refine_prompt = (
-                f"YOU ARE A REMOTION MASTER. REFINE THIS SPECIFIC SCENE JSON.\n"
+                f"YOU ARE A WORLD-CLASS MOTION GRAPHICS DIRECTOR. REFINE THIS SCENE JSON INTO A CINEMATIC MASTERPIECE.\n"
                 f"SCENE ID: {scene_id}\n"
                 f"TARGET LANGUAGE: {lang}\n"
-                f"NARRATION AUTHORITY: THE NARRATION BELOW IS THE ONLY SOURCE FOR CONTENT. IGNORE ENGLISH PLACEHOLDERS IN CURRENT JSON.\n"
+                f"NARRATION AUTHORITY: THE NARRATION BELOW IS THE ONLY SOURCE FOR CONTENT. IGNORE ENGLISH PLACEHOLDERS.\n"
                 f"NARRATION: {story_text}\n"
                 f"CURRENT JSON: {current_scene_json}\n"
                 f"AVAILABLE {lang} FONTS: {target_fonts}\n"
@@ -397,33 +397,24 @@ class RemotionRemaker:
                 f"  - ANIMATIONS: {', '.join(svg_animation_list)}. Use 'draw' or 'trace' for professional infographics.\n"
                 f"  - STYLES: {', '.join(svg_style_list)}. Use 'outline' with 'draw' for best results.\n"
                 f"  - IMPORTANCE: {', '.join(importance_list)}. Primary elements get automatic scale/glow.\n"
-                f"  - EFFECTS: 'glow' (bool), 'depth' (bool), 'container': 'glass_panel', 'gradient': {{'start': '#hex', 'end': '#hex'}}.\n"
-                f"  - GROUPING: 'groupId' (string). Elements in same group are laid out automatically.\n"
-                f"- INFOGRAPHIC COMPOSITION (Add these keys to the scene object):\n"
+                f"- INFOGRAPHIC COMPOSITION (Mandatory for 'procedural' scenes):\n"
                 f"  - 'background': {', '.join(background_list)}.\n"
                 f"  - 'groups': List of {{'id', 'layout': {', '.join(group_layout_list)}, 'spacing': number, 'x', 'y', 'animation': 'slideUp' }}.\n"
                 f"  - 'infographic_lines': List of {{'from': 'elementId', 'to': 'elementId', 'type': 'solid'|'dotted'|'arrow', 'color': '#hex'}}.\n"
                 f"  - 'infographic_nodes': List of {{'x', 'y', 'type': 'glow'|'pulse'|'signal', 'color': '#hex'}}. Add 'radius' for Orbit Rings.\n"
-                f"- 'chart_type' (for 'chart'): line, area, forecast, bar, horizontalBar, verticalBar, groupedBar, stackedBar, pie, donut, bump, areaBump, heatmap, radar, radialBar, stream, swarmplot, waffle, funnel, marimekko, circlePacking, calendar, parallelCoordinates, treemap, sunburst, scatter, network, chord, violinPlot.\n"
-                f"- 'indicator_type' (for 'data_indicator'): kpiNumber, percentageCounter, comparisonKPI, deltaIndicator, countdown, progressBar, circularProgress, semiGauge, milestoneTracker, dashboardCard, statGrid, techMetric, dataWave, scoreCard, batteryLevel, pulseRadar, multiProgress, speedometer, ringChart, statusBadge, metricRing, floatingTag, stepIndicator, eventTimeline, milestoneTimeline.\n"
-                f"- SHADCN LIBRARY (type: 'shadcn_chart' | 'shadcn_indicator'):\n"
-                f"  - 'chart_type' (shadcn_chart): glass_area, neon_bar, stacked_line, radial_score, radar_web, composed_tech, pie_donut_glass, scatter_bubble, horizontal_pill_bar, step_area, multi_bar_stack, curved_edge_line, double_radar.\n"
-                f"  - 'indicator_type' (shadcn_indicator): metric_tile, tech_badge, activity_ring, crypto_card, server_status, user_profile_stat, weather_glass, storage_pill, upload_cloud, score_board, notification_stack, data_ticker, network_ping, step_indicator_glass.\n"
+                f"- NIVO/SHADCN VISUALS:\n"
+                f"  - 'chart_type' (shadcn_chart): glass_area, neon_bar, radial_score, radar_web, step_area, multi_bar_stack, curved_edge_line, double_radar.\n"
+                f"  - 'indicator_type' (shadcn_indicator): metric_tile, tech_badge, activity_ring, crypto_card, server_status, user_profile_stat, data_ticker, network_ping, step_indicator_glass.\n"
                 f"FEEDBACK FROM PREVIOUS ATTEMPT: {feedback_context if feedback_context else 'None'}\n"
-                f"STRICT RULES (STRICT MODE ON):\n"
-                f"- OUTPUT A SINGLE JSON OBJECT FOR THIS SCENE ONLY.\n"
-                f"- STRICT LANGUAGE RULE: All 'content', 'title', and 'label' fields MUST BE IN {lang}. Do NOT use English if narration is Bangla.\n"
-                f"- DO NOT TRANSLATE BANGLA NARRATION TO ENGLISH TEXT. KEEP IT BANGLA.\n"
-                f"- MANDATORY KEYS: 'overlays' (List), 'camera' (Object).\n"
-                f"- DO NOT USE WRAPPER KEYS like 'sceneId', 'meta', or 'timeline'.\n"
-                f"- EVERY TEXT/NIVO LAYER MUST HAVE A VALID 'content' OR 'data' FIELD BASED ON THE NARRATION.\n"
-                f"- CONTENT MUST BE MEANINGFUL AND DERIVED FROM THE NARRATION. NO PLACEHOLDERS LIKE 'INSIGHT'.\n"
-                f"- DATA INTEGRITY: Ensure 'chart' has 'data' array/object and 'title'. Ensure 'indicator' has 'label' and 'value'.\n"
-                f"- YOU MUST UPDATE 'overlays' (animations, content, colors) AND 'camera' (presets, shots) BASED ON THE NARRATION.\n"
-                f"- Follow Studio V4 minimalist guidelines.\n"
-                f"- USE {lang} appropriate fonts from the provided list. NEVER use English fonts for Bangla text.\n"
-                f"- EXAMPLE: If Narration is 'ঢাকা।', content must be 'ঢাকা', font must be a Bangla font.\n"
-                f"- Maintain audio sync for hero words.\n"
+                f"STRICT DIRECTOR RULES:\n"
+                f"1. BUILD THE STORY: Do not just drop icons. Every 'procedural' scene MUST be an interconnected story using 'infographic_lines' and 'groups'.\n"
+                f"2. PERSISTENCE: Overlays MUST stay until the end of the scene. Set 'duration' correctly.\n"
+                f"3. STAGGERED ENTRANCES: Stagger 'start' frames by 10-20f. Use TIMESTAMPS for word-sync.\n"
+                f"4. 3-COLUMN ANCHORS: TEXT at x=400 (Left), Diagrams/Hubs at x=960 (Center), Stats/Charts at x=1520 (Right).\n"
+                f"5. NO PLACEHOLDERS: Use narration keywords. NO 'INSIGHT', 'DATA', or 'METRIC'.\n"
+                f"6. MANDATORY CAMERA: Always include 'camera': {{ 'shots': [...] }} using cinematic shots like 'slow_push' or 'dynamic_orbit'.\n"
+                f"7. STRICT LANGUAGE: All 'content', 'title', and 'label' fields MUST BE IN {lang}.\n"
+                f"8. EXAMPLE: If Narration is 'ঢাকা।', content must be 'ঢাকা', font must be a {lang} font.\n"
             )
 
             print("\n📝 --- FULL PROMPT SENT TO GEMINI ---")
@@ -467,11 +458,14 @@ class RemotionRemaker:
 
                     # Update entire scene if the response is a full scene object
                     if isinstance(extracted_data, dict) and ('overlays' in extracted_data or 'camera' in extracted_data or 'background_type' in extracted_data):
-                        print("✅ AI returned a full scene object. Merging background, camera and overlays.")
+                        print("✅ AI returned a full scene object. Merging background, camera, overlays and infographics.")
                         if 'background_type' in extracted_data: scene['background_type'] = extracted_data['background_type']
                         if 'procedural_config' in extracted_data: scene['procedural_config'] = extracted_data['procedural_config']
                         if 'overlays' in extracted_data: scene['overlays'] = extracted_data['overlays']
                         if 'camera' in extracted_data: scene['camera'] = extracted_data['camera']
+                        if 'groups' in extracted_data: scene['groups'] = extracted_data['groups']
+                        if 'infographic_lines' in extracted_data: scene['infographic_lines'] = extracted_data['infographic_lines']
+                        if 'infographic_nodes' in extracted_data: scene['infographic_nodes'] = extracted_data['infographic_nodes']
                     else:
                         # Locate overlays list using deep search
                         overlays = self.find_overlays(extracted_data)
@@ -479,13 +473,17 @@ class RemotionRemaker:
                             print(f"✅ Successfully recovered {len(overlays)} overlays from AI response.")
                             scene['overlays'] = overlays
 
-                        # Also try to find camera in the nested response
+                        # Also try to find nested components
                         if isinstance(extracted_data, dict):
                              for k in ['camera', 'camera_settings', 'motion']:
                                  if k in extracted_data:
                                      print(f"✅ Recovered camera settings from key '{k}'")
                                      scene['camera'] = extracted_data[k]
                                      break
+                             for k in ['groups', 'infographic_lines', 'infographic_nodes']:
+                                 if k in extracted_data:
+                                     print(f"✅ Recovered {k} from AI response.")
+                                     scene[k] = extracted_data[k]
 
                     # Apply guardrails to the full scene context
                     temp_data = {"scenes": [scene]}
