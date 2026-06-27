@@ -407,14 +407,16 @@ class RemotionRemaker:
                 f"  - 'indicator_type' (shadcn_indicator): metric_tile, tech_badge, activity_ring, crypto_card, server_status, user_profile_stat, data_ticker, network_ping, step_indicator_glass.\n"
                 f"FEEDBACK FROM PREVIOUS ATTEMPT: {feedback_context if feedback_context else 'None'}\n"
                 f"STRICT DIRECTOR RULES:\n"
-                f"1. BUILD THE STORY: Do not just drop icons. Every 'procedural' scene MUST be an interconnected story using 'infographic_lines' and 'groups'.\n"
-                f"2. PERSISTENCE: Overlays MUST stay until the end of the scene. Set 'duration' correctly.\n"
-                f"3. STAGGERED ENTRANCES: Stagger 'start' frames by 10-20f. Use TIMESTAMPS for word-sync.\n"
-                f"4. 3-COLUMN ANCHORS: TEXT at x=400 (Left), Diagrams/Hubs at x=960 (Center), Stats/Charts at x=1520 (Right).\n"
-                f"5. NO PLACEHOLDERS: Use narration keywords. NO 'INSIGHT', 'DATA', or 'METRIC'.\n"
-                f"6. MANDATORY CAMERA: Always include 'camera': {{ 'shots': [...] }} using cinematic shots like 'slow_push' or 'dynamic_orbit'.\n"
-                f"7. STRICT LANGUAGE: All 'content', 'title', and 'label' fields MUST BE IN {lang}.\n"
-                f"8. EXAMPLE: If Narration is 'ঢাকা।', content must be 'ঢাকা', font must be a {lang} font.\n"
+                f"1. 3-COLUMN ANCHORS: Left (x=350-500) for Text. Center (x=900-1050) for Main Graphics. Right (x=1450-1650) for Stats.\n"
+                f"2. VISUAL HIERARCHY: Define focal points using 'importance': 'primary' (largest), 'secondary', 'tertiary'.\n"
+                f"3. PROGRESSIVE STORYTELLING: Stagger entrances (stagger by 10-20f) as information is revealed in narration.\n"
+                f"4. INFOGRAPHIC RELATIONSHIPS: Every 'procedural' scene MUST be an interconnected story using 'infographic_lines' and 'groups'.\n"
+                f"5. NO PLACEHOLDERS: Use actual keywords. NO 'INSIGHT', 'DATA', or 'METRIC'. Visualize real stats.\n"
+                f"6. VIDEO SAFE ZONES: If background_type='video', avoid the center focal point of the footage.\n"
+                f"7. ASYMMETRICAL COMPOSITION: Use a 40/30/30 spatial balance. Avoid dead-center stacking.\n"
+                f"8. PERSISTENCE: Overlays MUST stay until the end of the scene. Set 'duration' correctly.\n"
+                f"9. MANDATORY CAMERA: Always include cinematic 'camera': {{ 'shots': [...] }}.\n"
+                f"10. STRICT LANGUAGE: All 'content', 'title', and 'label' fields MUST BE IN {lang}.\n"
             )
 
             print("\n📝 --- FULL PROMPT SENT TO GEMINI ---")
@@ -572,9 +574,9 @@ class RemotionRemaker:
 
         print(f"🎬 Triggering standalone render for {scene_id} via render.ts...")
 
-        # cmd: node --loader ts-node/esm render.ts --template=... --scene=SCENE_01 --output=...
+        # cmd: node --no-warnings --loader ts-node/esm render.ts --template=... --scene=SCENE_01 --output=...
         cmd = [
-            "node", "--loader", "ts-node/esm", "render.ts",
+            "node", "--no-warnings", "--loader", "ts-node/esm", "render.ts",
             f"--template={standalone_path}",
             f"--scene={scene_id}",
             f"--output={output_rel_path}",

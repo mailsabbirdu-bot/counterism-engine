@@ -189,16 +189,16 @@ class RemotionJsonMaker:
         }
 
         # Expert Motion Graphics Budget (High Fidelity)
-        MAX_TEXT_PER_SCENE = 2
-        MAX_FOCAL_PER_SCENE = 2
-        MAX_SVG_PER_SCENE = 8
+        MAX_TEXT_PER_SCENE = 3
+        MAX_FOCAL_PER_SCENE = 3
+        MAX_SVG_PER_SCENE = 12
 
         # Expert 3-Column Anchors (Wide)
         SECTORS = {
-            "TOP_LEFT": {"x": 400, "y": 270},
-            "TOP_RIGHT": {"x": 1520, "y": 270},
-            "BOTTOM_LEFT": {"x": 400, "y": 810},
-            "BOTTOM_RIGHT": {"x": 1520, "y": 810},
+            "TOP_LEFT": {"x": 400, "y": 250},
+            "TOP_RIGHT": {"x": 1520, "y": 250},
+            "BOTTOM_LEFT": {"x": 400, "y": 830},
+            "BOTTOM_RIGHT": {"x": 1520, "y": 830},
             "CENTER_FOCAL": {"x": 960, "y": 540},
             "MID_LEFT": {"x": 400, "y": 540},
             "MID_RIGHT": {"x": 1520, "y": 540},
@@ -526,12 +526,23 @@ class RemotionJsonMaker:
                         else:
                              ov['position'] = {"x": 960, "y": 700}
                     else:
-                        if ov_type in ['chart', 'ui_panel', 'data_indicator']:
-                            if "RIGHT" not in slot_name:
-                                 slot_name = ["TOP_RIGHT", "BOTTOM_RIGHT", "MID_RIGHT"][i % 3]
-                        elif ov_type == 'text':
-                            if "LEFT" not in slot_name:
-                                 slot_name = ["TOP_LEFT", "BOTTOM_LEFT", "MID_LEFT"][i % 3]
+                        # EXPERT COMPOSITION RULES
+                        bg_type = scene.get('background_type', 'procedural')
+
+                        if bg_type == 'video':
+                            # Safe Zone Composition (Avoid center focal point of footage)
+                            if ov_type in ['chart', 'ui_panel', 'data_indicator', 'kpi', 'timeline']:
+                                slot_name = ["TOP_RIGHT", "BOTTOM_RIGHT", "MID_RIGHT"][i % 3]
+                            else:
+                                slot_name = ["TOP_LEFT", "BOTTOM_LEFT", "MID_LEFT"][i % 3]
+                        else:
+                            # Procedural Composition (Balanced spread)
+                            if ov_type in ['hub_network', 'flow_diagram', 'process']:
+                                slot_name = "CENTER_COL"
+                            elif ov_type in ['chart', 'ui_panel', 'data_indicator', 'kpi', 'timeline']:
+                                slot_name = ["TOP_RIGHT", "BOTTOM_RIGHT", "MID_RIGHT"][i % 3]
+                            else:
+                                slot_name = ["TOP_LEFT", "BOTTOM_LEFT", "MID_LEFT"][i % 3]
 
                     if not has_relation and slot_name in SECTORS:
                         ov['position'] = {"x": SECTORS[slot_name]["x"], "y": SECTORS[slot_name]["y"]}
@@ -551,6 +562,8 @@ class RemotionJsonMaker:
                          ov['position'] = {"x": SECTORS[selected]["x"], "y": SECTORS[selected]["y"]}
 
                     # 2. Multi-Directional Collision Nudging (AABB Multi-Pass)
+                    # Increased buffer for Expert Whitespace (200px for large, 80px for small)
+                    buffer = 200 if w > 500 else 80
                     for attempt in range(15):
                         collision_found = False
                         for prev_ov, prev_w, prev_h in placed_overlays:
@@ -561,23 +574,23 @@ class RemotionJsonMaker:
                                 x1, y1 = ov['position']['x'], ov['position']['y']
                                 x2, y2 = prev_ov['position']['x'], prev_ov['position']['y']
 
-                                # Overlap check with 50px comfort buffer
-                                if abs(x1 - x2) < (w + prev_w) / 2 + 50 and abs(y1 - y2) < (h + prev_h) / 2 + 50:
+                                # Overlap check with comfort buffer
+                                if abs(x1 - x2) < (w + prev_w) / 2 + buffer and abs(y1 - y2) < (h + prev_h) / 2 + buffer:
                                     collision_found = True
 
                                     # Nudge logic: try vertical first, then horizontal
                                     if abs(y1 - y2) < (h + prev_h) / 2:
                                         # Resolve vertically
-                                        if y1 <= y2: ov['position']['y'] = y2 - (h + prev_h) / 2 - 60
-                                        else: ov['position']['y'] = y2 + (h + prev_h) / 2 + 60
+                                        if y1 <= y2: ov['position']['y'] = y2 - (h + prev_h) / 2 - buffer
+                                        else: ov['position']['y'] = y2 + (h + prev_h) / 2 + buffer
 
                                     # Secondary check: if vertical nudge pushed it off-screen, try horizontal
                                     if ov['position']['y'] < 200 or ov['position']['y'] > 880:
                                         ov['position']['y'] = y1 # reset y
-                                        if x1 <= x2: ov['position']['x'] = x2 - (w + prev_w) / 2 - 80
-                                        else: ov['position']['x'] = x2 + (w + prev_w) / 2 + 80
+                                        if x1 <= x2: ov['position']['x'] = x2 - (w + prev_w) / 2 - buffer - 50
+                                        else: ov['position']['x'] = x2 + (w + prev_w) / 2 + buffer + 50
 
-                                    print(f"   🔧 Nudging {ov['id']} to resolve overlap with {prev_ov['id']} -> New Pos: ({int(ov['position']['x'])}, {int(ov['position']['y'])})")
+                                    print(f"   🔧 Nudging {ov['id']} to resolve overlap -> New Pos: ({int(ov['position']['x'])}, {int(ov['position']['y'])})")
                         if not collision_found: break
 
                     # 3. Final Rigid Canvas Safety Clamping (150px safety zone)
@@ -593,12 +606,8 @@ class RemotionJsonMaker:
 
                     placed_overlays.append((ov, w, h))
 
-                    # 4. Expert Cinematic Persistence & Intro Sync
-                    # Every nivo and text layer should persist until the end of the scene for expert feel.
-                    # Sync start with the first word of the scene from timestamp.txt.
-
-                    intro_frames = 15
-                    outro_frames = 15
+                    # 4. Expert Cinematic Staging & Intro Sync
+                    # Introduce elements gradually to build the story.
                     min_total = 60 # Absolute minimum 2 seconds visibility
 
                     # Intro Sync: Use word-specific timestamp if possible
@@ -606,7 +615,8 @@ class RemotionJsonMaker:
                     if word_sync != -1:
                         start_f = word_sync
                     else:
-                        start_f = self._get_scene_start_frame(s_id)
+                        # Fallback to staggered entrance based on element index in scene
+                        start_f = self._get_scene_start_frame(s_id) + (i * 15)
 
                     # PERSISTENCE: Expert video editors keep graphics on screen until the scene changes
                     duration_f = scene_duration - start_f
@@ -864,7 +874,7 @@ class RemotionJsonMaker:
                     "position": {"x": 1440, "y": 540} # Default to right
                 })
 
-            # --- GUIDELINE: EXPERT HIGH-FIDELITY BUDGET (MAX 2 TEXT, 2 FOCAL, 8 SVG) ---
+            # --- GUIDELINE: EXPERT HIGH-FIDELITY BUDGET (MAX 3 TEXT, 3 FOCAL, 12 SVG) ---
             # EXCEPTION: SVGs and infographic elements are allowed in bulk for rich storytelling.
             COMPLEX_SVG_TYPES = ['svg', 'hub_network', 'flow_diagram', 'process', 'label', 'callout', 'timeline', 'composition']
             texts = [o for o in scene.get('overlays', []) if o.get('type') == 'text']
@@ -872,9 +882,9 @@ class RemotionJsonMaker:
             svg_elements = [o for o in scene.get('overlays', []) if o.get('type') in COMPLEX_SVG_TYPES]
 
             # Expert Cap
-            if len(texts) > 2: scene['overlays'] = texts[:2] + focals + svg_elements
-            if len(focals) > 2: scene['overlays'] = texts + focals[:2] + svg_elements
-            if len(svg_elements) > 8: scene['overlays'] = texts + focals + svg_elements[:8]
+            if len(texts) > 3: scene['overlays'] = texts[:3] + focals + svg_elements
+            if len(focals) > 3: scene['overlays'] = texts + focals[:3] + svg_elements
+            if len(svg_elements) > 12: scene['overlays'] = texts + focals + svg_elements[:12]
 
             # Detect Title+Content relation for stacking
             text_ov = next((o for o in scene['overlays'] if o.get('type') == 'text'), None)
@@ -884,10 +894,6 @@ class RemotionJsonMaker:
             # 1. Overlay Pass
             for ov in scene.get('overlays', []):
                 o_type = ov.get('type', 'text')
-                ov['scene_id'] = scene_id # Ensure scene_id is available for logging
-                ov['debug_info'] = f"Generated by Studio V4 at {time.strftime('%H:%M:%S')}"
-                if 'zIndex' not in ov:
-                    ov['zIndex'] = 100 if o_type == 'text' else 50
 
                 # --- GUIDELINE: TEXT AESTHETICS (STRIP PUNCTUATION) ---
                 if o_type == 'text':
@@ -1370,42 +1376,43 @@ class RemotionJsonMaker:
 
         full_prompt = (
             "ACT AS WORLD-CLASS MOTION GRAPHICS DIRECTOR & REMOTION ARCHITECT. OUTPUT RAW JSON ONLY.\n"
-            f"CRITICAL: GENERATE EXACTLY {len(self.story_scenes)} SCENES. NO PARTIAL RESPONSES. NO EXPLANATIONS.\n"
+            f"CRITICAL: GENERATE EXACTLY {len(self.story_scenes)} SCENES. NO PARTIAL RESPONSES.\n"
             "STRICT SCHEMA:\n"
             "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config', 'overlays': [], 'infographic_lines': [], 'infographic_nodes': [], 'groups': [], 'camera': { 'shots': [] } } ]\n"
             "- 'overlays': [\n"
-            "    { 'id', 'type': 'text', 'content', 'font', 'animation': 'flicker_reveal'|'glitch'|'slide_up', 'start', 'duration', 'position': {x,y} },\n"
-            "    { 'id', 'type': 'svg', 'query', 'provider': 'lucide', 'animation': 'draw'|'trace'|'pop', 'style': 'outline'|'tech', 'start', 'duration', 'position': {x,y}, 'groupId'? },\n"
-            "    { 'id', 'type': 'hub_network', 'centerSvg', 'nodes': ['icon1', 'icon2'], 'start', 'duration', 'position': {x,y} },\n"
-            "    { 'id', 'type': 'flow_diagram'|'process', 'steps': ['icon1', 'icon2'], 'start', 'duration', 'position': {x,y} },\n"
+            "    { 'id', 'type': 'text', 'content', 'font', 'animation', 'start', 'duration', 'position': {x,y} },\n"
+            "    { 'id', 'type': 'svg', 'query', 'provider': 'lucide', 'animation', 'style', 'start', 'duration', 'position': {x,y}, 'groupId'?, 'importance': 'primary'|'secondary'|'tertiary' },\n"
+            "    { 'id', 'type': 'hub_network', 'centerSvg', 'nodes': [], 'start', 'duration', 'position': {x,y} },\n"
+            "    { 'id', 'type': 'flow_diagram'|'process', 'steps': [], 'start', 'duration', 'position': {x,y} },\n"
             "    { 'id', 'type': 'kpi'|'timeline', 'label', 'value'?, 'icon'?, 'start', 'duration', 'position': {x,y} },\n"
             "    { 'id', 'type': 'chart'|'shadcn_chart'|'shadcn_indicator', 'chart_type'|'indicator_type', 'title'|'label', 'data'|'value', 'start', 'duration', 'position': {x,y} }\n"
             "  ]\n"
             "- 'groups': [ { 'id', 'layout': 'horizontal'|'vertical'|'orbit'|'grid', 'spacing', 'x', 'y' } ]\n"
             "- 'infographic_lines': [ { 'from': 'id', 'to': 'id', 'start', 'duration', 'color', 'type': 'solid'|'dotted'|'arrow' } ]\n"
-            "- 'infographic_nodes': [ { 'x', 'y', 'start', 'color', 'type': 'glow'|'pulse'|'signal', 'radius'? } ]\n"
-            "MANDATORY TARGETS:\n"
-            f"GENERATE ALL {len(self.story_scenes)} SCENES:\n{list(self.story_scenes.keys())}.\n"
+            "- 'infographic_nodes': [ { 'x', 'y', 'start', 'color', 'type': 'glow'|'pulse'|'signal' } ]\n"
+            f"MANDATORY TARGETS:\nGENERATE ALL {len(self.story_scenes)} SCENES:\n{list(self.story_scenes.keys())}.\n"
             f"NARRATION CONTEXT:\n{scene_targets}\n"
             "EXPERT DIRECTOR RULES:\n"
-            "1. BUILD THE SCENE: Do not just drop icons. Every scene MUST be a story. Use 'hub_network' to show relationships, 'flow_diagram' for processes, and 'infographic_lines' to connect related SVGs.\n"
-            "2. LAYERED COMPLEXITY: Every 'procedural' scene MUST have at least 3 SVGs connected by lines, 1 Chart/KPI, and 1 main Title.\n"
-            "3. CINEMATIC TIMING: Overlays MUST NOT appear all at once. Stagger 'start' frames by 10-20f. Use TIMESTAMPS for precise word-sync.\n"
-            "4. PERSISTENCE: Overlays should stay until the end of the scene unless they are temporary callouts.\n"
-            "5. NOUN-TO-INFOGRAPHIC: Never just show a 'factory' icon. Show a 'factory' (hub) connected to 'output' and 'labor' icons via 'infographic_lines'.\n"
-            "6. 3-COLUMN ANCHORS: TEXT at x=400 (Left), Diagrams/Hubs at x=960 (Center), Stats/Charts at x=1520 (Right).\n"
-            "7. CAMERA MOVEMENT: Always include 'camera': { 'shots': [...] }. Use 'slow_push' towards the most important focal element.\n"
+            "1. 3-COLUMN ANCHORS: Mandatory spatial separation. Left (x=350-500) for Titles/Text. Center (x=900-1050) for Hubs/Flows/Main SVGs. Right (x=1450-1650) for KPIs/Charts/Stats.\n"
+            "2. VISUAL HIERARCHY: Every scene needs a focal point. Assign 'importance'. Primary = largest focal center. Secondary = supporting diagrams. Tertiary = small labels/KPIs.\n"
+            "3. PROGRESSIVE STORYTELLING: Stagger entrances (stagger by 10-20f). Reveal Title -> Main Concept -> Relationships -> Statistics. Reveal information as it is spoken.\n"
+            "4. INFOGRAPHIC RELATIONSHIPS: Every procedural scene MUST be a connected story. Use 'infographic_lines' to explain relationships between nodes. Use 'groups' for 3+ related items.\n"
+            "5. NO PLACEHOLDERS: Visualize actual narration data. If text says '20 million', KPI must show '20M'. Use real keywords, not 'INSIGHT' or 'DATA'.\n"
+            "6. VIDEO SAFE ZONES: If background_type='video', avoid the center focal point. Keep overlays to the Left/Right columns to let footage breathe.\n"
+            "7. NO OVERLAPS: Ensure every major element occupies its own region. Maintain 200px whitespace between large objects.\n"
+            "8. NOUN-TO-SYSTEM: Never render a lone noun. Turn 'Factory' into a system: Factory Hub -> connected to Labor SVG and Output SVG.\n"
+            "9. PERSISTENCE: Graphics must stay until the end of the scene unless narration specifically moves on.\n"
+            "10. ASYMMETRICAL COMPOSITION: Avoid dead-center stacking. Let the composition breathe with a 40/30/30 spatial balance.\n"
             "VISUAL LIBRARY (PRESETS):\n"
             "- 'procedural_config': variants: 'dark_particles', 'liquid_gradient', 'neon_grid'.\n"
             "- 'svg': Use standard Lucide names (e.g. 'cpu', 'shield', 'activity', 'factory', 'users', 'trending-up').\n"
-            "- 'chart_type': glass_area, neon_bar, radial_score, radar_web, step_area, multi_bar_stack, curved_edge_line, double_radar.\n"
-            "- 'indicator_type': metric_tile, tech_badge, activity_ring, crypto_card, server_status, user_profile_stat, data_ticker, network_ping, step_indicator_glass.\n"
-            "- 'compositionType': 'corporate_overview', 'tech_stack', 'global_network', 'growth_metrics'.\n"
+            "- 'chart_type': glass_area, neon_bar, radial_score, radar_web, step_area, multi_bar_stack, curved_edge_line.\n"
+            "- 'indicator_type': metric_tile, tech_badge, activity_ring, crypto_card, server_status, data_ticker, network_ping.\n"
             "CORE TECHNICAL RULES:\n"
             "1. NO TRANSLATION. If Story is Bangla, Content MUST be Bangla.\n"
-            "2. EXACT SYNC: Match 'start' to TIMESTAMPS. If the word 'Apple' is at 45f, the 'Apple' icon/text MUST start at 45f.\n"
-            "3. MANDATORY STATS: Visualize EVERY number/percentage from the narration.\n"
-            "4. FONTS: Use Bangla list for Bangla text, English list for English.\n"
+            "2. EXACT SYNC: Match 'start' to TIMESTAMPS. If word is at 45f, start at 45f.\n"
+            "3. MANDATORY STATS: Visualize EVERY number/percentage.\n"
+            "4. FONTS: Use provided list.\n"
             f"FONTS: {local_fonts}\n"
             f"SFX: {self.camera_files}\n"
             f"VIDEOS: {self.video_files}\n"
