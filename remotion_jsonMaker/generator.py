@@ -283,7 +283,12 @@ class RemotionJsonMaker:
             if scene['background_type'] == 'video':
                 # Preserve existing valid render paths (important for Remake project)
                 current_vpath = scene.get('video_path', '')
-                if not current_vpath or not current_vpath.startswith('renders/'):
+                if current_vpath and not current_vpath.startswith('renders/'):
+                     # Ensure it has the renders/ prefix if it's just a filename
+                     if os.path.basename(current_vpath) == current_vpath:
+                          scene['video_path'] = f"renders/{current_vpath}"
+
+                if not scene.get('video_path'):
                     # Check if matching video actually exists
                     vname = f"scene_SC_{id_num:02d}.mp4"
                     if vname in self.video_files:
@@ -604,9 +609,12 @@ class RemotionJsonMaker:
                                         # Add horizontal "breathing" offset
                                         ov['position']['x'] += (50 if x1 > 960 else -50)
 
-                                    # Secondary check: if vertical nudge pushed it off-screen, try horizontal
-                                    if ov['position']['y'] < 200 or ov['position']['y'] > 880:
-                                        ov['position']['y'] = y1 # reset y
+                                    # CANVAS SAFETY CLAMPING (Intermediate)
+                                    ov['position']['x'] = max(150 + w/2, min(1920 - 150 - w/2, ov['position']['x']))
+                                    ov['position']['y'] = max(150 + h/2, min(1080 - 150 - h/2, ov['position']['y']))
+
+                                    # Secondary check: if vertical nudge didn't resolve or was clamped, try horizontal
+                                    if abs(ov['position']['y'] - y2) < (h + prev_h) / 2 + buffer:
                                         if x1 <= x2: ov['position']['x'] = x2 - (w + prev_w) / 2 - buffer - 50
                                         else: ov['position']['x'] = x2 + (w + prev_w) / 2 + buffer + 50
 
@@ -756,6 +764,10 @@ class RemotionJsonMaker:
             if scene.get('infographic_lines'):
                 safe_lines = []
                 for l in scene['infographic_lines']:
+                    # LLM Repair: from_id / to_id
+                    if 'from_id' in l and 'from' not in l: l['from'] = l['from_id']
+                    if 'to_id' in l and 'to' not in l: l['to'] = l['to_id']
+
                     f, t = l.get('from'), l.get('to')
 
                     # Try direct match first
