@@ -924,18 +924,19 @@ class RemotionJsonMaker:
 
                 # --- GUIDELINE: DOCUMENTARY COMPOSITION ---
                 # Force elements into distinct sectors based on layout_style to eliminate collisions
+                # Apply o_idx offsets to prevent stacking multiple elements of the same type
                 if layout_style == "SPLIT_SCREEN":
-                    if o_type == 'text': ov['position'] = {"x": 480, "y": 540} # Left half
-                    else: ov['position'] = {"x": 1440, "y": 540} # Right half
+                    if o_type == 'text': ov['position'] = {"x": 480, "y": 300 + (o_idx * 160)}
+                    else: ov['position'] = {"x": 1440, "y": 540 + ((o_idx-1) * 200)}
                 elif layout_style == "RULE_OF_THIRDS":
-                    if o_type == 'text': ov['position'] = {"x": 400, "y": 360} # Top-left intersection
-                    else: ov['position'] = {"x": 1280, "y": 720} # Bottom-right intersection
+                    if o_type == 'text': ov['position'] = {"x": 400, "y": 300 + (o_idx * 150)}
+                    else: ov['position'] = {"x": 1280, "y": 650 + ((o_idx-1) * 150)}
                 elif layout_style == "HERO_FOCAL":
-                    if o_type == 'text': ov['position'] = {"x": 400, "y": 800} # Bottom-left caption
-                    else: ov['position'] = {"x": 1100, "y": 500} # Large hero centerpiece
+                    if o_type == 'text': ov['position'] = {"x": 400, "y": 750 + (o_idx * 100)}
+                    else: ov['position'] = {"x": 1100, "y": 500 + ((o_idx-1) * 100)}
                 elif layout_style == "TOP_TITLE_LOWER_VIS":
-                    if o_type == 'text': ov['position'] = {"x": 960, "y": 250} # Centered top
-                    else: ov['position'] = {"x": 960, "y": 700} # Centered bottom
+                    if o_type == 'text': ov['position'] = {"x": 960, "y": 250 + (o_idx * 120)}
+                    else: ov['position'] = {"x": 960, "y": 750 + ((o_idx-1) * 150)}
 
                 # --- GUIDELINE: INFORMATION STAGING (WAVES) ---
                 # Sequential Reveal: Title -> Graphic -> Indicators
@@ -1205,98 +1206,140 @@ class RemotionJsonMaker:
                 # Unique ID for this interaction instance
                 u_id = uuid.uuid4().hex[:8]
 
-                display(HTML(f"""
-                    <div id="container-{u_id}" style="background-color: #1a1a1a; color: #fff; padding: 25px; border-radius: 12px; border: 2px solid #4CAF50; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.5); max-width: 800px; margin: 10px auto;">
-                        <h2 style="color: #4CAF50; margin-top: 0; font-size: 22px; border-bottom: 1px solid #333; padding-bottom: 10px;">🎬 Studio V4 - Manual AI Interaction</h2>
+                print(f"⏳ INITIALIZING MANUAL INTERACTION (Instance: {u_id})...")
 
-                        <div style="margin-top: 20px;">
-                            <p style="font-size: 15px;">1. Copy the generated prompt:</p>
-                            <button id="copyBtn-{u_id}" style="background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 100%;">
-                                📋 COPY PROMPT TO CLIPBOARD
-                            </button>
-                        </div>
+                # The HTML and Logic are combined to avoid race conditions between rendering and eval_js
+                # Use json.dumps to safely escape triple backticks and other special chars in the prompt
+                safe_prompt = json.dumps(prompt)
 
-                        <div style="margin-top: 25px;">
-                            <p style="font-size: 15px;">2. Get response from <a href="https://gemini.google.com" target="_blank" style="color: #2196F3; text-decoration: none; font-weight: bold;">Gemini</a> and paste here:</p>
-                            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                                <button id="pasteBtn-{u_id}" style="background: #444; color: white; border: 1px solid #666; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 13px;">
-                                    📋 PASTE FROM CLIPBOARD
-                                </button>
-                                <button id="clearBtn-{u_id}" style="background: #444; color: white; border: 1px solid #666; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 13px;">
-                                    🧹 CLEAR
+                js_code = f"""
+                    (async () => {{
+                        const u_id = "{u_id}";
+                        const promptText = {safe_prompt};
+
+                        // 1. Render the UI
+                        const container = document.createElement('div');
+                        container.id = "container-" + u_id;
+                        container.style = "background-color: #1a1a1a; color: #fff; padding: 25px; border-radius: 12px; border: 2px solid #4CAF50; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.5); max-width: 800px; margin: 10px auto; position: relative; z-index: 1000;";
+                        container.innerHTML = `
+                            <h2 style="color: #4CAF50; margin-top: 0; font-size: 22px; border-bottom: 1px solid #333; padding-bottom: 10px;">🎬 Studio V4 - Expert AI Workflow</h2>
+
+                            <div style="margin-top: 20px;">
+                                <p style="font-size: 15px;">1. Copy the documentary prompt:</p>
+                                <button id="copyBtn-${{u_id}}" style="background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); color: white; border: none; padding: 14px 28px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 100%; transition: all 0.2s;">
+                                    📋 COPY PROMPT TO CLIPBOARD
                                 </button>
                             </div>
-                            <textarea id="jsonResponse-{u_id}" style="width: 100%; height: 180px; background: #2d2d2d; color: #eee; border: 1px solid #444; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 13px; resize: vertical;" placeholder="Paste JSON response here..."></textarea>
-                        </div>
 
-                        <div style="margin-top: 20px;">
-                            <button id="submitBtn-{u_id}" style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); color: white; border: none; padding: 14px 28px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 100%;">
-                                🚀 SUBMIT RESPONSE
-                            </button>
-                        </div>
+                            <div style="margin-top: 25px;">
+                                <p style="font-size: 15px;">2. Get response from <a href="https://gemini.google.com" target="_blank" style="color: #2196F3; text-decoration: none; font-weight: bold;">Gemini</a> and paste here:</p>
+                                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                                    <button id="pasteBtn-${{u_id}}" style="background: #333; color: #4CAF50; border: 1px solid #4CAF50; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">
+                                        📋 PASTE RESPONSE
+                                    </button>
+                                    <button id="clearBtn-${{u_id}}" style="background: #333; color: #ff3b30; border: 1px solid #ff3b30; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">
+                                        🧹 CLEAR
+                                    </button>
+                                </div>
+                                <textarea id="jsonResponse-${{u_id}}" style="width: 100%; height: 220px; background: #000; color: #00FFAB; border: 1px solid #333; padding: 15px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 14px; resize: vertical; box-sizing: border-box;" placeholder="Paste Gemini JSON response here..."></textarea>
+                                <p style="font-size: 12px; color: #888; margin-top: 5px;">Tip: If 'Paste' button fails, use <b>Ctrl+V</b> inside the box.</p>
+                            </div>
 
-                        <textarea id="hiddenPrompt-{u_id}" style="display:none">{prompt}</textarea>
-                    </div>
+                            <div style="margin-top: 25px;">
+                                <button id="submitBtn-${{u_id}}" style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); color: white; border: none; padding: 16px 32px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 18px; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3); width: 100%; transition: all 0.3s;">
+                                    🚀 SUBMIT RESPONSE
+                                </button>
+                            </div>
+                        `;
 
-                    <script>
-                        (function() {{
-                            const u_id = "{u_id}";
-                            const copyBtn = document.getElementById('copyBtn-' + u_id);
-                            const pasteBtn = document.getElementById('pasteBtn-' + u_id);
-                            const clearBtn = document.getElementById('clearBtn-' + u_id);
-                            const promptText = document.getElementById('hiddenPrompt-' + u_id).value;
-                            const responseArea = document.getElementById('jsonResponse-' + u_id);
+                        document.body.appendChild(container);
+                        container.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
 
-                            copyBtn.onclick = () => {{
-                                navigator.clipboard.writeText(promptText);
-                                copyBtn.innerText = "✅ PROMPT COPIED!";
-                                copyBtn.style.background = "#2196F3";
-                                setTimeout(() => {{
-                                    copyBtn.innerText = "📋 COPY PROMPT TO CLIPBOARD";
-                                    copyBtn.style.background = "linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)";
-                                }}, 3000);
-                            }};
-
-                            pasteBtn.onclick = async () => {{
-                                try {{
-                                    const text = await navigator.clipboard.readText();
-                                    responseArea.value = text;
-                                    pasteBtn.innerText = "✅ PASTED!";
-                                    setTimeout(() => pasteBtn.innerText = "📋 PASTE FROM CLIPBOARD", 2000);
-                                }} catch (e) {{
-                                    alert("Browser blocked clipboard access. Please paste manually (Ctrl+V).");
-                                }}
-                            }};
-
-                            clearBtn.onclick = () => responseArea.value = "";
-                        }})();
-                    </script>
-                """))
-
-                print(f"⏳ Waiting for your input via the UI above (Instance: {u_id})...")
-
-                # Use eval_js to wait for the result of a promise (blocks Python until resolve)
-                result = output.eval_js(f"""
-                    new Promise((resolve) => {{
-                        const u_id = "{u_id}";
+                        const copyBtn = document.getElementById('copyBtn-' + u_id);
+                        const pasteBtn = document.getElementById('pasteBtn-' + u_id);
+                        const clearBtn = document.getElementById('clearBtn-' + u_id);
                         const submitBtn = document.getElementById('submitBtn-' + u_id);
                         const responseArea = document.getElementById('jsonResponse-' + u_id);
 
-                        submitBtn.onclick = () => {{
-                            const val = responseArea.value.trim();
-                            if (!val) {{
-                                alert("Please paste the Gemini response first!");
-                                return;
-                            }}
-                            submitBtn.disabled = true;
-                            submitBtn.innerText = "⌛ PROCESSING...";
-                            resolve(val);
-                        }};
-                    }})
-                """)
+                        if (!copyBtn || !submitBtn || !responseArea) {{
+                            console.error("UI Elements not found!");
+                            return "ERROR: UI Render Failed";
+                        }}
 
-                print("✅ Response received. Parsing...")
+                        copyBtn.onclick = () => {{
+                            navigator.clipboard.writeText(promptText);
+                            copyBtn.innerHTML = "✅ PROMPT COPIED!";
+                            copyBtn.style.background = "#2196F3";
+                            setTimeout(() => {{
+                                copyBtn.innerHTML = "📋 COPY PROMPT TO CLIPBOARD";
+                                copyBtn.style.background = "linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)";
+                            }}, 2500);
+                        }};
+
+                        pasteBtn.onclick = async () => {{
+                            try {{
+                                const text = await navigator.clipboard.readText();
+                                responseArea.value = text;
+                                pasteBtn.innerHTML = "✅ PASTED!";
+                                setTimeout(() => pasteBtn.innerHTML = "📋 PASTE RESPONSE", 2000);
+                            }} catch (e) {{
+                                alert("Browser security blocked clipboard access. Please use Ctrl+V to paste manually.");
+                            }}
+                        }};
+
+                        clearBtn.onclick = () => {{
+                            if(confirm("Clear text area?")) responseArea.value = "";
+                        }};
+
+                        // Return a promise that resolves when the user clicks submit
+                        return new Promise((resolve) => {{
+                            submitBtn.onclick = () => {{
+                                const val = responseArea.value.trim();
+                                if (!val) {{
+                                    alert("Error: Text area is empty. Please paste Gemini's response first.");
+                                    return;
+                                }}
+                                submitBtn.disabled = true;
+                                submitBtn.style.opacity = "0.5";
+                                submitBtn.innerHTML = "⌛ VALIDATING MANIFEST...";
+
+                                // Give it a moment to show the state before resolving
+                                setTimeout(() => {{
+                                    container.style.opacity = "0.7";
+                                    container.style.pointerEvents = "none";
+                                    resolve(val);
+                                }}, 500);
+                            }};
+                        }});
+                    }})();
+                """
+
+                result = output.eval_js(js_code)
+                print("✅ Manifest received. Analyzing structure...")
                 return result
+
+            except Exception as e:
+                print(f"⚠️ Rich UI failed: {e}. Falling back to terminal mode.")
+                # Fallback for standard terminal environments
+                print("\n" + "!"*80)
+                print("🖐️  MANUAL MODE ACTIVE (Terminal Fallback)")
+                print("1. COPY the prompt below.")
+                print("-" * 30 + " PROMPT START " + "-" * 30)
+                print(prompt)
+                print("-" * 30 + "  PROMPT END  " + "-" * 30 + "\n")
+
+                print("\n👉 Paste the JSON response from Gemini below.")
+                print("👉 TYPE 'END' ON A NEW LINE AND PRESS ENTER TO SUBMIT.")
+
+                lines = []
+                while True:
+                    try:
+                        line = input()
+                        if line.strip().upper() == "END": break
+                        lines.append(line)
+                    except EOFError:
+                        break
+                return "\n".join(lines)
 
             except ImportError:
                 # Fallback for standard terminal environments
