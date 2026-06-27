@@ -1317,8 +1317,7 @@ class RemotionJsonMaker:
 
                                 // Give it a moment to show the state before resolving
                                 setTimeout(() => {{
-                                    container.style.opacity = "0.7";
-                                    container.style.pointerEvents = "none";
+                                    container.remove(); // Remove UI to return focus to terminal
                                     resolve(val);
                                 }}, 500);
                             }};
@@ -1328,6 +1327,7 @@ class RemotionJsonMaker:
 
                 result = output.eval_js(js_code)
                 print("✅ Manifest received. Analyzing structure...")
+                sys.stdout.flush()
                 return result
 
             except Exception as e:
@@ -1804,6 +1804,8 @@ def main():
     if project_root not in sys.path:
         sys.path.append(project_root)
 
+    print(f"🎬 INITIALIZING: Scanning documentary assets in {abs_public}...")
+    sys.stdout.flush()
     maker.scan_assets(abs_public)
     guidelines = maker.load_guidelines(
         os.path.join(os.path.dirname(abs_public), "guideline.md"),
@@ -1832,8 +1834,13 @@ def main():
         elif args.timestamp_output:
              print("⚠️ Warning: --timestamp-output is deprecated. Please provide --timestamp-file.")
 
+        print("🚀 STAGE 1: Generating scene manifest via AI...")
+        sys.stdout.flush()
         render_json = maker.generate(story, guidelines, args.prompt_output, ts_content, scene_durations)
         maker.stop_browser()
+
+        print("📊 STAGE 2: Validating AI output and applying documentary rules...")
+        sys.stdout.flush()
 
         expected_scenes = len(scene_durations)
         if render_json and 'scenes' in render_json:
@@ -1851,6 +1858,10 @@ def main():
              sys.exit(1)
 
         render_json = maker.finalize_json_durations(render_json, public_dir=abs_public)
+
+        print(f"💾 STAGE 3: Saving master manifest to {args.output}...")
+        sys.stdout.flush()
+
         output_dir = os.path.dirname(args.output)
         if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
         with open(args.output, 'w', encoding='utf-8') as f:
@@ -1858,9 +1869,11 @@ def main():
             f.flush()
             os.fsync(f.fileno())
         print(f"✅ Master JSON created: {args.output} ({os.path.getsize(args.output)} bytes)")
+        sys.stdout.flush()
 
         # 3. Quality Assurance Pass
-        print("\n🧪 --- RUNNING QUALITY ASSURANCE PASS ---")
+        print("\n🧪 STAGE 4: Running final Quality Assurance pass...")
+        sys.stdout.flush()
         try:
             from scripts.test_manifest_quality import test_manifest_quality
             test_manifest_quality(args.output)
