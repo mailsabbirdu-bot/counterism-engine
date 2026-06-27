@@ -118,6 +118,7 @@ if not os.path.exists(TIMESTAMP_FILE):
     print(f"⚠️ WARNING: Timestamp file NOT FOUND at: {TIMESTAMP_FILE}")
     print("Generation will proceed without precise sync, but it is highly recommended to provide it.")
 
+# Use --manual flag if browser automation fails
 !xvfb-run python generator.py \
     --story-file="{STORY_FILE}" \
     --output="{OUTPUT_JSON}" \
@@ -126,7 +127,8 @@ if not os.path.exists(TIMESTAMP_FILE):
     --prompt-output="{PROMPT_FILE}" \
     --drive-prompt="{PROJECT_PATH}/guideline_prompt.txt" \
     --user-data-dir="{USER_DATA_DIR}" \
-    --public-dir="/content/engine/public"
+    --public-dir="/content/engine/public" \
+    --manual
 
 print_banner("🏁 PROCESS FINISHED")
 if os.path.exists(OUTPUT_JSON):
