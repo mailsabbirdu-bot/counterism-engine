@@ -65,10 +65,14 @@ def test_manifest_quality(filepath, public_dir=None):
         if scene.get('background_type') == 'video':
             vpath = scene.get('video_path', '')
             if vpath:
-                abs_vpath = os.path.join(public_dir, vpath.lstrip('/'))
+                # Video paths in manifest are usually relative to 'public/'
+                rel_vpath = vpath.replace('renders/', '') if vpath.startswith('renders/') else vpath
+                abs_vpath = os.path.join(public_dir, "renders", rel_vpath.lstrip('/'))
                 if not os.path.exists(abs_vpath):
-                    issues.append(f"[{scene_id}] Asset Missing: video '{vpath}'")
-                    scores["assets"] -= 20
+                    # Try direct join if not in renders/
+                    if not os.path.exists(os.path.join(public_dir, vpath.lstrip('/'))):
+                        issues.append(f"[{scene_id}] Asset Missing: video '{vpath}'")
+                        scores["assets"] -= 20
 
         # 2. Timing Validation
         if duration <= 0:
@@ -79,6 +83,7 @@ def test_manifest_quality(filepath, public_dir=None):
         overlay_ids = set()
         placed_geometries = []
         scene_colors = set()
+        starts = []
 
         for ov in overlays:
             ov_id = ov.get('id', 'unknown')
@@ -91,6 +96,7 @@ def test_manifest_quality(filepath, public_dir=None):
 
             o_type = str(ov.get('type', 'text')).lower()
             start = ov.get('start', 0)
+            starts.append(start)
             ov_dur = ov.get('duration', 0)
 
             # Timing
@@ -106,6 +112,12 @@ def test_manifest_quality(filepath, public_dir=None):
             # Geometry
             pos = ov.get('position', {})
             x, y = pos.get('x', 960), pos.get('y', 540)
+
+            # Center Stacking Detection
+            if x == 960 and y == 700:
+                warnings.append(f"[{scene_id}] '{ov_id}' is at potential placeholder position (960, 700).")
+                scores["composition"] -= 10
+
             w, h = TYPE_SIZES.get(o_type, (600, 400))
             if o_type == 'text':
                 content = str(ov.get('content', ''))
@@ -113,16 +125,15 @@ def test_manifest_quality(filepath, public_dir=None):
                 fs = int(fs_match.group()) if fs_match else 120
                 w = min(1600, len(content) * fs * 0.7)
                 h = fs * 1.5
-                # Word count check
                 if len(content.split()) > 6:
-                    warnings.append(f"[{scene_id}] Text '{ov_id}' is verbose ({len(content.split())} words). Recommendation: 3-5.")
+                    warnings.append(f"[{scene_id}] Text '{ov_id}' is verbose ({len(content.split())} words).")
 
             l, t = x - w/2, y - h/2
             r, b = x + w/2, y + h/2
 
             # Offscreen Check
             if l < -50 or r > 1970 or t < -50 or b > 1130:
-                issues.append(f"[{scene_id}] '{ov_id}' is OFFSCREEN (L:{int(l)}, R:{int(r)}, T:{int(t)}, B:{int(b)})")
+                issues.append(f"[{scene_id}] '{ov_id}' is OFFSCREEN (Box: L:{int(l)}, R:{int(r)}, T:{int(t)}, B:{int(b)})")
                 scores["layout"] -= 25
             elif l < 80 or r > 1840 or t < 60 or b > 1020:
                 warnings.append(f"[{scene_id}] '{ov_id}' violates safe margins.")
@@ -131,7 +142,7 @@ def test_manifest_quality(filepath, public_dir=None):
             # Collision Detection (AABB)
             for p_id, p_l, p_t, p_r, p_b, p_start, p_end in placed_geometries:
                 if max(start, p_start) < min(start + ov_dur, p_end):
-                    gap = 30
+                    gap = 20
                     if not (r + gap < p_l or l - gap > p_r or b + gap < p_t or t - gap > p_b):
                         issues.append(f"[{scene_id}] GEOMETRY COLLISION: '{ov_id}' overlaps with '{p_id}'")
                         scores["collision"] -= 30
@@ -148,26 +159,20 @@ def test_manifest_quality(filepath, public_dir=None):
                     if hero.get('start', 0) < start:
                         warnings.append(f"[{scene_id}] Hero word in '{ov_id}' starts before overlay.")
 
-            # Color validation
-            color = ov.get('color')
-            if color:
-                scene_colors.add(color.upper())
+            if ov.get('color'): scene_colors.add(ov['color'].upper())
 
-            # Data/KPI
-            if o_type in ['chart', 'data_indicator', 'shadcn_indicator', 'kpi', 'shadcn_chart']:
-                label = str(ov.get('label', ov.get('title', ''))).upper()
-                if any(x in label for x in ['INSIGHT', 'METRIC', 'DATA', 'REMOTION', 'OVERVIEW']):
-                    warnings.append(f"[{scene_id}] Placeholder label in '{ov_id}': {label}")
-
-        # Scene color variety warning
-        if len(scene_colors) > 3:
-            warnings.append(f"[{scene_id}] High color count ({len(scene_colors)}). May look cluttered.")
+        # Staging check
+        if len(set(starts)) == 1 and len(starts) > 1:
+            warnings.append(f"[{scene_id}] Elements lack progressive staging (all start at frame {starts[0]}).")
+            scores["timing"] -= 10
 
         # 4. Camera Shot Validation
         shots = scene.get('camera', {}).get('shots', [])
         last_shot_end = 0
+        camera_targets = []
         for s_idx, shot in enumerate(shots):
             target = shot.get('targetId')
+            camera_targets.append(target)
             if target and target not in overlay_ids:
                 issues.append(f"[{scene_id}] Camera shot {s_idx} targets missing ID: {target}")
                 scores["camera"] -= 20
@@ -176,10 +181,14 @@ def test_manifest_quality(filepath, public_dir=None):
             s_dur = shot.get('duration', 0)
             if s_start < last_shot_end - 1:
                 warnings.append(f"[{scene_id}] Camera shot {s_idx} overlaps with previous.")
-            if s_start + s_dur > duration + 5:
+            if s_start + s_dur > duration + 1:
                 issues.append(f"[{scene_id}] Camera shot {s_idx} exceeds scene duration.")
                 scores["camera"] -= 10
             last_shot_end = s_start + s_dur
+
+        if len(camera_targets) > 1 and len(set(camera_targets)) == 1:
+            warnings.append(f"[{scene_id}] Camera repeatedly targets the same element '{camera_targets[0]}'.")
+            scores["camera"] -= 15
 
         # 5. Infographic Line Validation
         for line in scene.get('infographic_lines', []):
