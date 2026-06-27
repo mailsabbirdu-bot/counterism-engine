@@ -522,17 +522,21 @@ class RemotionJsonMaker:
                         ov['duration'] = min(text_ov.get('duration', 120), focal_ov.get('duration', 120))
 
                         if ov_type == 'text':
-                             ov['position'] = {"x": 960, "y": 300}
+                             ov['position'] = {"x": 480, "y": 540} # Title column
                         else:
-                             ov['position'] = {"x": 960, "y": 700}
+                             ov['position'] = {"x": 1440, "y": 540} # Content column
                     else:
                         # EXPERT COMPOSITION RULES
                         bg_type = scene.get('background_type', 'procedural')
 
                         if bg_type == 'video':
                             # Safe Zone Composition (Avoid center focal point of footage)
+                            # Strictly avoid CENTER_FOCAL for video
                             if ov_type in ['chart', 'ui_panel', 'data_indicator', 'kpi', 'timeline']:
                                 slot_name = ["TOP_RIGHT", "BOTTOM_RIGHT", "MID_RIGHT"][i % 3]
+                            elif ov_type in ['hub_network', 'flow_diagram', 'process', 'svg']:
+                                # Push flows to columns instead of center for video
+                                slot_name = ["MID_LEFT", "MID_RIGHT"][i % 2]
                             else:
                                 slot_name = ["TOP_LEFT", "BOTTOM_LEFT", "MID_LEFT"][i % 3]
                         else:
@@ -562,8 +566,8 @@ class RemotionJsonMaker:
                          ov['position'] = {"x": SECTORS[selected]["x"], "y": SECTORS[selected]["y"]}
 
                     # 2. Multi-Directional Collision Nudging (AABB Multi-Pass)
-                    # Increased buffer for Expert Whitespace (200px for large, 80px for small)
-                    buffer = 200 if w > 500 else 80
+                    # Expert Whitespace (300px for large focal, 120px for text/small)
+                    buffer = 300 if w > 500 else 120
                     for attempt in range(15):
                         collision_found = False
                         for prev_ov, prev_w, prev_h in placed_overlays:
@@ -579,10 +583,13 @@ class RemotionJsonMaker:
                                     collision_found = True
 
                                     # Nudge logic: try vertical first, then horizontal
-                                    if abs(y1 - y2) < (h + prev_h) / 2:
-                                        # Resolve vertically
+                                    # Force asymmetric offset for expert feel
+                                    if abs(y1 - y2) < (h + prev_h) / 2 + buffer:
                                         if y1 <= y2: ov['position']['y'] = y2 - (h + prev_h) / 2 - buffer
                                         else: ov['position']['y'] = y2 + (h + prev_h) / 2 + buffer
+
+                                        # Add horizontal "breathing" offset
+                                        ov['position']['x'] += (50 if x1 > 960 else -50)
 
                                     # Secondary check: if vertical nudge pushed it off-screen, try horizontal
                                     if ov['position']['y'] < 200 or ov['position']['y'] > 880:
@@ -590,7 +597,7 @@ class RemotionJsonMaker:
                                         if x1 <= x2: ov['position']['x'] = x2 - (w + prev_w) / 2 - buffer - 50
                                         else: ov['position']['x'] = x2 + (w + prev_w) / 2 + buffer + 50
 
-                                    print(f"   🔧 Nudging {ov['id']} to resolve overlap -> New Pos: ({int(ov['position']['x'])}, {int(ov['position']['y'])})")
+                                    print(f"   🔧 Expert Nudging {ov['id']} to resolve overlap -> New Pos: ({int(ov['position']['x'])}, {int(ov['position']['y'])})")
                         if not collision_found: break
 
                     # 3. Final Rigid Canvas Safety Clamping (150px safety zone)
@@ -612,11 +619,13 @@ class RemotionJsonMaker:
 
                     # Intro Sync: Use word-specific timestamp if possible
                     word_sync = self._get_word_timestamp(s_id, ov.get('content') or ov.get('label') or ov.get('title', ''))
-                    if word_sync != -1:
-                        start_f = word_sync
-                    else:
-                        # Fallback to staggered entrance based on element index in scene
-                        start_f = self._get_scene_start_frame(s_id) + (i * 15)
+
+                    # Force staggering if multiple elements start at the exact same frame
+                    base_start = word_sync if word_sync != -1 else self._get_scene_start_frame(s_id)
+
+                    # Add staggering (15f per element) to the base start
+                    # Primary elements (i=0) appear first, secondary/tertiary follow
+                    start_f = base_start + (i * 15)
 
                     # PERSISTENCE: Expert video editors keep graphics on screen until the scene changes
                     duration_f = scene_duration - start_f
@@ -1375,52 +1384,40 @@ class RemotionJsonMaker:
         scene_targets = "\n".join([f"{sid}: {self.story_scenes[sid]}" for sid in sorted(self.story_scenes.keys())])
 
         full_prompt = (
-            "ACT AS WORLD-CLASS MOTION GRAPHICS DIRECTOR & REMOTION ARCHITECT. OUTPUT RAW JSON ONLY.\n"
-            f"CRITICAL: GENERATE EXACTLY {len(self.story_scenes)} SCENES. NO PARTIAL RESPONSES.\n"
-            "STRICT SCHEMA:\n"
-            "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config', 'overlays': [], 'infographic_lines': [], 'infographic_nodes': [], 'groups': [], 'camera': { 'shots': [] } } ]\n"
+            "YOU ARE A WORLD-CLASS DOCUMENTARY MOTION GRAPHICS DIRECTOR (Vox/Polymatter style).\n"
+            f"TASK: GENERATE RAW JSON FOR EXACTLY {len(self.story_scenes)} SCENES: {list(self.story_scenes.keys())}.\n"
+            f"STORY CONTENT (MANDATORY SOURCE):\n{story_context}\n"
+            f"TIMESTAMPS (FOR SYNC):\n{compact_ts}\n"
+            f"DURATIONS (30fps):\n{duration_context}\n"
+            "\nEXPERT COMPOSITION RULES (STRICT):\n"
+            "1. 3-COLUMN ANCHORS: ABSOLUTELY FORBIDDEN to center-stack everything. Use spatial columns:\n"
+            "   - LEFT (x=350 to 500): Titles, Paragraphs, Primary Text Labels.\n"
+            "   - CENTER (x=900 to 1050): Hub Networks, Flow Diagrams, Primary SVG focal points.\n"
+            "   - RIGHT (x=1450 to 1650): KPIs, Charts, Indicators, Statistics.\n"
+            "2. VISUAL HIERARCHY (IMPORTANCE): Every scene MUST have 1 Primary (large), 1-2 Secondary (medium), and Tertiary (small) elements. Eye should know where to look.\n"
+            "3. STAGGERED ENTRANCES: Elements MUST NOT appear simultaneously. Stagger 'start' frames by 15-20f. Build the story visually as it's narrated.\n"
+            "4. INFOGRAPHIC RELATIONSHIPS: Use 'infographic_lines' to connect related SVGs (e.g., Worker -> Factory -> Product). Never drop isolated icons.\n"
+            "5. NO PLACEHOLDERS: Use REAL DATA from narration. If text mentions '20 million', chart/KPI MUST show '20M'. NO 'A', 'B', '10', '20' dummy values.\n"
+            "6. VIDEO SAFE ZONES: If background_type='video', keep overlays to columns 1 and 3. Do NOT cover the center subjects of the footage.\n"
+            "7. GROUPS: Use 'groups' key for 3+ related elements (horizontal/vertical/orbit/grid layout).\n"
+            "8. ASYMMETRICAL BALANCE: Aim for 40/30/30 spatial split. Let the composition breathe. Maintain 200px whitespace.\n"
+            "9. PERSISTENCE: Overlays stay until scene changes. Set 'duration' correctly (scene_duration - start).\n"
+            "\nSCHEMA (RAW JSON ONLY):\n"
+            "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config', 'overlays': [], 'infographic_lines': [], 'groups': [] } ]\n"
             "- 'overlays': [\n"
-            "    { 'id', 'type': 'text', 'content', 'font', 'animation', 'start', 'duration', 'position': {x,y} },\n"
-            "    { 'id', 'type': 'svg', 'query', 'provider': 'lucide', 'animation', 'style', 'start', 'duration', 'position': {x,y}, 'groupId'?, 'importance': 'primary'|'secondary'|'tertiary' },\n"
-            "    { 'id', 'type': 'hub_network', 'centerSvg', 'nodes': [], 'start', 'duration', 'position': {x,y} },\n"
-            "    { 'id', 'type': 'flow_diagram'|'process', 'steps': [], 'start', 'duration', 'position': {x,y} },\n"
-            "    { 'id', 'type': 'kpi'|'timeline', 'label', 'value'?, 'icon'?, 'start', 'duration', 'position': {x,y} },\n"
+            "    { 'id', 'type': 'text', 'content', 'font', 'start', 'duration', 'position': {x,y} },\n"
+            "    { 'id', 'type': 'svg', 'query', 'animation', 'style', 'importance': 'primary'|'secondary', 'start', 'duration', 'position': {x,y}, 'groupId'? },\n"
+            "    { 'id', 'type': 'hub_network'|'flow_diagram', 'centerSvg', 'nodes'|'steps': [], 'start', 'duration', 'position': {x,y} },\n"
             "    { 'id', 'type': 'chart'|'shadcn_chart'|'shadcn_indicator', 'chart_type'|'indicator_type', 'title'|'label', 'data'|'value', 'start', 'duration', 'position': {x,y} }\n"
             "  ]\n"
-            "- 'groups': [ { 'id', 'layout': 'horizontal'|'vertical'|'orbit'|'grid', 'spacing', 'x', 'y' } ]\n"
-            "- 'infographic_lines': [ { 'from': 'id', 'to': 'id', 'start', 'duration', 'color', 'type': 'solid'|'dotted'|'arrow' } ]\n"
-            "- 'infographic_nodes': [ { 'x', 'y', 'start', 'color', 'type': 'glow'|'pulse'|'signal' } ]\n"
-            f"MANDATORY TARGETS:\nGENERATE ALL {len(self.story_scenes)} SCENES:\n{list(self.story_scenes.keys())}.\n"
-            f"NARRATION CONTEXT:\n{scene_targets}\n"
-            "EXPERT DIRECTOR RULES:\n"
-            "1. 3-COLUMN ANCHORS: Mandatory spatial separation. Left (x=350-500) for Titles/Text. Center (x=900-1050) for Hubs/Flows/Main SVGs. Right (x=1450-1650) for KPIs/Charts/Stats.\n"
-            "2. VISUAL HIERARCHY: Every scene needs a focal point. Assign 'importance'. Primary = largest focal center. Secondary = supporting diagrams. Tertiary = small labels/KPIs.\n"
-            "3. PROGRESSIVE STORYTELLING: Stagger entrances (stagger by 10-20f). Reveal Title -> Main Concept -> Relationships -> Statistics. Reveal information as it is spoken.\n"
-            "4. INFOGRAPHIC RELATIONSHIPS: Every procedural scene MUST be a connected story. Use 'infographic_lines' to explain relationships between nodes. Use 'groups' for 3+ related items.\n"
-            "5. NO PLACEHOLDERS: Visualize actual narration data. If text says '20 million', KPI must show '20M'. Use real keywords, not 'INSIGHT' or 'DATA'.\n"
-            "6. VIDEO SAFE ZONES: If background_type='video', avoid the center focal point. Keep overlays to the Left/Right columns to let footage breathe.\n"
-            "7. NO OVERLAPS: Ensure every major element occupies its own region. Maintain 200px whitespace between large objects.\n"
-            "8. NOUN-TO-SYSTEM: Never render a lone noun. Turn 'Factory' into a system: Factory Hub -> connected to Labor SVG and Output SVG.\n"
-            "9. PERSISTENCE: Graphics must stay until the end of the scene unless narration specifically moves on.\n"
-            "10. ASYMMETRICAL COMPOSITION: Avoid dead-center stacking. Let the composition breathe with a 40/30/30 spatial balance.\n"
-            "VISUAL LIBRARY (PRESETS):\n"
-            "- 'procedural_config': variants: 'dark_particles', 'liquid_gradient', 'neon_grid'.\n"
-            "- 'svg': Use standard Lucide names (e.g. 'cpu', 'shield', 'activity', 'factory', 'users', 'trending-up').\n"
-            "- 'chart_type': glass_area, neon_bar, radial_score, radar_web, step_area, multi_bar_stack, curved_edge_line.\n"
-            "- 'indicator_type': metric_tile, tech_badge, activity_ring, crypto_card, server_status, data_ticker, network_ping.\n"
-            "CORE TECHNICAL RULES:\n"
-            "1. NO TRANSLATION. If Story is Bangla, Content MUST be Bangla.\n"
-            "2. EXACT SYNC: Match 'start' to TIMESTAMPS. If word is at 45f, start at 45f.\n"
-            "3. MANDATORY STATS: Visualize EVERY number/percentage.\n"
-            "4. FONTS: Use provided list.\n"
-            f"FONTS: {local_fonts}\n"
-            f"SFX: {self.camera_files}\n"
+            "\nVISUAL LIBRARY:\n"
+            "- 'procedural_config': 'dark_particles', 'liquid_gradient', 'neon_grid'.\n"
+            "- 'chart_type': glass_area, neon_bar, radial_score, radar_web, step_area, multi_bar_stack.\n"
+            "- 'indicator_type': metric_tile, tech_badge, activity_ring, crypto_card, server_status, data_ticker.\n"
+            f"\nFONTS: {local_fonts}\n"
             f"VIDEOS: {self.video_files}\n"
-            f"DURATIONS: {duration_context}\n"
-            f"TIMESTAMPS: {compact_ts}\n"
-            f"STORY: \n{story_context}\n"
             f"REFERENCE: {schema_ref}\n"
-            f"TASK: GENERATE EVERY SINGLE SCENE: {list(self.story_scenes.keys())}. No partial responses. Output RAW JSON block ONLY."
+            "OUTPUT RAW JSON BLOCK ONLY. NO EXPLANATION. NO ERROR MESSAGES. GENERATE ALL SCENES."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
