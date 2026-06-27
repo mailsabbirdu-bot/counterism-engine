@@ -860,9 +860,15 @@ class RemotionJsonMaker:
         # ULTRA MODERN - EYE SOOTHING - ATTENTION GRABBING PALETTE (Curated)
         modern_colors = ["#00F5FF", "#FF3E6C", "#00FFAB", "#ADFF2F", "#FFD700", "#7B68EE", "#FF8C00"] # Cyan, Rose, Neon Mint, Lime, Gold, Iris, Deep Orange
 
+        # DOCUMENTARY STYLES POOL (Expert Layouts)
+        LAYOUT_PRESETS = ["SPLIT_SCREEN", "RULE_OF_THIRDS", "HERO_FOCAL", "TOP_TITLE_LOWER_VIS"]
+
         for idx, scene in enumerate(data['scenes']):
             scene_id = scene.get('scene_id', f"SCENE_{idx+1}")
             duration = scene.get('duration_in_frames', 180)
+
+            # Select a unique layout for this scene to prevent repetition
+            layout_style = LAYOUT_PRESETS[idx % len(LAYOUT_PRESETS)]
 
             # --- GUIDELINE: MANDATORY NIVO FOR NUMBERS ---
             # Scan scene text for digits or numerical words
@@ -912,8 +918,30 @@ class RemotionJsonMaker:
             has_relation = text_ov and focal_ov
 
             # 1. Overlay Pass
-            for ov in scene.get('overlays', []):
+            overlay_ids = [ov['id'] for ov in scene.get('overlays', [])]
+            for o_idx, ov in enumerate(scene.get('overlays', [])):
                 o_type = ov.get('type', 'text')
+
+                # --- GUIDELINE: DOCUMENTARY COMPOSITION ---
+                # Force elements into distinct sectors based on layout_style to eliminate collisions
+                if layout_style == "SPLIT_SCREEN":
+                    if o_type == 'text': ov['position'] = {"x": 480, "y": 540} # Left half
+                    else: ov['position'] = {"x": 1440, "y": 540} # Right half
+                elif layout_style == "RULE_OF_THIRDS":
+                    if o_type == 'text': ov['position'] = {"x": 400, "y": 360} # Top-left intersection
+                    else: ov['position'] = {"x": 1280, "y": 720} # Bottom-right intersection
+                elif layout_style == "HERO_FOCAL":
+                    if o_type == 'text': ov['position'] = {"x": 400, "y": 800} # Bottom-left caption
+                    else: ov['position'] = {"x": 1100, "y": 500} # Large hero centerpiece
+                elif layout_style == "TOP_TITLE_LOWER_VIS":
+                    if o_type == 'text': ov['position'] = {"x": 960, "y": 250} # Centered top
+                    else: ov['position'] = {"x": 960, "y": 700} # Centered bottom
+
+                # --- GUIDELINE: INFORMATION STAGING (WAVES) ---
+                # Sequential Reveal: Title -> Graphic -> Indicators
+                if o_type == 'text': ov['start'] = 15
+                elif o_type in ['svg', 'hub_network', 'flow_diagram', 'chart']: ov['start'] = 45
+                else: ov['start'] = 75 # Indicators and secondary elements
 
                 # --- GUIDELINE: TEXT AESTHETICS (STRIP PUNCTUATION) ---
                 if o_type == 'text':
@@ -1112,27 +1140,44 @@ class RemotionJsonMaker:
                      "easing": {"type": "bezier", "bezier": [0.65, 0, 0.35, 1]}
                  })
 
+            # SORT SHOTS BY START FRAME to ensure sequential execution
+            scene['camera']['shots'].sort(key=lambda s: s.get('startFrame', 0))
+
+            last_shot_end = 0
             for s_idx, shot in enumerate(scene['camera']['shots']):
-                # --- GUIDELINE: SMART TARGETING ---
-                # Contradiction Resolution: Null is ONLY for stacked layouts (center-zoom),
-                # otherwise we MUST have a valid target ID to avoid empty focus.
-                if has_relation:
-                    shot['targetId'] = None
-                elif shot.get('targetId') is None:
-                    shot['targetId'] = focal_ov['id'] if focal_ov else (text_ov['id'] if text_ov else None)
+                # --- GUIDELINE: NO OVERLAPPING SHOTS ---
+                if shot.get('startFrame', 0) < last_shot_end:
+                    shot['startFrame'] = last_shot_end
+
+                # --- GUIDELINE: NO OVERFLOW ---
+                if shot.get('startFrame', 0) + shot.get('duration', 30) > duration:
+                    shot['duration'] = max(15, duration - shot.get('startFrame', 0))
+
+                last_shot_end = shot.get('startFrame', 0) + shot.get('duration', 30)
+
+                # --- GUIDELINE: SMART TARGETING (NO NULLS) ---
+                if not shot.get('targetId') or shot['targetId'] not in overlay_ids:
+                    # Intelligent fallback: alternate between Title and Graphic
+                    targets = [o['id'] for o in scene.get('overlays', []) if o.get('type') in ['text', 'chart', 'hub_network', 'flow_diagram', 'svg']]
+                    if targets:
+                        shot['targetId'] = targets[s_idx % len(targets)]
+                    else:
+                        shot['targetId'] = overlay_ids[0] if overlay_ids else None
 
                 # --- GUIDELINE: CAMERA VARIETY (40 PRESET ROTATION) ---
-                # Use scene index + shot index to maximize uniqueness across the whole video
+                # Use unique seed per scene+shot to maximize variety
                 if not shot.get('style') or shot.get('style') == 'static':
-                    shot['style'] = camera_styles[(idx + s_idx) % len(camera_styles)]
+                    shot['style'] = camera_styles[(idx * 3 + s_idx) % len(camera_styles)]
 
                 # --- GUIDELINE: BUTTERY SMOOTH BEZIER ---
                 if not shot.get('easing'):
                     shot['easing'] = {"type": "bezier", "bezier": [0.65, 0, 0.35, 1]}
 
                 # --- GUIDELINE: CAMERA SAFETY (ZOOM CAPS) ---
-                max_zoom = 1.35 if has_relation else 1.6
-                shot['zoom'] = min(shot.get('zoom', 1.25), max_zoom)
+                # Diverse zoom levels
+                zooms = [1.15, 1.3, 1.1, 1.4, 1.25]
+                shot['zoom'] = shot.get('zoom', zooms[s_idx % len(zooms)])
+                shot['zoom'] = min(shot['zoom'], 1.6)
 
         # 3. SFX Pass
         valid_sfx = []
@@ -1539,38 +1584,42 @@ class RemotionJsonMaker:
         scene_targets = "\n".join([f"{sid}: {self.story_scenes[sid]}" for sid in sorted(self.story_scenes.keys())])
 
         full_prompt = (
-            f"TASK: GENERATE PRODUCTION-READY MOTION GRAPHICS JSON FOR THESE {len(self.story_scenes)} SCENES.\n"
-            "\n--- START OF STORYBOARD NARRATION (SOURCE) ---\n"
+            f"TASK: GENERATE AN EXPERT DOCUMENTARY MOTION GRAPHICS MANIFEST FOR {len(self.story_scenes)} SCENES.\n"
+            "STYLE MANDATE: Vox, Polymatter, Kurzgesagt, and Apple Keynote information design.\n"
+            "\n--- SOURCE NARRATION ---\n"
             "```text\n"
             f"{story_context}\n"
             "```\n"
-            "--- END OF STORYBOARD NARRATION ---\n"
-            "\n--- TIMING & SYNC DATA (MANDATORY) ---\n"
+            "\n--- TIMING DATA ---\n"
             f"TIMESTAMPS: {compact_ts}\n"
-            f"DURATIONS (30fps): {duration_context}\n"
-            "\nACT AS A PROFESSIONAL MOTION ARCHITECT. Design an expert documentary sequence (Vox/Polymatter style) using THE NARRATION ABOVE as the absolute source of truth.\n"
-            "COMPOSITION CONSTRAINTS (STRICT):\n"
-            "1. 3-COLUMN SPATIAL ANCHORS: Absolutely NO center-stacking. Every graphic must occupy a unique region:\n"
-            "   - COLUMN 1 (LEFT, x=400): Punchy Short Titles.\n"
-            "   - COLUMN 2 (CENTER, x=960): Hub Networks, Flow Diagrams, Primary SVG centerpieces.\n"
-            "   - COLUMN 3 (RIGHT, x=1520): KPIs, Charts, Indicators, Statistics.\n"
-            "2. VISUAL HIERARCHY: Every scene MUST have 1 'primary' element (largest), 1-2 'secondary' elements, and supporting labels. Eye-path must be clear.\n"
-            "3. STAGGERED ENTRANCES: Elements MUST NOT appear simultaneously. Stagger 'start' frames by 15-20f waves (Wave 1: Title, Wave 2: Diagram, Wave 3: Stats).\n"
-            "4. INFOGRAPHIC SYSTEMS: Procedural scenes MUST be connected stories. Use 'infographic_lines' (minimum 2 per scene) to link related SVGs. Use SVG icons only as helper nodes in a larger system, not isolated widgets.\n"
-            "5. REAL NARRATIVE DATA: Visualize ACTUAL NUMBERS from story. NO placeholder values (10, 20, A, B). If text says '5 million', KPI must show '5M'.\n"
-            "6. VIDEO SAFE-ZONES: If background_type='video', keep overlays to Columns 1 and 3. DO NOT obscure the center subjects of the video footage.\n"
-            "7. WHITESPACE & BREATHING ROOM: Maintain 300px between Primary elements. Use 40/30/30 spatial balance.\n"
-            "8. PERSISTENCE: Overlays stay until scene ends. duration = (scene_duration - start).\n"
-            "9. PUNCHY VIBE TEXT: Keep 'content' for text overlays EXTREMELY BRIEF (3-5 words max). It should capture the 'vibe' or a 'core keyword' of the scene, not the full narration. Use dramatic and punchy language.\n"
-            "10. HERO HIGHLIGHT: For every text overlay, you MUST identify one 'hero' word from the content and provide 'hero_config'.\n"
+            f"DURATIONS: {duration_context}\n"
+            "\nDIRECTOR'S RULES (STRICT COMPLIANCE REQUIRED):\n"
+            "1. ELIMINATE COLLISIONS: No two elements may overlap. Use the Rule of Thirds. Stop centering everything.\n"
+            "2. CINEMATIC COMPOSITIONS: Vary layouts across scenes:\n"
+             "   - Scene A: Split-screen (Left Title / Right Chart).\n"
+             "   - Scene B: Rule of Thirds (Title at x=400, y=300; Diagram at x=1200, y=600).\n"
+             "   - Scene C: Hero Focal (Large Hub Network center-right, supporting labels left).\n"
+            "3. PROGRESSIVE INFORMATION STAGING: Reveal data sequentially (sequential waves):\n"
+            "   - Wave 1 (15f): Background + Main Title.\n"
+            "   - Wave 2 (45f): Hero word animation + Primary Graphic.\n"
+            "   - Wave 3 (75f): Supporting metrics, Indicators, and Connectors.\n"
+            "4. CAMERA INTELLIGENCE: Every shot MUST have a 'targetId'. NO null targets.\n"
+            "   - Vary shots: rack_focus, cinematic_drift, pan_right, orbit, zoom_blur_reveal.\n"
+            "   - Sequential shots: move from Title focus to Data focus.\n"
+            "   - Validate: startFrame + duration <= scene_duration.\n"
+            "5. TYPOGRAPHIC HIERARCHY: Use punchy, vibe-focused 'content' (3-5 words max). Every text overlay MUST have 'hero_config' highlighting a core keyword.\n"
+            "6. DATA INTEGRITY: Use ACTUAL NUMBERS from story. If text says '20 million', KPI must show '20M'.\n"
+            "7. INFOGRAPHIC SYSTEMS: Procedural scenes MUST be connected systems. Use 'infographic_lines' to link spatially separated elements (Title -> Network -> KPI).\n"
+            "8. COLOR HIERARCHY: Use Saturation intentionally. 1 Primary brand color, 1 Accent, Neutral UI colors.\n"
             "\nJSON SCHEMA:\n"
-            "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config', 'overlays': [], 'infographic_lines': [], 'groups': [] } ]\n"
+            "- 'scenes': [ { 'scene_id', 'duration', 'background_type', 'overlays': [], 'infographic_lines': [], 'camera': { 'shots': [] } } ]\n"
             "- 'overlays': [\n"
-            "    { 'id', 'type': 'text', 'content', 'font', 'start', 'duration', 'position': {x,y}, 'hero_config': { 'word': 'KEYWORD', 'animation': 'glow_pulse|neon_flicker|glitch_pop', 'color': '#00F5FF' } },\n"
-            "    { 'id', 'type': 'svg', 'query', 'animation', 'style', 'importance': 'primary'|'secondary', 'start', 'duration', 'position': {x,y}, 'groupId'? },\n"
+            "    { 'id', 'type': 'text', 'content', 'font', 'start', 'duration', 'position': {x,y}, 'hero_config': { 'word', 'animation', 'color' } },\n"
+            "    { 'id', 'type': 'svg', 'query', 'animation', 'style', 'importance', 'start', 'duration', 'position': {x,y} },\n"
             "    { 'id', 'type': 'hub_network'|'flow_diagram', 'centerSvg', 'nodes'|'steps': [], 'start', 'duration', 'position': {x,y} },\n"
-            "    { 'id', 'type': 'chart'|'shadcn_chart'|'shadcn_indicator', 'chart_type'|'indicator_type', 'title'|'label', 'data'|'value', 'start', 'duration', 'position': {x,y} }\n"
+            "    { 'id', 'type': 'chart'|'shadcn_chart'|'shadcn_indicator', 'chart_type'|'indicator_type', 'title', 'data'|'value', 'start', 'duration', 'position': {x,y} }\n"
             "  ]\n"
+            "- 'camera': { 'shots': [ { 'targetId', 'style', 'zoom', 'startFrame', 'duration', 'inDuration' } ] }\n"
             "\nAVAILABLE PRESETS:\n"
             "- 'procedural_config': 'dark_particles', 'liquid_gradient', 'neon_grid'.\n"
             "- 'chart_type': glass_area, neon_bar, radial_score, radar_web, step_area, multi_bar_stack.\n"
