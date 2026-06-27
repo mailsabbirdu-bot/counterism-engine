@@ -1121,85 +1121,58 @@ class RemotionJsonMaker:
 
     def _interact_with_gemini(self, prompt: str, retry_count: int = 2) -> str:
         if self.manual:
-            # Check if running in Google Colab for rich UI
+            # Attempt to display a rich "Copy" button in Colab/Notebooks
             try:
-                from google.colab import output
                 from IPython.display import HTML, display
-
-                # HTML and JavaScript for a "Copy" button and a multi-line input fallback
-                # In Colab, we can't easily do a multi-line input back to python via 'input()' for large pastes
-                # So we use a JavaScript promise to capture the clipboard paste
                 display(HTML(f"""
-                    <div style="background-color: #1e1e1e; color: #fff; padding: 20px; border-radius: 8px; border: 1px solid #333; font-family: sans-serif;">
-                        <h3 style="color: #4CAF50; margin-top: 0;">🖐️ MANUAL GEMINI INTERACTION</h3>
-                        <p>1. Click the button below to copy the prompt.</p>
-                        <button id="copyBtn" style="background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                    <div style="background-color: #1a1a1a; color: #fff; padding: 25px; border-radius: 12px; border: 2px solid #4CAF50; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                        <h2 style="color: #4CAF50; margin-top: 0; font-size: 20px;">🎬 Counterism Studio V4 - Gemini Interaction</h2>
+                        <p style="font-size: 14px; margin-bottom: 20px;">1. Click the button below to copy the generated prompt to your clipboard.</p>
+                        <button id="copyPromptBtn" style="background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: transform 0.1s;">
                             📋 COPY PROMPT TO CLIPBOARD
                         </button>
-                        <p style="margin-top: 15px;">2. Paste it into <a href="https://gemini.google.com" target="_blank" style="color: #2196F3;">Gemini</a>.</p>
-                        <p>3. Copy the RAW JSON response from Gemini.</p>
-                        <p>4. Paste it into the text area below and click "SUBMIT".</p>
-                        <textarea id="jsonResponse" style="width: 100%; height: 150px; background: #2d2d2d; color: #eee; border: 1px solid #444; padding: 10px; border-radius: 4px; margin-bottom: 10px;" placeholder="Paste JSON here..."></textarea>
-                        <button id="submitBtn" style="background: #2196F3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                            🚀 SUBMIT RESPONSE
-                        </button>
-                        <textarea id="hiddenPrompt" style="display:none">{prompt}</textarea>
+                        <p style="margin-top: 20px; font-size: 14px;">2. Paste it into <a href="https://gemini.google.com" target="_blank" style="color: #2196F3; text-decoration: none; font-weight: bold;">Gemini</a>.</p>
+                        <p style="font-size: 14px;">3. Once you get the response, paste it into the <b>Colab terminal input area</b> below.</p>
+                        <p style="font-size: 12px; color: #aaa;">(Note: If you don't see the input area, click 'END' or check the bottom of the cell output)</p>
+                        <textarea id="hiddenPromptData" style="display:none">{prompt}</textarea>
                     </div>
                     <script>
-                        (async () => {{
-                            const copyBtn = document.getElementById('copyBtn');
-                            const submitBtn = document.getElementById('submitBtn');
-                            const promptText = document.getElementById('hiddenPrompt').value;
-                            const responseArea = document.getElementById('jsonResponse');
-
-                            copyBtn.onclick = () => {{
-                                navigator.clipboard.writeText(promptText);
-                                copyBtn.innerText = "✅ COPIED!";
-                                setTimeout(() => copyBtn.innerText = "📋 COPY PROMPT TO CLIPBOARD", 2000);
+                        (function() {{
+                            const btn = document.getElementById('copyPromptBtn');
+                            const prompt = document.getElementById('hiddenPromptData').value;
+                            btn.onclick = () => {{
+                                navigator.clipboard.writeText(prompt);
+                                btn.innerText = "✅ PROMPT COPIED!";
+                                btn.style.background = "#2196F3";
+                                setTimeout(() => {{
+                                    btn.innerText = "📋 COPY PROMPT TO CLIPBOARD";
+                                    btn.style.background = "linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)";
+                                }}, 3000);
                             }};
-
-                            const result = await new Promise((resolve) => {{
-                                submitBtn.onclick = () => {{
-                                    resolve(responseArea.value);
-                                }};
-                            }});
-
-                            google.colab.kernel.invokeFunction('notebook.ManualResponse', [result], {{}});
                         }})();
                     </script>
                 """))
-
-                captured_json = []
-                def handle_response(res):
-                    captured_json.append(res)
-
-                output.register_callback('notebook.ManualResponse', handle_response)
-
-                print("⏳  Waiting for your input via the UI above...")
-                while not captured_json:
-                    time.sleep(0.5)
-
-                return captured_json[0]
-
-            except ImportError:
-                # Fallback for standard terminal
+            except Exception:
+                # Fallback for standard terminal environments
                 print("\n" + "!"*80)
                 print("🖐️  MANUAL MODE ACTIVE (Terminal Fallback)")
                 print("1. COPY the prompt below.")
-                print("--- PROMPT START ---")
+                print("-" * 30 + " PROMPT START " + "-" * 30)
                 print(prompt)
-                print("--- PROMPT END ---\n")
-                print("2. Paste JSON from Gemini below. Type 'END' on a new line to submit.")
+                print("-" * 30 + "  PROMPT END  " + "-" * 30 + "\n")
 
-                lines = []
-                while True:
-                    try:
-                        line = input()
-                        if line.strip() == "END": break
-                        lines.append(line)
-                    except EOFError:
-                        break
-                return "\n".join(lines)
+            print("\n👉 Paste the JSON response from Gemini below.")
+            print("👉 TYPE 'END' ON A NEW LINE AND PRESS ENTER TO SUBMIT.")
+
+            lines = []
+            while True:
+                try:
+                    line = input()
+                    if line.strip().upper() == "END": break
+                    lines.append(line)
+                except EOFError:
+                    break
+            return "\n".join(lines)
 
         for attempt in range(retry_count + 1):
             self.start_browser()

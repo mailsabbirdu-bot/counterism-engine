@@ -55,5 +55,6 @@ print("\n" + "="*80)
 print(" 🛠️  SCENE REMAKER INTERACTIVE CLI")
 print("="*80)
 
-!python reMake_remotion/remaker.py
+# IMPORTANT: We use %run instead of !python to allow rich HTML output and terminal input in Colab.
+%run reMake_remotion/remaker.py
 ```
