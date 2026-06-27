@@ -11,9 +11,10 @@ from playwright.sync_api import sync_playwright
 import playwright_stealth
 
 class RemotionJsonMaker:
-    def __init__(self, user_data_dir: str = None, headless: bool = True):
+    def __init__(self, user_data_dir: str = None, headless: bool = True, manual: bool = False):
         self.user_data_dir = user_data_dir
         self.headless = headless
+        self.manual = manual
         self.playwright = None
         self.browser = None
         self.context = None
@@ -890,10 +891,8 @@ class RemotionJsonMaker:
             focals = [o for o in scene.get('overlays', []) if o.get('type') not in (['text'] + COMPLEX_SVG_TYPES)]
             svg_elements = [o for o in scene.get('overlays', []) if o.get('type') in COMPLEX_SVG_TYPES]
 
-            # Expert Cap
-            if len(texts) > 3: scene['overlays'] = texts[:3] + focals + svg_elements
-            if len(focals) > 3: scene['overlays'] = texts + focals[:3] + svg_elements
-            if len(svg_elements) > 12: scene['overlays'] = texts + focals + svg_elements[:12]
+            # Expert Cap (Enforce all limits simultaneously)
+            scene['overlays'] = texts[:3] + focals[:3] + svg_elements[:12]
 
             # Detect Title+Content relation for stacking
             text_ov = next((o for o in scene['overlays'] if o.get('type') == 'text'), None)
@@ -1121,6 +1120,33 @@ class RemotionJsonMaker:
 
 
     def _interact_with_gemini(self, prompt: str, retry_count: int = 2) -> str:
+        if self.manual:
+            print("\n" + "!"*80)
+            print("🖐️  MANUAL MODE ACTIVE")
+            print("1. COPY the prompt below.")
+            print("2. PASTE it into Gemini (https://gemini.google.com).")
+            print("3. COPY the RAW JSON response from Gemini.")
+            print("4. PASTE the response back here.")
+            print("!"*80 + "\n")
+
+            print("--- PROMPT START ---")
+            print(prompt)
+            print("--- PROMPT END ---\n")
+
+            print("👉 Please paste the Gemini JSON response below.")
+            print("(To finish, press Enter then Ctrl+D on a new line or type 'END' on a new line):")
+
+            lines = []
+            while True:
+                try:
+                    line = input()
+                    if line.strip() == "END": break
+                    lines.append(line)
+                except EOFError:
+                    break
+
+            return "\n".join(lines)
+
         for attempt in range(retry_count + 1):
             self.start_browser()
             page = self.page
@@ -1287,7 +1313,8 @@ class RemotionJsonMaker:
         if not search_clean and not search_words: return -1
 
         # Look for matches in timestamps for this scene
-        pattern = fr'{scene_id}:.*?\[30fps:\s*(\d+)f\s*-\s*\d+f\]\s*"(.*?)"'
+        # Support formats: "SCENE_01:0f \"ঢাকা।\"" and "SCENE_01: [30fps: 0f - 29f] \"ঢাকা।\""
+        pattern = fr'{scene_id}:(?:.*?\[30fps:\s*)?(\d+)f\s*(?:-\s*\d+f\]\s*)?"(.*?)"'
         ts_data = re.findall(pattern, self.raw_timestamps)
 
         # 1. CRITICAL SYNC: Prioritize matching the START of the phrase
@@ -1384,13 +1411,16 @@ class RemotionJsonMaker:
         scene_targets = "\n".join([f"{sid}: {self.story_scenes[sid]}" for sid in sorted(self.story_scenes.keys())])
 
         full_prompt = (
-            f"GENERATE PRODUCTION-READY MOTION GRAPHICS JSON FOR THESE {len(self.story_scenes)} SCENES: {list(self.story_scenes.keys())}.\n"
-            "\n--- MANDATORY STORYBOARD NARRATION ---\n"
+            f"TASK: GENERATE PRODUCTION-READY MOTION GRAPHICS JSON FOR THESE {len(self.story_scenes)} SCENES.\n"
+            "\n--- START OF STORYBOARD NARRATION (SOURCE) ---\n"
+            "```text\n"
             f"{story_context}\n"
-            "\n--- TIMING & SYNC DATA ---\n"
+            "```\n"
+            "--- END OF STORYBOARD NARRATION ---\n"
+            "\n--- TIMING & SYNC DATA (MANDATORY) ---\n"
             f"TIMESTAMPS: {compact_ts}\n"
             f"DURATIONS (30fps): {duration_context}\n"
-            "\nACT AS A PROFESSIONAL MOTION ARCHITECT. Design an expert documentary sequence (Vox/Polymatter style).\n"
+            "\nACT AS A PROFESSIONAL MOTION ARCHITECT. Design an expert documentary sequence (Vox/Polymatter style) using THE NARRATION ABOVE as the absolute source of truth.\n"
             "COMPOSITION CONSTRAINTS (STRICT):\n"
             "1. 3-COLUMN SPATIAL ANCHORS: Absolutely NO center-stacking. Every graphic must occupy a unique region:\n"
             "   - COLUMN 1 (LEFT, x=400): Narrations, Titles, Paragraphs.\n"
@@ -1506,12 +1536,13 @@ def main():
     parser.add_argument("--no-headless", action="store_false", dest="headless")
     parser.add_argument("--drive-prompt")
     parser.add_argument("--public-dir", default="../public")
+    parser.add_argument("--manual", action="store_true", help="Manual prompt interaction")
     parser.set_defaults(headless=True)
     args = parser.parse_args()
     if not os.path.exists(args.story_file): exit(1)
     if os.path.exists(args.output): os.remove(args.output)
     with open(args.story_file, 'r', encoding='utf-8') as f: story = f.read()
-    maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, headless=args.headless)
+    maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, headless=args.headless, manual=args.manual)
 
     if args.fps_update_file:
         maker.load_fps_update(args.fps_update_file)

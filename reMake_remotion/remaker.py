@@ -596,17 +596,22 @@ def main():
 
             print(f"\nOptions for {scene.get('scene_id')}:")
             print("1. Change manually")
-            print("2. Change through gemini")
-            print("3. Just Render (no changes)")
+            print("2. Change through Gemini (Auto)")
+            print("3. Change through Gemini (Manual Paste)")
+            print("4. Just Render (no changes)")
             mode = input("Select mode: ").strip()
 
             if mode == '1':
                 remaker.manual_change(scene)
             elif mode == '2':
-                # Convert input to int if possible for legacy method compatibility, else use string
+                remaker.maker.manual = False
                 scene_ref = int(line) if line.isdigit() else line
                 remaker.gemini_change(scene_ref, scene)
             elif mode == '3':
+                remaker.maker.manual = True
+                scene_ref = int(line) if line.isdigit() else line
+                remaker.gemini_change(scene_ref, scene)
+            elif mode == '4':
                 pass
             else:
                 print("⚠️ Invalid option")
