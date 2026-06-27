@@ -1121,31 +1121,85 @@ class RemotionJsonMaker:
 
     def _interact_with_gemini(self, prompt: str, retry_count: int = 2) -> str:
         if self.manual:
-            print("\n" + "!"*80)
-            print("🖐️  MANUAL MODE ACTIVE")
-            print("1. COPY the prompt below.")
-            print("2. PASTE it into Gemini (https://gemini.google.com).")
-            print("3. COPY the RAW JSON response from Gemini.")
-            print("4. PASTE the response back here.")
-            print("!"*80 + "\n")
+            # Check if running in Google Colab for rich UI
+            try:
+                from google.colab import output
+                from IPython.display import HTML, display
 
-            print("--- PROMPT START ---")
-            print(prompt)
-            print("--- PROMPT END ---\n")
+                # HTML and JavaScript for a "Copy" button and a multi-line input fallback
+                # In Colab, we can't easily do a multi-line input back to python via 'input()' for large pastes
+                # So we use a JavaScript promise to capture the clipboard paste
+                display(HTML(f"""
+                    <div style="background-color: #1e1e1e; color: #fff; padding: 20px; border-radius: 8px; border: 1px solid #333; font-family: sans-serif;">
+                        <h3 style="color: #4CAF50; margin-top: 0;">🖐️ MANUAL GEMINI INTERACTION</h3>
+                        <p>1. Click the button below to copy the prompt.</p>
+                        <button id="copyBtn" style="background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                            📋 COPY PROMPT TO CLIPBOARD
+                        </button>
+                        <p style="margin-top: 15px;">2. Paste it into <a href="https://gemini.google.com" target="_blank" style="color: #2196F3;">Gemini</a>.</p>
+                        <p>3. Copy the RAW JSON response from Gemini.</p>
+                        <p>4. Paste it into the text area below and click "SUBMIT".</p>
+                        <textarea id="jsonResponse" style="width: 100%; height: 150px; background: #2d2d2d; color: #eee; border: 1px solid #444; padding: 10px; border-radius: 4px; margin-bottom: 10px;" placeholder="Paste JSON here..."></textarea>
+                        <button id="submitBtn" style="background: #2196F3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                            🚀 SUBMIT RESPONSE
+                        </button>
+                        <textarea id="hiddenPrompt" style="display:none">{prompt}</textarea>
+                    </div>
+                    <script>
+                        (async () => {{
+                            const copyBtn = document.getElementById('copyBtn');
+                            const submitBtn = document.getElementById('submitBtn');
+                            const promptText = document.getElementById('hiddenPrompt').value;
+                            const responseArea = document.getElementById('jsonResponse');
 
-            print("👉 Please paste the Gemini JSON response below.")
-            print("(To finish, press Enter then Ctrl+D on a new line or type 'END' on a new line):")
+                            copyBtn.onclick = () => {{
+                                navigator.clipboard.writeText(promptText);
+                                copyBtn.innerText = "✅ COPIED!";
+                                setTimeout(() => copyBtn.innerText = "📋 COPY PROMPT TO CLIPBOARD", 2000);
+                            }};
 
-            lines = []
-            while True:
-                try:
-                    line = input()
-                    if line.strip() == "END": break
-                    lines.append(line)
-                except EOFError:
-                    break
+                            const result = await new Promise((resolve) => {{
+                                submitBtn.onclick = () => {{
+                                    resolve(responseArea.value);
+                                }};
+                            }});
 
-            return "\n".join(lines)
+                            google.colab.kernel.invokeFunction('notebook.ManualResponse', [result], {{}});
+                        }})();
+                    </script>
+                """))
+
+                captured_json = []
+                def handle_response(res):
+                    captured_json.append(res)
+
+                output.register_callback('notebook.ManualResponse', handle_response)
+
+                print("⏳  Waiting for your input via the UI above...")
+                while not captured_json:
+                    time.sleep(0.5)
+
+                return captured_json[0]
+
+            except ImportError:
+                # Fallback for standard terminal
+                print("\n" + "!"*80)
+                print("🖐️  MANUAL MODE ACTIVE (Terminal Fallback)")
+                print("1. COPY the prompt below.")
+                print("--- PROMPT START ---")
+                print(prompt)
+                print("--- PROMPT END ---\n")
+                print("2. Paste JSON from Gemini below. Type 'END' on a new line to submit.")
+
+                lines = []
+                while True:
+                    try:
+                        line = input()
+                        if line.strip() == "END": break
+                        lines.append(line)
+                    except EOFError:
+                        break
+                return "\n".join(lines)
 
         for attempt in range(retry_count + 1):
             self.start_browser()
@@ -1471,23 +1525,35 @@ class RemotionJsonMaker:
             return {}
 
         try:
-            # 1. Look for markdown code blocks first
-            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_output, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(1)
+            # 1. Look for markdown code blocks first (get the LAST one if user pasted multiple times)
+            all_blocks = re.findall(r'```(?:json)?\s*(\{.*?\})\s*```', raw_output, re.DOTALL)
+            if all_blocks:
+                json_str = all_blocks[-1]
             else:
                 # 2. Fallback to finding first { and last }
-                start_idx, end_idx = raw_output.find('{'), raw_output.rfind('}')
-                if start_idx != -1 and end_idx != -1:
-                    json_str = raw_output[start_idx:end_idx+1]
-                else:
-                    # Try to find a partial JSON if it was truncated
-                    start_idx = raw_output.find('{')
-                    if start_idx != -1:
-                        json_str = raw_output[start_idx:]
-                    else:
-                        print("❌ Could not find any JSON-like structures in Gemini response.")
-                        return {}
+                # If user pasted multiple responses, we try to find the last complete object
+                # Strategy: find all { and try to parse from there to the end.
+                all_starts = [m.start() for m in re.finditer('{', raw_output)]
+                json_str = None
+                for s_idx in reversed(all_starts):
+                    candidate = raw_output[s_idx:]
+                    # Simple balancer
+                    stack = 0
+                    end_pos = -1
+                    for i, char in enumerate(candidate):
+                        if char == '{': stack += 1
+                        elif char == '}':
+                            stack -= 1
+                            if stack == 0:
+                                end_pos = i
+                                break
+                    if end_pos != -1:
+                        json_str = candidate[:end_pos+1]
+                        break
+
+                if not json_str:
+                    print("❌ Could not find any valid JSON objects in Gemini response.")
+                    return {}
 
             # Pre-cleanup: Remove control characters except for standard whitespace
             json_str = "".join(ch for ch in json_str if ch.isprintable() or ch in "\n\r\t")
