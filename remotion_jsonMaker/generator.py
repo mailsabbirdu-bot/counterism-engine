@@ -875,9 +875,25 @@ class RemotionJsonMaker:
         # DOCUMENTARY STYLES POOL (Expert Layouts)
         LAYOUT_PRESETS = ["SPLIT_SCREEN", "RULE_OF_THIRDS", "HERO_FOCAL", "TOP_TITLE_LOWER_VIS"]
 
+        # Camera Style Rotation (Documentary Focus)
+        CINEMATIC_SHOTS = [
+            "rack_focus", "cinematic_drift", "pan_right", "orbit", "zoom_blur_reveal",
+            "slow_push", "slow_pull", "tilt_up", "dolly_zoom", "lateral_strafe"
+        ]
+
+        # Valid text animations (reject hallucinated camera styles)
+        VALID_TEXT_ANIMS = [
+            "glow_pulse", "neon_flicker", "glitch_pop", "bounce_pop", "word_by_word",
+            "slide_up", "typewriter", "color_shift", "heartbeat", "energy_beam"
+        ]
+
         for idx, scene in enumerate(data['scenes']):
             scene_id = scene.get('scene_id', f"SCENE_{idx+1}")
             duration = scene.get('duration_in_frames', 180)
+
+            # Clean up redundant procedural config for video backgrounds
+            if scene.get('background_type') == 'video':
+                 if 'procedural_config' in scene: del scene['procedural_config']
 
             # Select a unique layout for this scene to prevent repetition
             layout_style = LAYOUT_PRESETS[idx % len(LAYOUT_PRESETS)]
@@ -931,24 +947,36 @@ class RemotionJsonMaker:
 
             # 1. Overlay Pass
             overlay_ids = [ov['id'] for ov in scene.get('overlays', [])]
+
+            # Counter for elements within each sector to apply offsets
+            sector_counts = {"TITLE": 0, "VISUAL": 0, "METRIC": 0}
+
             for o_idx, ov in enumerate(scene.get('overlays', [])):
                 o_type = ov.get('type', 'text')
 
                 # --- GUIDELINE: DOCUMENTARY COMPOSITION ---
-                # Force elements into distinct sectors based on layout_style to eliminate collisions
-                # Apply o_idx offsets to prevent stacking multiple elements of the same type
-                if layout_style == "SPLIT_SCREEN":
-                    if o_type == 'text': ov['position'] = {"x": 480, "y": 300 + (o_idx * 160)}
-                    else: ov['position'] = {"x": 1440, "y": 540 + ((o_idx-1) * 200)}
-                elif layout_style == "RULE_OF_THIRDS":
-                    if o_type == 'text': ov['position'] = {"x": 400, "y": 300 + (o_idx * 150)}
-                    else: ov['position'] = {"x": 1280, "y": 650 + ((o_idx-1) * 150)}
-                elif layout_style == "HERO_FOCAL":
-                    if o_type == 'text': ov['position'] = {"x": 400, "y": 750 + (o_idx * 100)}
-                    else: ov['position'] = {"x": 1100, "y": 500 + ((o_idx-1) * 100)}
-                elif layout_style == "TOP_TITLE_LOWER_VIS":
-                    if o_type == 'text': ov['position'] = {"x": 960, "y": 250 + (o_idx * 120)}
-                    else: ov['position'] = {"x": 960, "y": 750 + ((o_idx-1) * 150)}
+                # Force elements into distinct sectors to eliminate collisions
+                if o_type == 'text':
+                    sector = "TITLE"
+                    offset = sector_counts[sector] * 180
+                    if layout_style == "SPLIT_SCREEN": ov['position'] = {"x": 450, "y": 350 + offset}
+                    elif layout_style == "RULE_OF_THIRDS": ov['position'] = {"x": 640, "y": 360 + offset}
+                    elif layout_style == "HERO_FOCAL": ov['position'] = {"x": 400, "y": 750 + offset}
+                    else: ov['position'] = {"x": 960, "y": 250 + offset} # TOP_TITLE
+                elif o_type in ['hub_network', 'flow_diagram', 'svg', 'chart', 'shadcn_chart']:
+                    sector = "VISUAL"
+                    offset = sector_counts[sector] * 300
+                    if layout_style == "SPLIT_SCREEN": ov['position'] = {"x": 1400, "y": 540 + offset}
+                    elif layout_style == "RULE_OF_THIRDS": ov['position'] = {"x": 1280, "y": 720 + offset}
+                    elif layout_style == "HERO_FOCAL": ov['position'] = {"x": 1100, "y": 500 + offset}
+                    else: ov['position'] = {"x": 960, "y": 700 + offset} # LOWER_VIS
+                else:
+                    sector = "METRIC"
+                    offset = sector_counts[sector] * 220
+                    # Push metrics to edges
+                    ov['position'] = {"x": 1600, "y": 300 + offset}
+
+                sector_counts[sector] += 1
 
                 # --- GUIDELINE: INFORMATION STAGING (WAVES) ---
                 # Sequential Reveal: Title -> Graphic -> Indicators
@@ -1004,22 +1032,11 @@ class RemotionJsonMaker:
 
                     if not hero_word_in_content:
                         hero = self._get_scene_hero_word(scene_id, ov.get('content', ''), duration)
-                        if not hero:
-                            hero = self._get_fallback_hero(ov.get('content', ''))
+                        if not hero: hero = self._get_fallback_hero(ov.get('content', ''))
 
                         if hero:
-                            hero_anims = [
-                                "glow_pulse", "isolate_zoom", "bounce_pop", "neon_flicker", "shake_alert",
-                                "rainbow_flow", "ghost_trail", "glitch_pop", "wave_float", "expand_contract",
-                                "blur_reveal", "color_shift", "rotation_swing", "shadow_pulse", "letter_jump",
-                                "skew_slide", "tilt_pan", "bounce_gravity", "border_glow", "glass_shimmer",
-                                "heartbeat", "strobe_flash", "threed_flip", "magnetic_pull", "fire_glow",
-                                "pixel_scatter", "swing_pivot", "depth_shadow", "energy_beam", "spiral_in",
-                                "fly_in_z", "typewriter_flicker", "vibrate_intense", "float_orbit", "mirror_split",
-                                "zoom_blur_pop", "liquid_waver"
-                            ]
                             # Robust rotation ensures variety across scenes
-                            anim_choice = hero_anims[idx % len(hero_anims)]
+                            anim_choice = VALID_TEXT_ANIMS[idx % len(VALID_TEXT_ANIMS)]
                             ov['hero_config'] = {
                                 "word": hero['word'],
                                 "start": hero.get('start', 45),
@@ -1027,11 +1044,13 @@ class RemotionJsonMaker:
                                 "animation": anim_choice
                             }
                     else:
-                        # Existing hero config is valid, just ensure it has a color and animation if missing
+                        # Validate existing animation (map hallucinations to safe defaults)
+                        if existing_hero.get('animation') not in VALID_TEXT_ANIMS:
+                             existing_hero['animation'] = VALID_TEXT_ANIMS[idx % len(VALID_TEXT_ANIMS)]
+
+                        # Existing hero config is valid, just ensure it has a color and start if missing
                         if not existing_hero.get('color'):
                              existing_hero['color'] = modern_colors[(idx + 2) % len(modern_colors)]
-                        if not existing_hero.get('animation'):
-                             existing_hero['animation'] = "glow_pulse"
                         if not existing_hero.get('start'):
                              existing_hero['start'] = 45
 
@@ -1177,10 +1196,10 @@ class RemotionJsonMaker:
                     else:
                         shot['targetId'] = overlay_ids[0] if overlay_ids else None
 
-                # --- GUIDELINE: CAMERA VARIETY (40 PRESET ROTATION) ---
+                # --- GUIDELINE: CAMERA VARIETY ---
                 # Use unique seed per scene+shot to maximize variety
-                if not shot.get('style') or shot.get('style') == 'static':
-                    shot['style'] = camera_styles[(idx * 3 + s_idx) % len(camera_styles)]
+                if not shot.get('style') or shot.get('style') == 'static' or shot.get('style') not in camera_styles:
+                    shot['style'] = CINEMATIC_SHOTS[(idx * 2 + s_idx) % len(CINEMATIC_SHOTS)]
 
                 # --- GUIDELINE: BUTTERY SMOOTH BEZIER ---
                 if not shot.get('easing'):
@@ -1304,22 +1323,29 @@ class RemotionJsonMaker:
                         }};
 
                         // Return a promise that resolves when the user clicks submit
-                        return new Promise((resolve) => {{
+                        return new Promise((resolve, reject) => {{
                             submitBtn.onclick = () => {{
-                                const val = responseArea.value.trim();
-                                if (!val) {{
-                                    alert("Error: Text area is empty. Please paste Gemini's response first.");
-                                    return;
-                                }}
-                                submitBtn.disabled = true;
-                                submitBtn.style.opacity = "0.5";
-                                submitBtn.innerHTML = "⌛ VALIDATING MANIFEST...";
+                                try {{
+                                    const val = responseArea.value.trim();
+                                    if (!val) {{
+                                        alert("Error: Text area is empty. Please paste Gemini's response first.");
+                                        return;
+                                    }}
+                                    submitBtn.disabled = true;
+                                    submitBtn.style.opacity = "0.5";
+                                    submitBtn.innerHTML = "⌛ VALIDATING MANIFEST...";
 
-                                // Give it a moment to show the state before resolving
-                                setTimeout(() => {{
-                                    container.remove(); // Remove UI to return focus to terminal
-                                    resolve(val);
-                                }}, 500);
+                                    // Use a small delay to ensure the UI update is visible
+                                    setTimeout(() => {{
+                                        console.log("Submitting manifest to Python kernel...");
+                                        container.remove(); // Remove UI to return focus to terminal
+                                        resolve(val);
+                                    }}, 200);
+                                }} catch (e) {{
+                                    console.error("Submission Error:", e);
+                                    alert("Fatal Error during submission. Check browser console.");
+                                    reject(e);
+                                }}
                             }};
                         }});
                     }})();
@@ -1649,12 +1675,12 @@ class RemotionJsonMaker:
             f"TIMESTAMPS: {compact_ts}\n"
             f"DURATIONS: {duration_context}\n"
             "\nDIRECTOR'S RULES (STRICT COMPLIANCE REQUIRED):\n"
-            "1. ELIMINATE COLLISIONS: No two elements may overlap. Use the Rule of Thirds. Stop centering everything.\n"
-            "2. CINEMATIC COMPOSITIONS: Vary layouts across scenes:\n"
-             "   - Scene A: Split-screen (Left Title / Right Chart).\n"
-             "   - Scene B: Rule of Thirds (Title at x=400, y=300; Diagram at x=1200, y=600).\n"
-             "   - Scene C: Hero Focal (Large Hub Network center-right, supporting labels left).\n"
-            "3. PROGRESSIVE INFORMATION STAGING: Reveal data sequentially (sequential waves):\n"
+            "1. ELIMINATE COLLISIONS: No two infographic elements may overlap. Use the Rule of Thirds. Stop centering everything.\n"
+            "2. CINEMATIC COMPOSITIONS: Use a different layout for every scene. Avoid repetition.\n"
+             "   - Split-screen: Title LEFT(x=450, y=350), Chart RIGHT(x=1400, y=540).\n"
+             "   - Rule of Thirds: Title TOP-LEFT(x=640, y=360), Diagram BOTTOM-RIGHT(x=1280, y=720).\n"
+             "   - Hero Focal: Captions BOTTOM-LEFT(x=400, y=750), Large centerpiece CENTER-RIGHT(x=1100, y=500).\n"
+            "3. PROGRESSIVE INFORMATION STAGING: Reveal data sequentially in waves:\n"
             "   - Wave 1 (15f): Background + Main Title.\n"
             "   - Wave 2 (45f): Hero word animation + Primary Graphic.\n"
             "   - Wave 3 (75f): Supporting metrics, Indicators, and Connectors.\n"
