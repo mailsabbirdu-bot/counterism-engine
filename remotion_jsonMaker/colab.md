@@ -119,8 +119,9 @@ if not os.path.exists(TIMESTAMP_FILE):
     print("Generation will proceed without precise sync, but it is highly recommended to provide it.")
 
 # Use --manual flag for reliable Gemini interaction
-# This will provide a "Copy Prompt" button and a paste area for Gemini's response.
-!xvfb-run python generator.py \
+# This will provide a "Copy Prompt" button.
+# IMPORTANT: We use %run instead of !python to allow rich HTML output in Colab.
+%run generator.py \
     --story-file="{STORY_FILE}" \
     --output="{OUTPUT_JSON}" \
     --timestamp-file="{TIMESTAMP_FILE}" \
