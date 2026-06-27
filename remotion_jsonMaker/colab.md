@@ -118,7 +118,8 @@ if not os.path.exists(TIMESTAMP_FILE):
     print(f"⚠️ WARNING: Timestamp file NOT FOUND at: {TIMESTAMP_FILE}")
     print("Generation will proceed without precise sync, but it is highly recommended to provide it.")
 
-# Use --manual flag if browser automation fails
+# Use --manual flag for reliable Gemini interaction
+# This will provide a "Copy Prompt" button and a paste area for Gemini's response.
 !xvfb-run python generator.py \
     --story-file="{STORY_FILE}" \
     --output="{OUTPUT_JSON}" \
