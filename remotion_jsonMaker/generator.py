@@ -1144,14 +1144,18 @@ class RemotionJsonMaker:
             try:
                 from google.colab import output
                 from IPython.display import HTML, display
+                import uuid
+
+                # Unique ID for this interaction instance
+                u_id = uuid.uuid4().hex[:8]
 
                 display(HTML(f"""
-                    <div id="interaction-container" style="background-color: #1a1a1a; color: #fff; padding: 25px; border-radius: 12px; border: 2px solid #4CAF50; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.5); max-width: 800px; margin: 10px auto;">
+                    <div id="container-{u_id}" style="background-color: #1a1a1a; color: #fff; padding: 25px; border-radius: 12px; border: 2px solid #4CAF50; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.5); max-width: 800px; margin: 10px auto;">
                         <h2 style="color: #4CAF50; margin-top: 0; font-size: 22px; border-bottom: 1px solid #333; padding-bottom: 10px;">🎬 Studio V4 - Manual AI Interaction</h2>
 
                         <div style="margin-top: 20px;">
                             <p style="font-size: 15px;">1. Copy the generated prompt:</p>
-                            <button id="copyPromptBtn" style="background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 100%;">
+                            <button id="copyBtn-{u_id}" style="background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 100%;">
                                 📋 COPY PROMPT TO CLIPBOARD
                             </button>
                         </div>
@@ -1159,33 +1163,33 @@ class RemotionJsonMaker:
                         <div style="margin-top: 25px;">
                             <p style="font-size: 15px;">2. Get response from <a href="https://gemini.google.com" target="_blank" style="color: #2196F3; text-decoration: none; font-weight: bold;">Gemini</a> and paste here:</p>
                             <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                                <button id="pasteBtn" style="background: #444; color: white; border: 1px solid #666; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 13px;">
+                                <button id="pasteBtn-{u_id}" style="background: #444; color: white; border: 1px solid #666; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 13px;">
                                     📋 PASTE FROM CLIPBOARD
                                 </button>
-                                <button id="clearBtn" style="background: #444; color: white; border: 1px solid #666; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 13px;">
+                                <button id="clearBtn-{u_id}" style="background: #444; color: white; border: 1px solid #666; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 13px;">
                                     🧹 CLEAR
                                 </button>
                             </div>
-                            <textarea id="jsonResponse" style="width: 100%; height: 180px; background: #2d2d2d; color: #eee; border: 1px solid #444; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 13px; resize: vertical;" placeholder="Paste JSON response here..."></textarea>
+                            <textarea id="jsonResponse-{u_id}" style="width: 100%; height: 180px; background: #2d2d2d; color: #eee; border: 1px solid #444; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 13px; resize: vertical;" placeholder="Paste JSON response here..."></textarea>
                         </div>
 
                         <div style="margin-top: 20px;">
-                            <button id="submitBtn" style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); color: white; border: none; padding: 14px 28px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 100%;">
+                            <button id="submitBtn-{u_id}" style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); color: white; border: none; padding: 14px 28px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 100%;">
                                 🚀 SUBMIT RESPONSE
                             </button>
                         </div>
 
-                        <textarea id="hiddenPromptData" style="display:none">{prompt}</textarea>
+                        <textarea id="hiddenPrompt-{u_id}" style="display:none">{prompt}</textarea>
                     </div>
 
                     <script>
-                        (async () => {{
-                            const copyBtn = document.getElementById('copyPromptBtn');
-                            const pasteBtn = document.getElementById('pasteBtn');
-                            const clearBtn = document.getElementById('clearBtn');
-                            const submitBtn = document.getElementById('submitBtn');
-                            const promptText = document.getElementById('hiddenPromptData').value;
-                            const responseArea = document.getElementById('jsonResponse');
+                        (function() {{
+                            const u_id = "{u_id}";
+                            const copyBtn = document.getElementById('copyBtn-' + u_id);
+                            const pasteBtn = document.getElementById('pasteBtn-' + u_id);
+                            const clearBtn = document.getElementById('clearBtn-' + u_id);
+                            const promptText = document.getElementById('hiddenPrompt-' + u_id).value;
+                            const responseArea = document.getElementById('jsonResponse-' + u_id);
 
                             copyBtn.onclick = () => {{
                                 navigator.clipboard.writeText(promptText);
@@ -1209,36 +1213,34 @@ class RemotionJsonMaker:
                             }};
 
                             clearBtn.onclick = () => responseArea.value = "";
-
-                            const result = await new Promise((resolve) => {{
-                                submitBtn.onclick = () => {{
-                                    if (!responseArea.value.trim()) {{
-                                        alert("Please paste the Gemini response first!");
-                                        return;
-                                    }}
-                                    submitBtn.disabled = true;
-                                    submitBtn.innerText = "⌛ PROCESSING...";
-                                    resolve(responseArea.value);
-                                }};
-                            }});
-
-                            google.colab.kernel.invokeFunction('notebook.ManualResponse', [result], {{}});
                         }})();
                     </script>
                 """))
 
-                captured_json = []
-                def handle_response(res):
-                    captured_json.append(res)
+                print(f"⏳ Waiting for your input via the UI above (Instance: {u_id})...")
 
-                output.register_callback('notebook.ManualResponse', handle_response)
+                # Use eval_js to wait for the result of a promise (blocks Python until resolve)
+                result = output.eval_js(f"""
+                    new Promise((resolve) => {{
+                        const u_id = "{u_id}";
+                        const submitBtn = document.getElementById('submitBtn-' + u_id);
+                        const responseArea = document.getElementById('jsonResponse-' + u_id);
 
-                print("⏳ Waiting for your input via the UI above...")
-                while not captured_json:
-                    time.sleep(0.5)
+                        submitBtn.onclick = () => {{
+                            const val = responseArea.value.trim();
+                            if (!val) {{
+                                alert("Please paste the Gemini response first!");
+                                return;
+                            }}
+                            submitBtn.disabled = true;
+                            submitBtn.innerText = "⌛ PROCESSING...";
+                            resolve(val);
+                        }};
+                    }})
+                """)
 
                 print("✅ Response received. Parsing...")
-                return captured_json[0]
+                return result
 
             except ImportError:
                 # Fallback for standard terminal environments
