@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import argparse
 import re
@@ -945,29 +946,42 @@ class RemotionJsonMaker:
                         ov['font'] = self.bangla_fonts[0]
 
                     # --- GUIDELINE: HERO WORD ---
-                    hero = self._get_scene_hero_word(scene_id, ov.get('content', ''), duration)
-                    if not hero:
-                        hero = self._get_fallback_hero(ov.get('content', ''))
+                    # Only auto-generate if missing or if the word isn't actually in the content
+                    existing_hero = ov.get('hero_config', {})
+                    hero_word_in_content = existing_hero.get('word') and str(existing_hero.get('word')) in str(ov.get('content', ''))
 
-                    if hero:
-                        hero_anims = [
-                            "glow_pulse", "isolate_zoom", "bounce_pop", "neon_flicker", "shake_alert",
-                            "rainbow_flow", "ghost_trail", "glitch_pop", "wave_float", "expand_contract",
-                            "blur_reveal", "color_shift", "rotation_swing", "shadow_pulse", "letter_jump",
-                            "skew_slide", "tilt_pan", "bounce_gravity", "border_glow", "glass_shimmer",
-                            "heartbeat", "strobe_flash", "threed_flip", "magnetic_pull", "fire_glow",
-                            "pixel_scatter", "swing_pivot", "depth_shadow", "energy_beam", "spiral_in",
-                            "fly_in_z", "typewriter_flicker", "vibrate_intense", "float_orbit", "mirror_split",
-                            "zoom_blur_pop", "liquid_waver"
-                        ]
-                        # Robust rotation ensures variety across scenes
-                        anim_choice = hero_anims[idx % len(hero_anims)]
-                        ov['hero_config'] = {
-                            "word": hero['word'],
-                            "start": hero['start'],
-                            "color": modern_colors[(idx + 2) % len(modern_colors)],
-                            "animation": anim_choice
-                        }
+                    if not hero_word_in_content:
+                        hero = self._get_scene_hero_word(scene_id, ov.get('content', ''), duration)
+                        if not hero:
+                            hero = self._get_fallback_hero(ov.get('content', ''))
+
+                        if hero:
+                            hero_anims = [
+                                "glow_pulse", "isolate_zoom", "bounce_pop", "neon_flicker", "shake_alert",
+                                "rainbow_flow", "ghost_trail", "glitch_pop", "wave_float", "expand_contract",
+                                "blur_reveal", "color_shift", "rotation_swing", "shadow_pulse", "letter_jump",
+                                "skew_slide", "tilt_pan", "bounce_gravity", "border_glow", "glass_shimmer",
+                                "heartbeat", "strobe_flash", "threed_flip", "magnetic_pull", "fire_glow",
+                                "pixel_scatter", "swing_pivot", "depth_shadow", "energy_beam", "spiral_in",
+                                "fly_in_z", "typewriter_flicker", "vibrate_intense", "float_orbit", "mirror_split",
+                                "zoom_blur_pop", "liquid_waver"
+                            ]
+                            # Robust rotation ensures variety across scenes
+                            anim_choice = hero_anims[idx % len(hero_anims)]
+                            ov['hero_config'] = {
+                                "word": hero['word'],
+                                "start": hero.get('start', 45),
+                                "color": modern_colors[(idx + 2) % len(modern_colors)],
+                                "animation": anim_choice
+                            }
+                    else:
+                        # Existing hero config is valid, just ensure it has a color and animation if missing
+                        if not existing_hero.get('color'):
+                             existing_hero['color'] = modern_colors[(idx + 2) % len(modern_colors)]
+                        if not existing_hero.get('animation'):
+                             existing_hero['animation'] = "glow_pulse"
+                        if not existing_hero.get('start'):
+                             existing_hero['start'] = 45
 
                 if o_type in ['chart', 'shadcn_chart']:
                     # Force Bangla font if scene is Bangla
@@ -1126,38 +1140,107 @@ class RemotionJsonMaker:
 
     def _interact_with_gemini(self, prompt: str, retry_count: int = 2) -> str:
         if self.manual:
-            # Attempt to display a rich "Copy" button in Colab/Notebooks
+            # Check if running in Google Colab for rich UI
             try:
+                from google.colab import output
                 from IPython.display import HTML, display
+
                 display(HTML(f"""
-                    <div style="background-color: #1a1a1a; color: #fff; padding: 25px; border-radius: 12px; border: 2px solid #4CAF50; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-                        <h2 style="color: #4CAF50; margin-top: 0; font-size: 20px;">🎬 Counterism Studio V4 - Gemini Interaction</h2>
-                        <p style="font-size: 14px; margin-bottom: 20px;">1. Click the button below to copy the generated prompt to your clipboard.</p>
-                        <button id="copyPromptBtn" style="background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: transform 0.1s;">
-                            📋 COPY PROMPT TO CLIPBOARD
-                        </button>
-                        <p style="margin-top: 20px; font-size: 14px;">2. Paste it into <a href="https://gemini.google.com" target="_blank" style="color: #2196F3; text-decoration: none; font-weight: bold;">Gemini</a>.</p>
-                        <p style="font-size: 14px;">3. Once you get the response, paste it into the <b>Colab terminal input area</b> below.</p>
-                        <p style="font-size: 12px; color: #aaa;">(Note: If you don't see the input area, click 'END' or check the bottom of the cell output)</p>
+                    <div id="interaction-container" style="background-color: #1a1a1a; color: #fff; padding: 25px; border-radius: 12px; border: 2px solid #4CAF50; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.5); max-width: 800px; margin: 10px auto;">
+                        <h2 style="color: #4CAF50; margin-top: 0; font-size: 22px; border-bottom: 1px solid #333; padding-bottom: 10px;">🎬 Studio V4 - Manual AI Interaction</h2>
+
+                        <div style="margin-top: 20px;">
+                            <p style="font-size: 15px;">1. Copy the generated prompt:</p>
+                            <button id="copyPromptBtn" style="background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 100%;">
+                                📋 COPY PROMPT TO CLIPBOARD
+                            </button>
+                        </div>
+
+                        <div style="margin-top: 25px;">
+                            <p style="font-size: 15px;">2. Get response from <a href="https://gemini.google.com" target="_blank" style="color: #2196F3; text-decoration: none; font-weight: bold;">Gemini</a> and paste here:</p>
+                            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                                <button id="pasteBtn" style="background: #444; color: white; border: 1px solid #666; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 13px;">
+                                    📋 PASTE FROM CLIPBOARD
+                                </button>
+                                <button id="clearBtn" style="background: #444; color: white; border: 1px solid #666; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 13px;">
+                                    🧹 CLEAR
+                                </button>
+                            </div>
+                            <textarea id="jsonResponse" style="width: 100%; height: 180px; background: #2d2d2d; color: #eee; border: 1px solid #444; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 13px; resize: vertical;" placeholder="Paste JSON response here..."></textarea>
+                        </div>
+
+                        <div style="margin-top: 20px;">
+                            <button id="submitBtn" style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); color: white; border: none; padding: 14px 28px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 100%;">
+                                🚀 SUBMIT RESPONSE
+                            </button>
+                        </div>
+
                         <textarea id="hiddenPromptData" style="display:none">{prompt}</textarea>
                     </div>
+
                     <script>
-                        (function() {{
-                            const btn = document.getElementById('copyPromptBtn');
-                            const prompt = document.getElementById('hiddenPromptData').value;
-                            btn.onclick = () => {{
-                                navigator.clipboard.writeText(prompt);
-                                btn.innerText = "✅ PROMPT COPIED!";
-                                btn.style.background = "#2196F3";
+                        (async () => {{
+                            const copyBtn = document.getElementById('copyPromptBtn');
+                            const pasteBtn = document.getElementById('pasteBtn');
+                            const clearBtn = document.getElementById('clearBtn');
+                            const submitBtn = document.getElementById('submitBtn');
+                            const promptText = document.getElementById('hiddenPromptData').value;
+                            const responseArea = document.getElementById('jsonResponse');
+
+                            copyBtn.onclick = () => {{
+                                navigator.clipboard.writeText(promptText);
+                                copyBtn.innerText = "✅ PROMPT COPIED!";
+                                copyBtn.style.background = "#2196F3";
                                 setTimeout(() => {{
-                                    btn.innerText = "📋 COPY PROMPT TO CLIPBOARD";
-                                    btn.style.background = "linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)";
+                                    copyBtn.innerText = "📋 COPY PROMPT TO CLIPBOARD";
+                                    copyBtn.style.background = "linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)";
                                 }}, 3000);
                             }};
+
+                            pasteBtn.onclick = async () => {{
+                                try {{
+                                    const text = await navigator.clipboard.readText();
+                                    responseArea.value = text;
+                                    pasteBtn.innerText = "✅ PASTED!";
+                                    setTimeout(() => pasteBtn.innerText = "📋 PASTE FROM CLIPBOARD", 2000);
+                                }} catch (e) {{
+                                    alert("Browser blocked clipboard access. Please paste manually (Ctrl+V).");
+                                }}
+                            }};
+
+                            clearBtn.onclick = () => responseArea.value = "";
+
+                            const result = await new Promise((resolve) => {{
+                                submitBtn.onclick = () => {{
+                                    if (!responseArea.value.trim()) {{
+                                        alert("Please paste the Gemini response first!");
+                                        return;
+                                    }}
+                                    submitBtn.disabled = true;
+                                    submitBtn.innerText = "⌛ PROCESSING...";
+                                    resolve(responseArea.value);
+                                }};
+                            }});
+
+                            google.colab.kernel.invokeFunction('notebook.ManualResponse', [result], {{}});
                         }})();
                     </script>
                 """))
-            except Exception:
+
+                captured_json = []
+                def handle_response(res):
+                    captured_json.append(res)
+
+                output.register_callback('notebook.ManualResponse', handle_response)
+
+                print("⏳ Waiting for your input via the UI above...")
+                while not captured_json:
+                    time.sleep(0.5)
+
+                print("✅ Response received. Parsing...")
+                return captured_json[0]
+
+            except ImportError:
                 # Fallback for standard terminal environments
                 print("\n" + "!"*80)
                 print("🖐️  MANUAL MODE ACTIVE (Terminal Fallback)")
@@ -1166,18 +1249,18 @@ class RemotionJsonMaker:
                 print(prompt)
                 print("-" * 30 + "  PROMPT END  " + "-" * 30 + "\n")
 
-            print("\n👉 Paste the JSON response from Gemini below.")
-            print("👉 TYPE 'END' ON A NEW LINE AND PRESS ENTER TO SUBMIT.")
+                print("\n👉 Paste the JSON response from Gemini below.")
+                print("👉 TYPE 'END' ON A NEW LINE AND PRESS ENTER TO SUBMIT.")
 
-            lines = []
-            while True:
-                try:
-                    line = input()
-                    if line.strip().upper() == "END": break
-                    lines.append(line)
-                except EOFError:
-                    break
-            return "\n".join(lines)
+                lines = []
+                while True:
+                    try:
+                        line = input()
+                        if line.strip().upper() == "END": break
+                        lines.append(line)
+                    except EOFError:
+                        break
+                return "\n".join(lines)
 
         for attempt in range(retry_count + 1):
             self.start_browser()
@@ -1505,35 +1588,38 @@ class RemotionJsonMaker:
             return {}
 
         try:
-            # 1. Look for markdown code blocks first (get the LAST one if user pasted multiple times)
-            all_blocks = re.findall(r'```(?:json)?\s*(\{.*?\})\s*```', raw_output, re.DOTALL)
-            if all_blocks:
-                json_str = all_blocks[-1]
-            else:
-                # 2. Fallback to finding first { and last }
-                # If user pasted multiple responses, we try to find the last complete object
-                # Strategy: find all { and try to parse from there to the end.
-                all_starts = [m.start() for m in re.finditer('{', raw_output)]
-                json_str = None
-                for s_idx in reversed(all_starts):
-                    candidate = raw_output[s_idx:]
-                    # Simple balancer
-                    stack = 0
-                    end_pos = -1
-                    for i, char in enumerate(candidate):
-                        if char == '{': stack += 1
-                        elif char == '}':
-                            stack -= 1
-                            if stack == 0:
-                                end_pos = i
-                                break
-                    if end_pos != -1:
-                        json_str = candidate[:end_pos+1]
-                        break
+            # Enhanced JSON extraction: Prioritize the largest balanced object containing "scenes"
+            json_str = None
 
-                if not json_str:
-                    print("❌ Could not find any valid JSON objects in Gemini response.")
-                    return {}
+            # 1. Look for markdown code blocks
+            all_blocks = re.findall(r'```(?:json)?\s*(\{.*?\})\s*```', raw_output, re.DOTALL)
+
+            # 2. Also look for any balanced { } structures outside blocks
+            all_starts = [m.start() for m in re.finditer('{', raw_output)]
+            for s_idx in all_starts:
+                candidate = raw_output[s_idx:]
+                stack = 0
+                end_pos = -1
+                for i, char in enumerate(candidate):
+                    if char == '{': stack += 1
+                    elif char == '}':
+                        stack -= 1
+                        if stack == 0:
+                            end_pos = i
+                            break
+                if end_pos != -1:
+                    all_blocks.append(candidate[:end_pos+1])
+
+            # Filter candidates that look like valid scenes manifest and pick the longest
+            valid_candidates = [b for b in all_blocks if '"scenes"' in b]
+            if valid_candidates:
+                json_str = max(valid_candidates, key=len)
+            elif all_blocks:
+                json_str = max(all_blocks, key=len)
+
+            if not json_str:
+                print("❌ Could not find any valid JSON objects in Gemini response.")
+                return {}
 
             # Pre-cleanup: Remove control characters except for standard whitespace
             json_str = "".join(ch for ch in json_str if ch.isprintable() or ch in "\n\r\t")
@@ -1585,7 +1671,7 @@ def main():
     parser.add_argument("--manual", action="store_true", help="Manual prompt interaction")
     parser.set_defaults(headless=True)
     args = parser.parse_args()
-    if not os.path.exists(args.story_file): exit(1)
+    if not os.path.exists(args.story_file): sys.exit(1)
     if os.path.exists(args.output): os.remove(args.output)
     with open(args.story_file, 'r', encoding='utf-8') as f: story = f.read()
     maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, headless=args.headless, manual=args.manual)
@@ -1634,12 +1720,12 @@ def main():
 
         if not render_json:
              print("❌ ERROR: Gemini failed to produce any JSON.")
-             exit(1)
+             sys.exit(1)
 
         if 'scenes' not in render_json or not render_json['scenes']:
              print("❌ ERROR: Generated JSON contains no scenes. Manifest is invalid.")
              print(f"DEBUG: Keys found in JSON: {list(render_json.keys())}")
-             exit(1)
+             sys.exit(1)
 
         render_json = maker.finalize_json_durations(render_json, public_dir=abs_public)
         output_dir = os.path.dirname(args.output)
@@ -1662,5 +1748,5 @@ def main():
         except: pass
     except Exception as e:
         print(f"❌ Error in main: {e}")
-        exit(1)
+        sys.exit(1)
 if __name__ == "__main__": main()

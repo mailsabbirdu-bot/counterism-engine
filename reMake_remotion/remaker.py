@@ -583,6 +583,8 @@ def main():
     public_dir = "/content/engine/public"
 
     remaker = RemotionRemaker(manifest_path, public_dir, timestamp_path, story_path)
+    # Force manual mode context for remaker
+    remaker.maker.manual = True
 
     while True:
         try:
