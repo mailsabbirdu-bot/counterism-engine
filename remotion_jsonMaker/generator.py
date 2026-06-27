@@ -522,9 +522,9 @@ class RemotionJsonMaker:
                         ov['duration'] = min(text_ov.get('duration', 120), focal_ov.get('duration', 120))
 
                         if ov_type == 'text':
-                             ov['position'] = {"x": 480, "y": 540} # Title column
+                             ov['position'] = {"x": 400, "y": 540} # Column 1
                         else:
-                             ov['position'] = {"x": 1440, "y": 540} # Content column
+                             ov['position'] = {"x": 1520, "y": 540} # Column 3
                     else:
                         # EXPERT COMPOSITION RULES
                         bg_type = scene.get('background_type', 'procedural')
@@ -1384,26 +1384,25 @@ class RemotionJsonMaker:
         scene_targets = "\n".join([f"{sid}: {self.story_scenes[sid]}" for sid in sorted(self.story_scenes.keys())])
 
         full_prompt = (
-            "TASK: OUTPUT RAW JSON ONLY. NO CONVERSATION. NO PREAMBLE.\n"
-            "SYSTEM: Counterism Studio V4 - Production Rendering Engine.\n"
-            f"TARGET: GENERATE FULL JSON FOR {len(self.story_scenes)} SCENES: {list(self.story_scenes.keys())}.\n"
-            "\nSTORY SOURCE DATA (MANDATORY):\n"
+            f"GENERATE PRODUCTION-READY MOTION GRAPHICS JSON FOR THESE {len(self.story_scenes)} SCENES: {list(self.story_scenes.keys())}.\n"
+            "\n--- MANDATORY STORYBOARD NARRATION ---\n"
             f"{story_context}\n"
-            "\nTIMING/SYNC DATA:\n"
+            "\n--- TIMING & SYNC DATA ---\n"
             f"TIMESTAMPS: {compact_ts}\n"
-            f"DURATIONS: {duration_context}\n"
-            "\nENGINE CONSTRAINTS (EXPERT DIRECTOR MODE):\n"
-            "1. 3-COLUMN SPATIAL ANCHORS (Strict): Center-stacking is an engine failure. Use columns:\n"
-            "   - LEFT (x=400): Titles, Narrations, Labels.\n"
-            "   - CENTER (x=960): Hub Networks, Flows, Primary focal SVG nodes.\n"
-            "   - RIGHT (x=1520): KPIs, Charts, Data Indicators.\n"
-            "2. VISUAL HIERARCHY: Every scene MUST have 1 'primary' (large focal point), 1-2 'secondary' (supporting nodes), and small labels. eye-path must be clear.\n"
-            "3. STAGGERED PROGRESSION: Start frames MUST be staggered by 15-20f (e.g. 0, 20, 40, 60). Visuals reveal as narrated. NO simultaneous pops.\n"
-            "4. CONNECTED SYSTEMS (Mandatory for procedural): Every scene is a system. Use 'infographic_lines' (minimum 2 per scene) to connect related SVGs (e.g. Worker node -> Factory node). Use 'groups' for 3+ items. Use SVG elements as building blocks for a larger diagram, not isolated icons.\n"
-            "5. NARRATIVE DATA: Extract REAL NUMBERS. If story says '2 crore', KPI value=2, suffix='Crore'. NO placeholder values (10, 20, A, B).\n"
-            "6. VIDEO SAFE-ZONE: If background_type='video', keep overlays to columns Left/Right to avoid obscuring center video subjects.\n"
-            "7. ASYMMETRICAL BALANCE: Maintain 300px whitespace between Primary elements. Let the composition breathe.\n"
-            "8. PERSISTENCE: duration = (scene_duration - start). Elements stay until scene end.\n"
+            f"DURATIONS (30fps): {duration_context}\n"
+            "\nACT AS A PROFESSIONAL MOTION ARCHITECT. Design an expert documentary sequence (Vox/Polymatter style).\n"
+            "COMPOSITION CONSTRAINTS (STRICT):\n"
+            "1. 3-COLUMN SPATIAL ANCHORS: Absolutely NO center-stacking. Every graphic must occupy a unique region:\n"
+            "   - COLUMN 1 (LEFT, x=400): Narrations, Titles, Paragraphs.\n"
+            "   - COLUMN 2 (CENTER, x=960): Hub Networks, Flow Diagrams, Primary SVG centerpieces.\n"
+            "   - COLUMN 3 (RIGHT, x=1520): KPIs, Charts, Indicators, Statistics.\n"
+            "2. VISUAL HIERARCHY: Every scene MUST have 1 'primary' element (largest), 1-2 'secondary' elements, and supporting labels. Eye-path must be clear.\n"
+            "3. STAGGERED ENTRANCES: Elements MUST NOT appear simultaneously. Stagger 'start' frames by 15-20f waves (Wave 1: Title, Wave 2: Diagram, Wave 3: Stats).\n"
+            "4. INFOGRAPHIC SYSTEMS: Procedural scenes MUST be connected stories. Use 'infographic_lines' (minimum 2 per scene) to link related SVGs. Use SVG icons only as helper nodes in a larger system, not isolated widgets.\n"
+            "5. REAL NARRATIVE DATA: Visualize ACTUAL NUMBERS from story. NO placeholder values (10, 20, A, B). If text says '5 million', KPI must show '5M'.\n"
+            "6. VIDEO SAFE-ZONES: If background_type='video', keep overlays to Columns 1 and 3. DO NOT obscure the center subjects of the video footage.\n"
+            "7. WHITESPACE & BREATHING ROOM: Maintain 300px between Primary elements. Use 40/30/30 spatial balance.\n"
+            "8. PERSISTENCE: Overlays stay until scene ends. duration = (scene_duration - start).\n"
             "\nJSON SCHEMA:\n"
             "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config', 'overlays': [], 'infographic_lines': [], 'groups': [] } ]\n"
             "- 'overlays': [\n"
@@ -1419,7 +1418,7 @@ class RemotionJsonMaker:
             f"\nENV_FONTS: {local_fonts}\n"
             f"ENV_VIDEOS: {self.video_files}\n"
             f"REFERENCE: {schema_ref}\n"
-            "\nEXECUTION: GENERATE ALL SCENES NOW. RAW JSON ONLY."
+            "\nTASK: OUTPUT RAW JSON BLOCK ONLY. NO PREAMBLE. NO CHATTER. NO ERROR MESSAGES."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
@@ -1574,6 +1573,13 @@ def main():
             os.fsync(f.fileno())
         print(f"✅ Master JSON created: {args.output} ({os.path.getsize(args.output)} bytes)")
 
+        # 3. Quality Assurance Pass
+        print("\n🧪 --- RUNNING QUALITY ASSURANCE PASS ---")
+        try:
+            from scripts.test_manifest_quality import test_manifest_quality
+            test_manifest_quality(args.output)
+        except ImportError:
+            print("⚠️ QA Script not found. Skipping validation.")
 
         try: shutil.copy(args.output, "/content/remotion_render.json")
         except: pass

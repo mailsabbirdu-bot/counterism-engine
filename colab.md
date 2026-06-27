@@ -86,8 +86,9 @@ else:
 
 # 5. Install Dependencies
 print_banner("🛠️ INSTALLING DEPENDENCIES")
-!apt-get update -y && apt-get install -y ffmpeg build-essential
-!npm install
+# Use -qq and --silent to ignore verbose node/apt messages
+!apt-get update -y -qq && apt-get install -y -qq ffmpeg build-essential
+!npm install --silent
 
 # 6. Render Pipeline
 print_banner("🎬 STARTING RENDERING PIPELINE")

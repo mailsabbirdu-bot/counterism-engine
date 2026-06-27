@@ -92,8 +92,9 @@ print("\n✨ All Drive assets successfully linked to local public folder.")
 %cd remotion_jsonMaker
 
 print_banner("🛠️ INSTALLING PROJECT DEPENDENCIES")
-!apt-get update -y && apt-get install -y ffmpeg build-essential
-!pip install -r requirements.txt
+# Use -qq and -q to ignore verbose output
+!apt-get update -y -qq && apt-get install -y -qq ffmpeg build-essential
+!pip install -q -r requirements.txt
 !playwright install chromium
 !playwright install-deps chromium
 
