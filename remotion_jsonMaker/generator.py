@@ -1,5 +1,4 @@
 import os
-import sys
 import json
 import argparse
 import re
@@ -173,21 +172,24 @@ class RemotionJsonMaker:
 
         # Calibrated base sizes for center-anchored overlays
         TYPE_SIZES = {
-            'text': (600, 120),
+            'text': (800, 200),
             'chart': (1000, 600),
             'shadcn_chart': (1000, 600),
             'ui_panel': (700, 500),
             'data_indicator': (450, 400),
             'shadcn_indicator': (450, 400),
-            'svg': (300, 300),
+            'svg': (400, 400),
             'kpi': (450, 400),
-            'timeline': (1000, 300),
-            'hub_network': (800, 800),
-            'flow_diagram': (1000, 400),
-            'process': (1000, 400),
+            'timeline': (1200, 300),
+            'hub_network': (900, 900),
+            'flow_diagram': (1000, 450),
+            'process': (1000, 450),
             'media': (900, 700),
             'image': (900, 700),
-            'video': (900, 700)
+            'video': (900, 700),
+            'label': (300, 100),
+            'callout': (400, 200),
+            'composition': (1200, 800)
         }
 
         # Expert Motion Graphics Budget (High Fidelity)
@@ -197,16 +199,16 @@ class RemotionJsonMaker:
 
         # Expert 3-Column Anchors (Wide)
         SECTORS = {
-            "TOP_LEFT": {"x": 400, "y": 250},
-            "TOP_RIGHT": {"x": 1520, "y": 250},
-            "BOTTOM_LEFT": {"x": 400, "y": 830},
-            "BOTTOM_RIGHT": {"x": 1520, "y": 830},
+            "TOP_LEFT": {"x": 480, "y": 270},
+            "TOP_RIGHT": {"x": 1440, "y": 270},
+            "BOTTOM_LEFT": {"x": 480, "y": 810},
+            "BOTTOM_RIGHT": {"x": 1440, "y": 810},
             "CENTER_FOCAL": {"x": 960, "y": 540},
-            "MID_LEFT": {"x": 400, "y": 540},
-            "MID_RIGHT": {"x": 1520, "y": 540},
-            "LEFT_COL": {"x": 400, "y": 540},
+            "MID_LEFT": {"x": 480, "y": 540},
+            "MID_RIGHT": {"x": 1440, "y": 540},
+            "LEFT_COL": {"x": 480, "y": 540},
             "CENTER_COL": {"x": 960, "y": 540},
-            "RIGHT_COL": {"x": 1520, "y": 540}
+            "RIGHT_COL": {"x": 1440, "y": 540}
         }
 
         sfx_manifest = []
@@ -261,12 +263,8 @@ class RemotionJsonMaker:
 
             if 'background' in scene and isinstance(scene['background'], dict):
                 bg = scene['background']
-                for k in ['background_type', 'video_path', 'audio_enabled', 'procedural_config']:
+                for k in ['background_type', 'video_path', 'audio_enabled']:
                     if k in bg and k not in scene: scene[k] = bg[k]
-
-            # LLM Repair: procedural_config as string
-            if 'procedural_config' in scene and isinstance(scene['procedural_config'], str):
-                 scene['procedural_config'] = {"variant": scene['procedural_config']}
 
             # 2. Background Handling (Studio V4 SVG Integration)
             if not scene.get('background_type'):
@@ -283,12 +281,7 @@ class RemotionJsonMaker:
             if scene['background_type'] == 'video':
                 # Preserve existing valid render paths (important for Remake project)
                 current_vpath = scene.get('video_path', '')
-                if current_vpath and not current_vpath.startswith('renders/'):
-                     # Ensure it has the renders/ prefix if it's just a filename
-                     if os.path.basename(current_vpath) == current_vpath:
-                          scene['video_path'] = f"renders/{current_vpath}"
-
-                if not scene.get('video_path'):
+                if not current_vpath or not current_vpath.startswith('renders/'):
                     # Check if matching video actually exists
                     vname = f"scene_SC_{id_num:02d}.mp4"
                     if vname in self.video_files:
@@ -297,17 +290,15 @@ class RemotionJsonMaker:
                     else:
                         # Fallback to procedural if video missing
                         scene['background_type'] = 'procedural'
-                        if not scene.get('procedural_config') or not isinstance(scene.get('procedural_config'), dict):
+                        if not scene.get('procedural_config'):
                             scene['procedural_config'] = {"variant": "neon_grid"}
                         scene['video_path'] = None
                         print(f"      🎨 Video {vname} missing. Falling back to procedural background.")
             elif scene['background_type'] == 'procedural':
-                if not scene.get('procedural_config') or not isinstance(scene.get('procedural_config'), dict):
+                if not scene.get('procedural_config'):
                     scene['procedural_config'] = {"variant": "neon_grid"}
                 scene['video_path'] = None
-
-                variant = scene['procedural_config'].get('variant', 'neon_grid')
-                print(f"      🎨 SVG Mode: Using procedural background '{variant}'")
+                print(f"      🎨 SVG Mode: Using procedural background '{scene['procedural_config']['variant']}'")
 
             # 3. Authoritative Duration Resolution
             raw_dur = scene.get('duration_in_frames') or scene.get('duration', 180)
@@ -349,13 +340,8 @@ class RemotionJsonMaker:
             focal_count = 0
 
             if scene.get('overlays'):
-                # LLM Repair: overlays as dict instead of list
-                if isinstance(scene['overlays'], dict):
-                     scene['overlays'] = [scene['overlays']]
-                     print(f"      🔧 Converted single overlay object to list")
-
                 # Pass 0: Detect Title+Content relation
-                text_ov = next((o for o in scene['overlays'] if isinstance(o, dict) and (o.get('type') == 'text' or 'text' in o or 'content' in o)), None)
+                text_ov = next((o for o in scene['overlays'] if o.get('type') == 'text' or 'text' in o or 'content' in o), None)
                 focal_ov = next((o for o in scene['overlays'] if o.get('type') in ['chart', 'shadcn_chart', 'ui_panel', 'data_indicator', 'shadcn_indicator', 'indicator'] or 'chart_type' in o or 'kind' in o), None)
                 has_relation = text_ov and focal_ov
 
@@ -583,54 +569,54 @@ class RemotionJsonMaker:
 
                          ov['position'] = {"x": SECTORS[selected]["x"], "y": SECTORS[selected]["y"]}
 
-                    # 2. Multi-Directional Collision Nudging (AABB Multi-Pass)
-                    # Expert Whitespace (300px for large focal, 120px for text/small)
-                    buffer = 300 if w > 500 else 120
-                    for attempt in range(15):
-                        collision_found = False
-                        for prev_ov, prev_w, prev_h in placed_overlays:
-                            s1, e1 = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', 60)
-                            s2, e2 = prev_ov.get('start', 0), prev_ov.get('start', 0) + prev_ov.get('duration', 60)
+                    # 2. Geometry-Aware Placement & Collision Resolution (AABB)
+                    # We use a multi-pass approach with screen clamping
+                    buffer = 200 if w > 500 else 80
+                    margin = 80
 
-                            if max(s1, s2) < min(e1, e2):
-                                x1, y1 = ov['position']['x'], ov['position']['y']
-                                x2, y2 = prev_ov['position']['x'], prev_ov['position']['y']
+                    orig_x, orig_y = ov['position']['x'], ov['position']['y']
+                    best_x, best_y = orig_x, orig_y
 
-                                # Overlap check with comfort buffer
-                                if abs(x1 - x2) < (w + prev_w) / 2 + buffer and abs(y1 - y2) < (h + prev_h) / 2 + buffer:
-                                    collision_found = True
+                    # Search candidates in a expanding pattern if blocked
+                    found_spot = False
+                    # Offsets: (0,0) then expanding boxes
+                    for r in range(0, 1000, 100):
+                        for dx, dy in [(0,0)] if r==0 else [(r,0), (-r,0), (0,r), (0,-r), (r,r), (-r,-r), (r,-r), (-r,r)]:
+                            cand_x = orig_x + dx
+                            cand_y = orig_y + dy
 
-                                    # Nudge logic: try vertical first, then horizontal
-                                    # Force asymmetric offset for expert feel
-                                    if abs(y1 - y2) < (h + prev_h) / 2 + buffer:
-                                        if y1 <= y2: ov['position']['y'] = y2 - (h + prev_h) / 2 - buffer
-                                        else: ov['position']['y'] = y2 + (h + prev_h) / 2 + buffer
+                            # Bounds Check
+                            l, t = cand_x - w/2, cand_y - h/2
+                            r_edge, b = cand_x + w/2, cand_y + h/2
+                            if l < margin or r_edge > 1920 - margin or t < margin or b > 1080 - margin:
+                                continue
 
-                                        # Add horizontal "breathing" offset
-                                        ov['position']['x'] += (50 if x1 > 960 else -50)
+                            # Collision Check
+                            collides = False
+                            for p_ov, p_w, p_h in placed_overlays:
+                                # Time overlap?
+                                if max(ov['start'], p_ov['start']) < min(ov['start']+ov['duration'], p_ov['start']+p_ov['duration']):
+                                    p_x, p_y = p_ov['position']['x'], p_ov['position']['y']
+                                    p_l, p_t = p_x - p_w/2, p_y - p_h/2
+                                    p_r, p_b = p_x + p_w/2, p_y + p_h/2
 
-                                    # CANVAS SAFETY CLAMPING (Intermediate)
-                                    ov['position']['x'] = max(150 + w/2, min(1920 - 150 - w/2, ov['position']['x']))
-                                    ov['position']['y'] = max(150 + h/2, min(1080 - 150 - h/2, ov['position']['y']))
+                                    # AABB with buffer
+                                    if not (r_edge + buffer < p_l or l - buffer > p_r or b + buffer < p_t or t - buffer > p_b):
+                                        collides = True
+                                        break
 
-                                    # Secondary check: if vertical nudge didn't resolve or was clamped, try horizontal
-                                    if abs(ov['position']['y'] - y2) < (h + prev_h) / 2 + buffer:
-                                        if x1 <= x2: ov['position']['x'] = x2 - (w + prev_w) / 2 - buffer - 50
-                                        else: ov['position']['x'] = x2 + (w + prev_w) / 2 + buffer + 50
+                            if not collides:
+                                best_x, best_y = cand_x, cand_y
+                                found_spot = True
+                                break
+                        if found_spot: break
 
-                                    print(f"   🔧 Expert Nudging {ov['id']} to resolve overlap -> New Pos: ({int(ov['position']['x'])}, {int(ov['position']['y'])})")
-                        if not collision_found: break
+                    if not found_spot:
+                        print(f"   ⚠️ Could not find perfect spot for {ov['id']}. Clamping.")
+                        best_x = max(margin + w/2, min(1920 - margin - w/2, best_x))
+                        best_y = max(margin + h/2, min(1080 - margin - h/2, best_y))
 
-                    # 3. Final Rigid Canvas Safety Clamping (150px safety zone)
-                    margin = 150
-                    x_min, x_max = margin + w/2, 1920 - margin - w/2
-                    y_min, y_max = margin + h/2, 1080 - margin - h/2
-
-                    if x_min > x_max: x_min = x_max = 960
-                    if y_min > y_max: y_min = y_max = 540
-
-                    ov['position']['x'] = max(x_min, min(x_max, int(ov.get('position', {}).get('x', 960))))
-                    ov['position']['y'] = max(y_min, min(y_max, int(ov.get('position', {}).get('y', 540))))
+                    ov['position'] = {"x": int(best_x), "y": int(best_y)}
 
                     placed_overlays.append((ov, w, h))
 
@@ -764,10 +750,6 @@ class RemotionJsonMaker:
             if scene.get('infographic_lines'):
                 safe_lines = []
                 for l in scene['infographic_lines']:
-                    # LLM Repair: from_id / to_id
-                    if 'from_id' in l and 'from' not in l: l['from'] = l['from_id']
-                    if 'to_id' in l and 'to' not in l: l['to'] = l['to_id']
-
                     f, t = l.get('from'), l.get('to')
 
                     # Try direct match first
@@ -872,31 +854,9 @@ class RemotionJsonMaker:
         # ULTRA MODERN - EYE SOOTHING - ATTENTION GRABBING PALETTE (Curated)
         modern_colors = ["#00F5FF", "#FF3E6C", "#00FFAB", "#ADFF2F", "#FFD700", "#7B68EE", "#FF8C00"] # Cyan, Rose, Neon Mint, Lime, Gold, Iris, Deep Orange
 
-        # DOCUMENTARY STYLES POOL (Expert Layouts)
-        LAYOUT_PRESETS = ["SPLIT_SCREEN", "RULE_OF_THIRDS", "HERO_FOCAL", "TOP_TITLE_LOWER_VIS"]
-
-        # Camera Style Rotation (Documentary Focus)
-        CINEMATIC_SHOTS = [
-            "rack_focus", "cinematic_drift", "pan_right", "orbit", "zoom_blur_reveal",
-            "slow_push", "slow_pull", "tilt_up", "dolly_zoom", "lateral_strafe"
-        ]
-
-        # Valid text animations (reject hallucinated camera styles)
-        VALID_TEXT_ANIMS = [
-            "glow_pulse", "neon_flicker", "glitch_pop", "bounce_pop", "word_by_word",
-            "slide_up", "typewriter", "color_shift", "heartbeat", "energy_beam"
-        ]
-
         for idx, scene in enumerate(data['scenes']):
             scene_id = scene.get('scene_id', f"SCENE_{idx+1}")
             duration = scene.get('duration_in_frames', 180)
-
-            # Clean up redundant procedural config for video backgrounds
-            if scene.get('background_type') == 'video':
-                 if 'procedural_config' in scene: del scene['procedural_config']
-
-            # Select a unique layout for this scene to prevent repetition
-            layout_style = LAYOUT_PRESETS[idx % len(LAYOUT_PRESETS)]
 
             # --- GUIDELINE: MANDATORY NIVO FOR NUMBERS ---
             # Scan scene text for digits or numerical words
@@ -946,53 +906,13 @@ class RemotionJsonMaker:
             has_relation = text_ov and focal_ov
 
             # 1. Overlay Pass
-            overlay_ids = [ov['id'] for ov in scene.get('overlays', [])]
-
-            # Counter for elements within each sector to apply offsets
-            sector_counts = {"TITLE": 0, "VISUAL": 0, "METRIC": 0}
-
-            for o_idx, ov in enumerate(scene.get('overlays', [])):
+            for ov in scene.get('overlays', []):
                 o_type = ov.get('type', 'text')
-
-                # --- GUIDELINE: DOCUMENTARY COMPOSITION ---
-                # Force elements into distinct sectors to eliminate collisions
-                if o_type == 'text':
-                    sector = "TITLE"
-                    offset = sector_counts[sector] * 180
-                    if layout_style == "SPLIT_SCREEN": ov['position'] = {"x": 450, "y": 350 + offset}
-                    elif layout_style == "RULE_OF_THIRDS": ov['position'] = {"x": 640, "y": 360 + offset}
-                    elif layout_style == "HERO_FOCAL": ov['position'] = {"x": 400, "y": 750 + offset}
-                    else: ov['position'] = {"x": 960, "y": 250 + offset} # TOP_TITLE
-                elif o_type in ['hub_network', 'flow_diagram', 'svg', 'chart', 'shadcn_chart']:
-                    sector = "VISUAL"
-                    offset = sector_counts[sector] * 300
-                    if layout_style == "SPLIT_SCREEN": ov['position'] = {"x": 1400, "y": 540 + offset}
-                    elif layout_style == "RULE_OF_THIRDS": ov['position'] = {"x": 1280, "y": 720 + offset}
-                    elif layout_style == "HERO_FOCAL": ov['position'] = {"x": 1100, "y": 500 + offset}
-                    else: ov['position'] = {"x": 960, "y": 700 + offset} # LOWER_VIS
-                else:
-                    sector = "METRIC"
-                    offset = sector_counts[sector] * 220
-                    # Push metrics to edges
-                    ov['position'] = {"x": 1600, "y": 300 + offset}
-
-                sector_counts[sector] += 1
-
-                # --- GUIDELINE: INFORMATION STAGING (WAVES) ---
-                # Sequential Reveal: Title -> Graphic -> Indicators
-                if o_type == 'text': ov['start'] = 15
-                elif o_type in ['svg', 'hub_network', 'flow_diagram', 'chart']: ov['start'] = 45
-                else: ov['start'] = 75 # Indicators and secondary elements
 
                 # --- GUIDELINE: TEXT AESTHETICS (STRIP PUNCTUATION) ---
                 if o_type == 'text':
                     if ov.get('content'):
                         ov['content'] = str(ov['content']).strip().rstrip('.। ')
-                        # MANDATORY TRUNCATION: Keep it punchy (Max 5 words) for the "vibe"
-                        words = ov['content'].split()
-                        if len(words) > 5:
-                            ov['content'] = " ".join(words[:5])
-                            print(f"      ✂️ (Guardrail) Truncated verbose text to vibe: \"{ov['content']}\"")
 
                     # Extreme Recovery for Hallucinations
                     hallucinations = ["INSIGHT", "CITY", "MASTERCLASS", "REMOTION", "OVERVIEW", "DATA", "ANALYSIS"]
@@ -1026,33 +946,29 @@ class RemotionJsonMaker:
                         ov['font'] = self.bangla_fonts[0]
 
                     # --- GUIDELINE: HERO WORD ---
-                    # Only auto-generate if missing or if the word isn't actually in the content
-                    existing_hero = ov.get('hero_config', {})
-                    hero_word_in_content = existing_hero.get('word') and str(existing_hero.get('word')) in str(ov.get('content', ''))
+                    hero = self._get_scene_hero_word(scene_id, ov.get('content', ''), duration)
+                    if not hero:
+                        hero = self._get_fallback_hero(ov.get('content', ''))
 
-                    if not hero_word_in_content:
-                        hero = self._get_scene_hero_word(scene_id, ov.get('content', ''), duration)
-                        if not hero: hero = self._get_fallback_hero(ov.get('content', ''))
-
-                        if hero:
-                            # Robust rotation ensures variety across scenes
-                            anim_choice = VALID_TEXT_ANIMS[idx % len(VALID_TEXT_ANIMS)]
-                            ov['hero_config'] = {
-                                "word": hero['word'],
-                                "start": hero.get('start', 45),
-                                "color": modern_colors[(idx + 2) % len(modern_colors)],
-                                "animation": anim_choice
-                            }
-                    else:
-                        # Validate existing animation (map hallucinations to safe defaults)
-                        if existing_hero.get('animation') not in VALID_TEXT_ANIMS:
-                             existing_hero['animation'] = VALID_TEXT_ANIMS[idx % len(VALID_TEXT_ANIMS)]
-
-                        # Existing hero config is valid, just ensure it has a color and start if missing
-                        if not existing_hero.get('color'):
-                             existing_hero['color'] = modern_colors[(idx + 2) % len(modern_colors)]
-                        if not existing_hero.get('start'):
-                             existing_hero['start'] = 45
+                    if hero:
+                        hero_anims = [
+                            "glow_pulse", "isolate_zoom", "bounce_pop", "neon_flicker", "shake_alert",
+                            "rainbow_flow", "ghost_trail", "glitch_pop", "wave_float", "expand_contract",
+                            "blur_reveal", "color_shift", "rotation_swing", "shadow_pulse", "letter_jump",
+                            "skew_slide", "tilt_pan", "bounce_gravity", "border_glow", "glass_shimmer",
+                            "heartbeat", "strobe_flash", "threed_flip", "magnetic_pull", "fire_glow",
+                            "pixel_scatter", "swing_pivot", "depth_shadow", "energy_beam", "spiral_in",
+                            "fly_in_z", "typewriter_flicker", "vibrate_intense", "float_orbit", "mirror_split",
+                            "zoom_blur_pop", "liquid_waver"
+                        ]
+                        # Robust rotation ensures variety across scenes
+                        anim_choice = hero_anims[idx % len(hero_anims)]
+                        ov['hero_config'] = {
+                            "word": hero['word'],
+                            "start": hero['start'],
+                            "color": modern_colors[(idx + 2) % len(modern_colors)],
+                            "animation": anim_choice
+                        }
 
                 if o_type in ['chart', 'shadcn_chart']:
                     # Force Bangla font if scene is Bangla
@@ -1172,44 +1088,27 @@ class RemotionJsonMaker:
                      "easing": {"type": "bezier", "bezier": [0.65, 0, 0.35, 1]}
                  })
 
-            # SORT SHOTS BY START FRAME to ensure sequential execution
-            scene['camera']['shots'].sort(key=lambda s: s.get('startFrame', 0))
-
-            last_shot_end = 0
             for s_idx, shot in enumerate(scene['camera']['shots']):
-                # --- GUIDELINE: NO OVERLAPPING SHOTS ---
-                if shot.get('startFrame', 0) < last_shot_end:
-                    shot['startFrame'] = last_shot_end
+                # --- GUIDELINE: SMART TARGETING ---
+                # Contradiction Resolution: Null is ONLY for stacked layouts (center-zoom),
+                # otherwise we MUST have a valid target ID to avoid empty focus.
+                if has_relation:
+                    shot['targetId'] = None
+                elif shot.get('targetId') is None:
+                    shot['targetId'] = focal_ov['id'] if focal_ov else (text_ov['id'] if text_ov else None)
 
-                # --- GUIDELINE: NO OVERFLOW ---
-                if shot.get('startFrame', 0) + shot.get('duration', 30) > duration:
-                    shot['duration'] = max(15, duration - shot.get('startFrame', 0))
-
-                last_shot_end = shot.get('startFrame', 0) + shot.get('duration', 30)
-
-                # --- GUIDELINE: SMART TARGETING (NO NULLS) ---
-                if not shot.get('targetId') or shot['targetId'] not in overlay_ids:
-                    # Intelligent fallback: alternate between Title and Graphic
-                    targets = [o['id'] for o in scene.get('overlays', []) if o.get('type') in ['text', 'chart', 'hub_network', 'flow_diagram', 'svg']]
-                    if targets:
-                        shot['targetId'] = targets[s_idx % len(targets)]
-                    else:
-                        shot['targetId'] = overlay_ids[0] if overlay_ids else None
-
-                # --- GUIDELINE: CAMERA VARIETY ---
-                # Use unique seed per scene+shot to maximize variety
-                if not shot.get('style') or shot.get('style') == 'static' or shot.get('style') not in camera_styles:
-                    shot['style'] = CINEMATIC_SHOTS[(idx * 2 + s_idx) % len(CINEMATIC_SHOTS)]
+                # --- GUIDELINE: CAMERA VARIETY (40 PRESET ROTATION) ---
+                # Use scene index + shot index to maximize uniqueness across the whole video
+                if not shot.get('style') or shot.get('style') == 'static':
+                    shot['style'] = camera_styles[(idx + s_idx) % len(camera_styles)]
 
                 # --- GUIDELINE: BUTTERY SMOOTH BEZIER ---
                 if not shot.get('easing'):
                     shot['easing'] = {"type": "bezier", "bezier": [0.65, 0, 0.35, 1]}
 
                 # --- GUIDELINE: CAMERA SAFETY (ZOOM CAPS) ---
-                # Diverse zoom levels
-                zooms = [1.15, 1.3, 1.1, 1.4, 1.25]
-                shot['zoom'] = shot.get('zoom', zooms[s_idx % len(zooms)])
-                shot['zoom'] = min(shot['zoom'], 1.6)
+                max_zoom = 1.35 if has_relation else 1.6
+                shot['zoom'] = min(shot.get('zoom', 1.25), max_zoom)
 
         # 3. SFX Pass
         valid_sfx = []
@@ -1232,170 +1131,77 @@ class RemotionJsonMaker:
             try:
                 from google.colab import output
                 from IPython.display import HTML, display
-                import uuid
 
-                # Unique ID for this interaction instance
-                u_id = uuid.uuid4().hex[:8]
+                # HTML and JavaScript for a "Copy" button and a multi-line input fallback
+                # In Colab, we can't easily do a multi-line input back to python via 'input()' for large pastes
+                # So we use a JavaScript promise to capture the clipboard paste
+                display(HTML(f"""
+                    <div style="background-color: #1e1e1e; color: #fff; padding: 20px; border-radius: 8px; border: 1px solid #333; font-family: sans-serif;">
+                        <h3 style="color: #4CAF50; margin-top: 0;">🖐️ MANUAL GEMINI INTERACTION</h3>
+                        <p>1. Click the button below to copy the prompt.</p>
+                        <button id="copyBtn" style="background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                            📋 COPY PROMPT TO CLIPBOARD
+                        </button>
+                        <p style="margin-top: 15px;">2. Paste it into <a href="https://gemini.google.com" target="_blank" style="color: #2196F3;">Gemini</a>.</p>
+                        <p>3. Copy the RAW JSON response from Gemini.</p>
+                        <p>4. Paste it into the text area below and click "SUBMIT".</p>
+                        <textarea id="jsonResponse" style="width: 100%; height: 150px; background: #2d2d2d; color: #eee; border: 1px solid #444; padding: 10px; border-radius: 4px; margin-bottom: 10px;" placeholder="Paste JSON here..."></textarea>
+                        <button id="submitBtn" style="background: #2196F3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                            🚀 SUBMIT RESPONSE
+                        </button>
+                        <textarea id="hiddenPrompt" style="display:none">{prompt}</textarea>
+                    </div>
+                    <script>
+                        (async () => {{
+                            const copyBtn = document.getElementById('copyBtn');
+                            const submitBtn = document.getElementById('submitBtn');
+                            const promptText = document.getElementById('hiddenPrompt').value;
+                            const responseArea = document.getElementById('jsonResponse');
 
-                print(f"⏳ INITIALIZING MANUAL INTERACTION (Instance: {u_id})...")
-
-                # The HTML and Logic are combined to avoid race conditions between rendering and eval_js
-                # Use json.dumps to safely escape triple backticks and other special chars in the prompt
-                safe_prompt = json.dumps(prompt)
-
-                js_code = f"""
-                    (async () => {{
-                        const u_id = "{u_id}";
-                        const promptText = {safe_prompt};
-
-                        // 1. Render the UI
-                        const container = document.createElement('div');
-                        container.id = "container-" + u_id;
-                        container.style = "background-color: #1a1a1a; color: #fff; padding: 25px; border-radius: 12px; border: 2px solid #4CAF50; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.5); max-width: 800px; margin: 10px auto; position: relative; z-index: 1000;";
-                        container.innerHTML = `
-                            <h2 style="color: #4CAF50; margin-top: 0; font-size: 22px; border-bottom: 1px solid #333; padding-bottom: 10px;">🎬 Studio V4 - Expert AI Workflow</h2>
-
-                            <div style="margin-top: 20px;">
-                                <p style="font-size: 15px;">1. Copy the documentary prompt:</p>
-                                <button id="copyBtn-${{u_id}}" style="background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); color: white; border: none; padding: 14px 28px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); width: 100%; transition: all 0.2s;">
-                                    📋 COPY PROMPT TO CLIPBOARD
-                                </button>
-                            </div>
-
-                            <div style="margin-top: 25px;">
-                                <p style="font-size: 15px;">2. Get response from <a href="https://gemini.google.com" target="_blank" style="color: #2196F3; text-decoration: none; font-weight: bold;">Gemini</a> and paste here:</p>
-                                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                                    <button id="pasteBtn-${{u_id}}" style="background: #333; color: #4CAF50; border: 1px solid #4CAF50; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">
-                                        📋 PASTE RESPONSE
-                                    </button>
-                                    <button id="clearBtn-${{u_id}}" style="background: #333; color: #ff3b30; border: 1px solid #ff3b30; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">
-                                        🧹 CLEAR
-                                    </button>
-                                </div>
-                                <textarea id="jsonResponse-${{u_id}}" style="width: 100%; height: 220px; background: #000; color: #00FFAB; border: 1px solid #333; padding: 15px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 14px; resize: vertical; box-sizing: border-box;" placeholder="Paste Gemini JSON response here..."></textarea>
-                                <p style="font-size: 12px; color: #888; margin-top: 5px;">Tip: If 'Paste' button fails, use <b>Ctrl+V</b> inside the box.</p>
-                            </div>
-
-                            <div style="margin-top: 25px;">
-                                <button id="submitBtn-${{u_id}}" style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); color: white; border: none; padding: 16px 32px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 18px; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3); width: 100%; transition: all 0.3s;">
-                                    🚀 SUBMIT RESPONSE
-                                </button>
-                            </div>
-                        `;
-
-                        document.body.appendChild(container);
-                        container.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
-
-                        const copyBtn = document.getElementById('copyBtn-' + u_id);
-                        const pasteBtn = document.getElementById('pasteBtn-' + u_id);
-                        const clearBtn = document.getElementById('clearBtn-' + u_id);
-                        const submitBtn = document.getElementById('submitBtn-' + u_id);
-                        const responseArea = document.getElementById('jsonResponse-' + u_id);
-
-                        if (!copyBtn || !submitBtn || !responseArea) {{
-                            console.error("UI Elements not found!");
-                            return "ERROR: UI Render Failed";
-                        }}
-
-                        copyBtn.onclick = () => {{
-                            navigator.clipboard.writeText(promptText);
-                            copyBtn.innerHTML = "✅ PROMPT COPIED!";
-                            copyBtn.style.background = "#2196F3";
-                            setTimeout(() => {{
-                                copyBtn.innerHTML = "📋 COPY PROMPT TO CLIPBOARD";
-                                copyBtn.style.background = "linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)";
-                            }}, 2500);
-                        }};
-
-                        pasteBtn.onclick = async () => {{
-                            try {{
-                                const text = await navigator.clipboard.readText();
-                                responseArea.value = text;
-                                pasteBtn.innerHTML = "✅ PASTED!";
-                                setTimeout(() => pasteBtn.innerHTML = "📋 PASTE RESPONSE", 2000);
-                            }} catch (e) {{
-                                alert("Browser security blocked clipboard access. Please use Ctrl+V to paste manually.");
-                            }}
-                        }};
-
-                        clearBtn.onclick = () => {{
-                            if(confirm("Clear text area?")) responseArea.value = "";
-                        }};
-
-                        // Return a promise that resolves when the user clicks submit
-                        return new Promise((resolve, reject) => {{
-                            submitBtn.onclick = () => {{
-                                try {{
-                                    const val = responseArea.value.trim();
-                                    if (!val) {{
-                                        alert("Error: Text area is empty. Please paste Gemini's response first.");
-                                        return;
-                                    }}
-                                    submitBtn.disabled = true;
-                                    submitBtn.style.opacity = "0.5";
-                                    submitBtn.innerHTML = "⌛ VALIDATING MANIFEST...";
-
-                                    // Use a small delay to ensure the UI update is visible
-                                    setTimeout(() => {{
-                                        console.log("Submitting manifest to Python kernel...");
-                                        container.remove(); // Remove UI to return focus to terminal
-                                        resolve(val);
-                                    }}, 200);
-                                }} catch (e) {{
-                                    console.error("Submission Error:", e);
-                                    alert("Fatal Error during submission. Check browser console.");
-                                    reject(e);
-                                }}
+                            copyBtn.onclick = () => {{
+                                navigator.clipboard.writeText(promptText);
+                                copyBtn.innerText = "✅ COPIED!";
+                                setTimeout(() => copyBtn.innerText = "📋 COPY PROMPT TO CLIPBOARD", 2000);
                             }};
-                        }});
-                    }})();
-                """
 
-                result = output.eval_js(js_code)
-                print("✅ Manifest received. Analyzing structure...")
-                sys.stdout.flush()
-                return result
+                            const result = await new Promise((resolve) => {{
+                                submitBtn.onclick = () => {{
+                                    resolve(responseArea.value);
+                                }};
+                            }});
 
-            except Exception as e:
-                print(f"⚠️ Rich UI failed: {e}. Falling back to terminal mode.")
-                # Fallback for standard terminal environments
-                print("\n" + "!"*80)
-                print("🖐️  MANUAL MODE ACTIVE (Terminal Fallback)")
-                print("1. COPY the prompt below.")
-                print("-" * 30 + " PROMPT START " + "-" * 30)
-                print(prompt)
-                print("-" * 30 + "  PROMPT END  " + "-" * 30 + "\n")
+                            google.colab.kernel.invokeFunction('notebook.ManualResponse', [result], {{}});
+                        }})();
+                    </script>
+                """))
 
-                print("\n👉 Paste the JSON response from Gemini below.")
-                print("👉 TYPE 'END' ON A NEW LINE AND PRESS ENTER TO SUBMIT.")
+                captured_json = []
+                def handle_response(res):
+                    captured_json.append(res)
 
-                lines = []
-                while True:
-                    try:
-                        line = input()
-                        if line.strip().upper() == "END": break
-                        lines.append(line)
-                    except EOFError:
-                        break
-                return "\n".join(lines)
+                output.register_callback('notebook.ManualResponse', handle_response)
+
+                print("⏳  Waiting for your input via the UI above...")
+                while not captured_json:
+                    time.sleep(0.5)
+
+                return captured_json[0]
 
             except ImportError:
-                # Fallback for standard terminal environments
+                # Fallback for standard terminal
                 print("\n" + "!"*80)
                 print("🖐️  MANUAL MODE ACTIVE (Terminal Fallback)")
                 print("1. COPY the prompt below.")
-                print("-" * 30 + " PROMPT START " + "-" * 30)
+                print("--- PROMPT START ---")
                 print(prompt)
-                print("-" * 30 + "  PROMPT END  " + "-" * 30 + "\n")
-
-                print("\n👉 Paste the JSON response from Gemini below.")
-                print("👉 TYPE 'END' ON A NEW LINE AND PRESS ENTER TO SUBMIT.")
+                print("--- PROMPT END ---\n")
+                print("2. Paste JSON from Gemini below. Type 'END' on a new line to submit.")
 
                 lines = []
                 while True:
                     try:
                         line = input()
-                        if line.strip().upper() == "END": break
+                        if line.strip() == "END": break
                         lines.append(line)
                     except EOFError:
                         break
@@ -1665,42 +1471,36 @@ class RemotionJsonMaker:
         scene_targets = "\n".join([f"{sid}: {self.story_scenes[sid]}" for sid in sorted(self.story_scenes.keys())])
 
         full_prompt = (
-            f"TASK: GENERATE AN EXPERT DOCUMENTARY MOTION GRAPHICS MANIFEST FOR {len(self.story_scenes)} SCENES.\n"
-            "STYLE MANDATE: Vox, Polymatter, Kurzgesagt, and Apple Keynote information design.\n"
-            "\n--- SOURCE NARRATION ---\n"
+            f"TASK: GENERATE PRODUCTION-READY MOTION GRAPHICS JSON FOR THESE {len(self.story_scenes)} SCENES.\n"
+            "\n--- START OF STORYBOARD NARRATION (SOURCE) ---\n"
             "```text\n"
             f"{story_context}\n"
             "```\n"
-            "\n--- TIMING DATA ---\n"
+            "--- END OF STORYBOARD NARRATION ---\n"
+            "\n--- TIMING & SYNC DATA (MANDATORY) ---\n"
             f"TIMESTAMPS: {compact_ts}\n"
-            f"DURATIONS: {duration_context}\n"
-            "\nDIRECTOR'S RULES (STRICT COMPLIANCE REQUIRED):\n"
-            "1. ELIMINATE COLLISIONS: No two infographic elements may overlap. Use the Rule of Thirds. Stop centering everything.\n"
-            "2. CINEMATIC COMPOSITIONS: Use a different layout for every scene. Avoid repetition.\n"
-             "   - Split-screen: Title LEFT(x=450, y=350), Chart RIGHT(x=1400, y=540).\n"
-             "   - Rule of Thirds: Title TOP-LEFT(x=640, y=360), Diagram BOTTOM-RIGHT(x=1280, y=720).\n"
-             "   - Hero Focal: Captions BOTTOM-LEFT(x=400, y=750), Large centerpiece CENTER-RIGHT(x=1100, y=500).\n"
-            "3. PROGRESSIVE INFORMATION STAGING: Reveal data sequentially in waves:\n"
-            "   - Wave 1 (15f): Background + Main Title.\n"
-            "   - Wave 2 (45f): Hero word animation + Primary Graphic.\n"
-            "   - Wave 3 (75f): Supporting metrics, Indicators, and Connectors.\n"
-            "4. CAMERA INTELLIGENCE: Every shot MUST have a 'targetId'. NO null targets.\n"
-            "   - Vary shots: rack_focus, cinematic_drift, pan_right, orbit, zoom_blur_reveal.\n"
-            "   - Sequential shots: move from Title focus to Data focus.\n"
-            "   - Validate: startFrame + duration <= scene_duration.\n"
-            "5. TYPOGRAPHIC HIERARCHY: Use punchy, vibe-focused 'content' (3-5 words max). Every text overlay MUST have 'hero_config' highlighting a core keyword.\n"
-            "6. DATA INTEGRITY: Use ACTUAL NUMBERS from story. If text says '20 million', KPI must show '20M'.\n"
-            "7. INFOGRAPHIC SYSTEMS: Procedural scenes MUST be connected systems. Use 'infographic_lines' to link spatially separated elements (Title -> Network -> KPI).\n"
-            "8. COLOR HIERARCHY: Use Saturation intentionally. 1 Primary brand color, 1 Accent, Neutral UI colors.\n"
+            f"DURATIONS (30fps): {duration_context}\n"
+            "\nACT AS A PROFESSIONAL MOTION ARCHITECT. Design an expert documentary sequence (Vox/Polymatter style) using THE NARRATION ABOVE as the absolute source of truth.\n"
+            "COMPOSITION CONSTRAINTS (STRICT):\n"
+            "1. 3-COLUMN SPATIAL ANCHORS: Absolutely NO center-stacking. Every graphic must occupy a unique region:\n"
+            "   - COLUMN 1 (LEFT, x=400): Narrations, Titles, Paragraphs.\n"
+            "   - COLUMN 2 (CENTER, x=960): Hub Networks, Flow Diagrams, Primary SVG centerpieces.\n"
+            "   - COLUMN 3 (RIGHT, x=1520): KPIs, Charts, Indicators, Statistics.\n"
+            "2. VISUAL HIERARCHY: Every scene MUST have 1 'primary' element (largest), 1-2 'secondary' elements, and supporting labels. Eye-path must be clear.\n"
+            "3. STAGGERED ENTRANCES: Elements MUST NOT appear simultaneously. Stagger 'start' frames by 15-20f waves (Wave 1: Title, Wave 2: Diagram, Wave 3: Stats).\n"
+            "4. INFOGRAPHIC SYSTEMS: Procedural scenes MUST be connected stories. Use 'infographic_lines' (minimum 2 per scene) to link related SVGs. Use SVG icons only as helper nodes in a larger system, not isolated widgets.\n"
+            "5. REAL NARRATIVE DATA: Visualize ACTUAL NUMBERS from story. NO placeholder values (10, 20, A, B). If text says '5 million', KPI must show '5M'.\n"
+            "6. VIDEO SAFE-ZONES: If background_type='video', keep overlays to Columns 1 and 3. DO NOT obscure the center subjects of the video footage.\n"
+            "7. WHITESPACE & BREATHING ROOM: Maintain 300px between Primary elements. Use 40/30/30 spatial balance.\n"
+            "8. PERSISTENCE: Overlays stay until scene ends. duration = (scene_duration - start).\n"
             "\nJSON SCHEMA:\n"
-            "- 'scenes': [ { 'scene_id', 'duration', 'background_type', 'overlays': [], 'infographic_lines': [], 'camera': { 'shots': [] } } ]\n"
+            "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config', 'overlays': [], 'infographic_lines': [], 'groups': [] } ]\n"
             "- 'overlays': [\n"
-            "    { 'id', 'type': 'text', 'content', 'font', 'start', 'duration', 'position': {x,y}, 'hero_config': { 'word', 'animation', 'color' } },\n"
-            "    { 'id', 'type': 'svg', 'query', 'animation', 'style', 'importance', 'start', 'duration', 'position': {x,y} },\n"
+            "    { 'id', 'type': 'text', 'content', 'font', 'start', 'duration', 'position': {x,y} },\n"
+            "    { 'id', 'type': 'svg', 'query', 'animation', 'style', 'importance': 'primary'|'secondary', 'start', 'duration', 'position': {x,y}, 'groupId'? },\n"
             "    { 'id', 'type': 'hub_network'|'flow_diagram', 'centerSvg', 'nodes'|'steps': [], 'start', 'duration', 'position': {x,y} },\n"
-            "    { 'id', 'type': 'chart'|'shadcn_chart'|'shadcn_indicator', 'chart_type'|'indicator_type', 'title', 'data'|'value', 'start', 'duration', 'position': {x,y} }\n"
+            "    { 'id', 'type': 'chart'|'shadcn_chart'|'shadcn_indicator', 'chart_type'|'indicator_type', 'title'|'label', 'data'|'value', 'start', 'duration', 'position': {x,y} }\n"
             "  ]\n"
-            "- 'camera': { 'shots': [ { 'targetId', 'style', 'zoom', 'startFrame', 'duration', 'inDuration' } ] }\n"
             "\nAVAILABLE PRESETS:\n"
             "- 'procedural_config': 'dark_particles', 'liquid_gradient', 'neon_grid'.\n"
             "- 'chart_type': glass_area, neon_bar, radial_score, radar_web, step_area, multi_bar_stack.\n"
@@ -1731,38 +1531,35 @@ class RemotionJsonMaker:
             return {}
 
         try:
-            # Enhanced JSON extraction: Prioritize the largest balanced object containing "scenes"
-            json_str = None
-
-            # 1. Look for markdown code blocks
+            # 1. Look for markdown code blocks first (get the LAST one if user pasted multiple times)
             all_blocks = re.findall(r'```(?:json)?\s*(\{.*?\})\s*```', raw_output, re.DOTALL)
+            if all_blocks:
+                json_str = all_blocks[-1]
+            else:
+                # 2. Fallback to finding first { and last }
+                # If user pasted multiple responses, we try to find the last complete object
+                # Strategy: find all { and try to parse from there to the end.
+                all_starts = [m.start() for m in re.finditer('{', raw_output)]
+                json_str = None
+                for s_idx in reversed(all_starts):
+                    candidate = raw_output[s_idx:]
+                    # Simple balancer
+                    stack = 0
+                    end_pos = -1
+                    for i, char in enumerate(candidate):
+                        if char == '{': stack += 1
+                        elif char == '}':
+                            stack -= 1
+                            if stack == 0:
+                                end_pos = i
+                                break
+                    if end_pos != -1:
+                        json_str = candidate[:end_pos+1]
+                        break
 
-            # 2. Also look for any balanced { } structures outside blocks
-            all_starts = [m.start() for m in re.finditer('{', raw_output)]
-            for s_idx in all_starts:
-                candidate = raw_output[s_idx:]
-                stack = 0
-                end_pos = -1
-                for i, char in enumerate(candidate):
-                    if char == '{': stack += 1
-                    elif char == '}':
-                        stack -= 1
-                        if stack == 0:
-                            end_pos = i
-                            break
-                if end_pos != -1:
-                    all_blocks.append(candidate[:end_pos+1])
-
-            # Filter candidates that look like valid scenes manifest and pick the longest
-            valid_candidates = [b for b in all_blocks if '"scenes"' in b]
-            if valid_candidates:
-                json_str = max(valid_candidates, key=len)
-            elif all_blocks:
-                json_str = max(all_blocks, key=len)
-
-            if not json_str:
-                print("❌ Could not find any valid JSON objects in Gemini response.")
-                return {}
+                if not json_str:
+                    print("❌ Could not find any valid JSON objects in Gemini response.")
+                    return {}
 
             # Pre-cleanup: Remove control characters except for standard whitespace
             json_str = "".join(ch for ch in json_str if ch.isprintable() or ch in "\n\r\t")
@@ -1814,7 +1611,7 @@ def main():
     parser.add_argument("--manual", action="store_true", help="Manual prompt interaction")
     parser.set_defaults(headless=True)
     args = parser.parse_args()
-    if not os.path.exists(args.story_file): sys.exit(1)
+    if not os.path.exists(args.story_file): exit(1)
     if os.path.exists(args.output): os.remove(args.output)
     with open(args.story_file, 'r', encoding='utf-8') as f: story = f.read()
     maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, headless=args.headless, manual=args.manual)
@@ -1824,14 +1621,6 @@ def main():
 
     # Use absolute paths where possible
     abs_public = os.path.abspath(args.public_dir)
-
-    # Add project root to sys.path for scripts import
-    project_root = os.path.dirname(abs_public)
-    if project_root not in sys.path:
-        sys.path.append(project_root)
-
-    print(f"🎬 INITIALIZING: Scanning documentary assets in {abs_public}...")
-    sys.stdout.flush()
     maker.scan_assets(abs_public)
     guidelines = maker.load_guidelines(
         os.path.join(os.path.dirname(abs_public), "guideline.md"),
@@ -1860,13 +1649,8 @@ def main():
         elif args.timestamp_output:
              print("⚠️ Warning: --timestamp-output is deprecated. Please provide --timestamp-file.")
 
-        print("🚀 STAGE 1: Generating scene manifest via AI...")
-        sys.stdout.flush()
         render_json = maker.generate(story, guidelines, args.prompt_output, ts_content, scene_durations)
         maker.stop_browser()
-
-        print("📊 STAGE 2: Validating AI output and applying documentary rules...")
-        sys.stdout.flush()
 
         expected_scenes = len(scene_durations)
         if render_json and 'scenes' in render_json:
@@ -1876,18 +1660,14 @@ def main():
 
         if not render_json:
              print("❌ ERROR: Gemini failed to produce any JSON.")
-             sys.exit(1)
+             exit(1)
 
         if 'scenes' not in render_json or not render_json['scenes']:
              print("❌ ERROR: Generated JSON contains no scenes. Manifest is invalid.")
              print(f"DEBUG: Keys found in JSON: {list(render_json.keys())}")
-             sys.exit(1)
+             exit(1)
 
         render_json = maker.finalize_json_durations(render_json, public_dir=abs_public)
-
-        print(f"💾 STAGE 3: Saving master manifest to {args.output}...")
-        sys.stdout.flush()
-
         output_dir = os.path.dirname(args.output)
         if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
         with open(args.output, 'w', encoding='utf-8') as f:
@@ -1895,20 +1675,18 @@ def main():
             f.flush()
             os.fsync(f.fileno())
         print(f"✅ Master JSON created: {args.output} ({os.path.getsize(args.output)} bytes)")
-        sys.stdout.flush()
 
         # 3. Quality Assurance Pass
-        print("\n🧪 STAGE 4: Running final Quality Assurance pass...")
-        sys.stdout.flush()
+        print("\n🧪 --- RUNNING QUALITY ASSURANCE PASS ---")
         try:
             from scripts.test_manifest_quality import test_manifest_quality
-            test_manifest_quality(args.output)
-        except ImportError:
-            print("⚠️ QA Script not found. Skipping validation.")
+            test_manifest_quality(args.output, abs_public)
+        except Exception as e:
+            print(f"⚠️ QA Script failed or not found: {e}")
 
         try: shutil.copy(args.output, "/content/remotion_render.json")
         except: pass
     except Exception as e:
         print(f"❌ Error in main: {e}")
-        sys.exit(1)
+        exit(1)
 if __name__ == "__main__": main()
