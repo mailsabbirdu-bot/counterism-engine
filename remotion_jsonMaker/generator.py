@@ -1694,6 +1694,12 @@ def main():
 
     # Use absolute paths where possible
     abs_public = os.path.abspath(args.public_dir)
+
+    # Add project root to sys.path for scripts import
+    project_root = os.path.dirname(abs_public)
+    if project_root not in sys.path:
+        sys.path.append(project_root)
+
     maker.scan_assets(abs_public)
     guidelines = maker.load_guidelines(
         os.path.join(os.path.dirname(abs_public), "guideline.md"),
