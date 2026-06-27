@@ -261,8 +261,12 @@ class RemotionJsonMaker:
 
             if 'background' in scene and isinstance(scene['background'], dict):
                 bg = scene['background']
-                for k in ['background_type', 'video_path', 'audio_enabled']:
+                for k in ['background_type', 'video_path', 'audio_enabled', 'procedural_config']:
                     if k in bg and k not in scene: scene[k] = bg[k]
+
+            # LLM Repair: procedural_config as string
+            if 'procedural_config' in scene and isinstance(scene['procedural_config'], str):
+                 scene['procedural_config'] = {"variant": scene['procedural_config']}
 
             # 2. Background Handling (Studio V4 SVG Integration)
             if not scene.get('background_type'):
@@ -288,15 +292,17 @@ class RemotionJsonMaker:
                     else:
                         # Fallback to procedural if video missing
                         scene['background_type'] = 'procedural'
-                        if not scene.get('procedural_config'):
+                        if not scene.get('procedural_config') or not isinstance(scene.get('procedural_config'), dict):
                             scene['procedural_config'] = {"variant": "neon_grid"}
                         scene['video_path'] = None
                         print(f"      🎨 Video {vname} missing. Falling back to procedural background.")
             elif scene['background_type'] == 'procedural':
-                if not scene.get('procedural_config'):
+                if not scene.get('procedural_config') or not isinstance(scene.get('procedural_config'), dict):
                     scene['procedural_config'] = {"variant": "neon_grid"}
                 scene['video_path'] = None
-                print(f"      🎨 SVG Mode: Using procedural background '{scene['procedural_config']['variant']}'")
+
+                variant = scene['procedural_config'].get('variant', 'neon_grid')
+                print(f"      🎨 SVG Mode: Using procedural background '{variant}'")
 
             # 3. Authoritative Duration Resolution
             raw_dur = scene.get('duration_in_frames') or scene.get('duration', 180)
@@ -338,8 +344,13 @@ class RemotionJsonMaker:
             focal_count = 0
 
             if scene.get('overlays'):
+                # LLM Repair: overlays as dict instead of list
+                if isinstance(scene['overlays'], dict):
+                     scene['overlays'] = [scene['overlays']]
+                     print(f"      🔧 Converted single overlay object to list")
+
                 # Pass 0: Detect Title+Content relation
-                text_ov = next((o for o in scene['overlays'] if o.get('type') == 'text' or 'text' in o or 'content' in o), None)
+                text_ov = next((o for o in scene['overlays'] if isinstance(o, dict) and (o.get('type') == 'text' or 'text' in o or 'content' in o)), None)
                 focal_ov = next((o for o in scene['overlays'] if o.get('type') in ['chart', 'shadcn_chart', 'ui_panel', 'data_indicator', 'shadcn_indicator', 'indicator'] or 'chart_type' in o or 'kind' in o), None)
                 has_relation = text_ov and focal_ov
 
