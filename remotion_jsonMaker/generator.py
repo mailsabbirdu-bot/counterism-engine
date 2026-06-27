@@ -907,6 +907,11 @@ class RemotionJsonMaker:
                 if o_type == 'text':
                     if ov.get('content'):
                         ov['content'] = str(ov['content']).strip().rstrip('.। ')
+                        # MANDATORY TRUNCATION: Keep it punchy (Max 5 words) for the "vibe"
+                        words = ov['content'].split()
+                        if len(words) > 5:
+                            ov['content'] = " ".join(words[:5])
+                            print(f"      ✂️ (Guardrail) Truncated verbose text to vibe: \"{ov['content']}\"")
 
                     # Extreme Recovery for Hallucinations
                     hallucinations = ["INSIGHT", "CITY", "MASTERCLASS", "REMOTION", "OVERVIEW", "DATA", "ANALYSIS"]
@@ -1450,7 +1455,7 @@ class RemotionJsonMaker:
             "\nACT AS A PROFESSIONAL MOTION ARCHITECT. Design an expert documentary sequence (Vox/Polymatter style) using THE NARRATION ABOVE as the absolute source of truth.\n"
             "COMPOSITION CONSTRAINTS (STRICT):\n"
             "1. 3-COLUMN SPATIAL ANCHORS: Absolutely NO center-stacking. Every graphic must occupy a unique region:\n"
-            "   - COLUMN 1 (LEFT, x=400): Narrations, Titles, Paragraphs.\n"
+            "   - COLUMN 1 (LEFT, x=400): Punchy Short Titles.\n"
             "   - COLUMN 2 (CENTER, x=960): Hub Networks, Flow Diagrams, Primary SVG centerpieces.\n"
             "   - COLUMN 3 (RIGHT, x=1520): KPIs, Charts, Indicators, Statistics.\n"
             "2. VISUAL HIERARCHY: Every scene MUST have 1 'primary' element (largest), 1-2 'secondary' elements, and supporting labels. Eye-path must be clear.\n"
@@ -1460,10 +1465,12 @@ class RemotionJsonMaker:
             "6. VIDEO SAFE-ZONES: If background_type='video', keep overlays to Columns 1 and 3. DO NOT obscure the center subjects of the video footage.\n"
             "7. WHITESPACE & BREATHING ROOM: Maintain 300px between Primary elements. Use 40/30/30 spatial balance.\n"
             "8. PERSISTENCE: Overlays stay until scene ends. duration = (scene_duration - start).\n"
+            "9. PUNCHY VIBE TEXT: Keep 'content' for text overlays EXTREMELY BRIEF (3-5 words max). It should capture the 'vibe' or a 'core keyword' of the scene, not the full narration. Use dramatic and punchy language.\n"
+            "10. HERO HIGHLIGHT: For every text overlay, you MUST identify one 'hero' word from the content and provide 'hero_config'.\n"
             "\nJSON SCHEMA:\n"
             "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config', 'overlays': [], 'infographic_lines': [], 'groups': [] } ]\n"
             "- 'overlays': [\n"
-            "    { 'id', 'type': 'text', 'content', 'font', 'start', 'duration', 'position': {x,y} },\n"
+            "    { 'id', 'type': 'text', 'content', 'font', 'start', 'duration', 'position': {x,y}, 'hero_config': { 'word': 'KEYWORD', 'animation': 'glow_pulse|neon_flicker|glitch_pop', 'color': '#00F5FF' } },\n"
             "    { 'id', 'type': 'svg', 'query', 'animation', 'style', 'importance': 'primary'|'secondary', 'start', 'duration', 'position': {x,y}, 'groupId'? },\n"
             "    { 'id', 'type': 'hub_network'|'flow_diagram', 'centerSvg', 'nodes'|'steps': [], 'start', 'duration', 'position': {x,y} },\n"
             "    { 'id', 'type': 'chart'|'shadcn_chart'|'shadcn_indicator', 'chart_type'|'indicator_type', 'title'|'label', 'data'|'value', 'start', 'duration', 'position': {x,y} }\n"
