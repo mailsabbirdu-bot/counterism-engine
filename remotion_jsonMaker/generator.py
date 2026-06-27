@@ -1384,25 +1384,27 @@ class RemotionJsonMaker:
         scene_targets = "\n".join([f"{sid}: {self.story_scenes[sid]}" for sid in sorted(self.story_scenes.keys())])
 
         full_prompt = (
-            "YOU ARE A WORLD-CLASS DOCUMENTARY MOTION GRAPHICS DIRECTOR (Vox/Polymatter style).\n"
-            f"TASK: GENERATE RAW JSON FOR EXACTLY {len(self.story_scenes)} SCENES: {list(self.story_scenes.keys())}.\n"
-            f"STORY CONTENT (MANDATORY SOURCE):\n{story_context}\n"
-            f"TIMESTAMPS (FOR SYNC):\n{compact_ts}\n"
-            f"DURATIONS (30fps):\n{duration_context}\n"
-            "\nEXPERT COMPOSITION RULES (STRICT):\n"
-            "1. 3-COLUMN ANCHORS: ABSOLUTELY FORBIDDEN to center-stack everything. Use spatial columns:\n"
-            "   - LEFT (x=350 to 500): Titles, Paragraphs, Primary Text Labels.\n"
-            "   - CENTER (x=900 to 1050): Hub Networks, Flow Diagrams, Primary SVG focal points.\n"
-            "   - RIGHT (x=1450 to 1650): KPIs, Charts, Indicators, Statistics.\n"
-            "2. VISUAL HIERARCHY (IMPORTANCE): Every scene MUST have 1 Primary (large), 1-2 Secondary (medium), and Tertiary (small) elements. Eye should know where to look.\n"
-            "3. STAGGERED ENTRANCES: Elements MUST NOT appear simultaneously. Stagger 'start' frames by 15-20f. Build the story visually as it's narrated.\n"
-            "4. INFOGRAPHIC RELATIONSHIPS: Use 'infographic_lines' to connect related SVGs (e.g., Worker -> Factory -> Product). Never drop isolated icons.\n"
-            "5. NO PLACEHOLDERS: Use REAL DATA from narration. If text mentions '20 million', chart/KPI MUST show '20M'. NO 'A', 'B', '10', '20' dummy values.\n"
-            "6. VIDEO SAFE ZONES: If background_type='video', keep overlays to columns 1 and 3. Do NOT cover the center subjects of the footage.\n"
-            "7. GROUPS: Use 'groups' key for 3+ related elements (horizontal/vertical/orbit/grid layout).\n"
-            "8. ASYMMETRICAL BALANCE: Aim for 40/30/30 spatial split. Let the composition breathe. Maintain 200px whitespace.\n"
-            "9. PERSISTENCE: Overlays stay until scene changes. Set 'duration' correctly (scene_duration - start).\n"
-            "\nSCHEMA (RAW JSON ONLY):\n"
+            "TASK: OUTPUT RAW JSON ONLY. NO CONVERSATION. NO PREAMBLE.\n"
+            "SYSTEM: Counterism Studio V4 - Production Rendering Engine.\n"
+            f"TARGET: GENERATE FULL JSON FOR {len(self.story_scenes)} SCENES: {list(self.story_scenes.keys())}.\n"
+            "\nSTORY SOURCE DATA (MANDATORY):\n"
+            f"{story_context}\n"
+            "\nTIMING/SYNC DATA:\n"
+            f"TIMESTAMPS: {compact_ts}\n"
+            f"DURATIONS: {duration_context}\n"
+            "\nENGINE CONSTRAINTS (EXPERT DIRECTOR MODE):\n"
+            "1. 3-COLUMN SPATIAL ANCHORS (Strict): Center-stacking is an engine failure. Use columns:\n"
+            "   - LEFT (x=400): Titles, Narrations, Labels.\n"
+            "   - CENTER (x=960): Hub Networks, Flows, Primary focal SVG nodes.\n"
+            "   - RIGHT (x=1520): KPIs, Charts, Data Indicators.\n"
+            "2. VISUAL HIERARCHY: Every scene MUST have 1 'primary' (large focal point), 1-2 'secondary' (supporting nodes), and small labels. eye-path must be clear.\n"
+            "3. STAGGERED PROGRESSION: Start frames MUST be staggered by 15-20f (e.g. 0, 20, 40, 60). Visuals reveal as narrated. NO simultaneous pops.\n"
+            "4. CONNECTED SYSTEMS (Mandatory for procedural): Every scene is a system. Use 'infographic_lines' (minimum 2 per scene) to connect related SVGs (e.g. Worker node -> Factory node). Use 'groups' for 3+ items. Use SVG elements as building blocks for a larger diagram, not isolated icons.\n"
+            "5. NARRATIVE DATA: Extract REAL NUMBERS. If story says '2 crore', KPI value=2, suffix='Crore'. NO placeholder values (10, 20, A, B).\n"
+            "6. VIDEO SAFE-ZONE: If background_type='video', keep overlays to columns Left/Right to avoid obscuring center video subjects.\n"
+            "7. ASYMMETRICAL BALANCE: Maintain 300px whitespace between Primary elements. Let the composition breathe.\n"
+            "8. PERSISTENCE: duration = (scene_duration - start). Elements stay until scene end.\n"
+            "\nJSON SCHEMA:\n"
             "- 'scenes': [ { 'scene_id', 'duration', 'background_type': 'video'|'procedural', 'procedural_config', 'overlays': [], 'infographic_lines': [], 'groups': [] } ]\n"
             "- 'overlays': [\n"
             "    { 'id', 'type': 'text', 'content', 'font', 'start', 'duration', 'position': {x,y} },\n"
@@ -1410,14 +1412,14 @@ class RemotionJsonMaker:
             "    { 'id', 'type': 'hub_network'|'flow_diagram', 'centerSvg', 'nodes'|'steps': [], 'start', 'duration', 'position': {x,y} },\n"
             "    { 'id', 'type': 'chart'|'shadcn_chart'|'shadcn_indicator', 'chart_type'|'indicator_type', 'title'|'label', 'data'|'value', 'start', 'duration', 'position': {x,y} }\n"
             "  ]\n"
-            "\nVISUAL LIBRARY:\n"
+            "\nAVAILABLE PRESETS:\n"
             "- 'procedural_config': 'dark_particles', 'liquid_gradient', 'neon_grid'.\n"
             "- 'chart_type': glass_area, neon_bar, radial_score, radar_web, step_area, multi_bar_stack.\n"
             "- 'indicator_type': metric_tile, tech_badge, activity_ring, crypto_card, server_status, data_ticker.\n"
-            f"\nFONTS: {local_fonts}\n"
-            f"VIDEOS: {self.video_files}\n"
+            f"\nENV_FONTS: {local_fonts}\n"
+            f"ENV_VIDEOS: {self.video_files}\n"
             f"REFERENCE: {schema_ref}\n"
-            "OUTPUT RAW JSON BLOCK ONLY. NO EXPLANATION. NO ERROR MESSAGES. GENERATE ALL SCENES."
+            "\nEXECUTION: GENERATE ALL SCENES NOW. RAW JSON ONLY."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
@@ -1470,7 +1472,14 @@ class RemotionJsonMaker:
                 parsed = json.loads(json_str, strict=False)
                 if isinstance(parsed, dict) and 'error' in parsed:
                     print(f"⚠️ Gemini returned an error JSON: {parsed['error']}")
+                    # If it's a conversational error, it's a failure.
                     return {}
+
+                # Validation: if it's a dict but doesn't have 'scenes', it might be conversational junk in a JSON wrapper
+                if isinstance(parsed, dict) and 'scenes' not in parsed and len(parsed.keys()) < 3:
+                     print(f"⚠️ Extracted JSON lacks 'scenes' and looks conversational. Rejecting.")
+                     return {}
+
                 return parsed
             except Exception as e:
                 print(f"⚠️ JSON primary parse failed. Attempting repair...")
