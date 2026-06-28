@@ -392,7 +392,7 @@ class RemotionJsonMaker:
     def _is_bangla(self, text: str) -> bool:
         return any('\u0980' <= c <= '\u09FF' for c in str(text))
 
-    def generate(self, story: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None) -> Dict[str, Any]:
+    def generate(self, story: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None, drive_prompt_path: str = None) -> Dict[str, Any]:
         pattern = r'(?:Scene|দৃশ্য)\s+[0-9০-৯]+[:\s]*'
         story_parts = [p.strip().lstrip(':').strip() for p in re.split(pattern, story) if p.strip()]
         for i, n in enumerate(story_parts, 1): self.story_scenes[f"SCENE_{i:02d}"] = n
@@ -400,9 +400,17 @@ class RemotionJsonMaker:
         compact_ts = self._compact_timestamps(timestamp_context)
         duration_context = ", ".join([f"SCENE_{i+1:02d}:{d}f" for i, d in enumerate(scene_durations)]) if scene_durations else ""
 
+        drive_guideline = ""
+        if drive_prompt_path and os.path.exists(drive_prompt_path):
+            try:
+                with open(drive_prompt_path, 'r', encoding='utf-8') as f:
+                    drive_guideline = f"\n--- DIRECTOR'S GUIDELINES ---\n{f.read()}\n"
+            except: pass
+
         full_prompt = (
             f"TASK: GENERATE AN EXPERT DOCUMENTARY MOTION GRAPHICS MANIFEST FOR {len(self.story_scenes)} SCENES.\n"
             f"STORY: {story}\nTIMESTAMPS: {compact_ts}\nDURATIONS: {duration_context}\n"
+            f"{drive_guideline}"
             "SYSTEM: WORLD-CLASS MOTION GRAPHICS DIRECTOR PERSONA MANDATORY.\n"
             "DIRECTOR'S RULES (STRICT COMPLIANCE REQUIRED):\n"
             "1. ELIMINATE COLLISIONS: Absolutely NO center-stacking (960, 540) or (960, 700). Use 9-Sector Layout (L/C/R x T/M/B).\n"
@@ -430,11 +438,13 @@ def main():
     parser.add_argument("--timestamp-file")
     parser.add_argument("--fps-update-file")
     parser.add_argument("--prompt-output")
+    parser.add_argument("--drive-prompt")
+    parser.add_argument("--user-data-dir")
     parser.add_argument("--public-dir", default="../public")
     parser.add_argument("--manual", action="store_true")
     args = parser.parse_args()
 
-    maker = RemotionJsonMaker(manual=args.manual)
+    maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, manual=args.manual)
     if args.fps_update_file: maker.load_fps_update(args.fps_update_file)
     maker.scan_assets(args.public_dir)
 
@@ -452,7 +462,7 @@ def main():
             else: break
 
     print("🚀 Stage 1: AI Prompting...")
-    render_json = maker.generate(story, args.prompt_output, ts_content, scene_durations)
+    render_json = maker.generate(story, args.prompt_output, ts_content, scene_durations, drive_prompt_path=args.drive_prompt)
 
     print("🚀 Stage 2: Hardening & Layout Optimization...")
     render_json = maker.finalize_json_durations(render_json, public_dir=args.public_dir)
