@@ -46,13 +46,17 @@ def test_manifest_quality(filepath, public_dir=None):
         return False
 
     TYPE_SIZES = {
-        'text': (800, 200), 'chart': (1000, 600), 'shadcn_chart': (1000, 600),
-        'ui_panel': (800, 600), 'data_indicator': (500, 450), 'shadcn_indicator': (500, 450),
-        'svg': (400, 400), 'kpi': (450, 400), 'timeline': (1200, 300),
-        'hub_network': (900, 900), 'flow_diagram': (1000, 450), 'process': (1000, 450),
-        'media': (900, 700), 'image': (900, 700), 'video': (900, 700),
-        'label': (300, 100), 'callout': (400, 200), 'composition': (1200, 800), 'groups': (1200, 800),
-        'graph': (1000, 700), 'shape': (600, 600)
+        'text': (800, 200),
+        'chart': (1000, 562), 'shadcn_chart': (1000, 562), # 16:9
+        'ui_panel': (800, 600), # 4:3
+        'data_indicator': (500, 375), 'shadcn_indicator': (500, 375), # 4:3
+        'svg': (400, 400), 'kpi': (450, 400), 'kpi_card': (450, 400),
+        'timeline': (1200, 300),
+        'hub_network': (800, 800), 'flow_diagram': (1000, 562), 'process': (1000, 562),
+        'media': (960, 540), 'image': (960, 540), 'video': (960, 540), # 16:9
+        'label': (300, 100), 'callout': (400, 200),
+        'compositions': (1200, 675), 'groups': (1200, 675), # 16:9
+        'graph': (1000, 700), 'shape': (400, 400)
     }
 
     MIN_CONSTRAINTS = {
