@@ -164,7 +164,7 @@ class RemotionJsonMaker:
         CLAMP_MIN_Y, CLAMP_MAX_Y = 150, 930
 
         PRIORITY = {
-            'hero': 1000, # Manual override
+            'hero': 1000,
             'text': 100,
             'hub_network': 90, 'flow_diagram': 90, 'process': 90,
             'chart': 80, 'shadcn_chart': 80, 'kpi_card': 80,
@@ -319,13 +319,23 @@ class RemotionJsonMaker:
 
                 # Hierarchy Metadata
                 imp = str(ov.get('importance', '')).lower()
-                if imp == 'hero': ov['depth'] = 100
-                elif imp == 'secondary': ov['depth'] = 50
-                elif imp == 'ambient': ov['depth'] = -50
-                elif imp == 'background': ov['depth'] = -100
+                if imp == 'hero':
+                    ov['depth'] = 100
+                    ov['parallax'] = 1.0
+                elif imp == 'secondary':
+                    ov['depth'] = 50
+                    ov['parallax'] = 0.8
+                elif imp == 'ambient':
+                    ov['depth'] = -50
+                    ov['parallax'] = 0.5
+                elif imp == 'background':
+                    ov['depth'] = -100
+                    ov['parallax'] = 0.2
                 else:
                     # Auto-assign depth based on priority
-                    ov['depth'] = PRIORITY.get(o_type, 40) - 50
+                    prio = PRIORITY.get(o_type, 40)
+                    ov['depth'] = prio - 50
+                    ov['parallax'] = max(0.2, min(1.0, prio / 100.0))
                 fs = 120
                 if o_type == 'text':
                     fs_match = re.search(r'\d+', str(ov.get('fontSize', '120')))
@@ -361,9 +371,9 @@ class RemotionJsonMaker:
                         w = max(MIN_CHART_W if 'chart' in o_type else MIN_SVG_W, base_w * scale)
                         h = max(MIN_CHART_H if 'chart' in o_type else MIN_SVG_H, base_h * scale)
 
-                    for step in range(0, 60): # Spiral search from AI position
-                        radius = step * 20
-                        # Axis-prioritized angles to maintain grid intent
+                    for step in range(0, 80): # Deep spiral search from AI position
+                        radius = step * 15
+                        # Axis-prioritized angles to maintain grid intent (Rule of Thirds bias)
                         angles = [0, 180, 90, 270, 45, 135, 225, 315] if radius > 0 else [0]
                         for angle in angles:
                             rad = math.radians(angle)
@@ -427,8 +437,9 @@ class RemotionJsonMaker:
                 scene['connections'] = []
 
             # Camera logic: Professional Sequencing & Sync
-            # Priority: focal > background > shape
-            focal_ids = [o['id'] for o in valid_overlays if PRIORITY.get(str(o.get('type')).lower(), 0) >= 50]
+            # Priority: Hero > focal > background
+            hero_ids = [o['id'] for o in valid_overlays if str(o.get('importance', '')).lower() == 'hero' or PRIORITY.get(o['type'], 0) >= 100]
+            focal_ids = [o['id'] for o in valid_overlays if PRIORITY.get(str(o.get('type')).lower(), 0) >= 50 and o['id'] not in hero_ids]
             background_ids = [o['id'] for o in valid_overlays if PRIORITY.get(str(o.get('type')).lower(), 0) < 50]
 
             ai_camera = scene.get('camera', {})
@@ -449,10 +460,14 @@ class RemotionJsonMaker:
                     shots.append({"targetId": background_ids[0], "startFrame": 0, "duration": 45, "style": "cinematic_drift", "zoom": 1.05, "inDuration": 15})
 
                 # 2. Sequence through focal elements, sync startFrame with overlay.start
-                # Sort focal elements by their actual start time for sequential shots
-                focal_elements = sorted([o for o in valid_overlays if o['id'] in focal_ids], key=lambda x: x['start'])
+                # Priority sequencing: Hero first, then focal evidence
+                ordered_targets = []
+                heroes = sorted([o for o in valid_overlays if o['id'] in hero_ids], key=lambda x: x['start'])
+                focals = sorted([o for o in valid_overlays if o['id'] in focal_ids], key=lambda x: x['start'])
+                ordered_targets.extend(heroes)
+                ordered_targets.extend(focals)
 
-                for i, ov in enumerate(focal_elements[:3]): # Up to 3 focal shots
+                for i, ov in enumerate(ordered_targets[:4]): # Up to 4 sequential shots
                     start = ov['start']
                     # Ensure shots don't overlap, adjust previous shot duration if needed
                     if shots and start <= shots[-1]['startFrame']:
@@ -576,19 +591,20 @@ class RemotionJsonMaker:
             f"TASK: GENERATE AN EXPERT DOCUMENTARY MOTION GRAPHICS MANIFEST FOR {len(self.story_scenes)} SCENES.\n"
             f"STORY: {story}\nTIMESTAMPS: {compact_ts}\nDURATIONS: {duration_context}\n"
             f"{drive_guideline}"
-            "SYSTEM: WORLD-CLASS MOTION GRAPHICS DIRECTOR PERSONA MANDATORY (Vox/Kurzgesagt/Polymatter style).\n"
+            "SYSTEM: WORLD-CLASS CINEMATIC MOTION DESIGNER (Vox/Polymatter/Johnny Harris/Kurzgesagt style).\n"
             "DIRECTOR'S RULES (STRICT COMPLIANCE REQUIRED):\n"
-            "1. CINEMATIC STORYTELLING: Fix dashboard feeling. Reduce UI elements. Background atmosphere → Hero statement → Evidence visualization → Supporting context.\n"
-            "2. SEMANTIC HIERARCHY: Every overlay MUST have 'importance': 'hero'|'secondary'|'ambient'|'background'. Hero depth: 100, Ambient: -50.\n"
-            "3. CINEMATIC BEATS: Split narrative text into separate emotional phrases. NEVER combine sentences like 'ঢাকা। মেগাসিটি।' Use separate timed objects.\n"
-            "4. FULL LIFECYCLE: Every element needs 'animation' (entrance), 'hold', and 'exitAnimation'. Variants: 'wordReveal', 'maskReveal', 'glassReveal', 'lineDraw', 'particleAssembly', 'blurFocus', 'svgMorph', 'depthZoom'.\n"
-            "5. CAMERA MASTERCLASS: Do not only target objects. Use true camera movement with start/end positions, scale, and ease: 'cubicOut'. Sequence multiple shots per scene.\n"
-            "6. COMPOSITION: Absolutely NO center stacking. Use Rule of Thirds, negative space, and foreground/background separation.\n"
-            "7. TYPOGRAPHY HIERARCHY: Hero (120-150px, bold), Secondary (60-80px), Data (40-55px). All text needs 'maxWidth': 800 for Bangla safe-wrapping.\n"
-            "8. DATA STORYTELLING: Charts need 'draw' animations and camera targeting. Mark invented metrics as 'illustrative_model'.\n"
-            "9. METAPHOR (SCENE_04): Make SCENE_04 the strongest. Transform 'Geological Clock' into main visual metaphor: giant timeline, earth layers, ticking danger indicator.\n"
-            "10. CONNECTOR SYSTEM: Use 'connections' array to link evidence: sourceId, targetId, type:'connector', style:'energy_line', animation:'draw', particle:true.\n"
-            "11. SYSTEMS: Use 'infographic_lines' and 'parallax' (background:0.2, hero:1.0). Add 'transition' and visual 'beats' array.\n"
+            "1. INFORMATION FLOW: Design scenes as visual arguments. Reading Order: Background atmosphere → Hero statement → Semantic Connection → Evidence visualization → Conclusion.\n"
+            "2. CINEMATIC BEATS: Split text into emotional phrases. Never combine 'ঢাকা। মেগাসিটি।' into one object. Create separate timed objects for each beat.\n"
+            "3. VISUAL HIERARCHY: Every scene needs exactly 1 Hero element, 1 Secondary element, and Supporting ambient graphics. Use 'importance': 'hero'|'secondary'|'ambient'|'background'.\n"
+            "4. PROGRESSIVE REVEAL: Visuals must appear as information is spoken. Stagger entrance of background, then hero, then evidence, then conclusion.\n"
+            "5. SEMANTIC CONNECTORS: Use 'connections' array to link logic (Cause, Effect, Progression). Use 'energy_line' or 'relationship_line'. DO NOT use decorative connectors.\n"
+            "6. STORY-DRIVEN CAMERA: Camera MUST follow information flow. Hero → (Connector draws) → Pan along connector → Arrive at Evidence → Zoom into Data. Use start/end positions and scale.\n"
+            "7. CAUSE-AND-EFFECT CHAINS: Convert narration processes into connected visual nodes. Background graphics (graph/network) must reinforce the story topic, not just decorate.\n"
+            "8. COMPOSITION MASTERCLASS: Absolutely NO center stacking. Use Rule of Thirds, negative space, and foreground/background depth separation.\n"
+            "9. TYPOGRAPHY: Hero (130-150px, bold), Secondary (70-80px), Data (45-55px). All text needs 'maxWidth': 800 for Bangla safe-wrapping. Animate meaningfully.\n"
+            "10. METAPHOR (SCENE_04): Make SCENE_04 the strongest. Transform 'Geological Clock' into main visual metaphor: earth layers, ticking danger indicator, critical threshold reveal.\n"
+            "11. FULL LIFECYCLE: Every element needs 'animation' (entrance), 'hold', and 'exitAnimation'. Variants: 'wordReveal', 'maskReveal', 'glassReveal', 'lineDraw', 'particleAssembly', 'blurFocus', 'svgMorph', 'depthZoom'.\n"
+            "12. PRODUCTION BLUEPRINT: Add 'transition':{'type':'cinematicMatchCut','duration':15}, 'parallax':{'background':0.2,'midground':0.5,'foreground':1.0}, and a 'beats' array for visual highlights.\n"
             "OUTPUT RAW JSON BLOCK ONLY. NO PREAMBLE. NO CHATTER."
         )
         if prompt_output_path:
