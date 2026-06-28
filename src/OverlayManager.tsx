@@ -9,12 +9,14 @@ import { MediaEngine } from './engines/MediaEngine';
 import { DataIndicatorEngine } from './engines/DataIndicatorEngine';
 import { ShadcnEngine } from './engines/ShadcnEngine';
 import { AnimatedSvg } from '../svg/components/AnimatedSvg';
+import { resolvePosition } from './services/SmartPositionResolver';
 
 interface OverlayManagerProps {
   overlays: any[];
+  analysis?: any;
 }
 
-export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays }) => {
+export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays, analysis }) => {
   if (overlays.length > 0) {
       console.log(`[OverlayManager] Detected ${overlays.length} overlays: ${overlays.map(o => `(${o.id}: ${o.type})`).join(', ')}`);
   }
@@ -24,31 +26,39 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays }) => {
         if (!overlay.id) {
             console.error(`[OverlayManager] CRITICAL: Overlay missing ID!`, overlay);
         }
+
+        // Apply Smart Position Resolution
+        const resolvedPosition = resolvePosition(overlay, analysis);
+        const positionalOverlay = {
+            ...overlay,
+            position: resolvedPosition
+        };
+
         const renderOverlay = () => {
           switch (overlay.type) {
             case 'text':
-              return <TextEngine overlay={overlay} />;
+              return <TextEngine overlay={positionalOverlay} />;
             case 'ui_panel':
-              return <UISystem overlay={overlay} />;
+              return <UISystem overlay={positionalOverlay} />;
             case 'shape':
-              return <ShapesEngine overlay={overlay} />;
+              return <ShapesEngine overlay={positionalOverlay} />;
             case 'chart':
-              return <ChartsEngine overlay={overlay} />;
+              return <ChartsEngine overlay={positionalOverlay} />;
             case 'indicator':
             case 'data_indicator':
-              return <DataIndicatorEngine overlay={overlay} />;
+              return <DataIndicatorEngine overlay={positionalOverlay} />;
             case 'graph':
-              return <GraphsEngine overlay={overlay} />;
+              return <GraphsEngine overlay={positionalOverlay} />;
             case 'video':
             case 'image':
-              return <MediaEngine overlay={overlay} />;
+              return <MediaEngine overlay={positionalOverlay} />;
             case 'shadcn_chart':
             case 'shadcn_indicator':
-              return <ShadcnEngine overlay={overlay} />;
+              return <ShadcnEngine overlay={positionalOverlay} />;
             case 'svg':
               return (
                 <AnimatedSvg
-                  {...overlay}
+                  {...positionalOverlay}
                   query={overlay.query || overlay.content || 'house'}
                   provider={overlay.provider || 'iconify'}
                   animation={overlay.animation || 'draw'}
@@ -56,8 +66,8 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays }) => {
                   durationInFrames={overlay.duration || 90}
                   width={overlay.width || 300}
                   height={overlay.height || 300}
-                  x={overlay.position?.x || 960}
-                  y={overlay.position?.y || 540}
+                  x={positionalOverlay.position?.x || 960}
+                  y={positionalOverlay.position?.y || 540}
                 />
               );
             default:

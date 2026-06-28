@@ -1,0 +1,62 @@
+{
+  "version": "1.0",
+  "status": "success",
+  "scene_type": "urban_city",
+  "objects": [
+    {
+      "id": "obj_001",
+      "type": "building",
+      "confidence": 0.95,
+      "bbox": {
+        "x": 800.0,
+        "y": 200.0,
+        "width": 400.0,
+        "height": 600.0
+      }
+    }
+  ],
+  "safe_text_regions": [
+    {
+      "x": 50.0,
+      "y": 50.0,
+      "width": 540.0,
+      "height": 260.0,
+      "confidence": 1.0
+    },
+    {
+      "x": 1330.0,
+      "y": 50.0,
+      "width": 540.0,
+      "height": 260.0,
+      "confidence": 1.0
+    },
+    {
+      "x": 50.0,
+      "y": 410.0,
+      "width": 540.0,
+      "height": 260.0,
+      "confidence": 1.0
+    },
+    {
+      "x": 1330.0,
+      "y": 410.0,
+      "width": 540.0,
+      "height": 260.0,
+      "confidence": 1.0
+    },
+    {
+      "x": 50.0,
+      "y": 770.0,
+      "width": 540.0,
+      "height": 260.0,
+      "confidence": 1.0
+    },
+    {
+      "x": 1330.0,
+      "y": 770.0,
+      "width": 540.0,
+      "height": 260.0,
+      "confidence": 1.0
+    }
+  ]
+}
