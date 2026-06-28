@@ -124,8 +124,12 @@ class RemotionJsonMaker:
             'media': (960, 540), 'image': (960, 540), 'video': (960, 540), # 16:9
             'label': (300, 100), 'callout': (400, 200),
             'compositions': (1200, 675), 'groups': (1200, 675), # 16:9
-            'graph': (1000, 700), 'shape': (400, 400)
+            'graph': (1000, 700), 'shape': (400, 400),
+            'data_emphasis': (600, 200), 'ambient_graphic': (1920, 1080)
         }
+
+        # Cinematic Animations pool
+        SEMANTIC_ANIMS = ["wordReveal", "glassReveal", "networkGrow", "barsRise", "cinematicGlow", "fadeScale", "parallaxDrift"]
 
         # Hard Constraints (Synced with QA MIN_CONSTRAINTS)
         MIN_FONT_SIZE = 40
@@ -159,6 +163,7 @@ class RemotionJsonMaker:
         CLAMP_MIN_Y, CLAMP_MAX_Y = 150, 930
 
         PRIORITY = {
+            'hero': 1000, # Manual override
             'text': 100,
             'hub_network': 90, 'flow_diagram': 90, 'process': 90,
             'chart': 80, 'shadcn_chart': 80, 'kpi_card': 80,
@@ -170,7 +175,8 @@ class RemotionJsonMaker:
             'svg': 40,
             'kpi': 40,
             'graph': 30,
-            'shape': 10
+            'shape': 10,
+            'background': 0
         }
 
         sfx_manifest = []
@@ -246,7 +252,7 @@ class RemotionJsonMaker:
                 elif o_type in ['chart', 'shadcn_chart', 'hub_network', 'flow_diagram', 'process', 'kpi_card', 'timeline', 'compositions', 'groups']:
                     if focal_count >= 3: continue
                     focal_count += 1
-                elif o_type in ['svg', 'label', 'callout', 'data_indicator', 'shadcn_indicator', 'shape', 'graph']:
+                elif o_type in ['svg', 'label', 'callout', 'data_indicator', 'shadcn_indicator', 'shape', 'graph', 'ambient_graphic']:
                     if svg_count >= 12: continue
                     svg_count += 1
 
@@ -263,6 +269,7 @@ class RemotionJsonMaker:
                     ov['font'] = self.english_fonts[0] if self.english_fonts else "Arial"
 
                 if ov['type'] == 'text':
+                    ov['maxWidth'] = ov.get('maxWidth', 800)
                     if not ov.get('hero_config'):
                         hero = self._get_scene_hero_word(s_id, ov['content'], scene_duration)
                         if not hero: hero = self._get_fallback_hero(ov['content'])
@@ -295,7 +302,29 @@ class RemotionJsonMaker:
                 # Coordinated Exit: 30f transition padding
                 ov['duration'] = max(30, scene_duration - ov['start'] - 30)
 
+                # Semantic Lifecycle
+                if not ov.get('exitAnimation'):
+                    ov['exitAnimation'] = "fade_out" if o_type != 'text' else "slide_down"
+
+                # Parallax support based on depth
+                if 'parallax' not in ov:
+                    imp = str(ov.get('importance', '')).lower()
+                    if imp == 'background': ov['parallax'] = 0.2
+                    elif imp == 'ambient': ov['parallax'] = 0.5
+                    elif imp == 'hero': ov['parallax'] = 1.0
+                    else: ov['parallax'] = 0.8
+
                 base_w, base_h = TYPE_SIZES.get(o_type, (600, 400))
+
+                # Hierarchy Metadata
+                imp = str(ov.get('importance', '')).lower()
+                if imp == 'hero': ov['depth'] = 100
+                elif imp == 'secondary': ov['depth'] = 50
+                elif imp == 'ambient': ov['depth'] = -50
+                elif imp == 'background': ov['depth'] = -100
+                else:
+                    # Auto-assign depth based on priority
+                    ov['depth'] = PRIORITY.get(o_type, 40) - 50
                 fs = 120
                 if o_type == 'text':
                     fs_match = re.search(r'\d+', str(ov.get('fontSize', '120')))
@@ -324,7 +353,8 @@ class RemotionJsonMaker:
 
                     if o_type == 'text':
                         curr_fs = max(MIN_FONT_SIZE, int(fs * scale))
-                        w = min(1600, len(ov['content']) * curr_fs * 0.7)
+                        max_w = ov.get('maxWidth', 800)
+                        w = min(max_w, len(ov['content']) * curr_fs * 0.7)
                         h = curr_fs * 1.5
                     else:
                         w = max(MIN_CHART_W if 'chart' in o_type else MIN_SVG_W, base_w * scale)
@@ -384,6 +414,13 @@ class RemotionJsonMaker:
             valid_overlays.sort(key=lambda o: PRIORITY.get(str(o.get('type')).lower(), 0))
             scene['overlays'] = valid_overlays
 
+            # Scene-level Transitions & Beats
+            if 'transition' not in scene:
+                scene['transition'] = {"type": "cinematicMatchCut", "duration": 15}
+
+            if 'beats' not in scene:
+                scene['beats'] = [{"frame": o['start'], "event": f"{o['id']}_reveal"} for o in valid_overlays if PRIORITY.get(o['type'], 0) >= 50]
+
             # Camera logic: Professional Sequencing & Sync
             # Priority: focal > background > shape
             focal_ids = [o['id'] for o in valid_overlays if PRIORITY.get(str(o.get('type')).lower(), 0) >= 50]
@@ -424,7 +461,8 @@ class RemotionJsonMaker:
                         "duration": 60, # Initial guess, will finalize below
                         "style": CAM_STYLES[(scene_idx + i) % len(CAM_STYLES)],
                         "zoom": 1.1 + (i * 0.05),
-                        "inDuration": 20
+                        "inDuration": 20,
+                        "ease": "cubicOut"
                     })
 
                 # Finalize last shot duration
@@ -530,17 +568,18 @@ class RemotionJsonMaker:
             f"TASK: GENERATE AN EXPERT DOCUMENTARY MOTION GRAPHICS MANIFEST FOR {len(self.story_scenes)} SCENES.\n"
             f"STORY: {story}\nTIMESTAMPS: {compact_ts}\nDURATIONS: {duration_context}\n"
             f"{drive_guideline}"
-            "SYSTEM: WORLD-CLASS MOTION GRAPHICS DIRECTOR PERSONA MANDATORY.\n"
+            "SYSTEM: WORLD-CLASS MOTION GRAPHICS DIRECTOR PERSONA MANDATORY (Vox/Kurzgesagt/Polymatter style).\n"
             "DIRECTOR'S RULES (STRICT COMPLIANCE REQUIRED):\n"
-            "1. NEVER RENDER A NOUN DIRECTLY: Use SVGs as building blocks for complex hierarchies. Never just 'a city'; build a system.\n"
-            "2. ELIMINATE COLLISIONS: Absolutely NO center-stacking (960, 540) or (960, 700). Use 9-Sector Layout (L/C/R x T/M/B).\n"
-            "3. CINEMATIC COMPOSITIONS: Vary layouts across scenes: Split-Screen (L Title / R Chart), Rule of Thirds (L-TOP Title / R-BOT Diagram), Hero Focal (Large Hub center-right).\n"
-            "4. PROGRESSIVE INFORMATION STAGING (Wave Reveal): Wave 1 (15f): Title. Wave 2 (45f): Primary Graphic. Wave 3 (75f): Details/Connectors.\n"
-            "5. CAMERA INTELLIGENCE: Every shot MUST have a 'targetId'. Rotate shots: rack_focus, cinematic_drift, pan_right, orbit.\n"
-            "6. DATA INTEGRITY: Use ACTUAL NUMBERS from story. If text says '20 million', KPI must show '20M' in 'kpi_card'.\n"
-            "7. TYPOGRAPHIC HIERARCHY: Content 3-5 words max. Every text overlay MUST have 'hero_config' highlighting a keyword.\n"
-            "8. INFOGRAPHIC SYSTEMS: Procedural scenes MUST be connected systems. Use 'infographic_lines' (type: 'arrow' or 'dotted') to link separated elements.\n"
-            "9. SECONDARY INFOGRAPHIC HELPERS: Use 'svg' for icons, 'label' for sub-captions, and 'callout' for detail highlights. Up to 12 secondary elements per scene.\n"
+            "1. SEMANTIC HIERARCHY: Every overlay MUST have 'importance': 'hero'|'secondary'|'ambient'|'background'.\n"
+            "2. CINEMATIC BEATS: Split narrative text into separate emotional phrases. NEVER combine multiple sentences in one object. Use separate IDs.\n"
+            "3. FULL LIFECYCLE: Every element needs 'animation' (entrance) and 'exitAnimation'. Use semantic variants: 'wordReveal', 'glassReveal', 'networkGrow', 'barsRise', 'cinematicGlow', 'fadeScale', 'parallaxDrift'.\n"
+            "4. CAMERA CHOREOGRAPHY: Sequence multiple shots per scene targeting individual element IDs. Each shot needs: 'targetId', 'startFrame', 'duration', 'zoom', 'style', 'ease':'cubicOut'.\n"
+            "5. ADVANCED COMPOSITION: Avoid center stacking. Use Rule of Thirds and negative space. Separation of foreground/background.\n"
+            "6. DATA STORYTELLING: Charts must have 'draw' animations and camera targeting. Use ACTUAL numbers from the story.\n"
+            "7. TEXT ENHANCEMENTS: Every text overlay MUST include 'maxWidth': 800, 'hero_config' (keyword, animation, color), and 'stagger': 4.\n"
+            "8. ENVIRONMENTAL MOTION: Background graphics ('graph', 'shape', 'ambient_graphic') must be 'ambient', start at frame 0, and have 'fade_out' exitAnimation.\n"
+            "9. INFOGRAPHIC SYSTEMS: Use 'infographic_lines' (arrow/dotted) and 'parallax' values (background:0.2, midground:0.5, foreground:1.0).\n"
+            "10. TRANSITIONS & BEATS: Add 'transition': {'type': 'cinematicMatchCut', 'duration': 15} to scenes. Generate a 'beats' array for visual highlights.\n"
             "OUTPUT RAW JSON BLOCK ONLY. NO PREAMBLE. NO CHATTER."
         )
         if prompt_output_path:
