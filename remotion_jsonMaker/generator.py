@@ -115,11 +115,12 @@ class RemotionJsonMaker:
         # Studio V4 Hardened Sizes (Synced with QA Logic)
         TYPE_SIZES = {
             'text': (800, 200), 'chart': (1000, 600), 'shadcn_chart': (1000, 600),
-            'ui_panel': (700, 500), 'data_indicator': (450, 400), 'shadcn_indicator': (450, 400),
+            'ui_panel': (800, 600), 'data_indicator': (500, 450), 'shadcn_indicator': (500, 450),
             'svg': (400, 400), 'kpi': (450, 400), 'timeline': (1200, 300),
             'hub_network': (900, 900), 'flow_diagram': (1000, 450), 'process': (1000, 450),
             'media': (900, 700), 'image': (900, 700), 'video': (900, 700),
-            'label': (300, 100), 'callout': (400, 200), 'composition': (1200, 800), 'groups': (1200, 800)
+            'label': (300, 100), 'callout': (400, 200), 'composition': (1200, 800), 'groups': (1200, 800),
+            'graph': (1000, 700), 'shape': (600, 600)
         }
 
         # Hard Constraints (Synced with QA MIN_CONSTRAINTS)
@@ -133,11 +134,11 @@ class RemotionJsonMaker:
         VALID_TEXT_ANIMS = ["glow_pulse", "neon_flicker", "glitch_pop", "bounce_pop", "word_by_word", "slide_up", "typewriter"]
 
         # Ultra-High End 9-Sector Anchors (1920x1080)
-        # Strategic offset to maximize space and minimize collisions
+        # Studio V4 Final Hardened Anchors (Deeply shifted for large components)
         ANCHORS = {
-            "L_TOP": (450, 300), "C_TOP": (960, 300), "R_TOP": (1470, 300),
-            "L_MID": (450, 540), "C_MID": (960, 540), "R_MID": (1470, 540),
-            "L_BOT": (450, 780), "C_BOT": (960, 780), "R_BOT": (1470, 780)
+            "L_TOP": (600, 350), "C_TOP": (960, 350), "R_TOP": (1320, 350),
+            "L_MID": (600, 540), "C_MID": (960, 540), "R_MID": (1320, 540),
+            "L_BOT": (600, 730), "C_BOT": (960, 730), "R_BOT": (1320, 730)
         }
 
         # Hard boundaries for strict clamping (QA safe zone)
@@ -221,6 +222,7 @@ class RemotionJsonMaker:
                         if not hero: hero = self._get_fallback_hero(ov['content'])
                         if hero:
                             ov['hero_config'] = {"word": hero['word'], "start": hero['start'], "color": MODERN_COLORS[(scene_idx + 2) % len(MODERN_COLORS)], "animation": VALID_TEXT_ANIMS[scene_idx % len(VALID_TEXT_ANIMS)]}
+
                     ov['color'] = MODERN_COLORS[scene_idx % len(MODERN_COLORS)]
                     ov['fontSize'] = ov.get('fontSize', "120px")
                 valid_overlays.append(ov)
@@ -273,6 +275,11 @@ class RemotionJsonMaker:
                             for angle in angles:
                                 rad = math.radians(angle)
                                 cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
+
+                                # Fix Center-Stacking bias: discourage 960,540
+                                if radius < 100 and abs(cx - 960) < 10 and abs(cy - 540) < 10:
+                                    if o_type == 'text' or i > 0: continue # Only allow focal centerpiece to be center
+
                                 l, t, r, b = cx-w/2, cy-h/2, cx+w/2, cy+h/2
 
                                 if l < CLAMP_MIN_X or r > CLAMP_MAX_X or t < CLAMP_MIN_Y or b > CLAMP_MAX_Y: continue
@@ -294,14 +301,24 @@ class RemotionJsonMaker:
                                             ov['height'] = int(h)
                                     if radius > 0: print(f"   🔧 Expert Nudging {ov['id']} to resolve overlap -> New Pos: ({int(cx)}, {int(cy)})")
 
-                                    # Geometry Sync for internal tracking
-                                    final_w, final_h = w, h
+                                    # Geometry Sync for internal tracking (Match QA exactly)
+                                    if o_type == 'text':
+                                        final_w = min(1600, len(ov['content']) * int(curr_fs) * 0.7)
+                                        final_h = int(curr_fs) * 1.5
+                                    else:
+                                        final_w, final_h = w, h
                                     break
                             if found: break
                         if found: break
                     if found: break
 
                 ov['position'] = {"x": int(best_pos[0]), "y": int(best_pos[1])}
+
+                # High-End Synchronization: Clamp hero start to follow overlay entry
+                if ov.get('hero_config'):
+                    h_start = ov['hero_config'].get('start', 0)
+                    ov['hero_config']['start'] = max(ov['start'] + 10, h_start)
+
                 placed_boxes.append((ov['id'], best_pos[0]-final_w/2, best_pos[1]-final_h/2, best_pos[0]+final_w/2, best_pos[1]+final_h/2, ov['start'], ov['start']+ov['duration']))
 
             scene['overlays'] = valid_overlays
