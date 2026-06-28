@@ -106,28 +106,43 @@ class RemotionJsonMaker:
         self.video_files = sorted([f for f in os.listdir(video_dir) if f.lower().endswith('.mp4')]) if os.path.exists(video_dir) else []
 
     def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
-        """Hardens layout, timing, camera, and assets with Geometry-Aware Logic."""
+        """Hardens layout, timing, camera, and assets with Geometry-Aware Logic and Adaptive Scaling."""
         if not data or not data.get('scenes'): return data
 
         abs_public = os.path.abspath(public_dir)
         print(f"🛠️ HARDENING ENGINE: Resolving spatial collisions and cinematic timing...")
 
+        # Studio V4 Hardened Sizes (Synced with QA Logic)
         TYPE_SIZES = {
-            'text': (800, 240), 'chart': (1000, 600), 'shadcn_chart': (1000, 600),
+            'text': (800, 200), 'chart': (1000, 600), 'shadcn_chart': (1000, 600),
             'ui_panel': (700, 500), 'data_indicator': (450, 400), 'shadcn_indicator': (450, 400),
-            'svg': (400, 400), 'hub_network': (900, 900), 'flow_diagram': (1000, 450),
-            'timeline': (1200, 300), 'composition': (1200, 800), 'kpi': (450, 400)
+            'svg': (400, 400), 'kpi': (450, 400), 'timeline': (1200, 300),
+            'hub_network': (900, 900), 'flow_diagram': (1000, 450), 'process': (1000, 450),
+            'media': (900, 700), 'image': (900, 700), 'video': (900, 700),
+            'label': (300, 100), 'callout': (400, 200), 'composition': (1200, 800), 'groups': (1200, 800)
         }
+
+        # Hard Constraints (Synced with QA MIN_CONSTRAINTS)
+        MIN_FONT_SIZE = 40
+        MIN_CHART_W, MIN_CHART_H = 300, 200
+        MIN_SVG_W, MIN_SVG_H = 100, 100
+        MIN_SPACING = 30
 
         LAYOUT_PRESETS = ["SPLIT_SCREEN", "RULE_OF_THIRDS", "HERO_FOCAL", "TOP_TITLE_LOWER_VIS"]
         MODERN_COLORS = ["#00F5FF", "#FF3E6C", "#00FFAB", "#ADFF2F", "#FFD700", "#7B68EE", "#FF8C00"]
         VALID_TEXT_ANIMS = ["glow_pulse", "neon_flicker", "glitch_pop", "bounce_pop", "word_by_word", "slide_up", "typewriter"]
 
+        # Ultra-High End 9-Sector Anchors (1920x1080)
+        # Strategic offset to maximize space and minimize collisions
         ANCHORS = {
-            "L_TOP": (480, 270), "C_TOP": (960, 270), "R_TOP": (1440, 270),
-            "L_MID": (480, 540), "C_MID": (960, 540), "R_MID": (1440, 540),
-            "L_BOT": (480, 810), "C_BOT": (960, 810), "R_BOT": (1440, 810)
+            "L_TOP": (450, 300), "C_TOP": (960, 300), "R_TOP": (1470, 300),
+            "L_MID": (450, 540), "C_MID": (960, 540), "R_MID": (1470, 540),
+            "L_BOT": (450, 780), "C_BOT": (960, 780), "R_BOT": (1470, 780)
         }
+
+        # Hard boundaries for strict clamping (QA safe zone)
+        CLAMP_MIN_X, CLAMP_MAX_X = 160, 1760
+        CLAMP_MIN_Y, CLAMP_MAX_Y = 160, 920
 
         sfx_manifest = []
         in_ptr, out_ptr, cam_ptr = 0, 0, 0
@@ -136,12 +151,10 @@ class RemotionJsonMaker:
             s_id = scene.get('scene_id', f"SCENE_{scene_idx+1}")
             print(f"   🎬 Processing: {s_id}")
 
-            # AI Repair: duration
             if 'duration' in scene and 'duration_in_frames' not in scene: scene['duration_in_frames'] = scene['duration']
             raw_dur = scene.get('duration_in_frames', 180)
             scene_duration = int(raw_dur * 30) if (isinstance(raw_dur, (float, int)) and raw_dur < 60) else int(raw_dur)
 
-            # Map Background
             id_num_match = re.search(r'(\d+)', s_id)
             id_num = int(id_num_match.group(1)) if id_num_match else (scene_idx + 1)
 
@@ -163,13 +176,11 @@ class RemotionJsonMaker:
             scene['duration_in_frames'] = scene_duration
             scene['audio_enabled'] = False
 
-            # Narration
             pattern = f"SC_{id_num:02d}".lower()
             narration_file = next((f for f in self.narration_files if pattern in f.lower()), None)
             if narration_file:
                 sfx_manifest.append({"scene_id": s_id, "file": narration_file, "start": 0, "end": scene_duration, "volume": 1.0})
 
-            # Overlays Setup
             if not scene.get('overlays'):
                 for k in ['elements', 'layers', 'visuals']:
                     if scene.get(k) and isinstance(scene[k], list): scene['overlays'] = scene[k]; break
@@ -199,9 +210,10 @@ class RemotionJsonMaker:
 
                 if not ov.get('id'): ov['id'] = f"ov_{id_num}_{len(valid_overlays)+1}"
 
-                is_ov_bangla = self._is_bangla(str(ov.get('content', '')))
-                if (is_ov_bangla or is_scene_bangla) and self.bangla_fonts: ov['font'] = self.bangla_fonts[0]
-                elif not ov.get('font'): ov['font'] = self.english_fonts[0] if self.english_fonts else "Arial"
+                if (self._is_bangla(str(ov.get('content', ''))) or is_scene_bangla) and self.bangla_fonts:
+                    ov['font'] = "Sohid_bangla" if "Sohid_bangla" in self.bangla_fonts else self.bangla_fonts[0]
+                elif not ov.get('font'):
+                    ov['font'] = self.english_fonts[0] if self.english_fonts else "Arial"
 
                 if ov['type'] == 'text':
                     if not ov.get('hero_config'):
@@ -213,61 +225,99 @@ class RemotionJsonMaker:
                     ov['fontSize'] = ov.get('fontSize', "120px")
                 valid_overlays.append(ov)
 
-            # Spatial and timing pass
+            # Spatial and timing pass with Adaptive Scaling
             placed_boxes = []
             layout_style = LAYOUT_PRESETS[scene_idx % len(LAYOUT_PRESETS)]
             for i, ov in enumerate(valid_overlays):
                 o_type = ov['type']
-                ov['start'] = 15 + i*30 # Force progressive staging (Wave timing)
+                ov['start'] = 15 + i*30
                 ov['duration'] = scene_duration - ov['start']
 
-                w, h = TYPE_SIZES.get(o_type, (600, 400))
+                base_w, base_h = TYPE_SIZES.get(o_type, (600, 400))
+                fs = 120
                 if o_type == 'text':
                     fs_match = re.search(r'\d+', str(ov.get('fontSize', '120')))
                     fs = int(fs_match.group()) if fs_match else 120
-                    w, h = min(1600, len(ov['content']) * fs * 0.7), fs * 1.5
 
-                # Layout Anchor logic
-                search_pool = []
-                if layout_style == "SPLIT_SCREEN": search_pool = ["L_MID", "L_TOP", "L_BOT"] if o_type=='text' else ["R_MID", "R_TOP", "R_BOT"]
-                elif layout_style == "RULE_OF_THIRDS": search_pool = ["L_TOP", "R_TOP"] if o_type=='text' else ["R_BOT", "L_BOT"]
-                elif layout_style == "HERO_FOCAL": search_pool = ["L_TOP", "R_TOP"] if o_type=='text' else ["C_MID", "C_BOT"]
-                else: search_pool = ["C_TOP", "L_TOP"] if o_type=='text' else ["C_BOT", "R_MID"]
-
-                # Combine with fallback anchors
-                search_pool += [k for k in ANCHORS.keys() if k not in search_pool]
-
+                found = False
                 best_pos = (960, 540)
-                for anchor_name in search_pool:
-                    ax, ay = ANCHORS[anchor_name]
-                    found = False
-                    for dx, dy in [(0,0), (120,0), (-120,0), (0,120), (0,-120), (200, 200), (-200, -200)]:
-                        cx, cy = ax + dx, ay + dy
-                        l, t, r, b = cx-w/2, cy-h/2, cx+w/2, cy+h/2
-                        if l < 100 or r > 1820 or t < 80 or b > 1000: continue
-                        collision = False
-                        for p_id, p_l, p_t, p_r, p_b, p_s, p_e in placed_boxes:
-                            if max(ov['start'], p_s) < min(ov['start']+ov['duration'], p_e):
-                                if not (r + 50 < p_l or l - 50 > p_r or b + 50 < p_t or t - 50 > p_b): collision = True; break
-                        if not collision: best_pos = (cx, cy); found = True; break
+                final_w, final_h = base_w, base_h
+
+                for scale_step in range(7): # Try 100% down to 10%
+                    scale = 1.0 - (scale_step * 0.15)
+                    if o_type == 'text':
+                        curr_fs = max(MIN_FONT_SIZE, int(fs * scale))
+                        w = min(1600, len(ov['content']) * curr_fs * 0.7)
+                        h = curr_fs * 1.5
+                    else:
+                        w = max(MIN_CHART_W if 'chart' in o_type else MIN_SVG_W, base_w * scale)
+                        h = max(MIN_CHART_H if 'chart' in o_type else MIN_SVG_H, base_h * scale)
+
+                    search_pool = []
+                    if layout_style == "SPLIT_SCREEN":
+                        search_pool = ["L_MID", "L_TOP", "L_BOT"] if o_type=='text' else ["R_MID", "R_TOP", "R_BOT"]
+                    elif layout_style == "RULE_OF_THIRDS":
+                        search_pool = ["L_TOP", "L_MID"] if o_type=='text' else ["R_BOT", "R_MID"]
+                    elif layout_style == "HERO_FOCAL":
+                        search_pool = ["L_TOP", "R_TOP"] if o_type=='text' else ["C_MID", "C_BOT"]
+                    else:
+                        search_pool = ["C_TOP", "L_TOP", "R_TOP"] if o_type=='text' else ["C_BOT", "L_BOT", "R_BOT"]
+
+                    search_pool += [k for k in ANCHORS.keys() if k not in search_pool]
+
+                    for anchor_name in search_pool:
+                        ax, ay = ANCHORS[anchor_name]
+                        for step in range(0, 25):
+                            radius = step * 40
+                            angles = [0, 180, 90, 270, 45, 135, 225, 315, 30, 60, 120, 150, 210, 240, 300, 330] if radius > 0 else [0]
+                            for angle in angles:
+                                rad = math.radians(angle)
+                                cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
+                                l, t, r, b = cx-w/2, cy-h/2, cx+w/2, cy+h/2
+
+                                if l < CLAMP_MIN_X or r > CLAMP_MAX_X or t < CLAMP_MIN_Y or b > CLAMP_MAX_Y: continue
+
+                                collision = False
+                                for p_id, p_l, p_t, p_r, p_b, p_s, p_e in placed_boxes:
+                                    if max(ov['start'], p_s) < min(ov['start']+ov['duration'], p_e):
+                                        # Sync gap with QA MIN_CONSTRAINTS
+                                        gap = MIN_SPACING
+                                        if not (r + gap < p_l or l - gap > p_r or b + gap < p_t or t - gap > p_b):
+                                            collision = True; break
+                                if not collision:
+                                    best_pos, found = (cx, cy), True
+                                    if scale < 1.0:
+                                        print(f"   📉 Scaling down {ov['id']} to {int(scale*100)}% to fit.")
+                                        if o_type == 'text': ov['fontSize'] = f"{int(curr_fs)}px"
+                                        else:
+                                            ov['width'] = int(w)
+                                            ov['height'] = int(h)
+                                    if radius > 0: print(f"   🔧 Expert Nudging {ov['id']} to resolve overlap -> New Pos: ({int(cx)}, {int(cy)})")
+
+                                    # Geometry Sync for internal tracking
+                                    final_w, final_h = w, h
+                                    break
+                            if found: break
+                        if found: break
                     if found: break
+
                 ov['position'] = {"x": int(best_pos[0]), "y": int(best_pos[1])}
-                placed_boxes.append((ov['id'], best_pos[0]-w/2, best_pos[1]-h/2, best_pos[0]+w/2, best_pos[1]+h/2, ov['start'], ov['start']+ov['duration']))
+                placed_boxes.append((ov['id'], best_pos[0]-final_w/2, best_pos[1]-final_h/2, best_pos[0]+final_w/2, best_pos[1]+final_h/2, ov['start'], ov['start']+ov['duration']))
 
             scene['overlays'] = valid_overlays
 
-            # Camera logic: Force distinct targets
+            # Camera logic: Force distinct targets and styles
             valid_ids = [o['id'] for o in valid_overlays]
+            CAM_STYLES = ["cinematic_drift", "slow_push", "pan_right", "orbit", "rack_focus", "dramatic_reveal"]
             if valid_ids:
                 if len(valid_ids) >= 2:
                     scene['camera'] = {"enabled": True, "shots": [
-                        {"targetId": valid_ids[0], "startFrame": 0, "duration": scene_duration//2, "style": "cinematic_drift"},
-                        {"targetId": valid_ids[1], "startFrame": scene_duration//2, "duration": scene_duration - (scene_duration//2), "style": "slow_push"}
+                        {"targetId": valid_ids[0], "startFrame": 0, "duration": scene_duration//2, "style": CAM_STYLES[scene_idx % len(CAM_STYLES)], "zoom": 1.1, "inDuration": 15},
+                        {"targetId": valid_ids[1], "startFrame": scene_duration//2, "duration": scene_duration - (scene_duration//2), "style": CAM_STYLES[(scene_idx + 1) % len(CAM_STYLES)], "zoom": 1.2, "inDuration": 30}
                     ]}
                 else:
-                    scene['camera'] = {"enabled": True, "shots": [{"targetId": valid_ids[0], "startFrame": 0, "duration": scene_duration, "style": "slow_push"}]}
+                    scene['camera'] = {"enabled": True, "shots": [{"targetId": valid_ids[0], "startFrame": 0, "duration": scene_duration, "style": "slow_push", "zoom": 1.15, "inDuration": 20}]}
 
-            # SFX
             for i, ov in enumerate(valid_overlays):
                 if self.in_files:
                     sfx_manifest.append({"scene_id": s_id, "file": self.in_files[(in_ptr+i)%len(self.in_files)], "start": ov['start'], "end": ov['start']+30, "volume": 0.05})
@@ -353,9 +403,16 @@ class RemotionJsonMaker:
         full_prompt = (
             f"TASK: GENERATE AN EXPERT DOCUMENTARY MOTION GRAPHICS MANIFEST FOR {len(self.story_scenes)} SCENES.\n"
             f"STORY: {story}\nTIMESTAMPS: {compact_ts}\nDURATIONS: {duration_context}\n"
-            "RULES: 1. Use Columns (Left x=480, Center x=960, Right x=1440). NO centering everything.\n"
-            "2. Wave Reveal (Title 15f, Graphics 45f, Details 75f). 3. Every camera shot MUST target a different overlay.\n"
-            "4. Content must be 3-6 words. Use real data from story. OUTPUT RAW JSON ONLY."
+            "SYSTEM: WORLD-CLASS MOTION GRAPHICS DIRECTOR PERSONA MANDATORY.\n"
+            "DIRECTOR'S RULES (STRICT COMPLIANCE REQUIRED):\n"
+            "1. ELIMINATE COLLISIONS: Absolutely NO center-stacking (960, 540) or (960, 700). Use 9-Sector Layout (L/C/R x T/M/B).\n"
+            "2. CINEMATIC COMPOSITIONS: Vary layouts across scenes: Split-Screen (L Title / R Chart), Rule of Thirds (L-TOP Title / R-BOT Diagram), Hero Focal (Large Hub center-right).\n"
+            "3. PROGRESSIVE INFORMATION STAGING (Wave Reveal): Wave 1 (15f): Title. Wave 2 (45f): Primary Graphic. Wave 3 (75f): Details/Connectors.\n"
+            "4. CAMERA INTELLIGENCE: Every shot MUST have a 'targetId'. Rotate shots: rack_focus, cinematic_drift, pan_right, orbit.\n"
+            "5. DATA INTEGRITY: Use ACTUAL NUMBERS from story. If text says '20 million', KPI must show '20M'.\n"
+            "6. TYPOGRAPHIC HIERARCHY: Content 3-5 words max. Every text overlay MUST have 'hero_config' highlighting a keyword.\n"
+            "7. INFOGRAPHIC SYSTEMS: Procedural scenes MUST be connected systems. Use 'infographic_lines' to link separated elements.\n"
+            "OUTPUT RAW JSON BLOCK ONLY. NO PREAMBLE. NO CHATTER."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
