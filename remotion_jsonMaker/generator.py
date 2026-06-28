@@ -116,10 +116,10 @@ class RemotionJsonMaker:
         TYPE_SIZES = {
             'text': (800, 200), 'chart': (1000, 600), 'shadcn_chart': (1000, 600),
             'ui_panel': (800, 600), 'data_indicator': (500, 450), 'shadcn_indicator': (500, 450),
-            'svg': (400, 400), 'kpi': (450, 400), 'timeline': (1200, 300),
+            'svg': (400, 400), 'kpi': (450, 400), 'kpi_card': (450, 400), 'timeline': (1200, 300),
             'hub_network': (900, 900), 'flow_diagram': (1000, 450), 'process': (1000, 450),
             'media': (900, 700), 'image': (900, 700), 'video': (900, 700),
-            'label': (300, 100), 'callout': (400, 200), 'composition': (1200, 800), 'groups': (1200, 800),
+            'label': (300, 100), 'callout': (400, 200), 'compositions': (1200, 800), 'groups': (1200, 800),
             'graph': (1000, 700), 'shape': (600, 600)
         }
 
@@ -147,9 +147,13 @@ class RemotionJsonMaker:
 
         PRIORITY = {
             'text': 100,
-            'chart': 80, 'shadcn_chart': 80,
+            'hub_network': 90, 'flow_diagram': 90, 'process': 90,
+            'chart': 80, 'shadcn_chart': 80, 'kpi_card': 80,
+            'timeline': 75,
             'ui_panel': 60,
+            'compositions': 55, 'groups': 55,
             'data_indicator': 50, 'shadcn_indicator': 50,
+            'label': 45, 'callout': 45,
             'svg': 40,
             'kpi': 40,
             'graph': 30,
@@ -202,7 +206,7 @@ class RemotionJsonMaker:
             if not scene.get('overlays'): scene['overlays'] = []
 
             valid_overlays = []
-            text_count, focal_count = 0, 0
+            text_count, focal_count, svg_count = 0, 0, 0
             is_scene_bangla = self._is_bangla(self.story_scenes.get(s_id, ""))
 
             raw_overlays = scene['overlays'] if isinstance(scene['overlays'], list) else [scene['overlays']]
@@ -218,7 +222,7 @@ class RemotionJsonMaker:
                 if 'indicator_type' in ov: o_type = 'shadcn_indicator'
 
                 if o_type == 'text':
-                    if text_count >= 4: continue
+                    if text_count >= 3: continue
                     text_count += 1
                     content = str(ov.get('content', ov.get('text', ''))).strip()
                     if not content:
@@ -226,9 +230,12 @@ class RemotionJsonMaker:
                         content = " ".join(story_text.split()[:6]) if story_text else "STUDIO V4"
                     ov['content'] = content
                     ov['type'] = 'text'
-                else:
-                    if focal_count >= 2: continue
+                elif o_type in ['chart', 'shadcn_chart', 'hub_network', 'flow_diagram', 'process', 'kpi_card', 'timeline', 'compositions', 'groups']:
+                    if focal_count >= 3: continue
                     focal_count += 1
+                elif o_type in ['svg', 'label', 'callout', 'data_indicator', 'shadcn_indicator', 'shape', 'graph']:
+                    if svg_count >= 12: continue
+                    svg_count += 1
 
                 if not ov.get('id'): ov['id'] = f"ov_{id_num}_{len(valid_overlays)+1}"
 
@@ -311,6 +318,12 @@ class RemotionJsonMaker:
                                         collision = True; break
                             if not collision:
                                 best_pos, found = (cx, cy), True
+                                if scale < 0.95 or radius > 80:
+                                    # Smooth animation override for adjusted elements
+                                    smooth_anims = ['pop', 'scale', 'reveal', 'glowPulse']
+                                    if not ov.get('animation') or ov.get('animation') not in smooth_anims:
+                                        ov['animation'] = smooth_anims[scene_idx % len(smooth_anims)]
+
                                 if scale < 1.0:
                                     print(f"   📉 Scaling down {ov['id']} to {int(scale*100)}% to fit.")
                                     if o_type == 'text': ov['fontSize'] = f"{int(curr_fs)}px"
@@ -458,13 +471,15 @@ class RemotionJsonMaker:
             f"{drive_guideline}"
             "SYSTEM: WORLD-CLASS MOTION GRAPHICS DIRECTOR PERSONA MANDATORY.\n"
             "DIRECTOR'S RULES (STRICT COMPLIANCE REQUIRED):\n"
-            "1. ELIMINATE COLLISIONS: Absolutely NO center-stacking (960, 540) or (960, 700). Use 9-Sector Layout (L/C/R x T/M/B).\n"
-            "2. CINEMATIC COMPOSITIONS: Vary layouts across scenes: Split-Screen (L Title / R Chart), Rule of Thirds (L-TOP Title / R-BOT Diagram), Hero Focal (Large Hub center-right).\n"
-            "3. PROGRESSIVE INFORMATION STAGING (Wave Reveal): Wave 1 (15f): Title. Wave 2 (45f): Primary Graphic. Wave 3 (75f): Details/Connectors.\n"
-            "4. CAMERA INTELLIGENCE: Every shot MUST have a 'targetId'. Rotate shots: rack_focus, cinematic_drift, pan_right, orbit.\n"
-            "5. DATA INTEGRITY: Use ACTUAL NUMBERS from story. If text says '20 million', KPI must show '20M'.\n"
-            "6. TYPOGRAPHIC HIERARCHY: Content 3-5 words max. Every text overlay MUST have 'hero_config' highlighting a keyword.\n"
-            "7. INFOGRAPHIC SYSTEMS: Procedural scenes MUST be connected systems. Use 'infographic_lines' to link separated elements.\n"
+            "1. NEVER RENDER A NOUN DIRECTLY: Use SVGs as building blocks for complex hierarchies. Never just 'a city'; build a system.\n"
+            "2. ELIMINATE COLLISIONS: Absolutely NO center-stacking (960, 540) or (960, 700). Use 9-Sector Layout (L/C/R x T/M/B).\n"
+            "3. CINEMATIC COMPOSITIONS: Vary layouts across scenes: Split-Screen (L Title / R Chart), Rule of Thirds (L-TOP Title / R-BOT Diagram), Hero Focal (Large Hub center-right).\n"
+            "4. PROGRESSIVE INFORMATION STAGING (Wave Reveal): Wave 1 (15f): Title. Wave 2 (45f): Primary Graphic. Wave 3 (75f): Details/Connectors.\n"
+            "5. CAMERA INTELLIGENCE: Every shot MUST have a 'targetId'. Rotate shots: rack_focus, cinematic_drift, pan_right, orbit.\n"
+            "6. DATA INTEGRITY: Use ACTUAL NUMBERS from story. If text says '20 million', KPI must show '20M' in 'kpi_card'.\n"
+            "7. TYPOGRAPHIC HIERARCHY: Content 3-5 words max. Every text overlay MUST have 'hero_config' highlighting a keyword.\n"
+            "8. INFOGRAPHIC SYSTEMS: Procedural scenes MUST be connected systems. Use 'infographic_lines' (type: 'arrow' or 'dotted') to link separated elements.\n"
+            "9. SECONDARY INFOGRAPHIC HELPERS: Use 'svg' for icons, 'label' for sub-captions, and 'callout' for detail highlights. Up to 12 secondary elements per scene.\n"
             "OUTPUT RAW JSON BLOCK ONLY. NO PREAMBLE. NO CHATTER."
         )
         if prompt_output_path:
