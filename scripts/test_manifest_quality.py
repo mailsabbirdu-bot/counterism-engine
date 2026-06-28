@@ -42,11 +42,12 @@ def test_manifest_quality(filepath, public_dir=None):
 
     TYPE_SIZES = {
         'text': (800, 200), 'chart': (1000, 600), 'shadcn_chart': (1000, 600),
-        'ui_panel': (700, 500), 'data_indicator': (450, 400), 'shadcn_indicator': (450, 400),
+        'ui_panel': (800, 600), 'data_indicator': (500, 450), 'shadcn_indicator': (500, 450),
         'svg': (400, 400), 'kpi': (450, 400), 'timeline': (1200, 300),
         'hub_network': (900, 900), 'flow_diagram': (1000, 450), 'process': (1000, 450),
         'media': (900, 700), 'image': (900, 700), 'video': (900, 700),
-        'label': (300, 100), 'callout': (400, 200), 'composition': (1200, 800), 'groups': (1200, 800)
+        'label': (300, 100), 'callout': (400, 200), 'composition': (1200, 800), 'groups': (1200, 800),
+        'graph': (1000, 700), 'shape': (600, 600)
     }
 
     # Minimum production constraints
@@ -126,11 +127,16 @@ def test_manifest_quality(filepath, public_dir=None):
                 warnings.append(f"[{scene_id}] '{ov_id}' is center-stacked at ({x}, {y}). Avoid generic centering.")
                 scores["composition"] -= 15
 
-            # 1. Prioritize manifest width/height
+            # 1. Prioritize manifest width/height and size
             # 2. Fallback to TYPE_SIZES
             base_w, base_h = TYPE_SIZES.get(o_type, (600, 400))
-            w = ov.get('width', base_w)
-            h = ov.get('height', base_h)
+            w = ov.get('width', ov.get('size', base_w))
+            h = ov.get('height', ov.get('size', base_h))
+
+            # Handle circle radius logic for 'shape'
+            if o_type == 'shape' and ov.get('shape_type') == 'circle':
+                radius = ov.get('size', 100)
+                w, h = radius * 2, radius * 2
 
             if o_type == 'text':
                 content = str(ov.get('content', ''))
