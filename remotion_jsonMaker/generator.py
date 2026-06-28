@@ -125,11 +125,12 @@ class RemotionJsonMaker:
             'label': (300, 100), 'callout': (400, 200),
             'compositions': (1200, 675), 'groups': (1200, 675), # 16:9
             'graph': (1000, 700), 'shape': (400, 400),
-            'data_emphasis': (600, 200), 'ambient_graphic': (1920, 1080)
+            'data_emphasis': (600, 200), 'ambient_graphic': (1920, 1080),
+            'connector': (400, 100)
         }
 
         # Cinematic Animations pool
-        SEMANTIC_ANIMS = ["wordReveal", "glassReveal", "networkGrow", "barsRise", "cinematicGlow", "fadeScale", "parallaxDrift"]
+        SEMANTIC_ANIMS = ["wordReveal", "glassReveal", "networkGrow", "barsRise", "cinematicGlow", "fadeScale", "parallaxDrift", "maskReveal", "lineDraw", "particleAssembly", "blurFocus", "svgMorph", "depthZoom"]
 
         # Hard Constraints (Synced with QA MIN_CONSTRAINTS)
         MIN_FONT_SIZE = 40
@@ -383,7 +384,7 @@ class RemotionJsonMaker:
                                 best_pos, found = (cx, cy), True
                                 if scale < 0.95 or radius > 80:
                                     # Smooth animation override for adjusted elements
-                                    smooth_anims = ['pop', 'scale', 'reveal', 'glowPulse']
+                                    smooth_anims = SEMANTIC_ANIMS
                                     if not ov.get('animation') or ov.get('animation') not in smooth_anims:
                                         ov['animation'] = smooth_anims[scene_idx % len(smooth_anims)]
 
@@ -420,6 +421,10 @@ class RemotionJsonMaker:
 
             if 'beats' not in scene:
                 scene['beats'] = [{"frame": o['start'], "event": f"{o['id']}_reveal"} for o in valid_overlays if PRIORITY.get(o['type'], 0) >= 50]
+
+            # Connections preservation
+            if 'connections' not in scene:
+                scene['connections'] = []
 
             # Camera logic: Professional Sequencing & Sync
             # Priority: focal > background > shape
@@ -473,6 +478,9 @@ class RemotionJsonMaker:
             else:
                 print(f"   🎥 Preserving AI Camera for {s_id}")
                 scene['camera']['enabled'] = True
+                # Ensure easing is applied to preserved shots
+                for shot in scene['camera'].get('shots', []):
+                    if not shot.get('ease'): shot['ease'] = "cubicOut"
 
             # SFX (Perfectly Aligned with Overlay Entry)
             for i, ov in enumerate(valid_overlays):
@@ -570,16 +578,17 @@ class RemotionJsonMaker:
             f"{drive_guideline}"
             "SYSTEM: WORLD-CLASS MOTION GRAPHICS DIRECTOR PERSONA MANDATORY (Vox/Kurzgesagt/Polymatter style).\n"
             "DIRECTOR'S RULES (STRICT COMPLIANCE REQUIRED):\n"
-            "1. SEMANTIC HIERARCHY: Every overlay MUST have 'importance': 'hero'|'secondary'|'ambient'|'background'.\n"
-            "2. CINEMATIC BEATS: Split narrative text into separate emotional phrases. NEVER combine multiple sentences in one object. Use separate IDs.\n"
-            "3. FULL LIFECYCLE: Every element needs 'animation' (entrance) and 'exitAnimation'. Use semantic variants: 'wordReveal', 'glassReveal', 'networkGrow', 'barsRise', 'cinematicGlow', 'fadeScale', 'parallaxDrift'.\n"
-            "4. CAMERA CHOREOGRAPHY: Sequence multiple shots per scene targeting individual element IDs. Each shot needs: 'targetId', 'startFrame', 'duration', 'zoom', 'style', 'ease':'cubicOut'.\n"
-            "5. ADVANCED COMPOSITION: Avoid center stacking. Use Rule of Thirds and negative space. Separation of foreground/background.\n"
-            "6. DATA STORYTELLING: Charts must have 'draw' animations and camera targeting. Use ACTUAL numbers from the story.\n"
-            "7. TEXT ENHANCEMENTS: Every text overlay MUST include 'maxWidth': 800, 'hero_config' (keyword, animation, color), and 'stagger': 4.\n"
-            "8. ENVIRONMENTAL MOTION: Background graphics ('graph', 'shape', 'ambient_graphic') must be 'ambient', start at frame 0, and have 'fade_out' exitAnimation.\n"
-            "9. INFOGRAPHIC SYSTEMS: Use 'infographic_lines' (arrow/dotted) and 'parallax' values (background:0.2, midground:0.5, foreground:1.0).\n"
-            "10. TRANSITIONS & BEATS: Add 'transition': {'type': 'cinematicMatchCut', 'duration': 15} to scenes. Generate a 'beats' array for visual highlights.\n"
+            "1. CINEMATIC STORYTELLING: Fix dashboard feeling. Reduce UI elements. Background atmosphere → Hero statement → Evidence visualization → Supporting context.\n"
+            "2. SEMANTIC HIERARCHY: Every overlay MUST have 'importance': 'hero'|'secondary'|'ambient'|'background'. Hero depth: 100, Ambient: -50.\n"
+            "3. CINEMATIC BEATS: Split narrative text into separate emotional phrases. NEVER combine sentences like 'ঢাকা। মেগাসিটি।' Use separate timed objects.\n"
+            "4. FULL LIFECYCLE: Every element needs 'animation' (entrance), 'hold', and 'exitAnimation'. Variants: 'wordReveal', 'maskReveal', 'glassReveal', 'lineDraw', 'particleAssembly', 'blurFocus', 'svgMorph', 'depthZoom'.\n"
+            "5. CAMERA MASTERCLASS: Do not only target objects. Use true camera movement with start/end positions, scale, and ease: 'cubicOut'. Sequence multiple shots per scene.\n"
+            "6. COMPOSITION: Absolutely NO center stacking. Use Rule of Thirds, negative space, and foreground/background separation.\n"
+            "7. TYPOGRAPHY HIERARCHY: Hero (120-150px, bold), Secondary (60-80px), Data (40-55px). All text needs 'maxWidth': 800 for Bangla safe-wrapping.\n"
+            "8. DATA STORYTELLING: Charts need 'draw' animations and camera targeting. Mark invented metrics as 'illustrative_model'.\n"
+            "9. METAPHOR (SCENE_04): Make SCENE_04 the strongest. Transform 'Geological Clock' into main visual metaphor: giant timeline, earth layers, ticking danger indicator.\n"
+            "10. CONNECTOR SYSTEM: Use 'connections' array to link evidence: sourceId, targetId, type:'connector', style:'energy_line', animation:'draw', particle:true.\n"
+            "11. SYSTEMS: Use 'infographic_lines' and 'parallax' (background:0.2, hero:1.0). Add 'transition' and visual 'beats' array.\n"
             "OUTPUT RAW JSON BLOCK ONLY. NO PREAMBLE. NO CHATTER."
         )
         if prompt_output_path:
