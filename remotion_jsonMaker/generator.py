@@ -141,9 +141,20 @@ class RemotionJsonMaker:
             "L_BOT": (550, 760), "C_BOT": (960, 760), "R_BOT": (1370, 760)
         }
 
-        # Hard boundaries for strict clamping (QA safe zone)
-        CLAMP_MIN_X, CLAMP_MAX_X = 160, 1760
-        CLAMP_MIN_Y, CLAMP_MAX_Y = 160, 920
+        # Hard boundaries for strict clamping (QA 150px safe zone)
+        CLAMP_MIN_X, CLAMP_MAX_X = 150, 1770
+        CLAMP_MIN_Y, CLAMP_MAX_Y = 150, 930
+
+        PRIORITY = {
+            'text': 100,
+            'chart': 80, 'shadcn_chart': 80,
+            'ui_panel': 60,
+            'data_indicator': 50, 'shadcn_indicator': 50,
+            'svg': 40,
+            'kpi': 40,
+            'graph': 30,
+            'shape': 10
+        }
 
         sfx_manifest = []
         in_ptr, out_ptr, cam_ptr = 0, 0, 0
@@ -175,7 +186,10 @@ class RemotionJsonMaker:
             filename = os.path.basename(str(scene.get('video_path', '')))
             if filename in self.fps_cache: scene_duration = self.fps_cache[filename]
             scene['duration_in_frames'] = scene_duration
-            scene['audio_enabled'] = False
+
+            # Preserve AI audio intent, default to True if not specified
+            if 'audio_enabled' not in scene:
+                scene['audio_enabled'] = True
 
             pattern = f"SC_{id_num:02d}".lower()
             narration_file = next((f for f in self.narration_files if pattern in f.lower()), None)
@@ -194,22 +208,9 @@ class RemotionJsonMaker:
             raw_overlays = scene['overlays'] if isinstance(scene['overlays'], list) else [scene['overlays']]
             processed_raw = []
 
-            # Semantic Splitting for verbose text
+            # Progressive Information Staging: Semantic pass
             for ov in raw_overlays:
-                if str(ov.get('type')).lower() == 'text':
-                    content = str(ov.get('content', ov.get('text', ''))).strip()
-                    words = content.split()
-                    if len(words) > 8:
-                        mid = len(words) // 2
-                        ov['content'] = " ".join(words[:mid])
-                        ov2 = ov.copy()
-                        ov2['id'] = f"{ov.get('id', 'txt')}_split"
-                        ov2['content'] = " ".join(words[mid:])
-                        processed_raw.extend([ov, ov2])
-                    else:
-                        processed_raw.append(ov)
-                else:
-                    processed_raw.append(ov)
+                processed_raw.append(ov)
 
             for ov in processed_raw:
                 o_type = str(ov.get('type', 'text')).lower()
@@ -217,10 +218,10 @@ class RemotionJsonMaker:
                 if 'indicator_type' in ov: o_type = 'shadcn_indicator'
 
                 if o_type == 'text':
-                    if text_count >= 3: continue # Increased budget for split text
+                    if text_count >= 4: continue
                     text_count += 1
-                    content = str(ov.get('content', ov.get('text', ''))).strip().rstrip('.। ')
-                    if not content or content.upper() in ["INSIGHT", "DYNAMIC", "REMOTION", "DATA"]:
+                    content = str(ov.get('content', ov.get('text', ''))).strip()
+                    if not content:
                         story_text = self.story_scenes.get(s_id, "")
                         content = " ".join(story_text.split()[:6]) if story_text else "STUDIO V4"
                     ov['content'] = content
@@ -231,9 +232,14 @@ class RemotionJsonMaker:
 
                 if not ov.get('id'): ov['id'] = f"ov_{id_num}_{len(valid_overlays)+1}"
 
-                if (self._is_bangla(str(ov.get('content', ''))) or is_scene_bangla) and self.bangla_fonts:
+                ai_font = ov.get('font')
+                all_scanned_fonts = self.bangla_fonts + self.english_fonts
+
+                if ai_font and ai_font in all_scanned_fonts:
+                    pass # Keep AI font
+                elif (self._is_bangla(str(ov.get('content', ''))) or is_scene_bangla) and self.bangla_fonts:
                     ov['font'] = "Sohid_bangla" if "Sohid_bangla" in self.bangla_fonts else self.bangla_fonts[0]
-                elif not ov.get('font'):
+                elif not ov.get('font') or ov.get('font') not in all_scanned_fonts:
                     ov['font'] = self.english_fonts[0] if self.english_fonts else "Arial"
 
                 if ov['type'] == 'text':
@@ -247,14 +253,18 @@ class RemotionJsonMaker:
                     ov['fontSize'] = ov.get('fontSize', "120px")
                 valid_overlays.append(ov)
 
-            # Spatial and timing pass with Adaptive Scaling
+            # Spatial and timing pass with Priority-Based Iterative Resolution
+            # Sort valid_overlays by priority (Descending)
+            valid_overlays.sort(key=lambda o: PRIORITY.get(str(o.get('type')).lower(), 0), reverse=True)
+
             placed_boxes = []
-            layout_style = LAYOUT_PRESETS[scene_idx % len(LAYOUT_PRESETS)]
-            print(f"   🎯 Scene {s_id} Composition Strategy: {layout_style}")
+            # Calculate dynamic stagger to ensure all elements fit in time
+            stagger_step = min(30, max(10, scene_duration // (len(valid_overlays) + 2)))
+
             for i, ov in enumerate(valid_overlays):
-                o_type = ov['type']
-                ov['start'] = 15 + i*30
-                ov['duration'] = scene_duration - ov['start']
+                o_type = str(ov.get('type', 'text')).lower()
+                ov['start'] = 15 + i * stagger_step
+                ov['duration'] = max(30, scene_duration - ov['start'])
 
                 base_w, base_h = TYPE_SIZES.get(o_type, (600, 400))
                 fs = 120
@@ -262,12 +272,16 @@ class RemotionJsonMaker:
                     fs_match = re.search(r'\d+', str(ov.get('fontSize', '120')))
                     fs = int(fs_match.group()) if fs_match else 120
 
+                # Use AI position as starting anchor
+                pos = ov.get('position', {})
+                ax, ay = int(pos.get('x', 960)), int(pos.get('y', 540))
+
                 found = False
-                best_pos = (960, 540)
+                best_pos = (ax, ay)
                 final_w, final_h = base_w, base_h
 
-                print(f"     🔍 Placing {ov['id']} ({o_type})...")
-                for scale_step in range(7): # Try 100% down to 10%
+                print(f"     🔍 Placing {ov['id']} ({o_type}) starting at ({ax}, {ay})...")
+                for scale_step in range(7):
                     scale = 1.0 - (scale_step * 0.15)
                     if o_type == 'text':
                         curr_fs = max(MIN_FONT_SIZE, int(fs * scale))
@@ -277,64 +291,37 @@ class RemotionJsonMaker:
                         w = max(MIN_CHART_W if 'chart' in o_type else MIN_SVG_W, base_w * scale)
                         h = max(MIN_CHART_H if 'chart' in o_type else MIN_SVG_H, base_h * scale)
 
-                    search_pool = []
-                    if layout_style == "SPLIT_SCREEN":
-                        search_pool = ["L_MID", "L_TOP", "L_BOT"] if o_type=='text' else ["R_MID", "R_TOP", "R_BOT"]
-                    elif layout_style == "RULE_OF_THIRDS":
-                        search_pool = ["L_TOP", "L_MID"] if o_type=='text' else ["R_BOT", "R_MID"]
-                    elif layout_style == "HERO_FOCAL":
-                        search_pool = ["L_TOP", "R_TOP"] if o_type=='text' else ["C_MID", "C_BOT"]
-                    else:
-                        search_pool = ["C_TOP", "L_TOP", "R_TOP"] if o_type=='text' else ["C_BOT", "L_BOT", "R_BOT"]
+                    for step in range(0, 30): # Spiral search from AI position
+                        radius = step * 40
+                        angles = [0, 180, 90, 270, 45, 135, 225, 315, 30, 60, 120, 150, 210, 240, 300, 330] if radius > 0 else [0]
+                        for angle in angles:
+                            rad = math.radians(angle)
+                            cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
 
-                    # Combine with ALL sectors as fallback
-                    search_pool += [k for k in ANCHORS.keys() if k not in search_pool]
+                            l, t, r, b = cx-w/2, cy-h/2, cx+w/2, cy+h/2
 
-                    for anchor_name in search_pool:
-                        ax, ay = ANCHORS[anchor_name]
-                        best_pos = (ax, ay) # Initialize to current anchor
+                            # Clamping to frame + safe zone
+                            if l < CLAMP_MIN_X or r > CLAMP_MAX_X or t < CLAMP_MIN_Y or b > CLAMP_MAX_Y: continue
 
-                        for step in range(0, 25):
-                            radius = step * 40
-                            angles = [0, 180, 90, 270, 45, 135, 225, 315, 30, 60, 120, 150, 210, 240, 300, 330] if radius > 0 else [0]
-                            for angle in angles:
-                                rad = math.radians(angle)
-                                cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
-
-                                # Fix Center-Stacking bias: discourage (960, 540) and (960, 700)
-                                is_center = (abs(cx - 960) < 20 and abs(cy - 540) < 20) or (abs(cx - 960) < 20 and abs(cy - 700) < 20)
-                                if is_center and i > 0:
-                                    continue # Only allow the very first element to take a center spot if it's the anchor
-
-                                l, t, r, b = cx-w/2, cy-h/2, cx+w/2, cy+h/2
-
-                                if l < CLAMP_MIN_X or r > CLAMP_MAX_X or t < CLAMP_MIN_Y or b > CLAMP_MAX_Y: continue
-
-                                collision = False
-                                for p_id, p_l, p_t, p_r, p_b, p_s, p_e in placed_boxes:
-                                    if max(ov['start'], p_s) < min(ov['start']+ov['duration'], p_e):
-                                        # Sync gap with QA MIN_CONSTRAINTS
-                                        gap = MIN_SPACING
-                                        if not (r + gap < p_l or l - gap > p_r or b + gap < p_t or t - gap > p_b):
-                                            collision = True; break
-                                if not collision:
-                                    best_pos, found = (cx, cy), True
-                                    if scale < 1.0:
-                                        print(f"   📉 Scaling down {ov['id']} to {int(scale*100)}% to fit.")
-                                        if o_type == 'text': ov['fontSize'] = f"{int(curr_fs)}px"
-                                        else:
-                                            ov['width'] = int(w)
-                                            ov['height'] = int(h)
-                                    if radius > 0: print(f"   🔧 Expert Nudging {ov['id']} to resolve overlap -> New Pos: ({int(cx)}, {int(cy)})")
-
-                                    # Geometry Sync for internal tracking (Match QA exactly)
-                                    if o_type == 'text':
-                                        final_w = min(1600, len(ov['content']) * int(curr_fs) * 0.7)
-                                        final_h = int(curr_fs) * 1.5
+                            collision = False
+                            for p_id, p_l, p_t, p_r, p_b, p_s, p_e in placed_boxes:
+                                if max(ov['start'], p_s) < min(ov['start']+ov['duration'], p_e):
+                                    gap = MIN_SPACING
+                                    if not (r + gap < p_l or l - gap > p_r or b + gap < p_t or t - gap > p_b):
+                                        collision = True; break
+                            if not collision:
+                                best_pos, found = (cx, cy), True
+                                if scale < 1.0:
+                                    print(f"   📉 Scaling down {ov['id']} to {int(scale*100)}% to fit.")
+                                    if o_type == 'text': ov['fontSize'] = f"{int(curr_fs)}px"
                                     else:
-                                        final_w, final_h = w, h
-                                    break
-                            if found: break
+                                        ov['width'] = int(w)
+                                        ov['height'] = int(h)
+                                if radius > 0: print(f"   🔧 Nudging {ov['id']} to ({int(cx)}, {int(cy)}) to resolve collision.")
+
+                                final_w = w if o_type != 'text' else min(1600, len(ov['content']) * int(curr_fs) * 0.7)
+                                final_h = h if o_type != 'text' else int(curr_fs) * 1.5
+                                break
                         if found: break
                     if found: break
 
@@ -349,17 +336,31 @@ class RemotionJsonMaker:
 
             scene['overlays'] = valid_overlays
 
-            # Camera logic: Force distinct targets and styles
+            # Camera logic: Preserve AI intent if valid, else fallback
             valid_ids = [o['id'] for o in valid_overlays]
-            CAM_STYLES = ["cinematic_drift", "slow_push", "pan_right", "orbit", "rack_focus", "dramatic_reveal"]
-            if valid_ids:
-                if len(valid_ids) >= 2:
-                    scene['camera'] = {"enabled": True, "shots": [
-                        {"targetId": valid_ids[0], "startFrame": 0, "duration": scene_duration//2, "style": CAM_STYLES[scene_idx % len(CAM_STYLES)], "zoom": 1.1, "inDuration": 15},
-                        {"targetId": valid_ids[1], "startFrame": scene_duration//2, "duration": scene_duration - (scene_duration//2), "style": CAM_STYLES[(scene_idx + 1) % len(CAM_STYLES)], "zoom": 1.2, "inDuration": 30}
-                    ]}
-                else:
-                    scene['camera'] = {"enabled": True, "shots": [{"targetId": valid_ids[0], "startFrame": 0, "duration": scene_duration, "style": "slow_push", "zoom": 1.15, "inDuration": 20}]}
+            ai_camera = scene.get('camera', {})
+            ai_shots = ai_camera.get('shots', [])
+
+            camera_valid = False
+            if ai_shots and isinstance(ai_shots, list):
+                # Validate that all shots have valid targetIds
+                if all(isinstance(shot, dict) and shot.get('targetId') in valid_ids for shot in ai_shots):
+                    camera_valid = True
+
+            if not camera_valid:
+                print(f"   🎥 Generating fallback camera for {s_id}")
+                CAM_STYLES = ["cinematic_drift", "slow_push", "pan_right", "orbit", "rack_focus", "dramatic_reveal"]
+                if valid_ids:
+                    if len(valid_ids) >= 2:
+                        scene['camera'] = {"enabled": True, "shots": [
+                            {"targetId": valid_ids[0], "startFrame": 0, "duration": scene_duration//2, "style": CAM_STYLES[scene_idx % len(CAM_STYLES)], "zoom": 1.1, "inDuration": 15},
+                            {"targetId": valid_ids[1], "startFrame": scene_duration//2, "duration": scene_duration - (scene_duration//2), "style": CAM_STYLES[(scene_idx + 1) % len(CAM_STYLES)], "zoom": 1.2, "inDuration": 30}
+                        ]}
+                    else:
+                        scene['camera'] = {"enabled": True, "shots": [{"targetId": valid_ids[0], "startFrame": 0, "duration": scene_duration, "style": "slow_push", "zoom": 1.15, "inDuration": 20}]}
+            else:
+                print(f"   🎥 Preserving AI Camera for {s_id}")
+                scene['camera']['enabled'] = True # Ensure enabled
 
             # SFX (Perfectly Aligned with Overlay Entry)
             for i, ov in enumerate(valid_overlays):
