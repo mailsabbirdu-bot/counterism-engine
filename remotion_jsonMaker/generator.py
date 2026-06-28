@@ -134,11 +134,11 @@ class RemotionJsonMaker:
         VALID_TEXT_ANIMS = ["glow_pulse", "neon_flicker", "glitch_pop", "bounce_pop", "word_by_word", "slide_up", "typewriter"]
 
         # Ultra-High End 9-Sector Anchors (1920x1080)
-        # Studio V4 Final Hardened Anchors (Deeply shifted for large components)
+        # Studio V4 Hardened Cinematic Anchors
         ANCHORS = {
-            "L_TOP": (600, 350), "C_TOP": (960, 350), "R_TOP": (1320, 350),
-            "L_MID": (600, 540), "C_MID": (960, 540), "R_MID": (1320, 540),
-            "L_BOT": (600, 730), "C_BOT": (960, 730), "R_BOT": (1320, 730)
+            "L_TOP": (550, 320), "C_TOP": (960, 320), "R_TOP": (1370, 320),
+            "L_MID": (550, 540), "C_MID": (960, 540), "R_MID": (1370, 540),
+            "L_BOT": (550, 760), "C_BOT": (960, 760), "R_BOT": (1370, 760)
         }
 
         # Hard boundaries for strict clamping (QA safe zone)
@@ -191,13 +191,33 @@ class RemotionJsonMaker:
             text_count, focal_count = 0, 0
             is_scene_bangla = self._is_bangla(self.story_scenes.get(s_id, ""))
 
-            for ov in (scene['overlays'] if isinstance(scene['overlays'], list) else [scene['overlays']]):
+            raw_overlays = scene['overlays'] if isinstance(scene['overlays'], list) else [scene['overlays']]
+            processed_raw = []
+
+            # Semantic Splitting for verbose text
+            for ov in raw_overlays:
+                if str(ov.get('type')).lower() == 'text':
+                    content = str(ov.get('content', ov.get('text', ''))).strip()
+                    words = content.split()
+                    if len(words) > 8:
+                        mid = len(words) // 2
+                        ov['content'] = " ".join(words[:mid])
+                        ov2 = ov.copy()
+                        ov2['id'] = f"{ov.get('id', 'txt')}_split"
+                        ov2['content'] = " ".join(words[mid:])
+                        processed_raw.extend([ov, ov2])
+                    else:
+                        processed_raw.append(ov)
+                else:
+                    processed_raw.append(ov)
+
+            for ov in processed_raw:
                 o_type = str(ov.get('type', 'text')).lower()
                 if 'chart_type' in ov: o_type = 'shadcn_chart'
                 if 'indicator_type' in ov: o_type = 'shadcn_indicator'
 
                 if o_type == 'text':
-                    if text_count >= 2: continue
+                    if text_count >= 3: continue # Increased budget for split text
                     text_count += 1
                     content = str(ov.get('content', ov.get('text', ''))).strip().rstrip('.। ')
                     if not content or content.upper() in ["INSIGHT", "DYNAMIC", "REMOTION", "DATA"]:
@@ -230,6 +250,7 @@ class RemotionJsonMaker:
             # Spatial and timing pass with Adaptive Scaling
             placed_boxes = []
             layout_style = LAYOUT_PRESETS[scene_idx % len(LAYOUT_PRESETS)]
+            print(f"   🎯 Scene {s_id} Composition Strategy: {layout_style}")
             for i, ov in enumerate(valid_overlays):
                 o_type = ov['type']
                 ov['start'] = 15 + i*30
@@ -245,6 +266,7 @@ class RemotionJsonMaker:
                 best_pos = (960, 540)
                 final_w, final_h = base_w, base_h
 
+                print(f"     🔍 Placing {ov['id']} ({o_type})...")
                 for scale_step in range(7): # Try 100% down to 10%
                     scale = 1.0 - (scale_step * 0.15)
                     if o_type == 'text':
@@ -265,10 +287,13 @@ class RemotionJsonMaker:
                     else:
                         search_pool = ["C_TOP", "L_TOP", "R_TOP"] if o_type=='text' else ["C_BOT", "L_BOT", "R_BOT"]
 
+                    # Combine with ALL sectors as fallback
                     search_pool += [k for k in ANCHORS.keys() if k not in search_pool]
 
                     for anchor_name in search_pool:
                         ax, ay = ANCHORS[anchor_name]
+                        best_pos = (ax, ay) # Initialize to current anchor
+
                         for step in range(0, 25):
                             radius = step * 40
                             angles = [0, 180, 90, 270, 45, 135, 225, 315, 30, 60, 120, 150, 210, 240, 300, 330] if radius > 0 else [0]
@@ -276,9 +301,10 @@ class RemotionJsonMaker:
                                 rad = math.radians(angle)
                                 cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
 
-                                # Fix Center-Stacking bias: discourage 960,540
-                                if radius < 100 and abs(cx - 960) < 10 and abs(cy - 540) < 10:
-                                    if o_type == 'text' or i > 0: continue # Only allow focal centerpiece to be center
+                                # Fix Center-Stacking bias: discourage (960, 540) and (960, 700)
+                                is_center = (abs(cx - 960) < 20 and abs(cy - 540) < 20) or (abs(cx - 960) < 20 and abs(cy - 700) < 20)
+                                if is_center and i > 0:
+                                    continue # Only allow the very first element to take a center spot if it's the anchor
 
                                 l, t, r, b = cx-w/2, cy-h/2, cx+w/2, cy+h/2
 
@@ -335,6 +361,7 @@ class RemotionJsonMaker:
                 else:
                     scene['camera'] = {"enabled": True, "shots": [{"targetId": valid_ids[0], "startFrame": 0, "duration": scene_duration, "style": "slow_push", "zoom": 1.15, "inDuration": 20}]}
 
+            # SFX (Perfectly Aligned with Overlay Entry)
             for i, ov in enumerate(valid_overlays):
                 if self.in_files:
                     sfx_manifest.append({"scene_id": s_id, "file": self.in_files[(in_ptr+i)%len(self.in_files)], "start": ov['start'], "end": ov['start']+30, "volume": 0.05})
@@ -443,10 +470,21 @@ class RemotionJsonMaker:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
 
         raw_output = self._interact_with_gemini(full_prompt)
+        print(f"   📊 AI Response Received ({len(raw_output)} chars).")
         try:
-            m = re.search(r'\{.*\}', raw_output, re.DOTALL)
-            return json.loads(m.group(0), strict=False) if m else {}
-        except: return {}
+            # Find the largest JSON block
+            blocks = re.findall(r'\{.*\}', raw_output, re.DOTALL)
+            if blocks:
+                json_str = max(blocks, key=len)
+                data = json.loads(json_str, strict=False)
+                print(f"   ✅ Successfully extracted {len(data.get('scenes', []))} scenes from AI response.")
+                return data
+            else:
+                print("   ❌ CRITICAL: No JSON block found in AI response. Check Gemini output.")
+                return {}
+        except Exception as e:
+            print(f"   ❌ JSON Parsing Error: {e}")
+            return {}
 
 def main():
     parser = argparse.ArgumentParser()
