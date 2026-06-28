@@ -147,13 +147,12 @@ class RemotionJsonMaker:
 
         PRIORITY = {
             'text': 100,
-            'chart': 80, 'shadcn_chart': 80,
+            'data_indicator': 80, 'kpi': 80, 'shadcn_indicator': 80,
+            'chart': 70, 'shadcn_chart': 70,
             'ui_panel': 60,
-            'data_indicator': 50, 'shadcn_indicator': 50,
-            'svg': 40,
-            'kpi': 40,
-            'graph': 30,
-            'shape': 10
+            'svg': 20,
+            'graph': 20,
+            'shape': 20
         }
 
         sfx_manifest = []
@@ -218,7 +217,6 @@ class RemotionJsonMaker:
                 if 'indicator_type' in ov: o_type = 'shadcn_indicator'
 
                 if o_type == 'text':
-                    if text_count >= 4: continue
                     text_count += 1
                     content = str(ov.get('content', ov.get('text', ''))).strip()
                     if not content:
@@ -227,7 +225,6 @@ class RemotionJsonMaker:
                     ov['content'] = content
                     ov['type'] = 'text'
                 else:
-                    if focal_count >= 2: continue
                     focal_count += 1
 
                 if not ov.get('id'): ov['id'] = f"ov_{id_num}_{len(valid_overlays)+1}"
@@ -283,17 +280,26 @@ class RemotionJsonMaker:
                 print(f"     🔍 Placing {ov['id']} ({o_type}) starting at ({ax}, {ay})...")
                 for scale_step in range(7):
                     scale = 1.0 - (scale_step * 0.15)
+
+                    # Protect Hero and Locked elements from downscaling
+                    if ov.get('importance') == 'hero' or ov.get('locked') is True:
+                        scale = 1.0
+
                     if o_type == 'text':
                         curr_fs = max(MIN_FONT_SIZE, int(fs * scale))
-                        w = min(1600, len(ov['content']) * curr_fs * 0.7)
-                        h = curr_fs * 1.5
+                        # Improved width calculation for multi-line text
+                        lines = ov['content'].split('\n')
+                        max_line_len = max(len(line) for line in lines) if lines else 0
+                        w = min(1600, max_line_len * curr_fs * 0.8)
+                        h = curr_fs * 1.2 * len(lines)
                     else:
                         w = max(MIN_CHART_W if 'chart' in o_type else MIN_SVG_W, base_w * scale)
                         h = max(MIN_CHART_H if 'chart' in o_type else MIN_SVG_H, base_h * scale)
 
-                    for step in range(0, 30): # Spiral search from AI position
-                        radius = step * 40
-                        angles = [0, 180, 90, 270, 45, 135, 225, 315, 30, 60, 120, 150, 210, 240, 300, 330] if radius > 0 else [0]
+                    for step in range(0, 60): # Spiral search from AI position
+                        radius = step * 20 # Smaller step size for better precision
+                        # Prioritize horizontal and vertical axes to maintain intentional split-screen/rule-of-thirds
+                        angles = [0, 180, 90, 270, 45, 135, 225, 315] if radius > 0 else [0]
                         for angle in angles:
                             rad = math.radians(angle)
                             cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
@@ -304,8 +310,12 @@ class RemotionJsonMaker:
                             if l < CLAMP_MIN_X or r > CLAMP_MAX_X or t < CLAMP_MIN_Y or b > CLAMP_MAX_Y: continue
 
                             collision = False
-                            for p_id, p_l, p_t, p_r, p_b, p_s, p_e in placed_boxes:
+                            for p_id, p_l, p_t, p_r, p_b, p_s, p_e, p_type in placed_boxes:
                                 if max(ov['start'], p_s) < min(ov['start']+ov['duration'], p_e):
+                                    # Allow intentional background layering (Hero/KPI/Chart can overlap Graph/Shape)
+                                    if (o_type in ['graph', 'shape'] or p_type in ['graph', 'shape']):
+                                        continue
+
                                     gap = MIN_SPACING
                                     if not (r + gap < p_l or l - gap > p_r or b + gap < p_t or t - gap > p_b):
                                         collision = True; break
@@ -332,7 +342,7 @@ class RemotionJsonMaker:
                     h_start = ov['hero_config'].get('start', 0)
                     ov['hero_config']['start'] = max(ov['start'] + 10, h_start)
 
-                placed_boxes.append((ov['id'], best_pos[0]-final_w/2, best_pos[1]-final_h/2, best_pos[0]+final_w/2, best_pos[1]+final_h/2, ov['start'], ov['start']+ov['duration']))
+                placed_boxes.append((ov['id'], best_pos[0]-final_w/2, best_pos[1]-final_h/2, best_pos[0]+final_w/2, best_pos[1]+final_h/2, ov['start'], ov['start']+ov['duration'], o_type))
 
             scene['overlays'] = valid_overlays
 
@@ -350,17 +360,28 @@ class RemotionJsonMaker:
             if not camera_valid:
                 print(f"   🎥 Generating fallback camera for {s_id}")
                 CAM_STYLES = ["cinematic_drift", "slow_push", "pan_right", "orbit", "rack_focus", "dramatic_reveal"]
-                if valid_ids:
-                    if len(valid_ids) >= 2:
+
+                # Sort valid overlays by priority for fallback target selection
+                priority_targets = sorted(valid_overlays, key=lambda o: PRIORITY.get(str(o.get('type')).lower(), 0), reverse=True)
+                target_ids = [o['id'] for o in priority_targets]
+
+                if target_ids:
+                    if len(target_ids) >= 2:
                         scene['camera'] = {"enabled": True, "shots": [
-                            {"targetId": valid_ids[0], "startFrame": 0, "duration": scene_duration//2, "style": CAM_STYLES[scene_idx % len(CAM_STYLES)], "zoom": 1.1, "inDuration": 15},
-                            {"targetId": valid_ids[1], "startFrame": scene_duration//2, "duration": scene_duration - (scene_duration//2), "style": CAM_STYLES[(scene_idx + 1) % len(CAM_STYLES)], "zoom": 1.2, "inDuration": 30}
+                            {"targetId": target_ids[0], "startFrame": 0, "duration": scene_duration//2, "style": CAM_STYLES[scene_idx % len(CAM_STYLES)], "zoom": 1.1, "inDuration": 15},
+                            {"targetId": target_ids[1], "startFrame": scene_duration//2, "duration": scene_duration - (scene_duration//2), "style": CAM_STYLES[(scene_idx + 1) % len(CAM_STYLES)], "zoom": 1.2, "inDuration": 30}
                         ]}
                     else:
-                        scene['camera'] = {"enabled": True, "shots": [{"targetId": valid_ids[0], "startFrame": 0, "duration": scene_duration, "style": "slow_push", "zoom": 1.15, "inDuration": 20}]}
+                        scene['camera'] = {"enabled": True, "shots": [{"targetId": target_ids[0], "startFrame": 0, "duration": scene_duration, "style": "slow_push", "zoom": 1.15, "inDuration": 20}]}
             else:
                 print(f"   🎥 Preserving AI Camera for {s_id}")
-                scene['camera']['enabled'] = True # Ensure enabled
+                # Strictly preserve AI shots and styles
+                scene['camera']['enabled'] = True
+                # Ensure all preserved shots have essential defaults if missing
+                for shot in scene['camera'].get('shots', []):
+                    if 'style' not in shot: shot['style'] = 'slow_push'
+                    if 'zoom' not in shot: shot['zoom'] = 1.15
+                    if 'inDuration' not in shot: shot['inDuration'] = 20
 
             # SFX (Perfectly Aligned with Overlay Entry)
             for i, ov in enumerate(valid_overlays):

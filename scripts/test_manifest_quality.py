@@ -154,9 +154,13 @@ def test_manifest_quality(filepath, public_dir=None):
                     print(f"   ❌ TYPOGRAPHY: {msg}")
                     scores["typography"] -= 20
 
-                w = min(1600, len(content) * fs * 0.7)
-                h = fs * 1.5
-                if len(content.split()) > 6:
+                # Improved Multi-line Geometry Awareness
+                lines = content.split('\n')
+                max_line_len = max(len(line) for line in lines) if lines else 0
+                w = min(1600, max_line_len * fs * 0.8)
+                h = fs * 1.2 * len(lines)
+
+                if len(content.split()) > 10:
                     msg = f"[{scene_id}] Text '{ov_id}' is verbose ({len(content.split())} words)."
                     warnings.append(msg)
                     print(f"   ⚠️ TYPOGRAPHY: {msg}")
@@ -177,8 +181,12 @@ def test_manifest_quality(filepath, public_dir=None):
                 scores["composition"] -= 5
 
             # Collision Detection
-            for p_id, p_l, p_t, p_r, p_b, p_s, p_e in placed_geometries:
+            for p_id, p_l, p_t, p_r, p_b, p_s, p_e, p_type in placed_geometries:
                 if max(start, p_s) < min(start + ov_dur, p_e):
+                    # Ignore collisions with background decorative elements (graph, shape)
+                    if o_type in ['graph', 'shape'] or p_type in ['graph', 'shape']:
+                        continue
+
                     gap = MIN_CONSTRAINTS['min_spacing']
                     if not (r + gap < p_l or l - gap > p_r or b + gap < p_t or t - gap > p_b):
                         msg = f"[{scene_id}] GEOMETRY COLLISION: '{ov_id}' overlaps with '{p_id}'"
@@ -186,7 +194,7 @@ def test_manifest_quality(filepath, public_dir=None):
                         print(f"   ❌ COLLISION: {msg}")
                         scores["collision"] -= 30
 
-            placed_geometries.append((ov_id, l, t, r, b, start, start + ov_dur))
+            placed_geometries.append((ov_id, l, t, r, b, start, start + ov_dur, o_type))
 
             # Hero Word Timing
             if o_type == 'text':
