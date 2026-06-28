@@ -112,15 +112,19 @@ class RemotionJsonMaker:
         abs_public = os.path.abspath(public_dir)
         print(f"🛠️ HARDENING ENGINE: Resolving spatial collisions and cinematic timing...")
 
-        # Studio V4 Hardened Sizes (Synced with QA Logic)
+        # Studio V4 Hardened Sizes (Standard Broadcast Aspect Ratios)
         TYPE_SIZES = {
-            'text': (800, 200), 'chart': (1000, 600), 'shadcn_chart': (1000, 600),
-            'ui_panel': (800, 600), 'data_indicator': (500, 450), 'shadcn_indicator': (500, 450),
-            'svg': (400, 400), 'kpi': (450, 400), 'kpi_card': (450, 400), 'timeline': (1200, 300),
-            'hub_network': (900, 900), 'flow_diagram': (1000, 450), 'process': (1000, 450),
-            'media': (900, 700), 'image': (900, 700), 'video': (900, 700),
-            'label': (300, 100), 'callout': (400, 200), 'compositions': (1200, 800), 'groups': (1200, 800),
-            'graph': (1000, 700), 'shape': (600, 600)
+            'text': (800, 200),
+            'chart': (1000, 562), 'shadcn_chart': (1000, 562), # 16:9
+            'ui_panel': (800, 600), # 4:3
+            'data_indicator': (500, 375), 'shadcn_indicator': (500, 375), # 4:3
+            'svg': (400, 400), 'kpi': (450, 400), 'kpi_card': (450, 400),
+            'timeline': (1200, 300),
+            'hub_network': (800, 800), 'flow_diagram': (1000, 562), 'process': (1000, 562),
+            'media': (960, 540), 'image': (960, 540), 'video': (960, 540), # 16:9
+            'label': (300, 100), 'callout': (400, 200),
+            'compositions': (1200, 675), 'groups': (1200, 675), # 16:9
+            'graph': (1000, 700), 'shape': (400, 400)
         }
 
         # Hard Constraints (Synced with QA MIN_CONSTRAINTS)
@@ -130,7 +134,16 @@ class RemotionJsonMaker:
         MIN_SPACING = 30
 
         LAYOUT_PRESETS = ["SPLIT_SCREEN", "RULE_OF_THIRDS", "HERO_FOCAL", "TOP_TITLE_LOWER_VIS"]
-        MODERN_COLORS = ["#00F5FF", "#FF3E6C", "#00FFAB", "#ADFF2F", "#FFD700", "#7B68EE", "#FF8C00"]
+        # Studio V4 Cohesive Documentary Palette (Vox/Polymatter Style)
+        DOC_COLORS = {
+            "primary": "#00F5FF", # Cyan
+            "amber": "#FFD700",   # Warning/Emphasis
+            "alert": "#FF3E6C",   # Critical
+            "success": "#00FFAB", # Positive
+            "neutral": "#F8FAFC"  # UI/Text
+        }
+        MODERN_COLORS = [DOC_COLORS["primary"], DOC_COLORS["amber"], DOC_COLORS["alert"], DOC_COLORS["success"]]
+
         VALID_TEXT_ANIMS = ["glow_pulse", "neon_flicker", "glitch_pop", "bounce_pop", "word_by_word", "slide_up", "typewriter"]
 
         # Ultra-High End 9-Sector Anchors (1920x1080)
@@ -270,8 +283,17 @@ class RemotionJsonMaker:
 
             for i, ov in enumerate(valid_overlays):
                 o_type = str(ov.get('type', 'text')).lower()
-                ov['start'] = 15 + i * stagger_step
-                ov['duration'] = max(30, scene_duration - ov['start'])
+
+                # Decorative background elements start at frame 0
+                if o_type in ['graph', 'shape']:
+                    ov['start'] = 0
+                elif PRIORITY.get(o_type, 0) < 50: # Other secondaries fade in early
+                    ov['start'] = 5
+                else:
+                    ov['start'] = 15 + i * stagger_step
+
+                # Coordinated Exit: 30f transition padding
+                ov['duration'] = max(30, scene_duration - ov['start'] - 30)
 
                 base_w, base_h = TYPE_SIZES.get(o_type, (600, 400))
                 fs = 120
@@ -279,9 +301,14 @@ class RemotionJsonMaker:
                     fs_match = re.search(r'\d+', str(ov.get('fontSize', '120')))
                     fs = int(fs_match.group()) if fs_match else 120
 
-                # Use AI position as starting anchor
+                # Use AI position as starting anchor, but Snap-to-Anchor if close
                 pos = ov.get('position', {})
                 ax, ay = int(pos.get('x', 960)), int(pos.get('y', 540))
+
+                for anchor_name, (grid_x, grid_y) in ANCHORS.items():
+                    if abs(ax - grid_x) < 150 and abs(ay - grid_y) < 150:
+                        ax, ay = grid_x, grid_y
+                        break
 
                 found = False
                 best_pos = (ax, ay)
@@ -290,6 +317,11 @@ class RemotionJsonMaker:
                 print(f"     🔍 Placing {ov['id']} ({o_type}) starting at ({ax}, {ay})...")
                 for scale_step in range(7):
                     scale = 1.0 - (scale_step * 0.15)
+
+                    # Limit decorative dominance
+                    if o_type in ['graph', 'shape']:
+                        scale = min(scale, 0.8)
+
                     if o_type == 'text':
                         curr_fs = max(MIN_FONT_SIZE, int(fs * scale))
                         w = min(1600, len(ov['content']) * curr_fs * 0.7)
@@ -298,9 +330,10 @@ class RemotionJsonMaker:
                         w = max(MIN_CHART_W if 'chart' in o_type else MIN_SVG_W, base_w * scale)
                         h = max(MIN_CHART_H if 'chart' in o_type else MIN_SVG_H, base_h * scale)
 
-                    for step in range(0, 30): # Spiral search from AI position
-                        radius = step * 40
-                        angles = [0, 180, 90, 270, 45, 135, 225, 315, 30, 60, 120, 150, 210, 240, 300, 330] if radius > 0 else [0]
+                    for step in range(0, 60): # Spiral search from AI position
+                        radius = step * 20
+                        # Axis-prioritized angles to maintain grid intent
+                        angles = [0, 180, 90, 270, 45, 135, 225, 315] if radius > 0 else [0]
                         for angle in angles:
                             rad = math.radians(angle)
                             cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
@@ -347,33 +380,61 @@ class RemotionJsonMaker:
 
                 placed_boxes.append((ov['id'], best_pos[0]-final_w/2, best_pos[1]-final_h/2, best_pos[0]+final_w/2, best_pos[1]+final_h/2, ov['start'], ov['start']+ov['duration']))
 
+            # Re-sort for visual layering (Backgrounds first, Hero elements last)
+            valid_overlays.sort(key=lambda o: PRIORITY.get(str(o.get('type')).lower(), 0))
             scene['overlays'] = valid_overlays
 
-            # Camera logic: Preserve AI intent if valid, else fallback
-            valid_ids = [o['id'] for o in valid_overlays]
+            # Camera logic: Professional Sequencing & Sync
+            # Priority: focal > background > shape
+            focal_ids = [o['id'] for o in valid_overlays if PRIORITY.get(str(o.get('type')).lower(), 0) >= 50]
+            background_ids = [o['id'] for o in valid_overlays if PRIORITY.get(str(o.get('type')).lower(), 0) < 50]
+
             ai_camera = scene.get('camera', {})
             ai_shots = ai_camera.get('shots', [])
 
             camera_valid = False
             if ai_shots and isinstance(ai_shots, list):
-                # Validate that all shots have valid targetIds
-                if all(isinstance(shot, dict) and shot.get('targetId') in valid_ids for shot in ai_shots):
+                if all(isinstance(shot, dict) and shot.get('targetId') in [o['id'] for o in valid_overlays] for shot in ai_shots):
                     camera_valid = True
 
             if not camera_valid:
-                print(f"   🎥 Generating fallback camera for {s_id}")
+                print(f"   🎥 Sequencing broadcast-grade camera for {s_id}")
                 CAM_STYLES = ["cinematic_drift", "slow_push", "pan_right", "orbit", "rack_focus", "dramatic_reveal"]
-                if valid_ids:
-                    if len(valid_ids) >= 2:
-                        scene['camera'] = {"enabled": True, "shots": [
-                            {"targetId": valid_ids[0], "startFrame": 0, "duration": scene_duration//2, "style": CAM_STYLES[scene_idx % len(CAM_STYLES)], "zoom": 1.1, "inDuration": 15},
-                            {"targetId": valid_ids[1], "startFrame": scene_duration//2, "duration": scene_duration - (scene_duration//2), "style": CAM_STYLES[(scene_idx + 1) % len(CAM_STYLES)], "zoom": 1.2, "inDuration": 30}
-                        ]}
-                    else:
-                        scene['camera'] = {"enabled": True, "shots": [{"targetId": valid_ids[0], "startFrame": 0, "duration": scene_duration, "style": "slow_push", "zoom": 1.15, "inDuration": 20}]}
+                shots = []
+
+                # 1. Start with background ambient drift if exists
+                if background_ids:
+                    shots.append({"targetId": background_ids[0], "startFrame": 0, "duration": 45, "style": "cinematic_drift", "zoom": 1.05, "inDuration": 15})
+
+                # 2. Sequence through focal elements, sync startFrame with overlay.start
+                # Sort focal elements by their actual start time for sequential shots
+                focal_elements = sorted([o for o in valid_overlays if o['id'] in focal_ids], key=lambda x: x['start'])
+
+                for i, ov in enumerate(focal_elements[:3]): # Up to 3 focal shots
+                    start = ov['start']
+                    # Ensure shots don't overlap, adjust previous shot duration if needed
+                    if shots and start <= shots[-1]['startFrame']:
+                        start = shots[-1]['startFrame'] + 10
+
+                    if shots: shots[-1]['duration'] = max(20, start - shots[-1]['startFrame'])
+
+                    shots.append({
+                        "targetId": ov['id'],
+                        "startFrame": start,
+                        "duration": 60, # Initial guess, will finalize below
+                        "style": CAM_STYLES[(scene_idx + i) % len(CAM_STYLES)],
+                        "zoom": 1.1 + (i * 0.05),
+                        "inDuration": 20
+                    })
+
+                # Finalize last shot duration
+                if shots:
+                    shots[-1]['duration'] = max(30, scene_duration - shots[-1]['startFrame'])
+
+                scene['camera'] = {"enabled": True, "shots": shots}
             else:
                 print(f"   🎥 Preserving AI Camera for {s_id}")
-                scene['camera']['enabled'] = True # Ensure enabled
+                scene['camera']['enabled'] = True
 
             # SFX (Perfectly Aligned with Overlay Entry)
             for i, ov in enumerate(valid_overlays):
