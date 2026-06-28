@@ -61,8 +61,8 @@ def test_manifest_quality(filepath, public_dir=None):
     }
 
     MIN_CONSTRAINTS = {
-        'fontSize': 40,
-        'hero_fontSize': 72, # Hero text protection
+        'fontSize': 45,
+        'hero_fontSize': 100, # Studio V4 Hero text protection
         'chart_w': 300, 'chart_h': 200,
         'svg_w': 100, 'svg_h': 100,
         'min_spacing': 30
@@ -80,6 +80,17 @@ def test_manifest_quality(filepath, public_dir=None):
         if scene_id in all_scene_ids:
             issues.append(f"CRITICAL: Duplicate scene_id '{scene_id}' detected.")
         all_scene_ids.add(scene_id)
+
+        # Reading Order & Sequencing validation
+        beats = scene.get('beats', [])
+        if not beats:
+            warnings.append(f"[{scene_id}] Missing 'beats' array for visual sequencing.")
+            scores["timing"] -= 5
+
+        # Transition validation
+        if not scene.get('transition'):
+            warnings.append(f"[{scene_id}] Missing 'transition' object for story flow.")
+            scores["composition"] -= 5
 
         duration = scene.get('duration_in_frames', 180)
         overlays = scene.get('overlays', [])
@@ -113,6 +124,11 @@ def test_manifest_quality(filepath, public_dir=None):
         placed_geometries = []
         starts = []
 
+        # Sort overlays by start for reading order validation
+        sorted_ovs = sorted(overlays, key=lambda x: x.get('start', 0))
+        prev_start = -1
+        sequential = True
+
         for ov in overlays:
             ov_id = ov.get('id', 'unknown')
             overlay_ids.add(ov_id)
@@ -120,6 +136,11 @@ def test_manifest_quality(filepath, public_dir=None):
 
             o_type = str(ov.get('type', 'text')).lower()
             start = ov.get('start', 0)
+
+            # Sequential Reveal check
+            if start < prev_start:
+                sequential = False
+            prev_start = start
             starts.append(start)
             ov_dur = ov.get('duration', 0)
 
@@ -210,6 +231,11 @@ def test_manifest_quality(filepath, public_dir=None):
 
             placed_geometries.append((ov_id, l, t, r, b, start, start + ov_dur, str(ov.get('importance', '')).lower()))
 
+            # Connector/Link Validation
+            connections = scene.get('connections', [])
+            for conn in connections:
+                if conn.get('sourceId') == ov_id or conn.get('targetId') == ov_id:
+                    print(f"   🔗 CONNECTOR: Linked logic detected for {ov_id}")
 
             # Hero Word Timing
             if o_type == 'text':
@@ -229,6 +255,11 @@ def test_manifest_quality(filepath, public_dir=None):
         if not overlays:
             print("   ⚠️ WARNING: Scene has no overlays.")
         else:
+            if sequential:
+                print(f"   ✅ SEQUENCING: Elements revealed in professional reading order.")
+            else:
+                warnings.append(f"[{scene_id}] Overlays revealed out of sequence.")
+                scores["timing"] -= 10
             print(f"   ✅ OVERLAYS: {len(overlays)} elements validated.")
 
     # Final Summary
