@@ -46,7 +46,15 @@ def test_manifest_quality(filepath, public_dir=None):
         'svg': (400, 400), 'kpi': (450, 400), 'timeline': (1200, 300),
         'hub_network': (900, 900), 'flow_diagram': (1000, 450), 'process': (1000, 450),
         'media': (900, 700), 'image': (900, 700), 'video': (900, 700),
-        'label': (300, 100), 'callout': (400, 200), 'composition': (1200, 800)
+        'label': (300, 100), 'callout': (400, 200), 'composition': (1200, 800), 'groups': (1200, 800)
+    }
+
+    # Minimum production constraints
+    MIN_CONSTRAINTS = {
+        'fontSize': 40,
+        'chart_w': 300, 'chart_h': 200,
+        'svg_w': 100, 'svg_h': 100,
+        'min_spacing': 30
     }
 
     all_scene_ids = set()
@@ -114,19 +122,41 @@ def test_manifest_quality(filepath, public_dir=None):
             x, y = pos.get('x', 960), pos.get('y', 540)
 
             # Center Stacking Detection
-            if x == 960 and y == 700:
-                warnings.append(f"[{scene_id}] '{ov_id}' is at potential placeholder position (960, 700).")
-                scores["composition"] -= 10
+            if (abs(x - 960) < 5 and abs(y - 540) < 5) or (abs(x - 960) < 5 and abs(y - 700) < 5):
+                warnings.append(f"[{scene_id}] '{ov_id}' is center-stacked at ({x}, {y}). Avoid generic centering.")
+                scores["composition"] -= 15
 
-            w, h = TYPE_SIZES.get(o_type, (600, 400))
+            # 1. Prioritize manifest width/height
+            # 2. Fallback to TYPE_SIZES
+            base_w, base_h = TYPE_SIZES.get(o_type, (600, 400))
+            w = ov.get('width', base_w)
+            h = ov.get('height', base_h)
+
             if o_type == 'text':
                 content = str(ov.get('content', ''))
                 fs_match = re.search(r'\d+', str(ov.get('fontSize', '120')))
                 fs = int(fs_match.group()) if fs_match else 120
+
+                # Check min fontSize constraint
+                if fs < MIN_CONSTRAINTS['fontSize']:
+                    issues.append(f"[{scene_id}] Text '{ov_id}' fontSize {fs}px is below production minimum (40px).")
+                    scores["typography"] -= 20
+
+                # Compute effective visual box for text
                 w = min(1600, len(content) * fs * 0.7)
                 h = fs * 1.5
                 if len(content.split()) > 6:
                     warnings.append(f"[{scene_id}] Text '{ov_id}' is verbose ({len(content.split())} words).")
+
+            # Check other min constraints
+            elif 'chart' in o_type:
+                if w < MIN_CONSTRAINTS['chart_w'] or h < MIN_CONSTRAINTS['chart_h']:
+                    issues.append(f"[{scene_id}] Chart '{ov_id}' size {w}x{h} is below production minimum.")
+                    scores["layout"] -= 20
+            elif o_type == 'svg':
+                if w < MIN_CONSTRAINTS['svg_w'] or h < MIN_CONSTRAINTS['svg_h']:
+                    issues.append(f"[{scene_id}] SVG '{ov_id}' size {w}x{h} is below production minimum.")
+                    scores["layout"] -= 20
 
             l, t = x - w/2, y - h/2
             r, b = x + w/2, y + h/2
@@ -142,7 +172,7 @@ def test_manifest_quality(filepath, public_dir=None):
             # Collision Detection (AABB)
             for p_id, p_l, p_t, p_r, p_b, p_start, p_end in placed_geometries:
                 if max(start, p_start) < min(start + ov_dur, p_end):
-                    gap = 20
+                    gap = MIN_CONSTRAINTS['min_spacing']
                     if not (r + gap < p_l or l - gap > p_r or b + gap < p_t or t - gap > p_b):
                         issues.append(f"[{scene_id}] GEOMETRY COLLISION: '{ov_id}' overlaps with '{p_id}'")
                         scores["collision"] -= 30
