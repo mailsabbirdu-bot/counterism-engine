@@ -56,11 +56,13 @@ def test_manifest_quality(filepath, public_dir=None):
         'media': (960, 540), 'image': (960, 540), 'video': (960, 540), # 16:9
         'label': (300, 100), 'callout': (400, 200),
         'compositions': (1200, 675), 'groups': (1200, 675), # 16:9
-        'graph': (1000, 700), 'shape': (400, 400)
+        'graph': (1000, 700), 'shape': (400, 400),
+        'connector': (400, 100), 'ambient_graphic': (1920, 1080)
     }
 
     MIN_CONSTRAINTS = {
         'fontSize': 40,
+        'hero_fontSize': 72, # Hero text protection
         'chart_w': 300, 'chart_h': 200,
         'svg_w': 100, 'svg_h': 100,
         'min_spacing': 30
@@ -148,17 +150,28 @@ def test_manifest_quality(filepath, public_dir=None):
                 radius = ov.get('size', 100)
                 w, h = radius * 2, radius * 2
 
+            # Semantic Lifecycle check
+            if not ov.get('exitAnimation'):
+                msg = f"[{scene_id}] '{ov_id}' missing 'exitAnimation'."
+                warnings.append(msg)
+                print(f"   ⚠️ PRODUCTION: {msg}")
+
             if o_type == 'text':
                 content = str(ov.get('content', ''))
                 fs_match = re.search(r'\d+', str(ov.get('fontSize', '120')))
                 fs = int(fs_match.group()) if fs_match else 120
-                if fs < MIN_CONSTRAINTS['fontSize']:
-                    msg = f"[{scene_id}] Text '{ov_id}' fontSize {fs}px is too small (min 40px)."
+
+                importance = str(ov.get('importance', '')).lower()
+                min_fs = MIN_CONSTRAINTS['hero_fontSize'] if importance == 'hero' else MIN_CONSTRAINTS['fontSize']
+
+                if fs < min_fs:
+                    msg = f"[{scene_id}] Text '{ov_id}' ({importance}) fontSize {fs}px is too small (min {min_fs}px)."
                     issues.append(msg)
                     print(f"   ❌ TYPOGRAPHY: {msg}")
                     scores["typography"] -= 20
 
-                w = min(1600, len(content) * fs * 0.7)
+                max_w = ov.get('maxWidth', 1600)
+                w = min(max_w, len(content) * fs * 0.7)
                 h = fs * 1.5
                 if len(content.split()) > 6:
                     msg = f"[{scene_id}] Text '{ov_id}' is verbose ({len(content.split())} words)."
@@ -180,9 +193,14 @@ def test_manifest_quality(filepath, public_dir=None):
                 print(f"   ⚠️ COMPOSITION: {msg}")
                 scores["composition"] -= 5
 
-            # Collision Detection
-            for p_id, p_l, p_t, p_r, p_b, p_s, p_e in placed_geometries:
+            # Collision Detection (Allow Hero/KPI to overlap backgrounds)
+            for p_id, p_l, p_t, p_r, p_b, p_s, p_e, p_imp in placed_geometries:
                 if max(start, p_s) < min(start + ov_dur, p_e):
+                    # Ignore collisions with backgrounds/ambient elements if current is Hero
+                    importance = str(ov.get('importance', '')).lower()
+                    if (importance == 'hero' or importance == 'secondary') and p_imp in ['background', 'ambient']:
+                        continue
+
                     gap = MIN_CONSTRAINTS['min_spacing']
                     if not (r + gap < p_l or l - gap > p_r or b + gap < p_t or t - gap > p_b):
                         msg = f"[{scene_id}] GEOMETRY COLLISION: '{ov_id}' overlaps with '{p_id}'"
@@ -190,7 +208,8 @@ def test_manifest_quality(filepath, public_dir=None):
                         print(f"   ❌ COLLISION: {msg}")
                         scores["collision"] -= 30
 
-            placed_geometries.append((ov_id, l, t, r, b, start, start + ov_dur))
+            placed_geometries.append((ov_id, l, t, r, b, start, start + ov_dur, str(ov.get('importance', '')).lower()))
+
 
             # Hero Word Timing
             if o_type == 'text':
