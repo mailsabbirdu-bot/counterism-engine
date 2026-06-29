@@ -1,0 +1,11 @@
+{
+  "scene_id": "SCENE_01",
+  "tracks": [{
+    "track_id": "track_001",
+    "type": "bus",
+    "frames": [
+      {"frame": 0, "x": 100, "y": 500, "width": 200, "height": 100},
+      {"frame": 150, "x": 1500, "y": 500, "width": 200, "height": 100}
+    ]
+  }]
+}

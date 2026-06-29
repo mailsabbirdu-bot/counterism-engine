@@ -1,4 +1,5 @@
 import React from 'react';
+import { useCurrentFrame } from 'remotion';
 import { ParallaxLayer } from './components/ParallaxLayer';
 import { TextEngine } from './engines/TextEngine';
 import { UISystem } from './engines/UISystem';
@@ -17,7 +18,9 @@ interface OverlayManagerProps {
 }
 
 export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays, analysis }) => {
-  if (overlays.length > 0) {
+  const frame = useCurrentFrame();
+
+  if (overlays.length > 0 && frame === 0) {
       console.log(`[OverlayManager] Detected ${overlays.length} overlays: ${overlays.map(o => `(${o.id}: ${o.type})`).join(', ')}`);
   }
   return (
@@ -28,7 +31,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays, analys
         }
 
         // Apply Smart Position Resolution
-        const resolvedPosition = resolvePosition(overlay, analysis);
+        const resolvedPosition = resolvePosition(overlay, analysis, frame);
         const positionalOverlay = {
             ...overlay,
             position: resolvedPosition

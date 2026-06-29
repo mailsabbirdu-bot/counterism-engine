@@ -15,7 +15,7 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
   const [analysis, setAnalysis] = useState<any>(null);
 
   useEffect(() => {
-    if (sceneData.background_type === 'video' && sceneData.video_path) {
+    if (sceneData.video_path) {
       loadAnalysis(sceneData.video_path).then(setAnalysis);
     }
   }, [sceneData.video_path, sceneData.background_type]);
