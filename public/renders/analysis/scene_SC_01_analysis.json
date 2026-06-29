@@ -720,40 +720,44 @@
     "confidence": 0.0
   },
   "shot_analysis": {
-    "shot_type": "unknown",
-    "camera_height": "unknown",
-    "environment": "unknown",
-    "complexity": "unknown"
+    "shot_type": "wide",
+    "camera_height": "normal",
+    "environment": "urban",
+    "complexity": "low"
   },
   "composition": {
-    "visual_balance": "unknown",
-    "negative_space": "unknown",
-    "horizon": "unknown",
+    "visual_balance": "balanced",
+    "negative_space": "top_left",
+    "horizon": "middle",
     "busy_score": 0.0,
-    "clean_score": 0.0
+    "clean_score": 1.0
   },
   "recommended_text_region": {
-    "x": 0.0,
-    "y": 0.0,
-    "width": 0.0,
-    "height": 0.0,
-    "confidence": 0.0,
-    "stability": 0.0
+    "x": 20.0,
+    "y": 20.0,
+    "width": 440.0,
+    "height": 230.0,
+    "confidence": 1.0,
+    "stability": 1.0
   },
   "visual_style": {
-    "dominant_colors": [],
-    "brightness": 0.0,
+    "dominant_colors": [
+      "#0000fe",
+      "#0000fe",
+      "#0000fe"
+    ],
+    "brightness": 0.11372549019607843,
     "contrast": 0.0
   },
   "motion": {
-    "intensity": "unknown",
-    "score": 0.0
+    "intensity": "low",
+    "score": 0.06
   },
   "scene_summary": {
     "main_subject": "unknown",
-    "selection_reason": "",
+    "selection_reason": "No distinct subject identified",
     "camera_motion": "unknown",
-    "best_overlay_side": "center",
+    "best_overlay_side": "left",
     "recommended_animation": "fade_in"
   }
 }

@@ -606,11 +606,22 @@ class RemotionJsonMaker:
         if self.visual_analysis:
             visual_context = "\n--- VISUAL PERCEPTION DATA (PRODUCTION GROUNDING) ---\n"
             for v_name, analysis in self.visual_analysis.items():
-                s_id = v_name.replace("scene_SC_", "SCENE_").replace(".mp4", "")
+                s_id = v_name.replace("scene_SC_", "SCENE_").replace(".mp4", "").upper()
                 v_type = analysis.get("scene_type", "unknown")
-                v_objs = [o["type"] for o in analysis.get("objects", [])]
-                v_regions = len(analysis.get("safe_text_regions", []))
-                visual_context += f"- {s_id}: Type={v_type}, Detected={v_objs}, SafeZones={v_regions}\n"
+
+                # Phase 2 Enhanced Data
+                summary = analysis.get("scene_summary", {})
+                main_subj = summary.get("main_subject", "unknown")
+                cam_mot = summary.get("camera_motion", "static")
+                side = summary.get("best_overlay_side", "center")
+
+                shot = analysis.get("shot_analysis", {})
+                shot_type = shot.get("shot_type", "wide")
+
+                comp = analysis.get("composition", {})
+                busy = comp.get("busy_score", 0)
+
+                visual_context += f"- {s_id}: Type={v_type}, Shot={shot_type}, MainSubject={main_subj}, Camera={cam_mot}, BestSide={side}, Clutter={busy:.2f}\n"
 
         full_prompt = (
             f"TASK: GENERATE AN EXPERT DOCUMENTARY MOTION GRAPHICS MANIFEST FOR {len(self.story_scenes)} SCENES.\n"

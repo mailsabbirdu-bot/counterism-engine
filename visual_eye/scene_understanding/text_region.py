@@ -9,55 +9,58 @@ except (ImportError, ValueError):
 
 def recommend_text_region(frames: List[AnalysisFrame]) -> RecommendedTextRegion:
     """
-    Find the most stable safe text region across all sampled frames.
+    Find the most stable safe text region by calculating intersection and persistence.
     """
     try:
         if not frames:
             return RecommendedTextRegion(x=100, y=100, width=500, height=300, confidence=0.5, stability=0.0)
 
-        grid_stats = {}
+        # 1. Gather all unique safe region slots (from our 4x4 grid in Phase 1.5)
+        grid_slots = {} # (x, y) -> {confidences: [], frames: []}
 
         for frame in frames:
             for region in frame.safe_text_regions:
-                key = (round(region.x, -1), round(region.y, -1))
+                key = (round(region.x), round(region.y))
+                if key not in grid_slots:
+                    grid_slots[key] = {'confidences': [], 'frames': [], 'w': region.width, 'h': region.height}
+                grid_slots[key]['confidences'].append(region.confidence)
+                grid_slots[key]['frames'].append(frame.frame_index)
 
-                if key not in grid_stats: grid_stats[key] = []
-                grid_stats[key].append(region.confidence)
-
-        if not grid_stats:
+        if not grid_slots:
             return RecommendedTextRegion(x=100, y=100, width=800, height=300, confidence=0.5, stability=0.0)
 
-        candidates = []
-        for key, confidences in grid_stats.items():
-            avg_conf = sum(confidences) / len(confidences)
-            stability = len(confidences) / len(frames)
-            score = avg_conf * stability
+        # 2. Calculate stability and average confidence for each slot
+        scored_candidates = []
+        total_sampled = len(frames)
 
-            candidates.append({
-                'key': key,
+        for key, data in grid_slots.items():
+            avg_conf = sum(data['confidences']) / len(data['confidences'])
+            # Stability = percentage of sampled frames where this region is safe
+            stability = len(data['frames']) / float(total_sampled)
+
+            # Final score weights stability heavily for text placement
+            score = (stability * 0.7) + (avg_conf * 0.3)
+
+            scored_candidates.append({
+                'pos': key,
+                'w': data['w'],
+                'h': data['h'],
                 'avg_conf': avg_conf,
                 'stability': stability,
                 'score': score
             })
 
-        candidates.sort(key=lambda x: x['score'], reverse=True)
-        best = candidates[0]
-
-        orig = None
-        for frame in frames:
-            for region in frame.safe_text_regions:
-                if (round(region.x, -1), round(region.y, -1)) == best['key']:
-                    orig = region
-                    break
-            if orig: break
+        # 3. Pick the best region
+        scored_candidates.sort(key=lambda x: x['score'], reverse=True)
+        best = scored_candidates[0]
 
         return RecommendedTextRegion(
-            x=orig.x if orig else best['key'][0],
-            y=orig.y if orig else best['key'][1],
-            width=orig.width if orig else 400,
-            height=orig.height if orig else 200,
-            confidence=best['avg_conf'],
-            stability=best['stability']
+            x=float(best['pos'][0]),
+            y=float(best['pos'][1]),
+            width=float(best['w']),
+            height=float(best['h']),
+            confidence=float(best['avg_conf']),
+            stability=float(best['stability'])
         )
 
     except Exception as e:
