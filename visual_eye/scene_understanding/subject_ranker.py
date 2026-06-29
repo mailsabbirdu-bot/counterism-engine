@@ -1,5 +1,5 @@
 import math
-from typing import List
+from typing import List, Optional
 try:
     from ..schema import TrackedObject, SubjectRank
 except (ImportError, ValueError):
@@ -8,52 +8,76 @@ except (ImportError, ValueError):
     except ImportError:
         from schema import TrackedObject, SubjectRank
 
-def rank_visual_subjects(tracks: List[TrackedObject], total_frames: int, sampled_frames_count: int) -> List[SubjectRank]:
+def rank_visual_subjects(tracks: List[TrackedObject], total_frames: int, sampled_frames_count: int,
+                        visual_style: Optional[any] = None, narrative_ranks: List[SubjectRank] = []) -> List[SubjectRank]:
     """
-    Rank objects by visual importance based on size, duration, confidence, and position.
+    Implements the Phase 3 Cinematic Importance Model.
+    Ranks subjects based on size, position, movement, contrast, and narrative relevance.
     """
     try:
-        ranked = []
         if not tracks or sampled_frames_count == 0:
             return []
 
+        # Map narrative scores for lookup
+        n_map = {r.track_id: r.narrative_importance for r in narrative_ranks}
+
+        ranked = []
         for track in tracks:
-            # 1. Size score (average screen coverage)
-            # Area relative to 1920x1080
+            # 1. Subject Size (Area coverage)
             avg_area = track.average_bbox.width * track.average_bbox.height
-            size_score = min(1.0, avg_area / (1920 * 1080 * 0.15)) # 15% coverage is high importance
+            screen_area = 1920 * 1080
+            coverage = avg_area / screen_area
+            size_score = min(1.0, coverage / 0.25)
 
-            # 2. Duration/Persistence score
-            # Frames visible relative to total sampled frames
-            persistence_score = track.frames_visible / float(sampled_frames_count)
-
-            # 3. Position score (Rule of Thirds / Centrality)
+            # 2. Screen Position Score
             cx = track.average_bbox.x + track.average_bbox.width / 2
             cy = track.average_bbox.y + track.average_bbox.height / 2
+            dist_center = math.sqrt((cx - 960)**2 + (cy - 540)**2)
+            pos_score = max(0, 1.0 - (dist_center / 1100.0))
 
-            # Centeredness: distance from center
-            dist_from_center = math.sqrt((cx - 960)**2 + (cy - 540)**2)
-            # Normalizing distance (max distance to corner is ~1100)
-            center_score = max(0, 1.0 - (dist_from_center / 1100.0))
+            # 3. Tracking Stability / Duration
+            stability = track.frames_visible / float(sampled_frames_count)
 
-            # 4. Movement consistency
-            # High movement might mean secondary object, steady position might mean subject
-            # (or vice-versa, but usually subjects are tracked steadily)
-            # For now, we prioritize confidence and duration.
+            # 4. Movement Score
+            mv_per_frame = track.movement_distance / (track.frames_visible + 1)
+            mv_score = max(0, 1.0 - (mv_per_frame / 20.0)) # Stable = better for focus
 
-            # Combined Visual Importance
-            # Weights: Persistence (30%), Size (30%), Confidence (25%), Position (15%)
-            v_imp = (persistence_score * 0.35) + (size_score * 0.25) + (track.average_confidence * 0.25) + (center_score * 0.15)
-            v_imp = float(min(1.0, v_imp))
+            # 5. Contrast (Heuristic from detection confidence and style)
+            contrast_score = (track.average_confidence * 0.7) + (0.3 if visual_style and visual_style.contrast > 0.5 else 0.1)
+
+            # 6. Narrative Match
+            n_score = n_map.get(track.track_id, 0.0)
+
+            # FORMULA: cinematic_score = size * 0.25 + screen_pos * 0.20 + movement * 0.15 + contrast * 0.15 + duration * 0.15 + narrative * 0.10
+            c_score = (size_score * 0.25) + \
+                      (pos_score * 0.20) + \
+                      (mv_score * 0.15) + \
+                      (contrast_score * 0.15) + \
+                      (stability * 0.15) + \
+                      (n_score * 0.10)
+
+            # FORMULA: final_importance = (visual_importance * 0.45) + (tracking_stability * 0.25) + (screen_pos * 0.15) + (duration * 0.15)
+            v_imp = (size_score * 0.45) + (stability * 0.25) + (pos_score * 0.15) + (stability * 0.15)
+
+            # HERO RULES
+            if track.type == 'person' and coverage > 0.25 and stability > 0.4:
+                v_imp = min(1.0, v_imp + 0.3)
 
             ranked.append(SubjectRank(
                 track_id=track.track_id,
                 type=track.type,
-                visual_importance=v_imp
+                confidence=track.average_confidence,
+                visual_importance=float(min(1.0, v_imp)),
+                narrative_importance=float(n_score),
+                tracking_stability=float(stability),
+                screen_position_score=float(pos_score),
+                duration_visibility=float(stability),
+                cinematic_score=float(min(1.0, c_score)),
+                final_importance=float(min(1.0, (v_imp * 0.6 + n_score * 0.4)))
             ))
 
-        ranked.sort(key=lambda x: x.visual_importance, reverse=True)
+        ranked.sort(key=lambda x: x.final_importance, reverse=True)
         return ranked
     except Exception as e:
-        print(f"⚠️ Visual subject ranking error: {e}")
+        print(f"⚠️ Subject Ranker Error: {e}")
         return []

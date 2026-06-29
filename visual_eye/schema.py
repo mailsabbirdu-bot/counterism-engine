@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 
 class BBox(BaseModel):
@@ -19,6 +19,7 @@ class SafeTextRegion(BaseModel):
     width: float
     height: float
     confidence: float
+    avoid_subject: bool = True
 
 class AnalysisFrame(BaseModel):
     frame_index: int
@@ -38,8 +39,13 @@ class TrackedObject(BaseModel):
 class SubjectRank(BaseModel):
     track_id: str
     type: str
+    confidence: float = 0.0
     visual_importance: float = 0.0
     narrative_importance: float = 0.0
+    tracking_stability: float = 0.0
+    screen_position_score: float = 0.0
+    duration_visibility: float = 0.0
+    cinematic_score: float = 0.0
     final_importance: float = 0.0
 
 class CameraMotion(BaseModel):
@@ -71,7 +77,21 @@ class MotionAnalysis(BaseModel):
     intensity: str = "unknown"
     score: float = 0.0
 
+class CinematicDecision(BaseModel):
+    decision: str
+    confidence: float
+    fallback_used: bool = False
+
 class SceneSummary(BaseModel):
+    # Phase 3 Production Fields
+    hero_subject: Optional[Dict[str, Any]] = None
+    secondary_subjects: List[Dict[str, Any]] = []
+    text_position: Optional[CinematicDecision] = None
+    camera_behavior: Optional[CinematicDecision] = None
+    animation_style: Optional[CinematicDecision] = None
+    overlay_strategy: Optional[str] = ""
+
+    # Legacy fields
     main_subject: Optional[str] = "unknown"
     selection_reason: Optional[str] = ""
     camera_motion: Optional[str] = "unknown"
@@ -79,18 +99,18 @@ class SceneSummary(BaseModel):
     recommended_animation: Optional[str] = "fade_in"
 
 class SceneAnalysis(BaseModel):
-    version: str = "2.0"
+    version: str = "3.0"
     status: str
     scene_type: Optional[str] = "unknown"
-    # Root level fields for backward compatibility (mapped to first sampled frame)
     objects: List[DetectedObject] = []
     safe_text_regions: List[SafeTextRegion] = []
-    # Phase 1.5 Multi-frame support
     frames: List[AnalysisFrame] = []
     total_frames: Optional[int] = 0
     sampled_frames: Optional[int] = 0
 
-    # Phase 2 Advanced Scene Understanding
+    # New Phase 3 Specific Output
+    main_subject: Optional[Dict[str, Any]] = None
+
     tracked_objects: List[TrackedObject] = []
     visual_subjects: List[SubjectRank] = []
     narrative_subjects: List[SubjectRank] = []

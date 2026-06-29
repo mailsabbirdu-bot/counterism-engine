@@ -10,7 +10,8 @@ from typing import List
 
 def classify_shot(frames: List[AnalysisFrame], composition: CompositionAnalysis, scene_type: str) -> ShotAnalysis:
     """
-    Classify shot type and complexity based on detections, composition, and scene metadata.
+    Production-grade shot classification.
+    Infers camera height and shot type using horizon, distortion, and object context.
     """
     try:
         if not frames:
@@ -19,51 +20,47 @@ def classify_shot(frames: List[AnalysisFrame], composition: CompositionAnalysis,
         all_objs = [obj for f in frames for obj in f.objects]
 
         # 1. Shot Type (Wide, Medium, Close-up)
-        if not all_objs:
-             shot_type = "wide" # Landscape/empty shot
-        else:
-            # Measure relative size of dominant objects
-            max_area = 0
-            for frame in frames:
-                if frame.objects:
-                    frame_max = max(o.bbox.width * o.bbox.height for o in frame.objects)
-                    max_area = max(max_area, frame_max)
+        # We look at the largest subject coverage across sampled frames
+        max_subject_coverage = 0
+        for f in frames:
+            if f.objects:
+                frame_max = max(o.bbox.width * o.bbox.height for o in f.objects)
+                max_subject_coverage = max(max_subject_coverage, frame_max / (1920 * 1080))
 
-            screen_area = 1920 * 1080
-            coverage = max_area / screen_area
+        if max_subject_coverage > 0.35: shot_type = "close_up"
+        elif max_subject_coverage > 0.1: shot_type = "medium"
+        else: shot_type = "wide"
 
-            if coverage > 0.4: shot_type = "close_up"
-            elif coverage > 0.12: shot_type = "medium"
-            else: shot_type = "wide"
-
-        # 2. Camera Height
-        # Inferred from horizon and scene type
-        if "aerial" in scene_type.lower() or composition.horizon == "lower_third":
+        # 2. Camera Height (Advanced Inference)
+        # Based on horizon position and perspective
+        if composition.horizon == "lower_third" or "aerial" in scene_type.lower():
             camera_height = "aerial"
-        elif any(o.type == "person" for o in all_objs):
-            camera_height = "eye_level"
         elif composition.horizon == "upper_third":
-            camera_height = "low_angle"
+            # If horizon is high, we are likely looking down from an elevated position
+            camera_height = "elevated"
+        elif any(o.type == "person" for o in all_objs):
+            # Check for distortion if person is very large/close
+            if max_subject_coverage > 0.3: camera_height = "low_angle" # common for close-ups
+            else: camera_height = "eye_level"
         else:
-            camera_height = "normal"
+            camera_height = "eye_level" # safe default
 
         # 3. Environment
         env_str = str(scene_type).lower()
-        if "city" in env_str or "highway" in env_str or "industrial" in env_str:
+        if any(kw in env_str for kw in ["city", "urban", "street", "building"]):
             environment = "urban"
-        elif "interior" in env_str or "office" in env_str or "factory" in env_str:
-            environment = "interior"
-        elif "forest" in env_str or "mountain" in env_str or "nature" in env_str or "coast" in env_str:
+        elif any(kw in env_str for kw in ["nature", "forest", "mountain", "river"]):
             environment = "nature"
+        elif "interior" in env_str or "office" in env_str:
+            environment = "interior"
         else:
             environment = "unknown"
 
         # 4. Complexity
-        # Combination of object count and composition busy score
-        avg_objs = len(all_objs) / len(frames)
-        if composition.busy_score > 0.7 or avg_objs > 12:
+        avg_obj_count = len(all_objs) / len(frames) if frames else 0
+        if composition.busy_score > 0.7 or avg_obj_count > 10:
             complexity = "high"
-        elif composition.busy_score < 0.25 and avg_objs < 3:
+        elif composition.busy_score < 0.3 and avg_obj_count < 3:
             complexity = "low"
         else:
             complexity = "medium"
@@ -76,5 +73,5 @@ def classify_shot(frames: List[AnalysisFrame], composition: CompositionAnalysis,
         )
 
     except Exception as e:
-        print(f"⚠️ Shot classification error: {e}")
+        print(f"⚠️ Shot Classifier Error: {e}")
         return ShotAnalysis()
