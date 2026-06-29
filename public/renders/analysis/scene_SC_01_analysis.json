@@ -1,5 +1,5 @@
 {
-  "version": "1.5",
+  "version": "2.0",
   "status": "success",
   "scene_type": "urban_city",
   "objects": [],
@@ -710,5 +710,50 @@
     }
   ],
   "total_frames": 125,
-  "sampled_frames": 5
+  "sampled_frames": 5,
+  "tracked_objects": [],
+  "visual_subjects": [],
+  "narrative_subjects": [],
+  "main_subjects": [],
+  "camera_motion": {
+    "type": "unknown",
+    "confidence": 0.0
+  },
+  "shot_analysis": {
+    "shot_type": "unknown",
+    "camera_height": "unknown",
+    "environment": "unknown",
+    "complexity": "unknown"
+  },
+  "composition": {
+    "visual_balance": "unknown",
+    "negative_space": "unknown",
+    "horizon": "unknown",
+    "busy_score": 0.0,
+    "clean_score": 0.0
+  },
+  "recommended_text_region": {
+    "x": 0.0,
+    "y": 0.0,
+    "width": 0.0,
+    "height": 0.0,
+    "confidence": 0.0,
+    "stability": 0.0
+  },
+  "visual_style": {
+    "dominant_colors": [],
+    "brightness": 0.0,
+    "contrast": 0.0
+  },
+  "motion": {
+    "intensity": "unknown",
+    "score": 0.0
+  },
+  "scene_summary": {
+    "main_subject": "unknown",
+    "selection_reason": "",
+    "camera_motion": "unknown",
+    "best_overlay_side": "center",
+    "recommended_animation": "fade_in"
+  }
 }

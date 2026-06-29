@@ -28,6 +28,17 @@ except (ImportError, ValueError):
         from safe_zone import detect_safe_text_regions
         from fallback import get_empty_analysis
 
+try:
+    from .scene_understanding.analyzer import perform_scene_understanding
+except (ImportError, ValueError):
+    try:
+        from visual_eye.scene_understanding.analyzer import perform_scene_understanding
+    except ImportError:
+        try:
+            from scene_understanding.analyzer import perform_scene_understanding
+        except ImportError:
+            def perform_scene_understanding(analysis, video_path, context=None): return analysis
+
 def get_sampling_indices(total_frames: int) -> List[int]:
     """
     Adaptive sampling: 5-40 frames based on video length.
@@ -88,7 +99,7 @@ def draw_debug_info(frame: np.ndarray, frame_idx: int, objects: List[DetectedObj
 
     return debug_frame
 
-def analyze_video(video_path: str, output_dir: str, debug: bool = False) -> SceneAnalysis:
+def analyze_video(video_path: str, output_dir: str, debug: bool = False, context: Optional[Dict[str, Any]] = None) -> SceneAnalysis:
     """
     Performs real multi-frame video analysis and caches results.
     """
@@ -106,10 +117,10 @@ def analyze_video(video_path: str, output_dir: str, debug: bool = False) -> Scen
             try:
                 with open(output_path, 'r') as f:
                     data = json.load(f)
-                    if data.get("version", "1.0") >= "1.5":
+                    if data.get("version", "1.0") >= "2.0": # Upgraded version check
                          return SceneAnalysis.model_validate(data)
                     else:
-                         print("🔄 Old analysis version found. Re-analyzing...")
+                         print(f"🔄 Old analysis version ({data.get('version')}) found. Re-analyzing for Phase 2...")
             except Exception as e:
                 print(f"⚠️ Cache read error: {e}. Re-analyzing...")
 
@@ -165,7 +176,7 @@ def analyze_video(video_path: str, output_dir: str, debug: bool = False) -> Scen
         first_frame = analysis_frames[0]
 
         analysis = SceneAnalysis(
-            version="1.5",
+            version="2.0",
             status="success",
             scene_type=final_scene_type,
             objects=first_frame.objects,
@@ -175,8 +186,12 @@ def analyze_video(video_path: str, output_dir: str, debug: bool = False) -> Scen
             sampled_frames=len(analysis_frames)
         )
 
+        # Stage 2: Scene Understanding Layer
+        print(f"🧠 Performing Scene Understanding for {video_name}...")
+        analysis = perform_scene_understanding(analysis, video_path, context)
+
         os.makedirs(output_dir, exist_ok=True)
-        with open(output_path, 'w') as f:
+        with open(output_path, 'w', encoding='utf-8') as f:
             f.write(analysis.model_dump_json(indent=2))
 
         return analysis
