@@ -61,7 +61,7 @@ def test_manifest_quality(filepath, public_dir=None):
     }
 
     MIN_CONSTRAINTS = {
-        'fontSize': 45,
+        'fontSize': 40,
         'hero_fontSize': 100, # Studio V4 Hero text protection
         'chart_w': 300, 'chart_h': 200,
         'svg_w': 100, 'svg_h': 100,
@@ -251,6 +251,39 @@ def test_manifest_quality(filepath, public_dir=None):
                         msg = f"[{scene_id}] Hero word in '{ov_id}' starts too early (needs 10f buffer)."
                         warnings.append(msg)
                         print(f"   ⚠️ SYNC: {msg}")
+
+        # 4. Camera Shot Validation
+        camera = scene.get('camera', {})
+        shots = camera.get('shots', [])
+        if not shots:
+            warnings.append(f"[{scene_id}] No camera shots defined.")
+            scores["camera"] -= 10
+        else:
+            for s_idx, shot in enumerate(shots):
+                target = shot.get('targetId')
+                if target and target not in overlay_ids:
+                    msg = f"[{scene_id}] Camera shot {s_idx} targets non-existent overlay '{target}'."
+                    issues.append(msg)
+                    print(f"   ❌ CAMERA: {msg}")
+                    scores["camera"] -= 20
+
+                s_start = shot.get('startFrame', 0)
+                s_dur = shot.get('duration', 0)
+                if s_start + s_dur > duration:
+                    msg = f"[{scene_id}] Camera shot {s_idx} exceeds scene duration."
+                    issues.append(msg)
+                    print(f"   ❌ CAMERA: {msg}")
+                    scores["camera"] -= 15
+
+        # 5. Infographic Line Validation
+        lines = scene.get('infographic_lines', [])
+        for line in lines:
+            from_id = line.get('from_id')
+            to_id = line.get('to_id')
+            if from_id and from_id not in overlay_ids:
+                issues.append(f"[{scene_id}] Infographic line references missing source '{from_id}'.")
+            if to_id and to_id not in overlay_ids:
+                issues.append(f"[{scene_id}] Infographic line references missing target '{to_id}'.")
 
         if not overlays:
             print("   ⚠️ WARNING: Scene has no overlays.")

@@ -11,23 +11,22 @@ except (ImportError, ValueError):
 
 def estimate_camera_motion(video_path: str, sampled_frames: List[int]) -> CameraMotion:
     """
-    Estimate camera motion (pan, zoom, static) using Lucas-Kanade optical flow on sampled frames.
+    Enhanced camera motion estimation (pan, zoom, tilt, forward/backward) using OpenCV.
     """
     try:
         cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
+        if not cap.isOpened() or len(sampled_frames) < 2:
             return CameraMotion(type="unknown", confidence=0.0)
 
         motions = []
 
-        # Parameters for lucas kanade optical flow
-        lk_params = dict(winSize=(15, 15), maxLevel=2,
-                        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+        # Lucas-Kanade parameters
+        lk_params = dict(winSize=(21, 21), maxLevel=3,
+                        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01))
 
-        # Parameters for ShiTomasi corner detection
-        feature_params = dict(maxCorners=100, qualityLevel=0.3, minDistance=7, blockSize=7)
+        # Feature parameters
+        feature_params = dict(maxCorners=200, qualityLevel=0.01, minDistance=10, blockSize=7)
 
-        # Iterate through pairs of sampled frames
         for i in range(len(sampled_frames) - 1):
             idx1 = sampled_frames[i]
             idx2 = sampled_frames[i+1]
@@ -49,46 +48,52 @@ def estimate_camera_motion(video_path: str, sampled_frames: List[int]) -> Camera
 
             if p1 is None: continue
 
-            # Select good points
+            # Filter good points
             good_new = p1[st == 1]
             good_old = p0[st == 1]
 
-            if len(good_new) < 10: continue
+            if len(good_new) < 15: continue
 
-            # Calculate movement vectors
+            # Global vectors
             dx = good_new[:, 0] - good_old[:, 0]
             dy = good_new[:, 1] - good_old[:, 1]
 
-            # Median movement
             mdx = np.median(dx)
             mdy = np.median(dy)
 
-            # Detect zoom
-            # Zoom in: points move away from center
-            # Zoom out: points move towards center
+            # Center of the frame
             h, w = gray1.shape
             cx, cy = w/2, h/2
 
+            # Radial distance from center
             dist_old = np.sqrt((good_old[:, 0] - cx)**2 + (good_old[:, 1] - cy)**2)
             dist_new = np.sqrt((good_new[:, 0] - cx)**2 + (good_new[:, 1] - cy)**2)
 
-            # Use ratio to detect zoom
-            zoom_ratios = dist_new / dist_old
-            valid_ratios = zoom_ratios[dist_old > 10] # Avoid division by small numbers near center
-            zoom_factor = np.median(valid_ratios) if len(valid_ratios) > 0 else 1.0
+            # Filter points very close to center to avoid noise
+            valid_mask = dist_old > 20
+            if np.any(valid_mask):
+                # Zoom / Forward/Backward detection
+                # Average ratio of distances from center
+                ratios = dist_new[valid_mask] / dist_old[valid_mask]
+                zoom_factor = np.median(ratios)
 
-            if zoom_factor > 1.01: motions.append("zoom_in")
-            elif zoom_factor < 0.99: motions.append("zoom_out")
-            elif abs(mdx) > 3:
-                # Pixels move right (mdx > 0) -> Camera panned left
-                if mdx > 0: motions.append("pan_left")
-                else: motions.append("pan_right")
-            elif abs(mdy) > 3:
-                # Pixels move down (mdy > 0) -> Camera tilted up
-                if mdy > 0: motions.append("tilt_up")
-                else: motions.append("tilt_down")
-            else:
-                motions.append("static")
+                # Check for "Forward" vs "Zoom In"
+                # Forward (Dolly): Expansion from center, but often accompanied by parallax
+                # Zoom In: Uniform scaling
+                # For this Phase, we'll treat them similarly but try to distinguish by ratio variance
+
+                if zoom_factor > 1.015:
+                    motions.append("forward" if np.std(ratios) > 0.05 else "zoom_in")
+                elif zoom_factor < 0.985:
+                    motions.append("backward" if np.std(ratios) > 0.05 else "zoom_out")
+                elif abs(mdx) > 4:
+                    # Pixels move right -> Camera moves left
+                    motions.append("pan_left" if mdx > 0 else "pan_right")
+                elif abs(mdy) > 4:
+                    # Pixels move down -> Camera moves up
+                    motions.append("tilt_up" if mdy > 0 else "tilt_down")
+                else:
+                    motions.append("static")
 
         cap.release()
 
@@ -97,11 +102,13 @@ def estimate_camera_motion(video_path: str, sampled_frames: List[int]) -> Camera
 
         from collections import Counter
         most_common = Counter(motions).most_common(1)[0]
+        confidence = most_common[1] / len(motions)
 
-        return CameraMotion(
-            type=most_common[0],
-            confidence=most_common[1] / len(motions)
-        )
+        # Only return if we have decent confidence (> 50%)
+        if confidence > 0.5:
+            return CameraMotion(type=most_common[0], confidence=float(confidence))
+        else:
+            return CameraMotion(type="unknown", confidence=float(confidence))
 
     except Exception as e:
         print(f"⚠️ Camera motion error: {e}")

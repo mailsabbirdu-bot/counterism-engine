@@ -11,13 +11,12 @@ except (ImportError, ValueError):
 
 def analyze_composition(frames: List[AnalysisFrame], video_path: str) -> CompositionAnalysis:
     """
-    Analyze visual balance, negative space, and busy/clean scores.
+    Analyze visual balance, negative space, and horizon using edge/texture density and object distribution.
     """
     try:
         if not frames:
             return CompositionAnalysis()
 
-        # Use a middle frame for detailed image-based analysis
         mid_idx = len(frames) // 2
         frame_idx = frames[mid_idx].frame_index
 
@@ -32,43 +31,62 @@ def analyze_composition(frames: List[AnalysisFrame], video_path: str) -> Composi
         h, w = img.shape[:2]
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        # 1. Visual Balance (Left vs Right occupancy)
-        # Use objects from the selected frame
-        left_occ = 0
-        right_occ = 0
+        # 1. Visual Balance (Density of objects and edges)
+        left_side = gray[:, :w//2]
+        right_side = gray[:, w//2:]
+
+        left_edges = cv2.Canny(left_side, 100, 200)
+        right_edges = cv2.Canny(right_side, 100, 200)
+
+        l_density = np.mean(left_edges)
+        r_density = np.mean(right_edges)
+
+        # Factor in objects
+        l_obj_area = 0
+        r_obj_area = 0
         for obj in frames[mid_idx].objects:
             cx = obj.bbox.x + obj.bbox.width / 2
             area = obj.bbox.width * obj.bbox.height
-            if cx < w/2: left_occ += area
-            else: right_occ += area
+            if cx < w/2: l_obj_area += area
+            else: r_obj_area += area
 
-        if left_occ > right_occ * 1.5: visual_balance = "left_heavy"
-        elif right_occ > left_occ * 1.5: visual_balance = "right_heavy"
+        # Weighted score for balance
+        l_score = l_density + (l_obj_area / (w*h/2)) * 100
+        r_score = r_density + (r_obj_area / (w*h/2)) * 100
+
+        if l_score > r_score * 1.4: visual_balance = "left_heavy"
+        elif r_score > l_score * 1.4: visual_balance = "right_heavy"
         else: visual_balance = "balanced"
 
-        # 2. Negative Space
-        # Divide into 3 vertical strips
-        left_strip = clutter_score(gray[:, :w//3])
-        mid_strip = clutter_score(gray[:, w//3:2*w//3])
-        right_strip = clutter_score(gray[:, 2*w//3:])
+        # 2. Negative Space (Finding the 'clearest' region)
+        # Check 4 sectors
+        q1 = gray[:h//2, :w//2] # top-left
+        q2 = gray[:h//2, w//2:] # top-right
+        q3 = gray[h//2:, :w//2] # bottom-left
+        q4 = gray[h//2:, w//2:] # bottom-right
 
-        strips = [("left", left_strip), ("center", mid_strip), ("right", right_strip)]
-        strips.sort(key=lambda x: x[1]) # Sort by clutter ascending
-        negative_space = strips[0][0] # Strip with least clutter
+        densities = [
+            ("top_left", np.mean(cv2.Canny(q1, 100, 200))),
+            ("top_right", np.mean(cv2.Canny(q2, 100, 200))),
+            ("bottom_left", np.mean(cv2.Canny(q3, 100, 200))),
+            ("bottom_right", np.mean(cv2.Canny(q4, 100, 200)))
+        ]
+        densities.sort(key=lambda x: x[1])
+        negative_space = densities[0][0]
 
-        # 3. Horizon Estimation
-        # Check edge density in horizontal strips
-        top_h = clutter_score(gray[:h//3, :])
-        mid_h = clutter_score(gray[h//3:2*h//3, :])
-        bot_h = clutter_score(gray[2*h//3:, :])
+        # 3. Horizon Estimation (Looking for gradient changes or lines)
+        # Simple heuristic: density gradient
+        top_h = np.mean(cv2.Canny(gray[:h//3, :], 100, 200))
+        mid_h = np.mean(cv2.Canny(gray[h//3:2*h//3, :], 100, 200))
+        bot_h = np.mean(cv2.Canny(gray[2*h//3:, :], 100, 200))
 
-        if top_h < mid_h and top_h < bot_h: horizon = "upper_third"
-        elif bot_h < mid_h and bot_h < top_h: horizon = "lower_third"
+        if top_h < mid_h * 0.7: horizon = "upper_third" # Sky is usually clear
+        elif bot_h < mid_h * 0.7: horizon = "lower_third" # Ground is usually more textured, unless it's water
         else: horizon = "middle"
 
         # 4. Busy vs Clean Scores
-        busy = clutter_score(gray)
-        clean = 1.0 - busy
+        busy = min(1.0, np.mean(cv2.Canny(gray, 100, 200)) / 40.0) # 40.0 is a heuristic max density
+        clean = float(1.0 - busy)
 
         return CompositionAnalysis(
             visual_balance=visual_balance,
@@ -81,13 +99,3 @@ def analyze_composition(frames: List[AnalysisFrame], video_path: str) -> Composi
     except Exception as e:
         print(f"⚠️ Composition analysis error: {e}")
         return CompositionAnalysis()
-
-def clutter_score(img_gray: np.ndarray) -> float:
-    """
-    Calculate a clutter score based on edge density.
-    """
-    edges = cv2.Canny(img_gray, 100, 200)
-    density = np.mean(edges) / 255.0
-    # Normalize to a reasonable range
-    score = min(1.0, density * 5.0)
-    return score
