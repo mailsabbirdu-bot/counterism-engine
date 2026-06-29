@@ -83,23 +83,70 @@ class CinematicDecision(BaseModel):
     fallback_used: bool = False
 
 class SceneSummary(BaseModel):
-    # Phase 3 Production Fields
     hero_subject: Optional[Dict[str, Any]] = None
     secondary_subjects: List[Dict[str, Any]] = []
     text_position: Optional[CinematicDecision] = None
     camera_behavior: Optional[CinematicDecision] = None
     animation_style: Optional[CinematicDecision] = None
     overlay_strategy: Optional[str] = ""
-
-    # Legacy fields
     main_subject: Optional[str] = "unknown"
     selection_reason: Optional[str] = ""
     camera_motion: Optional[str] = "unknown"
     best_overlay_side: Optional[str] = "center"
     recommended_animation: Optional[str] = "fade_in"
 
+# --- AI COMPACT SUMMARY SCHEMA (PHASE 3.1) ---
+
+class AIHeroSubject(BaseModel):
+    type: str
+    position: str
+    size_ratio: float
+    importance: float
+    confidence: float
+    role: str = "primary subject"
+
+class AIShotSummary(BaseModel):
+    type: str
+    camera_height: str
+    camera_motion: str
+
+class AICompositionSummary(BaseModel):
+    balance: str
+    negative_space: str
+    horizon: str
+    busy_score: float
+
+class AISemanticContext(BaseModel):
+    crowd_density: float = 0.0
+    traffic_density: float = 0.0
+    greenery_level: float = 0.0
+    urban_density: float = 0.0
+    water_presence: bool = False
+    skyline_visibility: float = 0.0
+    pedestrian_flow: str = "static"
+    movement_intensity: str = "low"
+    construction_level: float = 0.0
+    weather: str = "clear"
+    time_of_day: str = "unknown"
+
+class AISummary(BaseModel):
+    scene_id: str
+    scene_type: str
+    environment: str
+    shot: AIShotSummary
+    composition: AICompositionSummary
+    hero_subject: Optional[AIHeroSubject] = None
+    secondary_subjects: List[str] = []
+    semantic_context: AISemanticContext = AISemanticContext()
+    camera_recommendation: Dict[str, str] = {}
+    text_region: Dict[str, str] = {}
+    visual_style: ColorAnalysis
+    semantic_description: str
+
+# --- END AI SCHEMA ---
+
 class SceneAnalysis(BaseModel):
-    version: str = "3.0"
+    version: str = "3.1"
     status: str
     scene_type: Optional[str] = "unknown"
     objects: List[DetectedObject] = []
@@ -107,10 +154,7 @@ class SceneAnalysis(BaseModel):
     frames: List[AnalysisFrame] = []
     total_frames: Optional[int] = 0
     sampled_frames: Optional[int] = 0
-
-    # New Phase 3 Specific Output
     main_subject: Optional[Dict[str, Any]] = None
-
     tracked_objects: List[TrackedObject] = []
     visual_subjects: List[SubjectRank] = []
     narrative_subjects: List[SubjectRank] = []
@@ -122,3 +166,4 @@ class SceneAnalysis(BaseModel):
     visual_style: ColorAnalysis = ColorAnalysis()
     motion: MotionAnalysis = MotionAnalysis()
     scene_summary: SceneSummary = SceneSummary()
+    ai_summary: Optional[AISummary] = None
