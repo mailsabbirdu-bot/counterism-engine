@@ -1,2 +1,5 @@
 playwright
 playwright-stealth
+pydantic
+opencv-python
+numpy

@@ -1,0 +1,193 @@
+{
+  "scenes": [
+    {
+      "scene_id": "SCENE_01",
+      "duration": 180,
+      "overlays": [
+        {
+          "id": "c1",
+          "type": "chart",
+          "chart_type": "glass_area",
+          "title": "Density",
+          "font": "Audiowide-Regular_english",
+          "start": 45,
+          "duration": 105,
+          "exitAnimation": "fade_out",
+          "parallax": 0.8,
+          "depth": 30,
+          "animation": "wordReveal",
+          "width": 400,
+          "height": 224,
+          "position": {
+            "x": 960,
+            "y": 795
+          }
+        },
+        {
+          "id": "t1",
+          "type": "text",
+          "content": "ঢাকা: মেগাসিটি",
+          "fontSize": "150px",
+          "font": "Sohid_bangla",
+          "maxWidth": 800,
+          "hero_config": {
+            "word": "মেগাসিটি",
+            "start": 45,
+            "color": "#FF3E6C",
+            "animation": "glow_pulse"
+          },
+          "color": "#00F5FF",
+          "start": 15,
+          "duration": 135,
+          "exitAnimation": "slide_down",
+          "parallax": 1.0,
+          "depth": 50,
+          "position": {
+            "x": 960,
+            "y": 540
+          }
+        }
+      ],
+      "duration_in_frames": 180,
+      "background_type": "procedural",
+      "procedural_config": {
+        "variant": "neon_grid"
+      },
+      "video_path": null,
+      "audio_enabled": true,
+      "transition": {
+        "type": "cinematicMatchCut",
+        "duration": 15
+      },
+      "beats": [
+        {
+          "frame": 45,
+          "event": "c1_reveal"
+        },
+        {
+          "frame": 15,
+          "event": "t1_reveal"
+        }
+      ],
+      "connections": [],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "t1",
+            "startFrame": 15,
+            "duration": 30,
+            "style": "cinematic_drift",
+            "zoom": 1.1,
+            "inDuration": 20,
+            "ease": "cubicOut"
+          },
+          {
+            "targetId": "c1",
+            "startFrame": 45,
+            "duration": 135,
+            "style": "slow_push",
+            "zoom": 1.1500000000000001,
+            "inDuration": 20,
+            "ease": "cubicOut"
+          }
+        ]
+      }
+    },
+    {
+      "scene_id": "SCENE_02",
+      "duration": 200,
+      "overlays": [
+        {
+          "id": "i1",
+          "type": "shadcn_indicator",
+          "indicator_type": "metric_tile",
+          "value": "20M",
+          "font": "Audiowide-Regular_english",
+          "start": 45,
+          "duration": 125,
+          "exitAnimation": "fade_out",
+          "parallax": 0.5,
+          "depth": 0,
+          "animation": "glassReveal",
+          "width": 350,
+          "height": 262,
+          "position": {
+            "x": 960,
+            "y": 795
+          }
+        },
+        {
+          "id": "t2",
+          "type": "text",
+          "content": "Population Growth",
+          "fontSize": "120px",
+          "font": "Audiowide-Regular_english",
+          "maxWidth": 800,
+          "hero_config": {
+            "word": "Population",
+            "start": 45,
+            "color": "#00FFAB",
+            "animation": "neon_flicker"
+          },
+          "color": "#FFD700",
+          "start": 15,
+          "duration": 155,
+          "exitAnimation": "slide_down",
+          "parallax": 1.0,
+          "depth": 50,
+          "position": {
+            "x": 960,
+            "y": 540
+          }
+        }
+      ],
+      "duration_in_frames": 200,
+      "background_type": "procedural",
+      "procedural_config": {
+        "variant": "neon_grid"
+      },
+      "video_path": null,
+      "audio_enabled": true,
+      "transition": {
+        "type": "cinematicMatchCut",
+        "duration": 15
+      },
+      "beats": [
+        {
+          "frame": 45,
+          "event": "i1_reveal"
+        },
+        {
+          "frame": 15,
+          "event": "t2_reveal"
+        }
+      ],
+      "connections": [],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "t2",
+            "startFrame": 15,
+            "duration": 30,
+            "style": "slow_push",
+            "zoom": 1.1,
+            "inDuration": 20,
+            "ease": "cubicOut"
+          },
+          {
+            "targetId": "i1",
+            "startFrame": 45,
+            "duration": 155,
+            "style": "pan_right",
+            "zoom": 1.1500000000000001,
+            "inDuration": 20,
+            "ease": "cubicOut"
+          }
+        ]
+      }
+    }
+  ],
+  "audio_sfx_manifest": []
+}

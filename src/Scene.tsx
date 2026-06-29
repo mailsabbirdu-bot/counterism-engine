@@ -1,5 +1,5 @@
-import React from 'react';
-import { AbsoluteFill, useVideoConfig } from 'remotion';
+import React, { useEffect, useState } from 'react';
+import { AbsoluteFill, useVideoConfig, OffthreadVideo } from 'remotion';
 import { OverlayManager } from './OverlayManager';
 import { ProceduralBackground } from './engines/ProceduralBackground';
 import { CameraEngine } from './engines/CameraEngine';
@@ -7,9 +7,18 @@ import { resolveAsset } from './lib/resolveAsset';
 import { AudioEngine } from './engines/AudioEngine';
 import { AnimationProvider } from '../svg/components/AnimationContext';
 import { InfographicComposer } from '../svg/components/InfographicComposer';
+import { loadAnalysis } from './services/AnalysisLoader';
+import { VisualEyeDebug } from './engines/VisualEyeDebug';
 
 export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
   const { durationInFrames } = useVideoConfig();
+  const [analysis, setAnalysis] = useState<any>(null);
+
+  useEffect(() => {
+    if (sceneData.background_type === 'video' && sceneData.video_path) {
+      loadAnalysis(sceneData.video_path).then(setAnalysis);
+    }
+  }, [sceneData.video_path, sceneData.background_type]);
 
   if (!sceneData) {
     return <AbsoluteFill className="bg-black" />;
@@ -56,11 +65,10 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
           backgroundLayer={renderBackground()}
         >
           <InfographicComposer sceneData={sceneData} />
-          <OverlayManager overlays={sceneData.overlays || []} />
+          <OverlayManager overlays={sceneData.overlays || []} analysis={analysis} />
+          {sceneData.visual_eye_debug && <VisualEyeDebug analysis={analysis} />}
         </CameraEngine>
       </AnimationProvider>
     </AbsoluteFill>
   );
 };
-
-import { OffthreadVideo } from 'remotion';
