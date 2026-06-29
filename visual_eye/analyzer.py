@@ -9,16 +9,24 @@ from pydantic import BaseModel
 try:
     from .schema import SceneAnalysis, AnalysisFrame, DetectedObject, SafeTextRegion
 except (ImportError, ValueError):
-    from schema import SceneAnalysis, AnalysisFrame, DetectedObject, SafeTextRegion
+    try:
+        from visual_eye.schema import SceneAnalysis, AnalysisFrame, DetectedObject, SafeTextRegion
+    except ImportError:
+        from schema import SceneAnalysis, AnalysisFrame, DetectedObject, SafeTextRegion
 
 try:
     from .detector import detect_objects, classify_scene
     from .safe_zone import detect_safe_text_regions
     from .fallback import get_empty_analysis
 except (ImportError, ValueError):
-    from detector import detect_objects, classify_scene
-    from safe_zone import detect_safe_text_regions
-    from fallback import get_empty_analysis
+    try:
+        from visual_eye.detector import detect_objects, classify_scene
+        from visual_eye.safe_zone import detect_safe_text_regions
+        from visual_eye.fallback import get_empty_analysis
+    except ImportError:
+        from detector import detect_objects, classify_scene
+        from safe_zone import detect_safe_text_regions
+        from fallback import get_empty_analysis
 
 def get_sampling_indices(total_frames: int) -> List[int]:
     """

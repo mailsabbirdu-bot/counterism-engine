@@ -24,6 +24,7 @@ OUTPUT_JSON = f"{DRIVE_BASE_PATH}/manifests/remotion_render.json"
 PROMPT_FILE = f"{DRIVE_BASE_PATH}/manifests/remotion_prompt.txt"
 TIMESTAMP_FILE = f"{DRIVE_BASE_PATH}/manifests/timestamp.txt"
 USER_DATA_DIR = f"{DRIVE_BASE_PATH}/browser_session"
+ANALYSIS_DIR = f"{DRIVE_BASE_PATH}/manifests/analysis"
 
 # 2. Setup
 print_banner("📂 MOUNTING GOOGLE DRIVE")
@@ -43,6 +44,7 @@ print_banner("🔗 LINKING DRIVE ASSETS")
 # Ensure public directories exist
 !mkdir -p public/renders
 !mkdir -p public/fonts
+!mkdir -p public/renders/analysis
 !rm -rf public/renders/audios
 !mkdir -p public/renders/audios
 
@@ -58,13 +60,9 @@ for drive_sfx in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/rende
 
 s_count = !ls public/renders/audios/ | wc -l
 print(f"📦 Successfully linked {s_count[0]} files to public/renders/audios/")
-if int(s_count[0]) > 0:
-    !ls -p public/renders/audios/ | head -n 20
 
 # 2. Background Videos
 print("\n🎬 --- SYNCING BACKGROUND VIDEOS ---")
-print(f"🔍 Searching for videos in: {DRIVE_BASE_PATH}/renders")
-# Use Python for robust syncing to avoid shell expansion issues
 import glob
 drive_renders = f"{DRIVE_BASE_PATH}/renders"
 if os.path.exists(drive_renders):
@@ -72,55 +70,50 @@ if os.path.exists(drive_renders):
         !ln -sf "{f}" public/renders/
 v_count = !ls public/renders/*.mp4 | wc -l
 print(f"✅ Successfully linked {v_count[0]} background videos to public/renders/")
-if int(v_count[0]) > 0:
-    !ls -lh public/renders/*.mp4
 
-# 3. Fonts
+# 3. Visual Eye Analysis
+print("\n👁️ --- SYNCING VISUAL ANALYSIS ---")
+os.makedirs(ANALYSIS_DIR, exist_ok=True)
+!ln -sf {ANALYSIS_DIR}/* public/renders/analysis/ 2>/dev/null
+a_count = !ls public/renders/analysis/*.json | wc -l
+print(f"✅ Successfully linked {a_count[0]} analysis files.")
+
+# 4. Fonts
 print("\n✍️ --- SYNCING FONTS ---")
-print(f"🔍 Searching for fonts in base path: {DRIVE_BASE_PATH}")
-if os.path.exists(f"{DRIVE_BASE_PATH}/fonts"):
-    !ln -sf {DRIVE_BASE_PATH}/fonts/* public/fonts/ 2>/dev/null
 !find {DRIVE_BASE_PATH} -maxdepth 5 -type f \( -iname "*.ttf" -o -iname "*.otf" -o -iname "*.woff" -o -iname "*.woff2" \) -exec ln -sf '{}' public/fonts/ ';' 2>/dev/null
-
-f_count = !ls public/fonts/ | wc -l
-print(f"✅ Successfully linked {f_count[0]} fonts to public/fonts/")
-if int(f_count[0]) > 0:
-    !ls -p public/fonts/
 
 print("\n✨ All Drive assets successfully linked to local public folder.")
 
-%cd remotion_jsonMaker
-
 print_banner("🛠️ INSTALLING PROJECT DEPENDENCIES")
-# Use -qq and -q to ignore verbose output
 !apt-get update -y -qq && apt-get install -y -qq ffmpeg build-essential
-!pip install -q -r requirements.txt
+!pip install -q -r remotion_jsonMaker/requirements.txt
 !playwright install chromium
 !playwright install-deps chromium
 
-# 3. Context Verification
-print_banner("📝 CONTEXT VERIFICATION")
-if os.path.exists(STORY_FILE):
-    print(f"✅ Found story file at: {STORY_FILE}")
+# 👁️ VISUAL EYE STAGE
+print_banner("👁️ VISUAL EYE: PERCEPTION STAGE")
+%cd {PROJECT_PATH}
+import glob
+videos = glob.glob("public/renders/*.mp4")
+if videos:
+    print(f"🚀 Analyzing {len(videos)} videos for production grounding...")
+    # Add project root to path for visual_eye imports
+    sys.path.append(PROJECT_PATH)
+    from visual_eye.analyzer import analyze_video
+    for v in videos:
+        analyze_video(v, "public/renders/analysis")
+    # Sync back to Drive
+    !cp -n public/renders/analysis/*.json {ANALYSIS_DIR}/ 2>/dev/null
+    print("✅ Analysis complete and synced to Drive.")
 else:
-    print(f"❌ FATAL: Story file NOT FOUND: {STORY_FILE}")
-    sys.exit("Input story file missing.")
+    print("⚠️ No videos found for analysis.")
+
+%cd remotion_jsonMaker
 
 # 4. Generate Master JSON
 print_banner("🧠 GEMINI BROWSER AUTOMATION")
-print("🚀 Using Playwright to interact with Gemini.")
-
-# Using external manifests from Drive (MANDATORY for Counterism Studio V4)
 FPS_UPDATE_FILE = f"{DRIVE_BASE_PATH}/manifests/fps_update.txt"
 
-# Ensure timestamp file is present
-if not os.path.exists(TIMESTAMP_FILE):
-    print(f"⚠️ WARNING: Timestamp file NOT FOUND at: {TIMESTAMP_FILE}")
-    print("Generation will proceed without precise sync, but it is highly recommended to provide it.")
-
-# Use --manual flag for reliable Gemini interaction
-# This will provide a "Copy Prompt" button.
-# IMPORTANT: We use %run instead of !python to allow rich HTML output in Colab.
 %run generator.py \
     --story-file="{STORY_FILE}" \
     --output="{OUTPUT_JSON}" \
@@ -129,12 +122,8 @@ if not os.path.exists(TIMESTAMP_FILE):
     --prompt-output="{PROMPT_FILE}" \
     --drive-prompt="{PROJECT_PATH}/guideline_prompt.txt" \
     --user-data-dir="{USER_DATA_DIR}" \
-    --public-dir="/content/engine/public" \
+    --public-dir="{PROJECT_PATH}/public" \
     --manual
 
 print_banner("🏁 PROCESS FINISHED")
-if os.path.exists(OUTPUT_JSON):
-    print(f"✅ Master manifest saved to: {OUTPUT_JSON}")
-else:
-    print(f"❌ ERROR: Output JSON was not created.")
 ```

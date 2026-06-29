@@ -21,6 +21,7 @@ class RemotionJsonMaker:
         self.context = None
         self.page = None
         self.fps_cache = {}
+        self.visual_analysis = {}
         self.bangla_fonts = []
         self.english_fonts = []
         self.in_files = []
@@ -51,6 +52,19 @@ class RemotionJsonMaker:
             print(f"✅ Successfully cached {count} durations.")
         except Exception as e:
             print(f"⚠️ Error loading FPS update file: {e}")
+
+    def load_visual_analysis(self, public_dir: str):
+        analysis_dir = os.path.join(public_dir, "renders/analysis")
+        if not os.path.exists(analysis_dir): return
+
+        print(f"👁️ Loading Visual Eye analysis from: {analysis_dir}")
+        for f in os.listdir(analysis_dir):
+            if f.endswith("_analysis.json"):
+                v_name = f.replace("_analysis.json", ".mp4")
+                try:
+                    with open(os.path.join(analysis_dir, f), 'r') as jf:
+                        self.visual_analysis[v_name] = json.load(jf)
+                except: pass
 
     def start_browser(self):
         if self.page: return
@@ -104,6 +118,7 @@ class RemotionJsonMaker:
 
         video_dir = os.path.join(abs_public, "renders")
         self.video_files = sorted([f for f in os.listdir(video_dir) if f.lower().endswith('.mp4')]) if os.path.exists(video_dir) else []
+        self.load_visual_analysis(abs_public)
 
     def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
         """Hardens layout, timing, camera, and assets with Geometry-Aware Logic and Adaptive Scaling."""
@@ -587,9 +602,20 @@ class RemotionJsonMaker:
                     drive_guideline = f"\n--- DIRECTOR'S GUIDELINES ---\n{f.read()}\n"
             except: pass
 
+        visual_context = ""
+        if self.visual_analysis:
+            visual_context = "\n--- VISUAL PERCEPTION DATA (PRODUCTION GROUNDING) ---\n"
+            for v_name, analysis in self.visual_analysis.items():
+                s_id = v_name.replace("scene_SC_", "SCENE_").replace(".mp4", "")
+                v_type = analysis.get("scene_type", "unknown")
+                v_objs = [o["type"] for o in analysis.get("objects", [])]
+                v_regions = len(analysis.get("safe_text_regions", []))
+                visual_context += f"- {s_id}: Type={v_type}, Detected={v_objs}, SafeZones={v_regions}\n"
+
         full_prompt = (
             f"TASK: GENERATE AN EXPERT DOCUMENTARY MOTION GRAPHICS MANIFEST FOR {len(self.story_scenes)} SCENES.\n"
             f"STORY: {story}\nTIMESTAMPS: {compact_ts}\nDURATIONS: {duration_context}\n"
+            f"{visual_context}"
             f"{drive_guideline}"
             "SYSTEM: WORLD-CLASS CINEMATIC MOTION DESIGNER (Vox/Polymatter/Johnny Harris/Kurzgesagt style).\n"
             "DIRECTOR'S RULES (STRICT COMPLIANCE REQUIRED):\n"
