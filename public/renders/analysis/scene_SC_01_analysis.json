@@ -9,112 +9,128 @@
       "y": 20.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 500.0,
       "y": 20.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 980.0,
       "y": 20.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 1460.0,
       "y": 20.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 20.0,
       "y": 290.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 500.0,
       "y": 290.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 980.0,
       "y": 290.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 1460.0,
       "y": 290.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 20.0,
       "y": 560.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 500.0,
       "y": 560.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 980.0,
       "y": 560.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 1460.0,
       "y": 560.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 20.0,
       "y": 830.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 500.0,
       "y": 830.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 980.0,
       "y": 830.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     },
     {
       "x": 1460.0,
       "y": 830.0,
       "width": 440.0,
       "height": 230.0,
-      "confidence": 1.0
+      "confidence": 1.0,
+      "avoid_subject": true
     }
   ],
   "frames": [
@@ -127,112 +143,128 @@
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         }
       ]
     },
@@ -245,112 +277,128 @@
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         }
       ]
     },
@@ -363,112 +411,128 @@
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         }
       ]
     },
@@ -481,112 +545,128 @@
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         }
       ]
     },
@@ -599,129 +679,146 @@
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 20.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 290.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 560.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 20.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 500.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 980.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         },
         {
           "x": 1460.0,
           "y": 830.0,
           "width": 440.0,
           "height": 230.0,
-          "confidence": 1.0
+          "confidence": 1.0,
+          "avoid_subject": true
         }
       ]
     }
   ],
   "total_frames": 125,
   "sampled_frames": 5,
+  "main_subject": null,
   "tracked_objects": [],
   "visual_subjects": [],
   "narrative_subjects": [],
   "main_subjects": [],
   "camera_motion": {
-    "type": "unknown",
+    "type": "static_or_unknown",
     "confidence": 0.0
   },
   "shot_analysis": {
     "shot_type": "wide",
-    "camera_height": "normal",
+    "camera_height": "eye_level",
     "environment": "urban",
     "complexity": "low"
   },
@@ -733,11 +830,12 @@
     "clean_score": 1.0
   },
   "recommended_text_region": {
-    "x": 20.0,
-    "y": 20.0,
-    "width": 440.0,
-    "height": 230.0,
+    "x": 50.0,
+    "y": 50.0,
+    "width": 1820.0,
+    "height": 980.0,
     "confidence": 1.0,
+    "avoid_subject": true,
     "stability": 1.0
   },
   "visual_style": {
@@ -754,10 +852,28 @@
     "score": 0.06
   },
   "scene_summary": {
-    "main_subject": "unknown",
-    "selection_reason": "No distinct subject identified",
-    "camera_motion": "unknown",
-    "best_overlay_side": "left",
-    "recommended_animation": "fade_in"
+    "hero_subject": null,
+    "secondary_subjects": [],
+    "text_position": {
+      "decision": "place_text_top_left",
+      "confidence": 1.0,
+      "fallback_used": false
+    },
+    "camera_behavior": {
+      "decision": "static_or_unknown",
+      "confidence": 0.0,
+      "fallback_used": false
+    },
+    "animation_style": {
+      "decision": "slow_fade",
+      "confidence": 0.8,
+      "fallback_used": false
+    },
+    "overlay_strategy": "The primary environment subject occupies the balanced of the frame while the top left contains negative space suitable for documentary typography.",
+    "main_subject": "environment",
+    "selection_reason": "The primary environment subject occupies the balanced of the frame while the top left contains negative space suitable for documentary typography.",
+    "camera_motion": "static_or_unknown",
+    "best_overlay_side": "top_left",
+    "recommended_animation": "slow_fade"
   }
 }

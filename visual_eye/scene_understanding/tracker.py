@@ -1,5 +1,5 @@
 import math
-from typing import List
+from typing import List, Dict, Any
 try:
     from ..schema import AnalysisFrame, TrackedObject, BBox
 except (ImportError, ValueError):
@@ -26,42 +26,52 @@ def calculate_centroid_dist(boxA, boxB):
 
 def track_objects(frames: List[AnalysisFrame]) -> List[TrackedObject]:
     """
-    Enhanced lightweight IoU + Centroid tracking across sampled frames.
+    Production-grade object association and track merging.
+    Implement IoU + Centroid matching with temporal consistency.
     """
     try:
-        tracks = {}
+        if not frames:
+            return []
+
+        tracks = {} # track_id -> info
         next_track_id = 1
+        total_sampled = len(frames)
 
         for frame in frames:
-            current_objects = frame.objects
+            # Step 1: Association
             used_tracks = set()
-
-            # Sort current objects by area (process larger objects first)
-            sorted_objs = sorted(current_objects, key=lambda o: o.bbox.width * o.bbox.height, reverse=True)
+            sorted_objs = sorted(frame.objects, key=lambda o: o.bbox.width * o.bbox.height, reverse=True)
 
             for obj in sorted_objs:
+                # Confidence Gate: Ignore low-confidence detections
+                if obj.confidence < 0.45:
+                    # Check for persistence exception handled at final results stage
+                    pass
+
                 best_match_id = None
                 best_score = 0
 
-                for track_id, track_info in tracks.items():
-                    if track_id in used_tracks: continue
-                    if track_info['type'] != obj.type: continue
+                for tid, tinfo in tracks.items():
+                    if tid in used_tracks: continue
+                    if tinfo['type'] != obj.type: continue
 
-                    last_seen = track_info['history'][-1]
-                    # Don't match if the track hasn't been seen in a long time (max 10 sampled frames jump)
-                    # However, since we sample few frames, we allow more flexibility
+                    last_seen = tinfo['history'][-1]
+                    gap = frame.frame_index - last_seen['frame_index']
+                    if gap > 60: continue
 
                     iou = calculate_iou(last_seen['bbox'], obj.bbox)
                     dist = calculate_centroid_dist(last_seen['bbox'], obj.bbox)
 
-                    # Score combines IoU and normalized centroid distance
-                    # 1920x1080 screen diagonal is ~2200
-                    norm_dist = max(0, 1.0 - (dist / 500.0))
-                    score = (iou * 0.7) + (norm_dist * 0.3)
+                    size_a = last_seen['bbox'].width * last_seen['bbox'].height
+                    size_b = obj.bbox.width * obj.bbox.height
+                    size_sim = min(size_a, size_b) / max(size_a, size_b) if max(size_a, size_b) > 0 else 0
 
-                    if score > 0.4 and score > best_score:
+                    norm_dist = max(0, 1.0 - (dist / 400.0))
+                    score = (iou * 0.5) + (norm_dist * 0.3) + (size_sim * 0.2)
+
+                    if score > 0.35 and score > best_score:
                         best_score = score
-                        best_match_id = track_id
+                        best_match_id = tid
 
                 if best_match_id:
                     tracks[best_match_id]['history'].append({
@@ -82,10 +92,51 @@ def track_objects(frames: List[AnalysisFrame]) -> List[TrackedObject]:
                     }
                     next_track_id += 1
 
-        tracked_results = []
-        for track_id, info in tracks.items():
+        # Step 2: Track Merging
+        merged_tracks = {}
+        all_ids = list(tracks.keys())
+        merged_ids = set()
+
+        for i in range(len(all_ids)):
+            id1 = all_ids[i]
+            if id1 in merged_ids: continue
+
+            t1 = tracks[id1]
+            base_track = t1
+
+            for j in range(i + 1, len(all_ids)):
+                id2 = all_ids[j]
+                if id2 in merged_ids: continue
+
+                t2 = tracks[id2]
+                if t1['type'] != t2['type']: continue
+
+                start1, end1 = t1['history'][0]['frame_index'], t1['history'][-1]['frame_index']
+                start2, end2 = t2['history'][0]['frame_index'], t2['history'][-1]['frame_index']
+
+                if max(start1, start2) <= min(end1, end2): continue
+
+                if end1 < start2: box1, box2 = t1['history'][-1]['bbox'], t2['history'][0]['bbox']
+                else: box1, box2 = t2['history'][-1]['bbox'], t1['history'][0]['bbox']
+
+                dist = calculate_centroid_dist(box1, box2)
+                if dist < 300:
+                    base_track['history'].extend(t2['history'])
+                    base_track['history'].sort(key=lambda x: x['frame_index'])
+                    merged_ids.add(id2)
+
+            merged_tracks[id1] = base_track
+
+        # Step 3: Final Filtering and TrackedObject creation
+        final_results = []
+        for tid, info in merged_tracks.items():
             history = info['history']
             avg_conf = sum(h['confidence'] for h in history) / len(history)
+            persistence = len(history) / float(total_sampled)
+
+            # THE CONFIDENCE GATE
+            if avg_conf < 0.45 and persistence <= 0.7:
+                continue
 
             avg_x = sum(h['bbox'].x for h in history) / len(history)
             avg_y = sum(h['bbox'].y for h in history) / len(history)
@@ -93,11 +144,11 @@ def track_objects(frames: List[AnalysisFrame]) -> List[TrackedObject]:
             avg_h = sum(h['bbox'].height for h in history) / len(history)
 
             movement = 0
-            for i in range(1, len(history)):
-                movement += calculate_centroid_dist(history[i-1]['bbox'], history[i]['bbox'])
+            for k in range(1, len(history)):
+                movement += calculate_centroid_dist(history[k-1]['bbox'], history[k]['bbox'])
 
-            tracked_results.append(TrackedObject(
-                track_id=track_id,
+            final_results.append(TrackedObject(
+                track_id=tid,
                 type=info['type'],
                 first_frame=history[0]['frame_index'],
                 last_frame=history[-1]['frame_index'],
@@ -107,7 +158,7 @@ def track_objects(frames: List[AnalysisFrame]) -> List[TrackedObject]:
                 movement_distance=float(movement)
             ))
 
-        return tracked_results
+        return final_results
     except Exception as e:
-        print(f"⚠️ Tracking error: {e}")
+        print(f"⚠️ Tracker Error: {e}")
         return []

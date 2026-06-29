@@ -10,7 +10,7 @@ except (ImportError, ValueError):
 
 def rank_narrative_subjects(tracks: List[TrackedObject], context: Optional[Dict[str, Any]] = None) -> List[SubjectRank]:
     """
-    Rank objects based on narrative context (script, keywords).
+    Ranks tracked objects based on story context and narration keywords.
     """
     try:
         if not tracks:
@@ -20,57 +20,42 @@ def rank_narrative_subjects(tracks: List[TrackedObject], context: Optional[Dict[
         title = str(context.get('title', '')).lower() if context else ""
         keywords = [k.lower() for k in context.get('keywords', [])] if context else []
 
-        # Comprehensive Keyword mapping for common classes
+        # Production narrative map
         NARRATIVE_MAP = {
-            'building': ['concrete', 'house', 'empire', 'skyscraper', 'apartment', 'wall', 'brick', 'infrastructure', 'home', 'structure', 'construction'],
-            'person': ['man', 'woman', 'people', 'crowd', 'human', 'worker', 'citizen', 'child', 'audience', 'individual'],
-            'car': ['traffic', 'vehicle', 'road', 'street', 'transport', 'highway', 'commute', 'driver', 'motor', 'automobile'],
-            'truck': ['logistics', 'delivery', 'freight', 'transport', 'cargo', 'supply'],
-            'bus': ['transit', 'public transport', 'shuttle', 'commuter'],
-            'tree': ['nature', 'forest', 'green', 'leaf', 'garden', 'park', 'environment', 'ecology', 'plants'],
-            'water': ['river', 'lake', 'sea', 'ocean', 'boat', 'ship', 'sink', 'flood', 'marine', 'liquid'],
-            'bridge': ['span', 'connection', 'crossing', 'viaduct', 'overpass'],
-            'mosque': ['religion', 'prayer', 'sacred', 'architecture', 'faith', 'temple', 'church'],
-            'train': ['rail', 'subway', 'metro', 'station', 'platform', 'locomotive']
+            'building': ['skyscraper', 'architecture', 'concrete', 'city', 'office', 'house', 'empire', 'construction'],
+            'person': ['man', 'woman', 'people', 'human', 'worker', 'citizen', 'child', 'individual', 'crowd'],
+            'bridge': ['crossing', 'connection', 'viaduct', 'river', 'overpass'],
+            'river': ['water', 'flow', 'boat', 'nature', 'delta', 'sea'],
+            'mosque': ['prayer', 'religious', 'sacred', 'dome', 'faith', 'temple'],
+            'train': ['metro', 'rail', 'transit', 'station', 'transport', 'commute']
         }
 
         ranked = []
         for track in tracks:
             o_type = track.type.lower()
-            score = 0.0
+            n_score = 0.0
 
-            # 1. Exact match in script/title/keywords
-            if o_type in script: score += 0.5
-            if o_type in title: score += 0.4
-            if o_type in keywords: score += 0.6
+            # Exact matches
+            if o_type in script: n_score += 0.5
+            if o_type in title: n_score += 0.4
 
-            # 2. Semantic mapping match
-            relevant_words = NARRATIVE_MAP.get(o_type, [])
-            for word in relevant_words:
-                if word in script: score += 0.35
-                if word in title: score += 0.2
-                if word in keywords: score += 0.4
+            # Contextual matches
+            relevant = NARRATIVE_MAP.get(o_type, [])
+            for word in relevant:
+                if word in script: n_score += 0.3
+                if word in keywords: n_score += 0.2
 
-            # 3. Frequency boost
-            # Clean script for counting
-            clean_script = re.sub(r'[^\w\s]', '', script)
-            words_in_script = clean_script.split()
-            count = words_in_script.count(o_type)
-            for w in relevant_words:
-                count += words_in_script.count(w)
-
-            score += min(0.4, count * 0.1)
-
-            narrative_importance = float(min(1.0, score))
+            # Normalize and cap
+            final_n = min(1.0, n_score)
 
             ranked.append(SubjectRank(
                 track_id=track.track_id,
                 type=track.type,
-                narrative_importance=narrative_importance
+                narrative_importance=float(final_n)
             ))
 
         ranked.sort(key=lambda x: x.narrative_importance, reverse=True)
         return ranked
     except Exception as e:
-        print(f"⚠️ Narrative ranking error: {e}")
+        print(f"⚠️ Narrative Ranker Error: {e}")
         return []
