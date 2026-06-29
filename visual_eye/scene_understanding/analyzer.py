@@ -79,12 +79,34 @@ def perform_scene_understanding(analysis: SceneAnalysis, video_path: str, contex
         analysis.visual_subjects = analysis.main_subjects
     except: pass
 
+    # Hero selection logic
+    hero = None
     if analysis.main_subjects:
         best = analysis.main_subjects[0]
-        analysis.main_subject = {
-            "track_id": best.track_id, "type": best.type,
-            "confidence": best.confidence, "importance_score": best.final_importance
-        }
+        # Environment Dominance Check
+        scene_type = str(analysis.scene_type).lower()
+        script = str(context.get('script', '')).lower() if context else ""
+
+        # Determine if environment should be hero
+        env_hero_type = None
+        if "highway" in scene_type: env_hero_type = "traffic_scene"
+        elif "aerial" in scene_type or "skyline" in scene_type: env_hero_type = "urban_density"
+        elif any(kw in scene_type for kw in ["forest", "mountain", "nature", "landscape"]): env_hero_type = "landscape"
+        elif "crowd" in scene_type or "pedestrian" in scene_type: env_hero_type = "human_activity"
+
+        # If env hero detected AND (no visual hero is strong OR narrative focus is on env)
+        if env_hero_type and (best.final_importance < 0.6 or env_hero_type in script):
+            analysis.main_subject = {
+                "track_id": "environment",
+                "type": env_hero_type,
+                "confidence": 1.0,
+                "importance_score": 0.9
+            }
+        else:
+            analysis.main_subject = {
+                "track_id": best.track_id, "type": best.type,
+                "confidence": best.confidence, "importance_score": best.final_importance
+            }
 
     # 3. Decision Layer
     try: analysis.shot_analysis = classify_shot(frames, analysis.composition, analysis.scene_type)
@@ -99,7 +121,7 @@ def perform_scene_understanding(analysis: SceneAnalysis, video_path: str, contex
     try: analysis.scene_summary = generate_cinematic_summary(analysis)
     except: pass
 
-    # 4. Phase 3.1: AI Summary Generation
+    # 4. AI Summary Generation
     try: analysis.ai_summary = generate_ai_summary(analysis, context)
     except Exception as e:
         print(f"⚠️ AI Summary Generation Error: {e}")
@@ -153,19 +175,11 @@ def generate_cinematic_summary(analysis: SceneAnalysis) -> SceneSummary:
     )
 
 def generate_ai_summary(analysis: SceneAnalysis, context: Optional[Dict[str, Any]] = None) -> AISummary:
-    """
-    Produces a compact semantic summary for LLM prompting.
-    Converts tracking and motion data into qualitative descriptions.
-    """
-    # 1. Subject metrics
     types = [t.type for t in analysis.tracked_objects]
     avg_area = sum(t.average_bbox.width * t.average_bbox.height for t in analysis.tracked_objects) / (1920*1080) if analysis.tracked_objects else 0
-
-    # Semantic heuristics
     has_water = any(kw in analysis.scene_type.lower() for kw in ['river', 'ocean', 'coast', 'water']) or 'boat' in types
     is_night = analysis.visual_style.brightness < 0.35
 
-    # Qualitative flow and intensity
     p_flow = "static"
     if analysis.motion.score > 0.6: p_flow = "moving rapidly"
     elif analysis.motion.score > 0.2: p_flow = "moving across frame"
@@ -183,39 +197,46 @@ def generate_ai_summary(analysis: SceneAnalysis, context: Optional[Dict[str, Any
         time_of_day="night" if is_night else "day"
     )
 
-    # 2. Hero Subject
     hero = None
-    if analysis.main_subjects:
-        best = analysis.main_subjects[0]
-        t_info = next((t for t in analysis.tracked_objects if t.track_id == best.track_id), None)
+    if analysis.main_subject:
+        best = analysis.main_subject
         pos = "center"
         role = "primary subject"
-        if t_info:
-            cx = t_info.average_bbox.x + t_info.average_bbox.width/2
-            if cx < 640: pos = "left"
-            elif cx > 1280: pos = "right"
-            if t_info.average_bbox.width * t_info.average_bbox.height / (1920*1080) < 0.05:
-                role = "background subject"
+        if best['track_id'] != "environment":
+            t_info = next((t for t in analysis.tracked_objects if t.track_id == best['track_id']), None)
+            if t_info:
+                cx = t_info.average_bbox.x + t_info.average_bbox.width/2
+                if cx < 640: pos = "left"
+                elif cx > 1280: pos = "right"
+                if (t_info.average_bbox.width * t_info.average_bbox.height) / (1920*1080) < 0.05:
+                    role = "background subject"
+        else:
+            role = "environmental focus"
 
         hero = AIHeroSubject(
-            type=best.type,
+            type=best['type'],
             position=pos,
-            size_ratio=float(avg_area) if t_info else 0.0,
-            importance=best.final_importance,
-            confidence=best.confidence,
+            size_ratio=float(avg_area),
+            importance=best['importance_score'],
+            confidence=best['confidence'],
             role=role
         )
 
-    # 3. Decision mappings
     tx_pos = analysis.scene_summary.text_position.decision.replace('place_text_', '')
+    # Ensure preferred text region is strictly derived from high-confidence organic safe zones
+    if analysis.recommended_text_region.confidence > 0.7:
+        rx, ry = analysis.recommended_text_region.x, analysis.recommended_text_region.y
+        if rx < 640: tx_pos = "left"
+        elif rx > 1280: tx_pos = "right"
+        if ry < 360: tx_pos = f"top_{tx_pos}"
+        elif ry > 720: tx_pos = f"bottom_{tx_pos}"
+
     secondaries = list(set([s.type for s in analysis.main_subjects[1:5]]))
 
-    # 4. Natural Language Description
     shot_desc = f"{analysis.shot_analysis.shot_type.capitalize()} {analysis.shot_analysis.camera_height} shot"
     scene_desc = f"of {analysis.scene_type.replace('_', ' ')}"
     layout_desc = f"The primary focus is on the {hero.type if hero else 'environment'} on the {hero.position if hero else 'center'}."
     graphics_desc = f"The {analysis.composition.negative_space.replace('_', ' ')} provides clean negative space for typography."
-
     full_desc = f"{shot_desc} {scene_desc}. {layout_desc} {graphics_desc}"
 
     return AISummary(

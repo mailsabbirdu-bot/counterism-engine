@@ -7,7 +7,7 @@ import time
 import subprocess
 import shutil
 import math
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Tuple
 from playwright.sync_api import sync_playwright
 import playwright_stealth
 
@@ -127,76 +127,44 @@ class RemotionJsonMaker:
         abs_public = os.path.abspath(public_dir)
         print(f"🛠️ HARDENING ENGINE: Resolving spatial collisions and cinematic timing...")
 
-        # Studio V4 Hardened Sizes (Standard Broadcast Aspect Ratios)
         TYPE_SIZES = {
-            'text': (800, 200),
-            'chart': (1000, 562), 'shadcn_chart': (1000, 562), # 16:9
-            'ui_panel': (800, 600), # 4:3
-            'data_indicator': (500, 375), 'shadcn_indicator': (500, 375), # 4:3
+            'text': (800, 200), 'chart': (1000, 562), 'shadcn_chart': (1000, 562),
+            'ui_panel': (800, 600), 'data_indicator': (500, 375), 'shadcn_indicator': (500, 375),
             'svg': (400, 400), 'kpi': (450, 400), 'kpi_card': (450, 400),
-            'timeline': (1200, 300),
-            'hub_network': (800, 800), 'flow_diagram': (1000, 562), 'process': (1000, 562),
-            'media': (960, 540), 'image': (960, 540), 'video': (960, 540), # 16:9
-            'label': (300, 100), 'callout': (400, 200),
-            'compositions': (1200, 675), 'groups': (1200, 675), # 16:9
-            'graph': (1000, 700), 'shape': (400, 400),
-            'data_emphasis': (600, 200), 'ambient_graphic': (1920, 1080),
+            'timeline': (1200, 300), 'hub_network': (800, 800), 'flow_diagram': (1000, 562), 'process': (1000, 562),
+            'media': (960, 540), 'image': (960, 540), 'video': (960, 540),
+            'label': (300, 100), 'callout': (400, 200), 'compositions': (1200, 675), 'groups': (1200, 675),
+            'graph': (1000, 700), 'shape': (400, 400), 'data_emphasis': (600, 200), 'ambient_graphic': (1920, 1080),
             'connector': (400, 100)
         }
 
-        # Cinematic Animations pool
         SEMANTIC_ANIMS = ["wordReveal", "glassReveal", "networkGrow", "barsRise", "cinematicGlow", "fadeScale", "parallaxDrift", "maskReveal", "lineDraw", "particleAssembly", "blurFocus", "svgMorph", "depthZoom"]
-
-        # Hard Constraints (Synced with QA MIN_CONSTRAINTS)
         MIN_FONT_SIZE = 40
         MIN_CHART_W, MIN_CHART_H = 300, 200
         MIN_SVG_W, MIN_SVG_H = 100, 100
         MIN_SPACING = 30
-
-        LAYOUT_PRESETS = ["SPLIT_SCREEN", "RULE_OF_THIRDS", "HERO_FOCAL", "TOP_TITLE_LOWER_VIS"]
-        # Studio V4 Cohesive Documentary Palette (Vox/Polymatter Style)
-        DOC_COLORS = {
-            "primary": "#00F5FF", # Cyan
-            "amber": "#FFD700",   # Warning/Emphasis
-            "alert": "#FF3E6C",   # Critical
-            "success": "#00FFAB", # Positive
-            "neutral": "#F8FAFC"  # UI/Text
-        }
-        MODERN_COLORS = [DOC_COLORS["primary"], DOC_COLORS["amber"], DOC_COLORS["alert"], DOC_COLORS["success"]]
-
+        MODERN_COLORS = ["#00F5FF", "#FFD700", "#FF3E6C", "#00FFAB"]
         VALID_TEXT_ANIMS = ["glow_pulse", "neon_flicker", "glitch_pop", "bounce_pop", "word_by_word", "slide_up", "typewriter"]
+        LOCKED_FIELDS = ["content", "hero_config"]
 
-        # Ultra-High End 9-Sector Anchors (1920x1080)
-        # Studio V4 Hardened Cinematic Anchors
         ANCHORS = {
             "L_TOP": (550, 320), "C_TOP": (960, 320), "R_TOP": (1370, 320),
             "L_MID": (550, 540), "C_MID": (960, 540), "R_MID": (1370, 540),
             "L_BOT": (550, 760), "C_BOT": (960, 760), "R_BOT": (1370, 760)
         }
 
-        # Hard boundaries for strict clamping (QA 150px safe zone)
         CLAMP_MIN_X, CLAMP_MAX_X = 150, 1770
         CLAMP_MIN_Y, CLAMP_MAX_Y = 150, 930
 
         PRIORITY = {
-            'hero': 1000,
-            'text': 100,
-            'hub_network': 90, 'flow_diagram': 90, 'process': 90,
-            'chart': 80, 'shadcn_chart': 80, 'kpi_card': 80,
-            'timeline': 75,
-            'ui_panel': 60,
-            'compositions': 55, 'groups': 55,
-            'data_indicator': 50, 'shadcn_indicator': 50,
-            'label': 45, 'callout': 45,
-            'svg': 40,
-            'kpi': 40,
-            'graph': 30,
-            'shape': 10,
-            'background': 0
+            'hero': 1000, 'text': 100, 'hub_network': 90, 'flow_diagram': 90, 'process': 90,
+            'chart': 80, 'shadcn_chart': 80, 'kpi_card': 80, 'timeline': 75, 'ui_panel': 60,
+            'compositions': 55, 'groups': 55, 'data_indicator': 50, 'shadcn_indicator': 50,
+            'label': 45, 'callout': 45, 'svg': 40, 'kpi': 40, 'graph': 30, 'shape': 10, 'background': 0
         }
 
         sfx_manifest = []
-        in_ptr, out_ptr, cam_ptr = 0, 0, 0
+        in_ptr = 0
 
         for scene_idx, scene in enumerate(data['scenes']):
             s_id = scene.get('scene_id', f"SCENE_{scene_idx+1}")
@@ -225,10 +193,7 @@ class RemotionJsonMaker:
             filename = os.path.basename(str(scene.get('video_path', '')))
             if filename in self.fps_cache: scene_duration = self.fps_cache[filename]
             scene['duration_in_frames'] = scene_duration
-
-            # Preserve AI audio intent, default to True if not specified
-            if 'audio_enabled' not in scene:
-                scene['audio_enabled'] = True
+            if 'audio_enabled' not in scene: scene['audio_enabled'] = True
 
             pattern = f"SC_{id_num:02d}".lower()
             narration_file = next((f for f in self.narration_files if pattern in f.lower()), None)
@@ -245,17 +210,10 @@ class RemotionJsonMaker:
             is_scene_bangla = self._is_bangla(self.story_scenes.get(s_id, ""))
 
             raw_overlays = scene['overlays'] if isinstance(scene['overlays'], list) else [scene['overlays']]
-            processed_raw = []
-
-            # Progressive Information Staging: Semantic pass
             for ov in raw_overlays:
-                processed_raw.append(ov)
-
-            for ov in processed_raw:
                 o_type = str(ov.get('type', 'text')).lower()
                 if 'chart_type' in ov: o_type = 'shadcn_chart'
                 if 'indicator_type' in ov: o_type = 'shadcn_indicator'
-
                 if o_type == 'text':
                     if text_count >= 3: continue
                     text_count += 1
@@ -273,12 +231,9 @@ class RemotionJsonMaker:
                     svg_count += 1
 
                 if not ov.get('id'): ov['id'] = f"ov_{id_num}_{len(valid_overlays)+1}"
-
                 ai_font = ov.get('font')
                 all_scanned_fonts = self.bangla_fonts + self.english_fonts
-
-                if ai_font and ai_font in all_scanned_fonts:
-                    pass # Keep AI font
+                if ai_font and ai_font in all_scanned_fonts: pass
                 elif (self._is_bangla(str(ov.get('content', ''))) or is_scene_bangla) and self.bangla_fonts:
                     ov['font'] = "Sohid_bangla" if "Sohid_bangla" in self.bangla_fonts else self.bangla_fonts[0]
                 elif not ov.get('font') or ov.get('font') not in all_scanned_fonts:
@@ -289,233 +244,130 @@ class RemotionJsonMaker:
                     if not ov.get('hero_config'):
                         hero = self._get_scene_hero_word(s_id, ov['content'], scene_duration)
                         if not hero: hero = self._get_fallback_hero(ov['content'])
-                        if hero:
-                            ov['hero_config'] = {"word": hero['word'], "start": hero['start'], "color": MODERN_COLORS[(scene_idx + 2) % len(MODERN_COLORS)], "animation": VALID_TEXT_ANIMS[scene_idx % len(VALID_TEXT_ANIMS)]}
-
+                        if hero: ov['hero_config'] = {"word": hero['word'], "start": hero['start'], "color": MODERN_COLORS[(scene_idx + 2) % len(MODERN_COLORS)], "animation": VALID_TEXT_ANIMS[scene_idx % len(VALID_TEXT_ANIMS)]}
                     ov['color'] = MODERN_COLORS[scene_idx % len(MODERN_COLORS)]
                     ov['fontSize'] = ov.get('fontSize', "120px")
                 valid_overlays.append(ov)
 
-            # Spatial and timing pass with Priority-Based Iterative Resolution
-            # Sort valid_overlays by priority (Descending)
             valid_overlays.sort(key=lambda o: PRIORITY.get(str(o.get('type')).lower(), 0), reverse=True)
-
             placed_boxes = []
-            # Calculate dynamic stagger to ensure all elements fit in time
             stagger_step = min(30, max(10, scene_duration // (len(valid_overlays) + 2)))
+
+            # PROACTIVE ANTI-CENTERING & ANCHORING
+            scene_analysis = self.visual_analysis.get(filename, {})
+            recommended_region = scene_analysis.get("text_region", {}).get("preferred", "center")
 
             for i, ov in enumerate(valid_overlays):
                 o_type = str(ov.get('type', 'text')).lower()
-
-                # Decorative background elements start at frame 0
-                if o_type in ['graph', 'shape']:
-                    ov['start'] = 0
-                elif PRIORITY.get(o_type, 0) < 50: # Other secondaries fade in early
-                    ov['start'] = 5
-                else:
-                    ov['start'] = 15 + i * stagger_step
-
-                # Coordinated Exit: 30f transition padding
+                if o_type in ['graph', 'shape']: ov['start'] = 0
+                elif PRIORITY.get(o_type, 0) < 50: ov['start'] = 5
+                else: ov['start'] = 15 + i * stagger_step
                 ov['duration'] = max(30, scene_duration - ov['start'] - 30)
-
-                # Semantic Lifecycle
-                if not ov.get('exitAnimation'):
-                    ov['exitAnimation'] = "fade_out" if o_type != 'text' else "slide_down"
-
-                # Parallax support based on depth
-                if 'parallax' not in ov:
-                    imp = str(ov.get('importance', '')).lower()
-                    if imp == 'background': ov['parallax'] = 0.2
-                    elif imp == 'ambient': ov['parallax'] = 0.5
-                    elif imp == 'hero': ov['parallax'] = 1.0
-                    else: ov['parallax'] = 0.8
+                if not ov.get('exitAnimation'): ov['exitAnimation'] = "fade_out" if o_type != 'text' else "slide_down"
 
                 base_w, base_h = TYPE_SIZES.get(o_type, (600, 400))
-
-                # Hierarchy Metadata
                 imp = str(ov.get('importance', '')).lower()
-                if imp == 'hero':
-                    ov['depth'] = 100
-                    ov['parallax'] = 1.0
-                elif imp == 'secondary':
-                    ov['depth'] = 50
-                    ov['parallax'] = 0.8
-                elif imp == 'ambient':
-                    ov['depth'] = -50
-                    ov['parallax'] = 0.5
-                elif imp == 'background':
-                    ov['depth'] = -100
-                    ov['parallax'] = 0.2
+                if imp == 'hero': ov['depth'], ov['parallax'] = 100, 1.0
+                elif imp == 'secondary': ov['depth'], ov['parallax'] = 50, 0.8
+                elif imp == 'ambient': ov['depth'], ov['parallax'] = -50, 0.5
+                elif imp == 'background': ov['depth'], ov['parallax'] = -100, 0.2
                 else:
-                    # Auto-assign depth based on priority
                     prio = PRIORITY.get(o_type, 40)
-                    ov['depth'] = prio - 50
-                    ov['parallax'] = max(0.2, min(1.0, prio / 100.0))
-                fs = 120
-                if o_type == 'text':
-                    fs_match = re.search(r'\d+', str(ov.get('fontSize', '120')))
-                    fs = int(fs_match.group()) if fs_match else 120
+                    ov['depth'], ov['parallax'] = prio - 50, max(0.2, min(1.0, prio / 100.0))
 
-                # Use AI position as starting anchor, but Snap-to-Anchor if close
                 pos = ov.get('position', {})
                 ax, ay = int(pos.get('x', 960)), int(pos.get('y', 540))
 
+                # Proactive Anti-Centering: Shift if generic center
+                if (ax == 960 and (ay == 540 or ay == 700)):
+                    if "left" in recommended_region: ax = 550
+                    elif "right" in recommended_region: ax = 1370
+                    if "top" in recommended_region: ay = 320
+                    elif "bottom" in recommended_region: ay = 760
+
                 for anchor_name, (grid_x, grid_y) in ANCHORS.items():
                     if abs(ax - grid_x) < 150 and abs(ay - grid_y) < 150:
-                        ax, ay = grid_x, grid_y
-                        break
+                        ax, ay = grid_x, grid_y; break
 
                 found = False
-                best_pos = (ax, ay)
-                final_w, final_h = base_w, base_h
+                best_pos, final_w, final_h = (ax, ay), base_w, base_h
+                fs = int(re.search(r'\d+', str(ov.get('fontSize', '120'))).group()) if o_type == 'text' else 120
 
-                print(f"     🔍 Placing {ov['id']} ({o_type}) starting at ({ax}, {ay})...")
                 for scale_step in range(7):
                     scale = 1.0 - (scale_step * 0.15)
+                    # Protect Hero elements from downscaling
+                    if imp == 'hero' and scale < 1.0: break
 
-                    # Limit decorative dominance
-                    if o_type in ['graph', 'shape']:
-                        scale = min(scale, 0.8)
-
+                    if o_type in ['graph', 'shape']: scale = min(scale, 0.8)
                     if o_type == 'text':
                         curr_fs = max(MIN_FONT_SIZE, int(fs * scale))
-                        max_w = ov.get('maxWidth', 800)
-                        w = min(max_w, len(ov['content']) * curr_fs * 0.7)
+                        w = min(ov.get('maxWidth', 800), len(ov['content']) * curr_fs * 0.7)
                         h = curr_fs * 1.5
                     else:
                         w = max(MIN_CHART_W if 'chart' in o_type else MIN_SVG_W, base_w * scale)
                         h = max(MIN_CHART_H if 'chart' in o_type else MIN_SVG_H, base_h * scale)
 
-                    for step in range(0, 80): # Deep spiral search from AI position
+                    for step in range(0, 80):
                         radius = step * 15
-                        # Axis-prioritized angles to maintain grid intent (Rule of Thirds bias)
                         angles = [0, 180, 90, 270, 45, 135, 225, 315] if radius > 0 else [0]
                         for angle in angles:
                             rad = math.radians(angle)
                             cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
-
                             l, t, r, b = cx-w/2, cy-h/2, cx+w/2, cy+h/2
-
-                            # Clamping to frame + safe zone
                             if l < CLAMP_MIN_X or r > CLAMP_MAX_X or t < CLAMP_MIN_Y or b > CLAMP_MAX_Y: continue
-
                             collision = False
                             for p_id, p_l, p_t, p_r, p_b, p_s, p_e in placed_boxes:
                                 if max(ov['start'], p_s) < min(ov['start']+ov['duration'], p_e):
-                                    gap = MIN_SPACING
-                                    if not (r + gap < p_l or l - gap > p_r or b + gap < p_t or t - gap > p_b):
+                                    if not (r + MIN_SPACING < p_l or l - MIN_SPACING > p_r or b + MIN_SPACING < p_t or t - MIN_SPACING > p_b):
                                         collision = True; break
                             if not collision:
                                 best_pos, found = (cx, cy), True
-                                if scale < 0.95 or radius > 80:
-                                    # Smooth animation override for adjusted elements
-                                    smooth_anims = SEMANTIC_ANIMS
-                                    if not ov.get('animation') or ov.get('animation') not in smooth_anims:
-                                        ov['animation'] = smooth_anims[scene_idx % len(smooth_anims)]
-
+                                if radius > 80:
+                                    print(f"   🔧 Expert Nudging {ov['id']} to resolve overlap -> New Pos: ({int(cx)}, {int(cy)})")
+                                    if not ov.get('animation') or ov.get('animation') not in SEMANTIC_ANIMS:
+                                        ov['animation'] = SEMANTIC_ANIMS[scene_idx % len(SEMANTIC_ANIMS)]
                                 if scale < 1.0:
-                                    print(f"   📉 Scaling down {ov['id']} to {int(scale*100)}% to fit.")
+                                    print(f"   🔧 Scaling down {ov['id']} to {int(scale*100)}% to fit")
                                     if o_type == 'text': ov['fontSize'] = f"{int(curr_fs)}px"
-                                    else:
-                                        ov['width'] = int(w)
-                                        ov['height'] = int(h)
-                                if radius > 0: print(f"   🔧 Nudging {ov['id']} to ({int(cx)}, {int(cy)}) to resolve collision.")
-
-                                final_w = w if o_type != 'text' else min(1600, len(ov['content']) * int(curr_fs) * 0.7)
-                                final_h = h if o_type != 'text' else int(curr_fs) * 1.5
+                                    else: ov['width'], ov['height'] = int(w), int(h)
+                                final_w, final_h = (w if o_type != 'text' else min(1600, len(ov['content']) * int(curr_fs) * 0.7)), (h if o_type != 'text' else int(curr_fs) * 1.5)
                                 break
                         if found: break
                     if found: break
 
                 ov['position'] = {"x": int(best_pos[0]), "y": int(best_pos[1])}
-
-                # High-End Synchronization: Clamp hero start to follow overlay entry
-                if ov.get('hero_config'):
-                    h_start = ov['hero_config'].get('start', 0)
-                    ov['hero_config']['start'] = max(ov['start'] + 10, h_start)
-
+                ov['visual_anchor'] = True
+                if ov.get('hero_config'): ov['hero_config']['start'] = max(ov['start'] + 10, ov['hero_config'].get('start', 0))
                 placed_boxes.append((ov['id'], best_pos[0]-final_w/2, best_pos[1]-final_h/2, best_pos[0]+final_w/2, best_pos[1]+final_h/2, ov['start'], ov['start']+ov['duration']))
 
-            # Re-sort for visual layering (Backgrounds first, Hero elements last)
             valid_overlays.sort(key=lambda o: PRIORITY.get(str(o.get('type')).lower(), 0))
             scene['overlays'] = valid_overlays
+            if 'transition' not in scene: scene['transition'] = {"type": "cinematicMatchCut", "duration": 15}
+            if 'beats' not in scene: scene['beats'] = [{"frame": o['start'], "event": f"{o['id']}_reveal"} for o in valid_overlays if PRIORITY.get(o['type'], 0) >= 50]
+            if 'connections' not in scene: scene['connections'] = []
 
-            # Scene-level Transitions & Beats
-            if 'transition' not in scene:
-                scene['transition'] = {"type": "cinematicMatchCut", "duration": 15}
-
-            if 'beats' not in scene:
-                scene['beats'] = [{"frame": o['start'], "event": f"{o['id']}_reveal"} for o in valid_overlays if PRIORITY.get(o['type'], 0) >= 50]
-
-            # Connections preservation
-            if 'connections' not in scene:
-                scene['connections'] = []
-
-            # Camera logic: Professional Sequencing & Sync
-            # Priority: Hero > focal > background
             hero_ids = [o['id'] for o in valid_overlays if str(o.get('importance', '')).lower() == 'hero' or PRIORITY.get(o['type'], 0) >= 100]
             focal_ids = [o['id'] for o in valid_overlays if PRIORITY.get(str(o.get('type')).lower(), 0) >= 50 and o['id'] not in hero_ids]
             background_ids = [o['id'] for o in valid_overlays if PRIORITY.get(str(o.get('type')).lower(), 0) < 50]
 
-            ai_camera = scene.get('camera', {})
-            ai_shots = ai_camera.get('shots', [])
-
-            camera_valid = False
-            if ai_shots and isinstance(ai_shots, list):
-                if all(isinstance(shot, dict) and shot.get('targetId') in [o['id'] for o in valid_overlays] for shot in ai_shots):
-                    camera_valid = True
-
-            if not camera_valid:
-                print(f"   🎥 Sequencing broadcast-grade camera for {s_id}")
+            ai_shots = scene.get('camera', {}).get('shots', [])
+            if not ai_shots or not all(s.get('targetId') in [o['id'] for o in valid_overlays] for s in ai_shots):
                 CAM_STYLES = ["cinematic_drift", "slow_push", "pan_right", "orbit", "rack_focus", "dramatic_reveal"]
                 shots = []
-
-                # 1. Start with background ambient drift if exists
-                if background_ids:
-                    shots.append({"targetId": background_ids[0], "startFrame": 0, "duration": 45, "style": "cinematic_drift", "zoom": 1.05, "inDuration": 15})
-
-                # 2. Sequence through focal elements, sync startFrame with overlay.start
-                # Priority sequencing: Hero first, then focal evidence
-                ordered_targets = []
-                heroes = sorted([o for o in valid_overlays if o['id'] in hero_ids], key=lambda x: x['start'])
-                focals = sorted([o for o in valid_overlays if o['id'] in focal_ids], key=lambda x: x['start'])
-                ordered_targets.extend(heroes)
-                ordered_targets.extend(focals)
-
-                for i, ov in enumerate(ordered_targets[:4]): # Up to 4 sequential shots
-                    start = ov['start']
-                    # Ensure shots don't overlap, adjust previous shot duration if needed
-                    if shots and start <= shots[-1]['startFrame']:
-                        start = shots[-1]['startFrame'] + 10
-
+                if background_ids: shots.append({"targetId": background_ids[0], "startFrame": 0, "duration": 45, "style": "cinematic_drift", "zoom": 1.05, "inDuration": 15})
+                ordered_targets = sorted([o for o in valid_overlays if o['id'] in (hero_ids + focal_ids)], key=lambda x: x['start'])
+                for i, ov in enumerate(ordered_targets[:4]):
+                    start = max(shots[-1]['startFrame'] + 10, ov['start']) if shots else ov['start']
                     if shots: shots[-1]['duration'] = max(20, start - shots[-1]['startFrame'])
-
-                    shots.append({
-                        "targetId": ov['id'],
-                        "startFrame": start,
-                        "duration": 60, # Initial guess, will finalize below
-                        "style": CAM_STYLES[(scene_idx + i) % len(CAM_STYLES)],
-                        "zoom": 1.1 + (i * 0.05),
-                        "inDuration": 20,
-                        "ease": "cubicOut"
-                    })
-
-                # Finalize last shot duration
-                if shots:
-                    shots[-1]['duration'] = max(30, scene_duration - shots[-1]['startFrame'])
-
+                    shots.append({"targetId": ov['id'], "startFrame": start, "duration": 60, "style": CAM_STYLES[(scene_idx + i) % len(CAM_STYLES)], "zoom": 1.1 + (i * 0.05), "inDuration": 20, "ease": "cubicOut"})
+                if shots: shots[-1]['duration'] = max(30, scene_duration - shots[-1]['startFrame'])
                 scene['camera'] = {"enabled": True, "shots": shots}
             else:
-                print(f"   🎥 Preserving AI Camera for {s_id}")
                 scene['camera']['enabled'] = True
-                # Ensure easing is applied to preserved shots
-                for shot in scene['camera'].get('shots', []):
-                    if not shot.get('ease'): shot['ease'] = "cubicOut"
+                for shot in scene['camera']['shots']: shot['ease'] = shot.get('ease', "cubicOut")
 
-            # SFX (Perfectly Aligned with Overlay Entry)
             for i, ov in enumerate(valid_overlays):
-                if self.in_files:
-                    sfx_manifest.append({"scene_id": s_id, "file": self.in_files[(in_ptr+i)%len(self.in_files)], "start": ov['start'], "end": ov['start']+30, "volume": 0.05})
+                if self.in_files: sfx_manifest.append({"scene_id": s_id, "file": self.in_files[(in_ptr+i)%len(self.in_files)], "start": ov['start'], "end": ov['start']+30, "volume": 0.05})
             in_ptr += len(valid_overlays)
 
         data['audio_sfx_manifest'] = sfx_manifest
@@ -524,7 +376,6 @@ class RemotionJsonMaker:
     def _get_scene_hero_word(self, scene_id: str, overlay_content: str, scene_duration: int = 180):
         if not self.raw_timestamps or not overlay_content: return None
         matches = re.findall(fr'{scene_id}:.*?\[30fps:\s*(\d+)f\s*-\s*\d+f\]\s*"(.*?)"', self.raw_timestamps)
-        if not matches: return None
         content_words = re.sub(r'[.।]', '', overlay_content).split()
         candidates = [{"word": w, "start": int(f)} for f, w in matches if re.sub(r'[.।]', '', w) in content_words]
         if not candidates: return None
@@ -536,26 +387,41 @@ class RemotionJsonMaker:
         words = re.sub(r'[.।]', '', str(overlay_content)).split()
         return {"word": max(words, key=len), "start": 45} if words else None
 
-    def _interact_with_gemini(self, prompt: str) -> str:
+    def _interact_with_gemini(self, prompt: str, previous_json: str = None, errors: List[str] = None) -> str:
         if self.manual:
             try:
                 from google.colab import output
                 import uuid
                 u_id = uuid.uuid4().hex[:8]
-                safe_prompt = json.dumps(prompt)
+                feedback_html = ""
+                if errors:
+                    err_list = "".join([f"<li>{e}</li>" for e in errors])
+                    feedback_html = f"""<div style='color: #FF3E6C; margin-bottom: 15px; border-left: 4px solid #FF3E6C; padding-left: 15px;'>
+                        <strong>❌ QA FEEDBACK (SCORE: {len(errors)} Issues):</strong>
+                        <ul style='margin-top: 5px; font-size: 13px;'>{err_list}</ul>
+                    </div>"""
+
+                copy_payload = prompt
+                if previous_json:
+                    copy_payload = f"--- PREVIOUS FAILED JSON ---\n{previous_json}\n\n--- FEEDBACK ---\n{chr(10).join(errors)}\n\n--- TASK ---\n{prompt}"
+
                 js_code = f"""
                     (async () => {{
                         const u_id = "{u_id}";
                         const container = document.createElement('div');
                         container.style = "background: #111; color: #fff; padding: 20px; border-radius: 12px; border: 2px solid #4CAF50; font-family: monospace; max-width: 800px; margin: 20px auto;";
                         container.innerHTML = `
-                            <h3 style="color: #4CAF50; margin-top: 0;">🎬 Studio V4 Pipeline</h3>
-                            <button id="copy-${{u_id}}" style="background: #4CAF50; color: #000; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%;">📋 COPY PROMPT</button>
-                            <textarea id="paste-${{u_id}}" style="width: 100%; height: 200px; background: #000; color: #00FFAB; border: 1px solid #333; margin-top: 15px; padding: 10px;" placeholder="Paste JSON here..."></textarea>
-                            <button id="submit-${{u_id}}" style="background: #2196F3; color: #fff; border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px;">🚀 SUBMIT</button>
+                            <h3 style="color: #4CAF50; margin-top: 0;">🎬 Studio V4 Production Pipeline</h3>
+                            {feedback_html}
+                            <button id="copy-${{u_id}}" style="background: #4CAF50; color: #000; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%;">📋 COPY PROMPT & FEEDBACK</button>
+                            <textarea id="paste-${{u_id}}" style="width: 100%; height: 200px; background: #000; color: #00FFAB; border: 1px solid #333; margin-top: 15px; padding: 10px;" placeholder="Paste corrected JSON here..."></textarea>
+                            <button id="submit-${{u_id}}" style="background: #2196F3; color: #fff; border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px;">🚀 SUBMIT CORRECTED VERSION</button>
                         `;
                         document.body.appendChild(container);
-                        document.getElementById('copy-'+u_id).onclick = () => {{ navigator.clipboard.writeText({safe_prompt}); document.getElementById('copy-'+u_id).innerText = "COPIED!"; }};
+                        document.getElementById('copy-'+u_id).onclick = () => {{
+                            navigator.clipboard.writeText({json.dumps(copy_payload)});
+                            document.getElementById('copy-'+u_id).innerText = "COPIED!";
+                        }};
                         return new Promise((resolve) => {{
                             document.getElementById('submit-'+u_id).onclick = () => {{ const val = document.getElementById('paste-'+u_id).value; container.remove(); resolve(val); }};
                         }});
@@ -565,41 +431,27 @@ class RemotionJsonMaker:
             except: return input("Paste Gemini JSON: ")
         return ""
 
-    def _to_eng_digit(self, s: str) -> str:
-        return s.translate(str.maketrans('০১২৩৪৫৬৭৮৯', '0123456789'))
-
     def _compact_timestamps(self, ts_content: str) -> str:
         self.raw_timestamps = ts_content
         if not ts_content: return ""
         matches = re.findall(r'(SCENE_\d+):.*?\[30fps:\s*(\d+)f\s*-\s*\d+f\]\s*"(.*?)"', ts_content)
         return " | ".join([f"{m[0]}:{m[1]}f \"{m[2]}\"" for m in matches])
 
-    def _get_word_timestamp(self, scene_id: str, search_text: str) -> int:
-        if not self.raw_timestamps or not search_text: return -1
-        words = [re.sub(r'[^\w\u0980-\u09FF]', '', w).lower() for w in str(search_text).split() if len(w) > 1]
-        if not words: return -1
-        matches = re.findall(fr'{scene_id}:(?:.*?\[30fps:\s*)?(\d+)f\s*(?:-\s*\d+f\]\s*)?"(.*?)"', self.raw_timestamps)
-        for f, w in matches:
-            wc = re.sub(r'[^\w\u0980-\u09FF]', '', w).lower()
-            if wc == words[0] or (len(wc) > 3 and wc in words[0]): return int(f)
-        return -1
-
     def _is_bangla(self, text: str) -> bool:
         return any('\u0980' <= c <= '\u09FF' for c in str(text))
 
-    def generate(self, story: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None, drive_prompt_path: str = None) -> Dict[str, Any]:
+    def generate(self, story: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None, drive_prompt_path: str = None,
+                 previous_json: str = None, feedback_errors: List[str] = None) -> Dict[str, Any]:
         pattern = r'(?:Scene|দৃশ্য)\s+[0-9০-৯]+[:\s]*'
         story_parts = [p.strip().lstrip(':').strip() for p in re.split(pattern, story) if p.strip()]
         for i, n in enumerate(story_parts, 1): self.story_scenes[f"SCENE_{i:02d}"] = n
-
         compact_ts = self._compact_timestamps(timestamp_context)
         duration_context = ", ".join([f"SCENE_{i+1:02d}:{d}f" for i, d in enumerate(scene_durations)]) if scene_durations else ""
 
         drive_guideline = ""
         if drive_prompt_path and os.path.exists(drive_prompt_path):
             try:
-                with open(drive_prompt_path, 'r', encoding='utf-8') as f:
-                    drive_guideline = f"\n--- DIRECTOR'S GUIDELINES ---\n{f.read()}\n"
+                with open(drive_prompt_path, 'r', encoding='utf-8') as f: drive_guideline = f"\n--- DIRECTOR'S GUIDELINES ---\n{f.read()}\n"
             except: pass
 
         visual_context = ""
@@ -607,57 +459,28 @@ class RemotionJsonMaker:
             visual_context = "\n--- VISUAL PERCEPTION DATA (PRODUCTION GROUNDING) ---\n"
             for v_name, analysis in self.visual_analysis.items():
                 s_id = v_name.replace("scene_SC_", "SCENE_").replace(".mp4", "").upper()
-                v_type = analysis.get("scene_type", "unknown")
-
-                # Phase 3.1: Compact AI Summary
-                # The generator now consumes the interpretation directly
-                summary_obj = analysis # Note: analysis is actually the content of .summary.json here
-                v_env = summary_obj.get("environment", "unknown")
-                v_desc = summary_obj.get("semantic_description", "")
-                v_style = summary_obj.get("visual_style", {})
-
+                v_desc = analysis.get("semantic_description", "")
+                v_style = analysis.get("visual_style", {})
                 visual_context += f"- {s_id}: {v_desc} (Style: Brightness={v_style.get('brightness', 0):.2f}, Contrast={v_style.get('contrast', 0):.2f})\n"
 
         full_prompt = (
             f"TASK: GENERATE AN EXPERT DOCUMENTARY MOTION GRAPHICS MANIFEST FOR {len(self.story_scenes)} SCENES.\n"
-            f"STORY: {story}\nTIMESTAMPS: {compact_ts}\nDURATIONS: {duration_context}\n"
-            f"{visual_context}"
-            f"{drive_guideline}"
-            "SYSTEM: WORLD-CLASS CINEMATIC MOTION DESIGNER (Vox/Polymatter/Johnny Harris/Kurzgesagt style).\n"
-            "DIRECTOR'S RULES (STRICT COMPLIANCE REQUIRED):\n"
-            "1. INFORMATION FLOW: Design scenes as visual arguments. Reading Order: Background atmosphere → Hero statement → Semantic Connection → Evidence visualization → Conclusion.\n"
-            "2. CINEMATIC BEATS: Split text into emotional phrases. Never combine 'ঢাকা। মেগাসিটি।' into one object. Create separate timed objects for each beat.\n"
-            "3. VISUAL HIERARCHY: Every scene needs exactly 1 Hero element, 1 Secondary element, and Supporting ambient graphics. Use 'importance': 'hero'|'secondary'|'ambient'|'background'.\n"
-            "4. PROGRESSIVE REVEAL: Visuals must appear as information is spoken. Stagger entrance of background, then hero, then evidence, then conclusion.\n"
-            "5. SEMANTIC CONNECTORS: Use 'connections' array to link logic (Cause, Effect, Progression). Use 'energy_line' or 'relationship_line'. DO NOT use decorative connectors.\n"
-            "6. STORY-DRIVEN CAMERA: Camera MUST follow information flow. Hero → (Connector draws) → Pan along connector → Arrive at Evidence → Zoom into Data. Use start/end positions and scale.\n"
-            "7. CAUSE-AND-EFFECT CHAINS: Convert narration processes into connected visual nodes. Background graphics (graph/network) must reinforce the story topic, not just decorate.\n"
-            "8. COMPOSITION MASTERCLASS: Absolutely NO center stacking. Use Rule of Thirds, negative space, and foreground/background depth separation.\n"
-            "9. TYPOGRAPHY: Hero (130-150px, bold), Secondary (70-80px), Data (45-55px). All text needs 'maxWidth': 800 for Bangla safe-wrapping. Animate meaningfully.\n"
-            "10. METAPHOR (SCENE_04): Make SCENE_04 the strongest. Transform 'Geological Clock' into main visual metaphor: earth layers, ticking danger indicator, critical threshold reveal.\n"
-            "11. FULL LIFECYCLE: Every element needs 'animation' (entrance), 'hold', and 'exitAnimation'. Variants: 'wordReveal', 'maskReveal', 'glassReveal', 'lineDraw', 'particleAssembly', 'blurFocus', 'svgMorph', 'depthZoom'.\n"
-            "12. PRODUCTION BLUEPRINT: Add 'transition':{'type':'cinematicMatchCut','duration':15}, 'parallax':{'background':0.2,'midground':0.5,'foreground':1.0}, and a 'beats' array for visual highlights.\n"
-            "OUTPUT RAW JSON BLOCK ONLY. NO PREAMBLE. NO CHATTER."
+            f"STORY: {story}\nTIMESTAMPS: {compact_ts}\nDURATIONS: {duration_context}\n{visual_context}{drive_guideline}"
+            "SYSTEM: WORLD-CLASS CINEMATIC MOTION DESIGNER.\nDIRECTOR'S RULES: 1. INFORMATION FLOW. 2. CINEMATIC BEATS. 3. VISUAL HIERARCHY. 4. PROGRESSIVE REVEAL. 5. SEMANTIC CONNECTORS. 6. STORY-DRIVEN CAMERA. 7. CAUSE-AND-EFFECT. 8. RULE OF THIRDS. 9. TYPOGRAPHY. 10. METAPHOR.\n"
+            "OUTPUT RAW JSON BLOCK ONLY."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
 
-        raw_output = self._interact_with_gemini(full_prompt)
-        print(f"   📊 AI Response Received ({len(raw_output)} chars).")
+        raw_output = self._interact_with_gemini(full_prompt, previous_json, feedback_errors)
         try:
-            # Find the largest JSON block
             blocks = re.findall(r'\{.*\}', raw_output, re.DOTALL)
             if blocks:
                 json_str = max(blocks, key=len)
                 data = json.loads(json_str, strict=False)
-                print(f"   ✅ Successfully extracted {len(data.get('scenes', []))} scenes from AI response.")
                 return data
-            else:
-                print("   ❌ CRITICAL: No JSON block found in AI response. Check Gemini output.")
-                return {}
-        except Exception as e:
-            print(f"   ❌ JSON Parsing Error: {e}")
             return {}
+        except: return {}
 
 def main():
     parser = argparse.ArgumentParser()
@@ -676,35 +499,37 @@ def main():
     if args.fps_update_file: maker.load_fps_update(args.fps_update_file)
     maker.scan_assets(args.public_dir)
 
-    if os.path.exists(args.story_file):
-        with open(args.story_file, 'r', encoding='utf-8') as f: story = f.read()
-    else: story = ""
-
+    story = open(args.story_file, 'r', encoding='utf-8').read() if os.path.exists(args.story_file) else ""
     ts_content = open(args.timestamp_file, 'r', encoding='utf-8').read() if args.timestamp_file and os.path.exists(args.timestamp_file) else None
+    scene_durations = [maker.fps_cache[f"scene_SC_{i:02d}.mp4"] for i in range(1, 100) if f"scene_SC_{i:02d}.mp4" in maker.fps_cache]
 
-    scene_durations = []
-    if maker.fps_cache:
-        for i in range(1, 100):
-            vname = f"scene_SC_{i:02d}.mp4"
-            if vname in maker.fps_cache: scene_durations.append(maker.fps_cache[vname])
-            else: break
-
-    print("🚀 Stage 1: AI Prompting...")
-    render_json = maker.generate(story, args.prompt_output, ts_content, scene_durations, drive_prompt_path=args.drive_prompt)
-
-    print("🚀 Stage 2: Hardening & Layout Optimization...")
-    render_json = maker.finalize_json_durations(render_json, public_dir=args.public_dir)
-
-    with open(args.output, 'w', encoding='utf-8') as f:
-        json.dump(render_json, f, indent=2, ensure_ascii=False)
-    print(f"✅ Final Manifest: {args.output}")
-
-    print("🚀 Stage 3: Professional QA...")
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    try:
-        from scripts.test_manifest_quality import test_manifest_quality
-        test_manifest_quality(args.output, args.public_dir)
-    except Exception as e:
-        print(f"⚠️ QA Error: {e}")
+    from scripts.test_manifest_quality import test_manifest_quality
+
+    iteration = 1
+    previous_json = None
+    feedback_errors = None
+
+    while iteration <= 5: # Max 5 attempts for production perfection
+        print(f"\n🚀 ITERATION {iteration}: AI Generation & Hardening...")
+        render_json = maker.generate(story, args.prompt_output, ts_content, scene_durations, args.drive_prompt, previous_json, feedback_errors)
+        render_json = maker.finalize_json_durations(render_json, public_dir=args.public_dir)
+
+        # Save temporarily for QA
+        with open(args.output, 'w', encoding='utf-8') as f: json.dump(render_json, f, indent=2, ensure_ascii=False)
+
+        print(f"🧪 STAGE 3: Production QA (Iteration {iteration})...")
+        success, score, feedback = test_manifest_quality(args.output, args.public_dir)
+
+        if success:
+            print(f"\n✨ PRODUCTION READY! Final Rating: {score}%")
+            break
+        else:
+            print(f"\n⚠️ QA FAILED ({score}%). Re-prompting for correction...")
+            previous_json = json.dumps(render_json, indent=2, ensure_ascii=False)
+            feedback_errors = feedback
+            iteration += 1
+
+    print(f"✅ Final Manifest saved to: {args.output}")
 
 if __name__ == "__main__": main()

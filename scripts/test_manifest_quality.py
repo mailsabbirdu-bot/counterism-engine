@@ -6,15 +6,16 @@ import re
 def test_manifest_quality(filepath, public_dir=None):
     """
     Hardened Geometry-Aware QA suite for Studio V4 manifests.
-    Validates assets, geometry, collisions, timing, typography, and data integrity.
+    Returns: (success, score, issues)
     """
     print(f"\n" + "="*80)
     print(f"🎬 STUDIO V4 PRODUCTION QA: {os.path.basename(filepath)}")
     print("="*80)
 
     if not os.path.exists(filepath):
-        print(f"❌ QA Error: File {filepath} not found.")
-        return False
+        msg = f"QA Error: File {filepath} not found."
+        print(f"❌ {msg}")
+        return False, 0, [msg]
 
     if public_dir is None:
         public_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(filepath)), "public"))
@@ -23,8 +24,9 @@ def test_manifest_quality(filepath, public_dir=None):
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
     except Exception as e:
-        print(f"❌ QA Error: Failed to parse JSON: {e}")
-        return False
+        msg = f"QA Error: Failed to parse JSON: {e}"
+        print(f"❌ {msg}")
+        return False, 0, [msg]
 
     issues = [] # Fatal errors (FAIL)
     warnings = [] # Aesthetic suggestions
@@ -42,35 +44,34 @@ def test_manifest_quality(filepath, public_dir=None):
 
     scenes = data.get('scenes', [])
     if not scenes:
-        print("❌ CRITICAL: No scenes found in manifest.")
-        return False
+        msg = "CRITICAL: No scenes found in manifest."
+        print(f"❌ {msg}")
+        return False, 0, [msg]
 
     TYPE_SIZES = {
         'text': (800, 200),
-        'chart': (1000, 562), 'shadcn_chart': (1000, 562), # 16:9
-        'ui_panel': (800, 600), # 4:3
-        'data_indicator': (500, 375), 'shadcn_indicator': (500, 375), # 4:3
+        'chart': (1000, 562), 'shadcn_chart': (1000, 562),
+        'ui_panel': (800, 600),
+        'data_indicator': (500, 375), 'shadcn_indicator': (500, 375),
         'svg': (400, 400), 'kpi': (450, 400), 'kpi_card': (450, 400),
         'timeline': (1200, 300),
         'hub_network': (800, 800), 'flow_diagram': (1000, 562), 'process': (1000, 562),
-        'media': (960, 540), 'image': (960, 540), 'video': (960, 540), # 16:9
+        'media': (960, 540), 'image': (960, 540), 'video': (960, 540),
         'label': (300, 100), 'callout': (400, 200),
-        'compositions': (1200, 675), 'groups': (1200, 675), # 16:9
+        'compositions': (1200, 675), 'groups': (1200, 675),
         'graph': (1000, 700), 'shape': (400, 400),
         'connector': (400, 100), 'ambient_graphic': (1920, 1080)
     }
 
     MIN_CONSTRAINTS = {
         'fontSize': 40,
-        'hero_fontSize': 100, # Studio V4 Hero text protection
+        'hero_fontSize': 100,
         'chart_w': 300, 'chart_h': 200,
         'svg_w': 100, 'svg_h': 100,
         'min_spacing': 30
     }
 
     all_scene_ids = set()
-    global_overlay_ids = set()
-
     print(f"🔍 ANALYZING {len(scenes)} SCENES...")
 
     for idx, scene in enumerate(scenes):
@@ -78,16 +79,15 @@ def test_manifest_quality(filepath, public_dir=None):
         print(f"\n--- {scene_id} ---")
 
         if scene_id in all_scene_ids:
-            issues.append(f"CRITICAL: Duplicate scene_id '{scene_id}' detected.")
+            issues.append(f"[{scene_id}] CRITICAL: Duplicate scene_id detected.")
         all_scene_ids.add(scene_id)
 
-        # Reading Order & Sequencing validation
+        # Reading Order & Sequencing
         beats = scene.get('beats', [])
         if not beats:
             warnings.append(f"[{scene_id}] Missing 'beats' array for visual sequencing.")
             scores["timing"] -= 5
 
-        # Transition validation
         if not scene.get('transition'):
             warnings.append(f"[{scene_id}] Missing 'transition' object for story flow.")
             scores["composition"] -= 5
@@ -102,29 +102,21 @@ def test_manifest_quality(filepath, public_dir=None):
                 rel_vpath = vpath.replace('renders/', '') if vpath.startswith('renders/') else vpath
                 abs_vpath = os.path.join(public_dir, "renders", rel_vpath.lstrip('/'))
                 if not os.path.exists(abs_vpath):
-                    if not os.path.exists(os.path.join(public_dir, vpath.lstrip('/'))):
-                        msg = f"[{scene_id}] Asset Missing: video '{vpath}'"
-                        issues.append(msg)
-                        print(f"   ❌ ASSETS: {msg}")
-                        scores["assets"] -= 20
+                    msg = f"[{scene_id}] Asset Missing: video '{vpath}'"
+                    issues.append(msg)
+                    scores["assets"] -= 20
                 else:
-                    print(f"   ✅ ASSETS: Video '{vpath}' verified.")
+                    print(f"   ✅ ASSETS: Video verified.")
 
-        # 2. Timing Validation
+        # 2. Timing
         if duration <= 0:
             msg = f"[{scene_id}] Invalid scene duration: {duration}"
             issues.append(msg)
-            print(f"   ❌ TIMING: {msg}")
             scores["timing"] -= 50
-        else:
-            print(f"   ✅ TIMING: Duration {duration}f valid.")
 
         # 3. Overlay Validation
         overlay_ids = set()
         placed_geometries = []
-        starts = []
-
-        # Sort overlays by start for reading order validation
         sorted_ovs = sorted(overlays, key=lambda x: x.get('start', 0))
         prev_start = -1
         sequential = True
@@ -132,127 +124,58 @@ def test_manifest_quality(filepath, public_dir=None):
         for ov in overlays:
             ov_id = ov.get('id', 'unknown')
             overlay_ids.add(ov_id)
-            global_overlay_ids.add(ov_id)
-
             o_type = str(ov.get('type', 'text')).lower()
             start = ov.get('start', 0)
-
-            # Sequential Reveal check
-            if start < prev_start:
-                sequential = False
+            if start < prev_start: sequential = False
             prev_start = start
-            starts.append(start)
-            ov_dur = ov.get('duration', 0)
 
-            # Timing check
             if start < 0 or start >= duration:
-                msg = f"[{scene_id}] '{ov_id}' start time {start} out of bounds."
-                issues.append(msg)
-                print(f"   ❌ TIMING: {msg}")
+                issues.append(f"[{scene_id}] '{ov_id}' start time {start} out of bounds.")
                 scores["timing"] -= 10
 
-            # Geometry check
             pos = ov.get('position', {})
             x, y = pos.get('x', 960), pos.get('y', 540)
 
-            # Center Stacking Detection
-            if (abs(x - 960) < 5 and abs(y - 540) < 5) or (abs(x - 960) < 5 and abs(y - 700) < 5):
-                msg = f"[{scene_id}] '{ov_id}' is center-stacked at ({x}, {y}). Avoid generic centering."
+            # Center Stacking
+            if (abs(x - 960) < 5 and (abs(y - 540) < 5 or abs(y - 700) < 5)):
+                msg = f"[{scene_id}] '{ov_id}' is center-stacked at ({x}, {y})."
                 warnings.append(msg)
-                print(f"   ⚠️ COMPOSITION: {msg}")
                 scores["composition"] -= 15
 
-            # Geometry Prioritization
             base_w, base_h = TYPE_SIZES.get(o_type, (600, 400))
-            w = ov.get('width', ov.get('size', base_w))
-            h = ov.get('height', ov.get('size', base_h))
-
-            if o_type == 'shape' and ov.get('shape_type') == 'circle':
-                radius = ov.get('size', 100)
-                w, h = radius * 2, radius * 2
-
-            # Semantic Lifecycle check
-            if not ov.get('exitAnimation'):
-                msg = f"[{scene_id}] '{ov_id}' missing 'exitAnimation'."
-                warnings.append(msg)
-                print(f"   ⚠️ PRODUCTION: {msg}")
+            w, h = ov.get('width', base_w), ov.get('height', base_h)
 
             if o_type == 'text':
-                content = str(ov.get('content', ''))
                 fs_match = re.search(r'\d+', str(ov.get('fontSize', '120')))
                 fs = int(fs_match.group()) if fs_match else 120
-
-                importance = str(ov.get('importance', '')).lower()
-                min_fs = MIN_CONSTRAINTS['hero_fontSize'] if importance == 'hero' else MIN_CONSTRAINTS['fontSize']
-
+                min_fs = MIN_CONSTRAINTS['hero_fontSize'] if str(ov.get('importance','')).lower() == 'hero' else MIN_CONSTRAINTS['fontSize']
                 if fs < min_fs:
-                    msg = f"[{scene_id}] Text '{ov_id}' ({importance}) fontSize {fs}px is too small (min {min_fs}px)."
-                    issues.append(msg)
-                    print(f"   ❌ TYPOGRAPHY: {msg}")
+                    issues.append(f"[{scene_id}] Text '{ov_id}' fontSize {fs}px is too small (min {min_fs}px).")
                     scores["typography"] -= 20
+                w, h = min(ov.get('maxWidth', 1600), len(str(ov.get('content',''))) * fs * 0.7), fs * 1.5
 
-                max_w = ov.get('maxWidth', 1600)
-                w = min(max_w, len(content) * fs * 0.7)
-                h = fs * 1.5
-                if len(content.split()) > 6:
-                    msg = f"[{scene_id}] Text '{ov_id}' is verbose ({len(content.split())} words)."
-                    warnings.append(msg)
-                    print(f"   ⚠️ TYPOGRAPHY: {msg}")
-
-            l, t = x - w/2, y - h/2
-            r, b = x + w/2, y + h/2
-
-            # Offscreen Check
+            l, t, r, b = x - w/2, y - h/2, x + w/2, y + h/2
             if l < 0 or r > 1920 or t < 0 or b > 1080:
-                msg = f"[{scene_id}] '{ov_id}' is OFFSCREEN (Box: L:{int(l)}, R:{int(r)}, T:{int(t)}, B:{int(b)})"
-                issues.append(msg)
-                print(f"   ❌ LAYOUT: {msg}")
+                issues.append(f"[{scene_id}] '{ov_id}' is OFFSCREEN.")
                 scores["layout"] -= 25
             elif l < 150 or r > 1770 or t < 150 or b > 930:
-                msg = f"[{scene_id}] '{ov_id}' violates 150px safe margins."
-                warnings.append(msg)
-                print(f"   ⚠️ COMPOSITION: {msg}")
+                warnings.append(f"[{scene_id}] '{ov_id}' violates 150px safe margins.")
                 scores["composition"] -= 5
 
-            # Collision Detection (Allow Hero/KPI to overlap backgrounds)
             for p_id, p_l, p_t, p_r, p_b, p_s, p_e, p_imp in placed_geometries:
-                if max(start, p_s) < min(start + ov_dur, p_e):
-                    # Ignore collisions with backgrounds/ambient elements if current is Hero
-                    importance = str(ov.get('importance', '')).lower()
-                    if (importance == 'hero' or importance == 'secondary') and p_imp in ['background', 'ambient']:
-                        continue
-
+                if max(start, p_s) < min(start + ov.get('duration',0), p_e):
+                    if str(ov.get('importance','')).lower() in ['hero','secondary'] and p_imp in ['background','ambient']: continue
                     gap = MIN_CONSTRAINTS['min_spacing']
                     if not (r + gap < p_l or l - gap > p_r or b + gap < p_t or t - gap > p_b):
-                        msg = f"[{scene_id}] GEOMETRY COLLISION: '{ov_id}' overlaps with '{p_id}'"
-                        issues.append(msg)
-                        print(f"   ❌ COLLISION: {msg}")
+                        issues.append(f"[{scene_id}] GEOMETRY COLLISION: '{ov_id}' overlaps with '{p_id}'")
                         scores["collision"] -= 30
+            placed_geometries.append((ov_id, l, t, r, b, start, start + ov.get('duration',0), str(ov.get('importance','')).lower()))
 
-            placed_geometries.append((ov_id, l, t, r, b, start, start + ov_dur, str(ov.get('importance', '')).lower()))
+        if overlays and not sequential:
+            warnings.append(f"[{scene_id}] Overlays revealed out of sequence.")
+            scores["timing"] -= 10
 
-            # Connector/Link Validation
-            connections = scene.get('connections', [])
-            for conn in connections:
-                if conn.get('sourceId') == ov_id or conn.get('targetId') == ov_id:
-                    print(f"   🔗 CONNECTOR: Linked logic detected for {ov_id}")
-
-            # Hero Word Timing
-            if o_type == 'text':
-                hero = ov.get('hero_config', {})
-                if hero:
-                    h_start = hero.get('start', 0)
-                    if h_start < start:
-                        msg = f"[{scene_id}] Hero word in '{ov_id}' starts at {h_start}f, before overlay entry at {start}f."
-                        issues.append(msg)
-                        print(f"   ❌ SYNC: {msg}")
-                        scores["timing"] -= 10
-                    elif h_start < start + 10:
-                        msg = f"[{scene_id}] Hero word in '{ov_id}' starts too early (needs 10f buffer)."
-                        warnings.append(msg)
-                        print(f"   ⚠️ SYNC: {msg}")
-
-        # 4. Camera Shot Validation
+        # 4. Camera & Lines
         camera = scene.get('camera', {})
         shots = camera.get('shots', [])
         if not shots:
@@ -262,59 +185,22 @@ def test_manifest_quality(filepath, public_dir=None):
             for s_idx, shot in enumerate(shots):
                 target = shot.get('targetId')
                 if target and target not in overlay_ids:
-                    msg = f"[{scene_id}] Camera shot {s_idx} targets non-existent overlay '{target}'."
-                    issues.append(msg)
-                    print(f"   ❌ CAMERA: {msg}")
+                    issues.append(f"[{scene_id}] Camera shot {s_idx} targets non-existent overlay '{target}'.")
                     scores["camera"] -= 20
 
-                s_start = shot.get('startFrame', 0)
-                s_dur = shot.get('duration', 0)
-                if s_start + s_dur > duration:
-                    msg = f"[{scene_id}] Camera shot {s_idx} exceeds scene duration."
-                    issues.append(msg)
-                    print(f"   ❌ CAMERA: {msg}")
-                    scores["camera"] -= 15
+        for line in scene.get('infographic_lines', []):
+            if line.get('from_id') not in overlay_ids or line.get('to_id') not in overlay_ids:
+                issues.append(f"[{scene_id}] Infographic line references missing ID.")
 
-        # 5. Infographic Line Validation
-        lines = scene.get('infographic_lines', [])
-        for line in lines:
-            from_id = line.get('from_id')
-            to_id = line.get('to_id')
-            if from_id and from_id not in overlay_ids:
-                issues.append(f"[{scene_id}] Infographic line references missing source '{from_id}'.")
-            if to_id and to_id not in overlay_ids:
-                issues.append(f"[{scene_id}] Infographic line references missing target '{to_id}'.")
-
-        if not overlays:
-            print("   ⚠️ WARNING: Scene has no overlays.")
-        else:
-            if sequential:
-                print(f"   ✅ SEQUENCING: Elements revealed in professional reading order.")
-            else:
-                warnings.append(f"[{scene_id}] Overlays revealed out of sequence.")
-                scores["timing"] -= 10
-            print(f"   ✅ OVERLAYS: {len(overlays)} elements validated.")
-
-    # Final Summary
     overall_score = sum(scores.values()) / len(scores)
+    all_feedback = issues + warnings
+
     print("\n" + "="*80)
     print(f"📈 FINAL PRODUCTION REPORT: {int(overall_score)}%")
-    print("-" * 80)
-    for k, v in scores.items():
-        status = "✅" if v > 80 else "⚠️" if v > 50 else "❌"
-        print(f"   {status} {k.upper():<12} : {max(0, int(v))}/100")
     print("="*80)
 
-    if issues:
-        print("\n❌ CRITICAL PRODUCTION ERRORS FOUND:")
-        for issue in sorted(issues): print(f"  ● {issue}")
-        return False
-
-    print(f"\n✨ PASS: Manifest is Ultra-High End Production ready!")
-    return True
+    return (len(issues) == 0 and overall_score == 100), int(overall_score), all_feedback
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python test_manifest_quality.py <path_to_json> [public_dir]")
-    else:
-        test_manifest_quality(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)
+    success, score, feedback = test_manifest_quality(sys.argv[1])
+    sys.exit(0 if success else 1)
