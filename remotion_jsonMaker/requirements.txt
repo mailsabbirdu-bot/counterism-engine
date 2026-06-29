@@ -3,3 +3,4 @@ playwright-stealth
 pydantic
 opencv-python
 numpy
+ultralytics
