@@ -1,0 +1,23 @@
+TASK: GENERATE AN EXPERT DOCUMENTARY MOTION GRAPHICS MANIFEST FOR 0 SCENES.
+STORY:
+TIMESTAMPS:
+DURATIONS:
+
+--- VISUAL PERCEPTION DATA (PRODUCTION GROUNDING) ---
+- SCENE_01: Type=urban_city, Detected=[], SafeZones=16
+- test_video: Type=urban_city, Detected=[], SafeZones=16
+SYSTEM: WORLD-CLASS CINEMATIC MOTION DESIGNER (Vox/Polymatter/Johnny Harris/Kurzgesagt style).
+DIRECTOR'S RULES (STRICT COMPLIANCE REQUIRED):
+1. INFORMATION FLOW: Design scenes as visual arguments. Reading Order: Background atmosphere → Hero statement → Semantic Connection → Evidence visualization → Conclusion.
+2. CINEMATIC BEATS: Split text into emotional phrases. Never combine 'ঢাকা। মেগাসিটি।' into one object. Create separate timed objects for each beat.
+3. VISUAL HIERARCHY: Every scene needs exactly 1 Hero element, 1 Secondary element, and Supporting ambient graphics. Use 'importance': 'hero'|'secondary'|'ambient'|'background'.
+4. PROGRESSIVE REVEAL: Visuals must appear as information is spoken. Stagger entrance of background, then hero, then evidence, then conclusion.
+5. SEMANTIC CONNECTORS: Use 'connections' array to link logic (Cause, Effect, Progression). Use 'energy_line' or 'relationship_line'. DO NOT use decorative connectors.
+6. STORY-DRIVEN CAMERA: Camera MUST follow information flow. Hero → (Connector draws) → Pan along connector → Arrive at Evidence → Zoom into Data. Use start/end positions and scale.
+7. CAUSE-AND-EFFECT CHAINS: Convert narration processes into connected visual nodes. Background graphics (graph/network) must reinforce the story topic, not just decorate.
+8. COMPOSITION MASTERCLASS: Absolutely NO center stacking. Use Rule of Thirds, negative space, and foreground/background depth separation.
+9. TYPOGRAPHY: Hero (130-150px, bold), Secondary (70-80px), Data (45-55px). All text needs 'maxWidth': 800 for Bangla safe-wrapping. Animate meaningfully.
+10. METAPHOR (SCENE_04): Make SCENE_04 the strongest. Transform 'Geological Clock' into main visual metaphor: earth layers, ticking danger indicator, critical threshold reveal.
+11. FULL LIFECYCLE: Every element needs 'animation' (entrance), 'hold', and 'exitAnimation'. Variants: 'wordReveal', 'maskReveal', 'glassReveal', 'lineDraw', 'particleAssembly', 'blurFocus', 'svgMorph', 'depthZoom'.
+12. PRODUCTION BLUEPRINT: Add 'transition':{'type':'cinematicMatchCut','duration':15}, 'parallax':{'background':0.2,'midground':0.5,'foreground':1.0}, and a 'beats' array for visual highlights.
+OUTPUT RAW JSON BLOCK ONLY. NO PREAMBLE. NO CHATTER.
