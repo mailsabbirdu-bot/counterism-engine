@@ -2,7 +2,11 @@ import os
 from typing import List, Dict, Any, Optional
 
 try:
-    from ..schema import SceneAnalysis, SceneSummary, SubjectRank, CinematicDecision, RecommendedTextRegion
+    from ..schema import (
+        SceneAnalysis, SceneSummary, SubjectRank, CinematicDecision,
+        RecommendedTextRegion, AISummary, AIHeroSubject, AIShotSummary,
+        AICompositionSummary, AISemanticContext
+    )
     from .tracker import track_objects
     from .subject_ranker import rank_visual_subjects
     from .narrative_ranker import rank_narrative_subjects
@@ -14,7 +18,11 @@ try:
     from .motion_analysis import analyze_motion
 except (ImportError, ValueError):
     try:
-        from visual_eye.schema import SceneAnalysis, SceneSummary, SubjectRank, CinematicDecision, RecommendedTextRegion
+        from visual_eye.schema import (
+            SceneAnalysis, SceneSummary, SubjectRank, CinematicDecision,
+            RecommendedTextRegion, AISummary, AIHeroSubject, AIShotSummary,
+            AICompositionSummary, AISemanticContext
+        )
         from visual_eye.scene_understanding.tracker import track_objects
         from visual_eye.scene_understanding.subject_ranker import rank_visual_subjects
         from visual_eye.scene_understanding.narrative_ranker import rank_narrative_subjects
@@ -25,7 +33,11 @@ except (ImportError, ValueError):
         from visual_eye.scene_understanding.color_analysis import analyze_colors
         from visual_eye.scene_understanding.motion_analysis import analyze_motion
     except ImportError:
-        from schema import SceneAnalysis, SceneSummary, SubjectRank, CinematicDecision, RecommendedTextRegion
+        from schema import (
+            SceneAnalysis, SceneSummary, SubjectRank, CinematicDecision,
+            RecommendedTextRegion, AISummary, AIHeroSubject, AIShotSummary,
+            AICompositionSummary, AISemanticContext
+        )
         from tracker import track_objects
         from subject_ranker import rank_visual_subjects
         from narrative_ranker import rank_narrative_subjects
@@ -38,7 +50,7 @@ except (ImportError, ValueError):
 
 def perform_scene_understanding(analysis: SceneAnalysis, video_path: str, context: Optional[Dict[str, Any]] = None) -> SceneAnalysis:
     """
-    Main Orchestrator for Phase 3 Cinematic Intelligence.
+    Main Orchestrator for Phase 3.1 AI-Ready Scene Understanding.
     """
     frames = analysis.frames
     total_frames = analysis.total_frames
@@ -57,20 +69,16 @@ def perform_scene_understanding(analysis: SceneAnalysis, video_path: str, contex
     try: analysis.camera_motion = estimate_camera_motion(video_path, indices)
     except: pass
 
-    # 2. Ranking Layer (Refined ordering for dependencies)
+    # 2. Ranking Layer
     try:
-        # Get narrative scores first
         analysis.narrative_subjects = rank_narrative_subjects(analysis.tracked_objects, context)
-        # Use them in cinematic model
         analysis.main_subjects = rank_visual_subjects(
             analysis.tracked_objects, total_frames, len(frames),
             analysis.visual_style, analysis.narrative_subjects
         )
-        # Sync visual_subjects for schema compatibility
         analysis.visual_subjects = analysis.main_subjects
     except: pass
 
-    # Hero selection
     if analysis.main_subjects:
         best = analysis.main_subjects[0]
         analysis.main_subject = {
@@ -90,6 +98,11 @@ def perform_scene_understanding(analysis: SceneAnalysis, video_path: str, contex
 
     try: analysis.scene_summary = generate_cinematic_summary(analysis)
     except: pass
+
+    # 4. Phase 3.1: AI Summary Generation
+    try: analysis.ai_summary = generate_ai_summary(analysis, context)
+    except Exception as e:
+        print(f"⚠️ AI Summary Generation Error: {e}")
 
     return analysis
 
@@ -137,4 +150,97 @@ def generate_cinematic_summary(analysis: SceneAnalysis) -> SceneSummary:
         camera_motion=analysis.camera_motion.type,
         best_overlay_side=analysis.composition.negative_space,
         recommended_animation=anim_style
+    )
+
+def generate_ai_summary(analysis: SceneAnalysis, context: Optional[Dict[str, Any]] = None) -> AISummary:
+    """
+    Produces a compact semantic summary for LLM prompting.
+    Converts tracking and motion data into qualitative descriptions.
+    """
+    # 1. Subject metrics
+    types = [t.type for t in analysis.tracked_objects]
+    avg_area = sum(t.average_bbox.width * t.average_bbox.height for t in analysis.tracked_objects) / (1920*1080) if analysis.tracked_objects else 0
+
+    # Semantic heuristics
+    has_water = any(kw in analysis.scene_type.lower() for kw in ['river', 'ocean', 'coast', 'water']) or 'boat' in types
+    is_night = analysis.visual_style.brightness < 0.35
+
+    # Qualitative flow and intensity
+    p_flow = "static"
+    if analysis.motion.score > 0.6: p_flow = "moving rapidly"
+    elif analysis.motion.score > 0.2: p_flow = "moving across frame"
+
+    semantic = AISemanticContext(
+        crowd_density=min(1.0, types.count('person') / 12.0),
+        traffic_density=min(1.0, (types.count('car') + types.count('truck') + types.count('bus')) / 10.0),
+        greenery_level=min(1.0, types.count('tree') / 6.0),
+        urban_density=min(1.0, types.count('building') / 5.0),
+        water_presence=has_water,
+        skyline_visibility=1.0 if analysis.composition.horizon == "lower_third" else 0.4,
+        pedestrian_flow=p_flow,
+        movement_intensity=analysis.motion.intensity,
+        construction_level=min(1.0, types.count('truck') / 4.0) if 'building' in types else 0.0,
+        time_of_day="night" if is_night else "day"
+    )
+
+    # 2. Hero Subject
+    hero = None
+    if analysis.main_subjects:
+        best = analysis.main_subjects[0]
+        t_info = next((t for t in analysis.tracked_objects if t.track_id == best.track_id), None)
+        pos = "center"
+        role = "primary subject"
+        if t_info:
+            cx = t_info.average_bbox.x + t_info.average_bbox.width/2
+            if cx < 640: pos = "left"
+            elif cx > 1280: pos = "right"
+            if t_info.average_bbox.width * t_info.average_bbox.height / (1920*1080) < 0.05:
+                role = "background subject"
+
+        hero = AIHeroSubject(
+            type=best.type,
+            position=pos,
+            size_ratio=float(avg_area) if t_info else 0.0,
+            importance=best.final_importance,
+            confidence=best.confidence,
+            role=role
+        )
+
+    # 3. Decision mappings
+    tx_pos = analysis.scene_summary.text_position.decision.replace('place_text_', '')
+    secondaries = list(set([s.type for s in analysis.main_subjects[1:5]]))
+
+    # 4. Natural Language Description
+    shot_desc = f"{analysis.shot_analysis.shot_type.capitalize()} {analysis.shot_analysis.camera_height} shot"
+    scene_desc = f"of {analysis.scene_type.replace('_', ' ')}"
+    layout_desc = f"The primary focus is on the {hero.type if hero else 'environment'} on the {hero.position if hero else 'center'}."
+    graphics_desc = f"The {analysis.composition.negative_space.replace('_', ' ')} provides clean negative space for typography."
+
+    full_desc = f"{shot_desc} {scene_desc}. {layout_desc} {graphics_desc}"
+
+    return AISummary(
+        scene_id=context.get('scene_id', 'SCENE_XX') if context else "SCENE_XX",
+        scene_type=analysis.scene_type,
+        environment=analysis.shot_analysis.environment,
+        shot=AIShotSummary(
+            type=analysis.shot_analysis.shot_type,
+            camera_height=analysis.shot_analysis.camera_height,
+            camera_motion=analysis.camera_motion.type
+        ),
+        composition=AICompositionSummary(
+            balance=analysis.composition.visual_balance,
+            negative_space=analysis.composition.negative_space,
+            horizon=analysis.composition.horizon,
+            busy_score=analysis.composition.busy_score
+        ),
+        hero_subject=hero,
+        secondary_subjects=secondaries,
+        semantic_context=semantic,
+        camera_recommendation={
+            "animation": analysis.scene_summary.recommended_animation,
+            "overlay_side": analysis.composition.negative_space
+        },
+        text_region={"preferred": tx_pos},
+        visual_style=analysis.visual_style,
+        semantic_description=full_desc
     )

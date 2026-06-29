@@ -59,8 +59,8 @@ class RemotionJsonMaker:
 
         print(f"👁️ Loading Visual Eye analysis from: {analysis_dir}")
         for f in os.listdir(analysis_dir):
-            if f.endswith("_analysis.json"):
-                v_name = f.replace("_analysis.json", ".mp4")
+            if f.endswith(".summary.json"):
+                v_name = f.replace(".summary.json", ".mp4")
                 try:
                     with open(os.path.join(analysis_dir, f), 'r') as jf:
                         self.visual_analysis[v_name] = json.load(jf)
@@ -609,19 +609,14 @@ class RemotionJsonMaker:
                 s_id = v_name.replace("scene_SC_", "SCENE_").replace(".mp4", "").upper()
                 v_type = analysis.get("scene_type", "unknown")
 
-                # Phase 2 Enhanced Data
-                summary = analysis.get("scene_summary", {})
-                main_subj = summary.get("main_subject", "unknown")
-                cam_mot = summary.get("camera_motion", "static")
-                side = summary.get("best_overlay_side", "center")
+                # Phase 3.1: Compact AI Summary
+                # The generator now consumes the interpretation directly
+                summary_obj = analysis # Note: analysis is actually the content of .summary.json here
+                v_env = summary_obj.get("environment", "unknown")
+                v_desc = summary_obj.get("semantic_description", "")
+                v_style = summary_obj.get("visual_style", {})
 
-                shot = analysis.get("shot_analysis", {})
-                shot_type = shot.get("shot_type", "wide")
-
-                comp = analysis.get("composition", {})
-                busy = comp.get("busy_score", 0)
-
-                visual_context += f"- {s_id}: Type={v_type}, Shot={shot_type}, MainSubject={main_subj}, Camera={cam_mot}, BestSide={side}, Clutter={busy:.2f}\n"
+                visual_context += f"- {s_id}: {v_desc} (Style: Brightness={v_style.get('brightness', 0):.2f}, Contrast={v_style.get('contrast', 0):.2f})\n"
 
         full_prompt = (
             f"TASK: GENERATE AN EXPERT DOCUMENTARY MOTION GRAPHICS MANIFEST FOR {len(self.story_scenes)} SCENES.\n"
