@@ -130,7 +130,7 @@ def test_manifest_quality(filepath, public_dir=None):
             prev_start = start
 
             if start < 0 or start >= duration:
-                issues.append(f"[{scene_id}] '{ov_id}' start time {start} out of bounds.")
+                issues.append(f"[{scene_id}] TIMING ERROR: Overlay '{ov_id}' has start={start} which is out of bounds for scene duration {duration}.")
                 scores["timing"] -= 10
 
             pos = ov.get('position', {})
@@ -168,12 +168,12 @@ def test_manifest_quality(filepath, public_dir=None):
                     if str(ov.get('importance','')).lower() in ['hero','secondary'] and p_imp in ['background','ambient']: continue
                     gap = MIN_CONSTRAINTS['min_spacing']
                     if not (r + gap < p_l or l - gap > p_r or b + gap < p_t or t - gap > p_b):
-                        issues.append(f"[{scene_id}] GEOMETRY COLLISION: '{ov_id}' overlaps with '{p_id}'")
+                        issues.append(f"[{scene_id}] GEOMETRY COLLISION: Overlay '{ov_id}' overlaps with '{p_id}'. Move '{ov_id}' away from ({x}, {y}) to an empty region.")
                         scores["collision"] -= 30
             placed_geometries.append((ov_id, l, t, r, b, start, start + ov.get('duration',0), str(ov.get('importance','')).lower()))
 
         if overlays and not sequential:
-            warnings.append(f"[{scene_id}] Overlays revealed out of sequence.")
+            warnings.append(f"[{scene_id}] SYNC ORDER ERROR: Overlays revealed out of sequence. Ensure 'start' times strictly increase in the 'overlays' array.")
             scores["timing"] -= 10
 
         # 4. Camera & Lines

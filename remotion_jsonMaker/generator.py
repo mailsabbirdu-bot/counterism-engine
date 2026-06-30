@@ -417,7 +417,16 @@ class RemotionJsonMaker:
 
                 copy_payload = prompt
                 if previous_json:
-                    copy_payload = f"--- CURRENT STATUS: {score}% ACCURACY ---\n\n--- PREVIOUS JSON ---\n{previous_json}\n\n--- FIX THESE ISSUES ---\n{chr(10).join(errors)}\n\n--- INSTRUCTIONS ---\n{prompt}"
+                    protocol = """
+--- PRODUCTION CORRECTION PROTOCOL ---
+1. ANALYZE: Review the ERROR LIST and the PREVIOUS JSON block provided below.
+2. REPAIR: Apply targeted fixes to the JSON structure to resolve ALL errors.
+3. SYNC ORDER: If you see "Overlays revealed out of sequence", ensure the 'start' frame values strictly increase or stay equal as you go down the 'overlays' array.
+4. GEOMETRY: If you see "GEOMETRY COLLISION" or "center-stacked", adjust the {x, y} coordinates of the overlapping elements to move them apart. Avoid {x: 960, y: 540} and {x: 960, y: 700} if multiple elements are present. Use the Rule of Thirds.
+5. INTEGRITY: Maintain all original story content and timestamps while fixing technical layout and timing issues.
+6. OUTPUT: Return only the corrected raw JSON block.
+"""
+                    copy_payload = f"--- CURRENT STATUS: {score}% ACCURACY ---\n\n{protocol}\n\n--- ERROR LIST ---\n{chr(10).join(errors)}\n\n--- PREVIOUS JSON ---\n{previous_json}\n\n--- ORIGINAL INSTRUCTIONS ---\n{prompt}"
 
                 js_code = f"""
                     (async () => {{
@@ -449,13 +458,27 @@ class RemotionJsonMaker:
                             document.getElementById('copy-'+u_id).innerText = "COPIED!";
                         }};
                         return new Promise((resolve) => {{
-                            document.getElementById('submit-'+u_id).onclick = () => {{ const val = document.getElementById('paste-'+u_id).value; container.remove(); resolve(val); }};
-                            document.getElementById('force-'+u_id).onclick = () => {{ const val = "FORCE_QUIT_SIGNAL:" + document.getElementById('paste-'+u_id).value; container.remove(); resolve(val); }};
+                            document.getElementById('submit-'+u_id).onclick = () => {{
+                                const val = document.getElementById('paste-'+u_id).value.trim();
+                                if (!val) {{ alert("Please paste Gemini's response first."); return; }}
+                                if (!val.startsWith('{{')) {{ alert("Invalid input. Please paste a raw JSON block."); return; }}
+                                container.remove(); resolve(val);
+                            }};
+                            document.getElementById('force-'+u_id).onclick = () => {{
+                                const val = document.getElementById('paste-'+u_id).value.trim();
+                                if (window.confirm("🛑 STOP ITERATIONS?\\n\\nThis will end the AI generation loop and save current files even if accuracy is not 100%. Proceed?")) {{
+                                    container.remove(); resolve("FORCE_QUIT_SIGNAL:" + val);
+                                }}
+                            }};
                         }});
                     }})();
                 """
                 return output.eval_js(js_code)
-            except: return input("Paste Gemini JSON: ")
+            except:
+                val = ""
+                while not val.strip():
+                    val = input("Paste Gemini JSON (Required): ").strip()
+                return val
         return ""
 
     def _compact_timestamps(self, ts_content: str) -> str:
