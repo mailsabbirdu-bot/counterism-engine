@@ -80,8 +80,10 @@ def analyze_video(video_path: str, output_dir: str, debug: bool = False, context
             return get_empty_analysis()
 
         video_name = os.path.splitext(os.path.basename(video_path))[0]
-        analysis_path = os.path.join(output_dir, f"{video_name}.analysis.json")
+        # PRODUCTION ALIGNMENT: Remotion expects {basename}_analysis.json
+        analysis_path = os.path.join(output_dir, f"{video_name}_analysis.json")
         summary_path = os.path.join(output_dir, f"{video_name}.summary.json")
+        tracks_path = os.path.join(output_dir, f"{video_name}.tracks.json")
 
         # 1. Version Check & Cache (Phase 3.1)
         if os.path.exists(analysis_path):
@@ -143,17 +145,25 @@ def analyze_video(video_path: str, output_dir: str, debug: bool = False, context
         print(f"🧠 Extracting Semantic Summary for {video_name}...")
         analysis = perform_scene_understanding(analysis, video_path, context)
 
-        # 4. Save Dual Outputs
+        # 4. Save Multi-Stage Outputs (Production Hardened)
         os.makedirs(output_dir, exist_ok=True)
 
-        # A. Full Debug Analysis
+        # A. Full Production Analysis (for Remotion)
         with open(analysis_path, 'w') as f:
             f.write(analysis.model_dump_json(indent=2))
 
-        # B. Compact AI Summary
+        # B. Compact AI Summary (for Grounding)
         if analysis.ai_summary:
             with open(summary_path, 'w') as f:
                 f.write(analysis.ai_summary.model_dump_json(indent=2))
+
+        # C. Specialized Track Export (Phase 3.2 Selective Export)
+        if analysis.tracks:
+            with open(tracks_path, 'w') as f:
+                # Filter tracks to only include the "hero" and high-confidence subjects for animation stability
+                hero_id = analysis.main_subject.get('track_id') if analysis.main_subject else None
+                export_tracks = [t for t in analysis.tracks if t.track_id == hero_id or len(t.frames) > (analysis.total_frames * 0.3)]
+                json.dump([t.model_dump() for t in export_tracks], f, indent=2)
 
         print(f"✅ Analysis saved to {analysis_path}")
         print(f"✨ AI Summary created: {summary_path}")

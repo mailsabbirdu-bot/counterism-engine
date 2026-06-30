@@ -136,11 +136,12 @@ def test_manifest_quality(filepath, public_dir=None):
             pos = ov.get('position', {})
             x, y = pos.get('x', 960), pos.get('y', 540)
 
-            # Center Stacking
-            if (abs(x - 960) < 5 and (abs(y - 540) < 5 or abs(y - 700) < 5)):
-                msg = f"[{scene_id}] '{ov_id}' is center-stacked at ({x}, {y})."
-                warnings.append(msg)
-                scores["composition"] -= 15
+            # Center Stacking (Bypass for motion tracked elements)
+            if not ov.get('tracking', {}).get('enabled'):
+                if (abs(x - 960) < 5 and (abs(y - 540) < 5 or abs(y - 700) < 5)):
+                    msg = f"[{scene_id}] '{ov_id}' is center-stacked at ({x}, {y}). Avoid generic centering."
+                    warnings.append(msg)
+                    scores["composition"] -= 15
 
             base_w, base_h = TYPE_SIZES.get(o_type, (600, 400))
             w, h = ov.get('width', base_w), ov.get('height', base_h)
@@ -158,7 +159,7 @@ def test_manifest_quality(filepath, public_dir=None):
             if l < 0 or r > 1920 or t < 0 or b > 1080:
                 issues.append(f"[{scene_id}] '{ov_id}' is OFFSCREEN.")
                 scores["layout"] -= 25
-            elif l < 150 or r > 1770 or t < 150 or b > 930:
+            elif o_type not in ['ambient_graphic', 'background'] and (l < 150 or r > 1770 or t < 150 or b > 930):
                 warnings.append(f"[{scene_id}] '{ov_id}' violates 150px safe margins.")
                 scores["composition"] -= 5
 

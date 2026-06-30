@@ -26,6 +26,18 @@ class AnalysisFrame(BaseModel):
     objects: List[DetectedObject] = []
     safe_text_regions: List[SafeTextRegion] = []
 
+class TrackFrame(BaseModel):
+    frame: int
+    x: float
+    y: float
+    width: float
+    height: float
+
+class TrackData(BaseModel):
+    track_id: str
+    type: str
+    frames: List[TrackFrame]
+
 class TrackedObject(BaseModel):
     track_id: str
     type: str
@@ -35,6 +47,7 @@ class TrackedObject(BaseModel):
     average_confidence: float
     average_bbox: BBox
     movement_distance: float
+    history: List[TrackFrame] = []
 
 class SubjectRank(BaseModel):
     track_id: str
@@ -167,3 +180,4 @@ class SceneAnalysis(BaseModel):
     motion: MotionAnalysis = MotionAnalysis()
     scene_summary: SceneSummary = SceneSummary()
     ai_summary: Optional[AISummary] = None
+    tracks: List[TrackData] = []

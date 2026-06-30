@@ -145,8 +145,9 @@ class RemotionJsonMaker:
         MIN_SPACING = 30
         MODERN_COLORS = ["#00F5FF", "#FFD700", "#FF3E6C", "#00FFAB"]
         VALID_TEXT_ANIMS = ["glow_pulse", "neon_flicker", "glitch_pop", "bounce_pop", "word_by_word", "slide_up", "typewriter"]
-        LOCKED_FIELDS = ["content", "hero_config"]
+        LOCKED_FIELDS = ["content", "hero_config", "tracking"]
 
+        # Production-Grade Grid Anchors (Rule of Thirds)
         ANCHORS = {
             "L_TOP": (550, 320), "C_TOP": (960, 320), "R_TOP": (1370, 320),
             "L_MID": (550, 540), "C_MID": (960, 540), "R_MID": (1370, 540),
@@ -278,16 +279,27 @@ class RemotionJsonMaker:
                 pos = ov.get('position', {})
                 ax, ay = int(pos.get('x', 960)), int(pos.get('y', 540))
 
-                # Proactive Anti-Centering: Shift if generic center
-                if (ax == 960 and (ay == 540 or ay == 700)):
-                    if "left" in recommended_region: ax = 550
-                    elif "right" in recommended_region: ax = 1370
-                    if "top" in recommended_region: ay = 320
-                    elif "bottom" in recommended_region: ay = 760
+                # Pre-Hardening Safety Clamp: Ensure initial pos isn't crazy
+                ax = max(CLAMP_MIN_X, min(CLAMP_MAX_X, ax))
+                ay = max(CLAMP_MIN_Y, min(CLAMP_MAX_Y, ay))
 
-                for anchor_name, (grid_x, grid_y) in ANCHORS.items():
-                    if abs(ax - grid_x) < 150 and abs(ay - grid_y) < 150:
-                        ax, ay = grid_x, grid_y; break
+                # Studio V4 Aggressive Anti-Centering (Studio-Grade Layouts)
+                if abs(ax - 960) < 10 and (abs(ay - 540) < 10 or abs(ay - 700) < 10):
+                    # Force elements away from the generic center "death zone"
+                    if "left" in recommended_region: ax, ay = ANCHORS["L_MID"]
+                    elif "right" in recommended_region: ax, ay = ANCHORS["R_MID"]
+                    elif "top" in recommended_region: ax, ay = ANCHORS["C_TOP"]
+                    elif "bottom" in recommended_region: ax, ay = ANCHORS["C_BOT"]
+                    else:
+                        # Cyclic distribution based on index to ensure professional spacing
+                        layout_targets = [ANCHORS["L_MID"], ANCHORS["R_MID"], ANCHORS["L_TOP"], ANCHORS["R_BOT"]]
+                        ax, ay = layout_targets[i % len(layout_targets)]
+
+                # Snapping to closest production grid anchor
+                if not ov.get('tracking', {}).get('enabled'):
+                    for anchor_name, (grid_x, grid_y) in ANCHORS.items():
+                        if abs(ax - grid_x) < 180 and abs(ay - grid_y) < 180:
+                            ax, ay = grid_x, grid_y; break
 
                 found = False
                 best_pos, final_w, final_h = (ax, ay), base_w, base_h
@@ -387,35 +399,46 @@ class RemotionJsonMaker:
         words = re.sub(r'[.।]', '', str(overlay_content)).split()
         return {"word": max(words, key=len), "start": 45} if words else None
 
-    def _interact_with_gemini(self, prompt: str, previous_json: str = None, errors: List[str] = None) -> str:
+    def _interact_with_gemini(self, prompt: str, previous_json: str = None, errors: List[str] = None, score: int = 0) -> str:
         if self.manual:
             try:
                 from google.colab import output
                 import uuid
                 u_id = uuid.uuid4().hex[:8]
                 feedback_html = ""
+                header_color = "#4CAF50" if score >= 100 else "#FF9800" if score >= 80 else "#FF3E6C"
+
                 if errors:
                     err_list = "".join([f"<li>{e}</li>" for e in errors])
-                    feedback_html = f"""<div style='color: #FF3E6C; margin-bottom: 15px; border-left: 4px solid #FF3E6C; padding-left: 15px;'>
-                        <strong>❌ QA FEEDBACK (SCORE: {len(errors)} Issues):</strong>
-                        <ul style='margin-top: 5px; font-size: 13px;'>{err_list}</ul>
+                    feedback_html = f"""<div style='color: #FF3E6C; margin-bottom: 15px; border-left: 4px solid #FF3E6C; padding-left: 15px; background: #1a0a0d; padding: 10px;'>
+                        <strong style='font-size: 16px;'>🚨 QA FEEDBACK (CURRENT SCORE: {score}%)</strong>
+                        <ul style='margin-top: 8px; font-size: 13px; color: #ff85a1;'>{err_list}</ul>
                     </div>"""
 
                 copy_payload = prompt
                 if previous_json:
-                    copy_payload = f"--- PREVIOUS FAILED JSON ---\n{previous_json}\n\n--- FEEDBACK ---\n{chr(10).join(errors)}\n\n--- TASK ---\n{prompt}"
+                    copy_payload = f"--- CURRENT STATUS: {score}% ACCURACY ---\n\n--- PREVIOUS JSON ---\n{previous_json}\n\n--- FIX THESE ISSUES ---\n{chr(10).join(errors)}\n\n--- INSTRUCTIONS ---\n{prompt}"
 
                 js_code = f"""
                     (async () => {{
                         const u_id = "{u_id}";
                         const container = document.createElement('div');
-                        container.style = "background: #111; color: #fff; padding: 20px; border-radius: 12px; border: 2px solid #4CAF50; font-family: monospace; max-width: 800px; margin: 20px auto;";
+                        container.style = "background: #0a0a0a; color: #fff; padding: 25px; border-radius: 16px; border: 2px solid {header_color}; font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 850px; margin: 20px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5);";
                         container.innerHTML = `
-                            <h3 style="color: #4CAF50; margin-top: 0;">🎬 Studio V4 Production Pipeline</h3>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <h3 style="color: {header_color}; margin: 0; font-size: 22px;">🎬 Studio V4 Production Pipeline</h3>
+                                <span style="background: {header_color}; color: #000; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 14px;">ACCURACY: {score}%</span>
+                            </div>
                             {feedback_html}
-                            <button id="copy-${{u_id}}" style="background: #4CAF50; color: #000; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%;">📋 COPY PROMPT & FEEDBACK</button>
-                            <textarea id="paste-${{u_id}}" style="width: 100%; height: 200px; background: #000; color: #00FFAB; border: 1px solid #333; margin-top: 15px; padding: 10px;" placeholder="Paste corrected JSON here..."></textarea>
-                            <button id="submit-${{u_id}}" style="background: #2196F3; color: #fff; border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px;">🚀 SUBMIT CORRECTED VERSION</button>
+                            <div style="background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333; margin-bottom: 15px;">
+                                <p style="margin: 0 0 10px 0; font-size: 14px; color: #aaa;">1. Copy the instructions and failed JSON.</p>
+                                <button id="copy-${{u_id}}" style="background: {header_color}; color: #000; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; transition: opacity 0.2s;">📋 COPY PROMPT & FEEDBACK</button>
+                            </div>
+                            <div style="background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333;">
+                                <p style="margin: 0 0 10px 0; font-size: 14px; color: #aaa;">2. Paste Gemini's corrected response below.</p>
+                                <textarea id="paste-${{u_id}}" style="width: 100%; height: 250px; background: #000; color: #00FFAB; border: 1px solid #444; padding: 12px; font-family: 'Cascadia Code', 'Courier New', monospace; font-size: 13px; border-radius: 6px; resize: vertical;" placeholder="Paste corrected JSON block here..."></textarea>
+                                <button id="submit-${{u_id}}" style="background: #2196F3; color: #fff; border: none; padding: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 15px; font-size: 16px; box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);">🚀 SUBMIT FOR POST-PASTE HARDENING</button>
+                            </div>
                         `;
                         document.body.appendChild(container);
                         document.getElementById('copy-'+u_id).onclick = () => {{
@@ -441,7 +464,7 @@ class RemotionJsonMaker:
         return any('\u0980' <= c <= '\u09FF' for c in str(text))
 
     def generate(self, story: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None, drive_prompt_path: str = None,
-                 previous_json: str = None, feedback_errors: List[str] = None) -> Dict[str, Any]:
+                 previous_json: str = None, feedback_errors: List[str] = None, current_score: int = 0) -> Dict[str, Any]:
         pattern = r'(?:Scene|দৃশ্য)\s+[0-9০-৯]+[:\s]*'
         story_parts = [p.strip().lstrip(':').strip() for p in re.split(pattern, story) if p.strip()]
         for i, n in enumerate(story_parts, 1): self.story_scenes[f"SCENE_{i:02d}"] = n
@@ -461,18 +484,28 @@ class RemotionJsonMaker:
                 s_id = v_name.replace("scene_SC_", "SCENE_").replace(".mp4", "").upper()
                 v_desc = analysis.get("semantic_description", "")
                 v_style = analysis.get("visual_style", {})
-                visual_context += f"- {s_id}: {v_desc} (Style: Brightness={v_style.get('brightness', 0):.2f}, Contrast={v_style.get('contrast', 0):.2f})\n"
+
+                track_info = ""
+                hero = analysis.get("hero_subject", {})
+                if hero and hero.get("type"):
+                    track_info = f" [TRACKABLE: {hero['type']} as 'hero_track']"
+
+                visual_context += f"- {s_id}: {v_desc}{track_info} (Style: Brightness={v_style.get('brightness', 0):.2f}, Contrast={v_style.get('contrast', 0):.2f})\n"
 
         full_prompt = (
             f"TASK: GENERATE AN EXPERT DOCUMENTARY MOTION GRAPHICS MANIFEST FOR {len(self.story_scenes)} SCENES.\n"
             f"STORY: {story}\nTIMESTAMPS: {compact_ts}\nDURATIONS: {duration_context}\n{visual_context}{drive_guideline}"
-            "SYSTEM: WORLD-CLASS CINEMATIC MOTION DESIGNER.\nDIRECTOR'S RULES: 1. INFORMATION FLOW. 2. CINEMATIC BEATS. 3. VISUAL HIERARCHY. 4. PROGRESSIVE REVEAL. 5. SEMANTIC CONNECTORS. 6. STORY-DRIVEN CAMERA. 7. CAUSE-AND-EFFECT. 8. RULE OF THIRDS. 9. TYPOGRAPHY. 10. METAPHOR.\n"
+            "SYSTEM: WORLD-CLASS CINEMATIC MOTION DESIGNER.\n"
+            "DIRECTOR'S RULES: 1. INFORMATION FLOW. 2. CINEMATIC BEATS. 3. VISUAL HIERARCHY. 4. PROGRESSIVE REVEAL. 5. SEMANTIC CONNECTORS. 6. STORY-DRIVEN CAMERA. 7. CAUSE-AND-EFFECT. 8. RULE OF THIRDS. 9. TYPOGRAPHY. 10. METAPHOR. 11. MOTION TRACKING.\n"
+            "MOTION TRACKING RULE: Use tracking when the narration mentions a specific moving subject. "
+            "To attach an overlay to a subject, use: 'tracking': { 'enabled': true, 'target': 'hero_track', 'offset': { 'x': 0, 'y': -80 } }. "
+            "The target 'hero_track' follows the primary subject. Offset is in pixels relative to object center.\n"
             "OUTPUT RAW JSON BLOCK ONLY."
         )
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
 
-        raw_output = self._interact_with_gemini(full_prompt, previous_json, feedback_errors)
+        raw_output = self._interact_with_gemini(full_prompt, previous_json, feedback_errors, current_score)
         try:
             blocks = re.findall(r'\{.*\}', raw_output, re.DOTALL)
             if blocks:
@@ -509,10 +542,13 @@ def main():
     iteration = 1
     previous_json = None
     feedback_errors = None
+    current_score = 0
 
-    while iteration <= 5: # Max 5 attempts for production perfection
+    while iteration <= 10: # Increased attempts for production perfection
         print(f"\n🚀 ITERATION {iteration}: AI Generation & Hardening...")
-        render_json = maker.generate(story, args.prompt_output, ts_content, scene_durations, args.drive_prompt, previous_json, feedback_errors)
+        render_json = maker.generate(story, args.prompt_output, ts_content, scene_durations, args.drive_prompt, previous_json, feedback_errors, current_score)
+
+        # Post-Paste Hardening
         render_json = maker.finalize_json_durations(render_json, public_dir=args.public_dir)
 
         # Save temporarily for QA
@@ -520,6 +556,7 @@ def main():
 
         print(f"🧪 STAGE 3: Production QA (Iteration {iteration})...")
         success, score, feedback = test_manifest_quality(args.output, args.public_dir)
+        current_score = score
 
         if success:
             print(f"\n✨ PRODUCTION READY! Final Rating: {score}%")
