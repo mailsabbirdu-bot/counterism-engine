@@ -118,6 +118,15 @@ def perform_scene_understanding(analysis: SceneAnalysis, video_path: str, contex
     try: analysis.motion = analyze_motion(analysis.tracked_objects, analysis.camera_motion, total_frames)
     except: pass
 
+    # Prepare Tracks for Remotion (Phase 3.2 Hardening)
+    try:
+        from ..schema import TrackData
+        analysis.tracks = [
+            TrackData(track_id=t.track_id, type=t.type, frames=t.history)
+            for t in analysis.tracked_objects if t.frames_visible > 5
+        ]
+    except: pass
+
     try: analysis.scene_summary = generate_cinematic_summary(analysis)
     except: pass
 

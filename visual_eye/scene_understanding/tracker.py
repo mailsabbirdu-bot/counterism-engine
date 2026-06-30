@@ -1,12 +1,12 @@
 import math
 from typing import List, Dict, Any
 try:
-    from ..schema import AnalysisFrame, TrackedObject, BBox
+    from ..schema import AnalysisFrame, TrackedObject, BBox, TrackFrame
 except (ImportError, ValueError):
     try:
-        from visual_eye.schema import AnalysisFrame, TrackedObject, BBox
+        from visual_eye.schema import AnalysisFrame, TrackedObject, BBox, TrackFrame
     except ImportError:
-        from schema import AnalysisFrame, TrackedObject, BBox
+        from schema import AnalysisFrame, TrackedObject, BBox, TrackFrame
 
 def calculate_iou(boxA, boxB):
     xA = max(boxA.x, boxB.x)
@@ -155,7 +155,8 @@ def track_objects(frames: List[AnalysisFrame]) -> List[TrackedObject]:
                 frames_visible=len(history),
                 average_confidence=float(avg_conf),
                 average_bbox=BBox(x=float(avg_x), y=float(avg_y), width=float(avg_w), height=float(avg_h)),
-                movement_distance=float(movement)
+                movement_distance=float(movement),
+                history=[TrackFrame(frame=h['frame_index'], x=h['bbox'].x, y=h['bbox'].y, width=h['bbox'].width, height=h['bbox'].height) for h in history]
             ))
 
         return final_results
