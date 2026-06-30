@@ -464,7 +464,7 @@ class RemotionJsonMaker:
         return any('\u0980' <= c <= '\u09FF' for c in str(text))
 
     def generate(self, story: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None, drive_prompt_path: str = None,
-                 previous_json: str = None, feedback_errors: List[str] = None, current_score: int = 0) -> Dict[str, Any]:
+                 previous_json: str = None, feedback_errors: List[str] = None, current_score: int = 0, interaction_log_path: str = None) -> Dict[str, Any]:
         pattern = r'(?:Scene|দৃশ্য)\s+[0-9০-৯]+[:\s]*'
         story_parts = [p.strip().lstrip(':').strip() for p in re.split(pattern, story) if p.strip()]
         for i, n in enumerate(story_parts, 1): self.story_scenes[f"SCENE_{i:02d}"] = n
@@ -506,6 +506,26 @@ class RemotionJsonMaker:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
 
         raw_output = self._interact_with_gemini(full_prompt, previous_json, feedback_errors, current_score)
+
+        if interaction_log_path:
+            try:
+                with open(interaction_log_path, 'a', encoding='utf-8') as log_f:
+                    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                    log_f.write(f"\n\n{'='*80}\n")
+                    log_f.write(f"🕒 ITERATION LOG: {timestamp}\n")
+                    log_f.write(f"📊 CURRENT SCORE: {current_score}%\n")
+                    log_f.write(f"{'='*80}\n\n")
+
+                    if previous_json:
+                        log_f.write(f"--- PREVIOUS JSON ---\n{previous_json}\n\n")
+                    if feedback_errors:
+                        log_f.write(f"--- FEEDBACK ERRORS ---\n{chr(10).join(feedback_errors)}\n\n")
+
+                    log_f.write(f"--- FULL PROMPT SENT ---\n{full_prompt}\n\n")
+                    log_f.write(f"--- RAW RESPONSE RECEIVED ---\n{raw_output}\n\n")
+            except Exception as e:
+                print(f"⚠️ Failed to write to interaction log: {e}")
+
         try:
             blocks = re.findall(r'\{.*\}', raw_output, re.DOTALL)
             if blocks:
@@ -544,9 +564,13 @@ def main():
     feedback_errors = None
     current_score = 0
 
+    manifest_dir = os.path.dirname(args.output)
+    interaction_log = os.path.join(manifest_dir, "interaction_log.txt")
+
     while iteration <= 10: # Increased attempts for production perfection
         print(f"\n🚀 ITERATION {iteration}: AI Generation & Hardening...")
-        render_json = maker.generate(story, args.prompt_output, ts_content, scene_durations, args.drive_prompt, previous_json, feedback_errors, current_score)
+        render_json = maker.generate(story, args.prompt_output, ts_content, scene_durations, args.drive_prompt,
+                                     previous_json, feedback_errors, current_score, interaction_log_path=interaction_log)
 
         # Post-Paste Hardening
         render_json = maker.finalize_json_durations(render_json, public_dir=args.public_dir)
