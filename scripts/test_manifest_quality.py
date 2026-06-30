@@ -117,20 +117,26 @@ def test_manifest_quality(filepath, public_dir=None):
         # 3. Overlay Validation
         overlay_ids = set()
         placed_geometries = []
-        sorted_ovs = sorted(overlays, key=lambda x: x.get('start', 0))
+        prev_ov_id = None
         prev_start = -1
-        sequential = True
 
-        for ov in overlays:
-            ov_id = ov.get('id', 'unknown')
+        for ov_idx, ov in enumerate(overlays):
+            ov_id = ov.get('id', f'overlay_{ov_idx}')
             overlay_ids.add(ov_id)
             o_type = str(ov.get('type', 'text')).lower()
-            start = ov.get('start', 0)
-            if start < prev_start: sequential = False
+            start = int(ov.get('start', 0))
+
+            # 2.1 detailed SYNC ORDER Check
+            if prev_start != -1 and start < prev_start:
+                msg = f"[{scene_id}] SYNC ORDER ERROR: Overlay '{ov_id}' (start={start}) appears AFTER '{prev_ov_id}' (start={prev_start}) in the array. Fx: Increase '{ov_id}.start' to >= {prev_start} or move '{ov_id}' earlier in the array."
+                issues.append(msg)
+                scores["timing"] -= 15
+
             prev_start = start
+            prev_ov_id = ov_id
 
             if start < 0 or start >= duration:
-                issues.append(f"[{scene_id}] TIMING ERROR: Overlay '{ov_id}' has start={start} which is out of bounds for scene duration {duration}.")
+                issues.append(f"[{scene_id}] TIMING ERROR: Overlay '{ov_id}' field 'start'={start} is invalid. Scene duration is {duration}. Fix: set 'start' between 0 and {duration-1}.")
                 scores["timing"] -= 10
 
             pos = ov.get('position', {})
@@ -138,9 +144,9 @@ def test_manifest_quality(filepath, public_dir=None):
 
             # Center Stacking (Bypass for motion tracked elements)
             if not ov.get('tracking', {}).get('enabled'):
-                if (abs(x - 960) < 5 and (abs(y - 540) < 5 or abs(y - 700) < 5)):
-                    msg = f"[{scene_id}] '{ov_id}' is center-stacked at ({x}, {y}). Avoid generic centering."
-                    warnings.append(msg)
+                if (abs(x - 960) < 20 and (abs(y - 540) < 20 or abs(y - 700) < 20)):
+                    msg = f"[{scene_id}] GEOMETRY ERROR: Overlay '{ov_id}' is generic-centered at ({x}, {y}). Fix: Use Rule of Thirds anchors like (550, 540) or (1370, 540) to avoid center-stacking."
+                    issues.append(msg)
                     scores["composition"] -= 15
 
             base_w, base_h = TYPE_SIZES.get(o_type, (600, 400))
@@ -151,32 +157,35 @@ def test_manifest_quality(filepath, public_dir=None):
                 fs = int(fs_match.group()) if fs_match else 120
                 min_fs = MIN_CONSTRAINTS['hero_fontSize'] if str(ov.get('importance','')).lower() == 'hero' else MIN_CONSTRAINTS['fontSize']
                 if fs < min_fs:
-                    issues.append(f"[{scene_id}] Text '{ov_id}' fontSize {fs}px is too small (min {min_fs}px).")
+                    issues.append(f"[{scene_id}] TYPOGRAPHY ERROR: Text '{ov_id}' fontSize {fs}px is too small. Minimum required for {ov.get('importance','primary')} text is {min_fs}px.")
                     scores["typography"] -= 20
                 w, h = min(ov.get('maxWidth', 1600), len(str(ov.get('content',''))) * fs * 0.7), fs * 1.5
 
             l, t, r, b = x - w/2, y - h/2, x + w/2, y + h/2
             if l < 0 or r > 1920 or t < 0 or b > 1080:
-                issues.append(f"[{scene_id}] '{ov_id}' is OFFSCREEN.")
+                off_desc = []
+                if l < 0: off_desc.append(f"left by {abs(l)}px")
+                if r > 1920: off_desc.append(f"right by {r-1920}px")
+                if t < 0: off_desc.append(f"top by {abs(t)}px")
+                if b > 1080: off_desc.append(f"bottom by {b-1080}px")
+                issues.append(f"[{scene_id}] OFFSCREEN ERROR: Overlay '{ov_id}' is out of bounds on {' and '.join(off_desc)}. Calculated Box: [L:{int(l)}, T:{int(t)}, R:{int(r)}, B:{int(b)}]. Fix: Move position away from edges.")
                 scores["layout"] -= 25
             elif o_type not in ['ambient_graphic', 'background'] and (l < 150 or r > 1770 or t < 150 or b > 930):
-                warnings.append(f"[{scene_id}] '{ov_id}' violates 150px safe margins.")
+                warnings.append(f"[{scene_id}] MARGIN WARNING: Overlay '{ov_id}' violates 150px safety zone. Box: [L:{int(l)}, T:{int(t)}, R:{int(r)}, B:{int(b)}]. Suggest moving towards center.")
                 scores["composition"] -= 5
 
             for p_id, p_l, p_t, p_r, p_b, p_s, p_e, p_imp in placed_geometries:
-                if max(start, p_s) < min(start + ov.get('duration',0), p_e):
+                # Check for temporal overlap first
+                ov_dur = ov.get('duration', duration - start)
+                if max(start, p_s) < min(start + ov_dur, p_e):
                     if str(ov.get('importance','')).lower() in ['hero','secondary'] and p_imp in ['background','ambient']: continue
                     gap = MIN_CONSTRAINTS['min_spacing']
                     if not (r + gap < p_l or l - gap > p_r or b + gap < p_t or t - gap > p_b):
-                        # Suggest specific anchors based on quad split to help AI fix it instantly
-                        suggested_anchor = "(550, 320)" if x < 960 else "(1370, 760)"
-                        issues.append(f"[{scene_id}] GEOMETRY COLLISION: Overlay '{ov_id}' overlaps with '{p_id}'. Move '{ov_id}' away from ({x}, {y}) to a safe anchor like {suggested_anchor}.")
+                        # Surgical Collision Feedback
+                        suggested_anchor = "(550, 320)" if x > 960 else "(1370, 760)"
+                        issues.append(f"[{scene_id}] GEOMETRY COLLISION: Overlay '{ov_id}' at ({int(x)}, {int(y)}) overlaps with '{p_id}'. Fix: Move '{ov_id}' to a remote anchor like {suggested_anchor} or adjust timing so they don't appear at once.")
                         scores["collision"] -= 30
-            placed_geometries.append((ov_id, l, t, r, b, start, start + ov.get('duration',0), str(ov.get('importance','')).lower()))
-
-        if overlays and not sequential:
-            # Downgrade to warning since engine now handles auto-sorting during hardening
-            warnings.append(f"[{scene_id}] SYNC ADVISORY: Overlays are not in start-time order in the array. The engine will auto-sort them, but please maintain order for readability.")
+            placed_geometries.append((ov_id, l, t, r, b, start, start + ov.get('duration', duration - start), str(ov.get('importance','')).lower()))
 
         # 4. Camera & Lines
         camera = scene.get('camera', {})

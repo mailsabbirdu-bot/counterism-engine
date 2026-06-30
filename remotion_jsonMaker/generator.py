@@ -421,16 +421,15 @@ class RemotionJsonMaker:
                 if previous_json:
                     protocol = """
 --- PRODUCTION CORRECTION PROTOCOL (STRICT) ---
-1. CRITICAL ANALYSIS: Review the ERROR LIST. Every item listed must be fixed.
-2. CORRECTION LOG: Before the JSON block, provide a short 1-line summary for EACH fix you made (e.g., "Fixed collision in SCENE_01 by moving chart to (1370, 760)").
-3. REPAIR STRATEGY:
-   - GEOMETRY: Use exact Rule of Thirds anchors: L_MID(550, 540), R_MID(1370, 540), C_TOP(960, 320), C_BOT(960, 760). Avoid (960, 540) if anything else is on screen.
-   - COLLISION: If two items overlap, move the lower priority one (SVG/Graph) to a far corner.
-   - SYNC: Ensure the array order of 'overlays' matches their 'start' times.
-4. INTEGRITY: Do NOT change the story content, hero_config, or narration timestamps.
-5. OUTPUT: Return the Correction Log followed by the RAW JSON block.
+You have FAILED the quality assurance pass. You must REPAIR the manifest using the surgical feedback below.
+
+1. MANDATORY DIAGNOSTIC: List each error from the 'ERROR LIST' below and state the EXACT numerical change you are making to fix it.
+2. GEOMETRY: Use the suggested coordinates. Rule of Thirds Anchors: L_MID(550, 540), R_MID(1370, 540), C_TOP(960, 320), C_BOT(960, 760).
+3. SYNC: Re-order the 'overlays' array objects so that 'start' times strictly increase.
+4. INTEGRITY: Do NOT alter narration content, hero words, or timestamps unless fixing an out-of-bounds error.
+5. OUTPUT: Provide the Diagnostic List first, then the Entire Corrected RAW JSON Block. No conversational chatter.
 """
-                    copy_payload = f"--- CURRENT STATUS: {score}% ACCURACY ---\n\n{protocol}\n\n--- ERROR LIST ---\n{chr(10).join(errors)}\n\n--- PREVIOUS JSON ---\n{previous_json}\n\n--- ORIGINAL INSTRUCTIONS ---\n{prompt}"
+                    copy_payload = f"🚨 URGENT: PRODUCTION ERRORS DETECTED ({score}% ACCURACY)\n\n--- ERROR LIST ---\n{chr(10).join(errors)}\n\n{protocol}\n\n--- PREVIOUS JSON ---\n{previous_json}\n\n--- ORIGINAL TASK CONTEXT ---\n{prompt}"
 
                 js_code = f"""
                     (async () => {{
