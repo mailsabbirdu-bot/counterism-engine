@@ -284,7 +284,8 @@ class RemotionJsonMaker:
                 ay = max(CLAMP_MIN_Y, min(CLAMP_MAX_Y, ay))
 
                 # Studio V4 Aggressive Anti-Centering (Studio-Grade Layouts)
-                if abs(ax - 960) < 10 and (abs(ay - 540) < 10 or abs(ay - 700) < 10):
+                # Widened "Death Zone" to +/- 200px to force Rule of Thirds variety
+                if abs(ax - 960) < 200 and (abs(ay - 540) < 150 or abs(ay - 700) < 150):
                     # Force elements away from the generic center "death zone"
                     if "left" in recommended_region: ax, ay = ANCHORS["L_MID"]
                     elif "right" in recommended_region: ax, ay = ANCHORS["R_MID"]
@@ -352,7 +353,8 @@ class RemotionJsonMaker:
                 if ov.get('hero_config'): ov['hero_config']['start'] = max(ov['start'] + 10, ov['hero_config'].get('start', 0))
                 placed_boxes.append((ov['id'], best_pos[0]-final_w/2, best_pos[1]-final_h/2, best_pos[0]+final_w/2, best_pos[1]+final_h/2, ov['start'], ov['start']+ov['duration']))
 
-            valid_overlays.sort(key=lambda o: PRIORITY.get(str(o.get('type')).lower(), 0))
+            # PRODUCTION SYNC: Auto-sort overlays by 'start' time to prevent chronological array sequence errors.
+            valid_overlays.sort(key=lambda o: (int(o.get('start', 0)), PRIORITY.get(str(o.get('type')).lower(), 0)))
             scene['overlays'] = valid_overlays
             if 'transition' not in scene: scene['transition'] = {"type": "cinematicMatchCut", "duration": 15}
             if 'beats' not in scene: scene['beats'] = [{"frame": o['start'], "event": f"{o['id']}_reveal"} for o in valid_overlays if PRIORITY.get(o['type'], 0) >= 50]
@@ -418,13 +420,15 @@ class RemotionJsonMaker:
                 copy_payload = prompt
                 if previous_json:
                     protocol = """
---- PRODUCTION CORRECTION PROTOCOL ---
-1. ANALYZE: Review the ERROR LIST and the PREVIOUS JSON block provided below.
-2. REPAIR: Apply targeted fixes to the JSON structure to resolve ALL errors.
-3. SYNC ORDER: If you see "Overlays revealed out of sequence", ensure the 'start' frame values strictly increase or stay equal as you go down the 'overlays' array.
-4. GEOMETRY: If you see "GEOMETRY COLLISION" or "center-stacked", adjust the {x, y} coordinates of the overlapping elements to move them apart. Avoid {x: 960, y: 540} and {x: 960, y: 700} if multiple elements are present. Use the Rule of Thirds.
-5. INTEGRITY: Maintain all original story content and timestamps while fixing technical layout and timing issues.
-6. OUTPUT: Return only the corrected raw JSON block.
+--- PRODUCTION CORRECTION PROTOCOL (STRICT) ---
+1. CRITICAL ANALYSIS: Review the ERROR LIST. Every item listed must be fixed.
+2. CORRECTION LOG: Before the JSON block, provide a short 1-line summary for EACH fix you made (e.g., "Fixed collision in SCENE_01 by moving chart to (1370, 760)").
+3. REPAIR STRATEGY:
+   - GEOMETRY: Use exact Rule of Thirds anchors: L_MID(550, 540), R_MID(1370, 540), C_TOP(960, 320), C_BOT(960, 760). Avoid (960, 540) if anything else is on screen.
+   - COLLISION: If two items overlap, move the lower priority one (SVG/Graph) to a far corner.
+   - SYNC: Ensure the array order of 'overlays' matches their 'start' times.
+4. INTEGRITY: Do NOT change the story content, hero_config, or narration timestamps.
+5. OUTPUT: Return the Correction Log followed by the RAW JSON block.
 """
                     copy_payload = f"--- CURRENT STATUS: {score}% ACCURACY ---\n\n{protocol}\n\n--- ERROR LIST ---\n{chr(10).join(errors)}\n\n--- PREVIOUS JSON ---\n{previous_json}\n\n--- ORIGINAL INSTRUCTIONS ---\n{prompt}"
 

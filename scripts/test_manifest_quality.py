@@ -168,13 +168,15 @@ def test_manifest_quality(filepath, public_dir=None):
                     if str(ov.get('importance','')).lower() in ['hero','secondary'] and p_imp in ['background','ambient']: continue
                     gap = MIN_CONSTRAINTS['min_spacing']
                     if not (r + gap < p_l or l - gap > p_r or b + gap < p_t or t - gap > p_b):
-                        issues.append(f"[{scene_id}] GEOMETRY COLLISION: Overlay '{ov_id}' overlaps with '{p_id}'. Move '{ov_id}' away from ({x}, {y}) to an empty region.")
+                        # Suggest specific anchors based on quad split to help AI fix it instantly
+                        suggested_anchor = "(550, 320)" if x < 960 else "(1370, 760)"
+                        issues.append(f"[{scene_id}] GEOMETRY COLLISION: Overlay '{ov_id}' overlaps with '{p_id}'. Move '{ov_id}' away from ({x}, {y}) to a safe anchor like {suggested_anchor}.")
                         scores["collision"] -= 30
             placed_geometries.append((ov_id, l, t, r, b, start, start + ov.get('duration',0), str(ov.get('importance','')).lower()))
 
         if overlays and not sequential:
-            warnings.append(f"[{scene_id}] SYNC ORDER ERROR: Overlays revealed out of sequence. Ensure 'start' times strictly increase in the 'overlays' array.")
-            scores["timing"] -= 10
+            # Downgrade to warning since engine now handles auto-sorting during hardening
+            warnings.append(f"[{scene_id}] SYNC ADVISORY: Overlays are not in start-time order in the array. The engine will auto-sort them, but please maintain order for readability.")
 
         # 4. Camera & Lines
         camera = scene.get('camera', {})
