@@ -437,7 +437,10 @@ class RemotionJsonMaker:
                             <div style="background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333;">
                                 <p style="margin: 0 0 10px 0; font-size: 14px; color: #aaa;">2. Paste Gemini's corrected response below.</p>
                                 <textarea id="paste-${{u_id}}" style="width: 100%; height: 250px; background: #000; color: #00FFAB; border: 1px solid #444; padding: 12px; font-family: 'Cascadia Code', 'Courier New', monospace; font-size: 13px; border-radius: 6px; resize: vertical;" placeholder="Paste corrected JSON block here..."></textarea>
-                                <button id="submit-${{u_id}}" style="background: #2196F3; color: #fff; border: none; padding: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 15px; font-size: 16px; box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);">🚀 SUBMIT FOR POST-PASTE HARDENING</button>
+                                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                                    <button id="submit-${{u_id}}" style="flex: 2; background: #2196F3; color: #fff; border: none; padding: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);">🚀 SUBMIT FOR HARDENING</button>
+                                    <button id="force-${{u_id}}" style="flex: 1; background: #FF3E6C; color: #fff; border: none; padding: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 4px 15px rgba(255, 62, 108, 0.3);">🛑 END & FINALIZE</button>
+                                </div>
                             </div>
                         `;
                         document.body.appendChild(container);
@@ -447,6 +450,7 @@ class RemotionJsonMaker:
                         }};
                         return new Promise((resolve) => {{
                             document.getElementById('submit-'+u_id).onclick = () => {{ const val = document.getElementById('paste-'+u_id).value; container.remove(); resolve(val); }};
+                            document.getElementById('force-'+u_id).onclick = () => {{ const val = "FORCE_QUIT_SIGNAL:" + document.getElementById('paste-'+u_id).value; container.remove(); resolve(val); }};
                         }});
                     }})();
                 """
@@ -464,7 +468,7 @@ class RemotionJsonMaker:
         return any('\u0980' <= c <= '\u09FF' for c in str(text))
 
     def generate(self, story: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None, drive_prompt_path: str = None,
-                 previous_json: str = None, feedback_errors: List[str] = None, current_score: int = 0, interaction_log_path: str = None) -> Dict[str, Any]:
+                 previous_json: str = None, feedback_errors: List[str] = None, current_score: int = 0, interaction_log_path: str = None) -> Tuple[Dict[str, Any], bool]:
         pattern = r'(?:Scene|দৃশ্য)\s+[0-9০-৯]+[:\s]*'
         story_parts = [p.strip().lstrip(':').strip() for p in re.split(pattern, story) if p.strip()]
         for i, n in enumerate(story_parts, 1): self.story_scenes[f"SCENE_{i:02d}"] = n
@@ -506,6 +510,11 @@ class RemotionJsonMaker:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
 
         raw_output = self._interact_with_gemini(full_prompt, previous_json, feedback_errors, current_score)
+        force_stop = False
+        if raw_output.startswith("FORCE_QUIT_SIGNAL:"):
+            force_stop = True
+            raw_output = raw_output.replace("FORCE_QUIT_SIGNAL:", "")
+            print("🛑 Force-finalize requested by user.")
 
         if interaction_log_path:
             try:
@@ -531,9 +540,9 @@ class RemotionJsonMaker:
             if blocks:
                 json_str = max(blocks, key=len)
                 data = json.loads(json_str, strict=False)
-                return data
-            return {}
-        except: return {}
+                return data, force_stop
+            return {}, force_stop
+        except: return {}, force_stop
 
 def main():
     parser = argparse.ArgumentParser()
@@ -569,7 +578,7 @@ def main():
 
     while iteration <= 10: # Increased attempts for production perfection
         print(f"\n🚀 ITERATION {iteration}: AI Generation & Hardening...")
-        render_json = maker.generate(story, args.prompt_output, ts_content, scene_durations, args.drive_prompt,
+        render_json, force_stop = maker.generate(story, args.prompt_output, ts_content, scene_durations, args.drive_prompt,
                                      previous_json, feedback_errors, current_score, interaction_log_path=interaction_log)
 
         # Post-Paste Hardening
@@ -582,8 +591,9 @@ def main():
         success, score, feedback = test_manifest_quality(args.output, args.public_dir)
         current_score = score
 
-        if success:
-            print(f"\n✨ PRODUCTION READY! Final Rating: {score}%")
+        if success or force_stop:
+            if force_stop: print(f"\n🛑 PROCESS ENDED MANUALLY. Final Rating: {score}%")
+            else: print(f"\n✨ PRODUCTION READY! Final Rating: {score}%")
             break
         else:
             print(f"\n⚠️ QA FAILED ({score}%). Re-prompting for correction...")
