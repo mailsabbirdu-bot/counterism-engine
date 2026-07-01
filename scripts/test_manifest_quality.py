@@ -31,6 +31,78 @@ def test_manifest_quality(filepath, public_dir=None):
     issues = [] # Fatal errors (FAIL)
     warnings = [] # Aesthetic suggestions
 
+    # --- ASSET & TYPE REGISTRY (Surgical Validation) ---
+    VALID_TYPES = [
+        'text', 'ui_panel', 'shape', 'chart', 'indicator', 'data_indicator',
+        'graph', 'video', 'image', 'shadcn_chart', 'shadcn_indicator', 'svg'
+    ]
+
+    ENGINE_VARIANTS = {
+        'shadcn_chart': [
+            'glass_area', 'neon_bar', 'stacked_line', 'radial_score', 'radar_web', 'composed_tech',
+            'pie_donut_glass', 'scatter_bubble', 'horizontal_pill_bar', 'step_area', 'multi_bar_stack',
+            'curved_edge_line', 'double_radar', 'funnel_glass', 'vertical_stepper', 'micro_sparkline',
+            'grid_dots', 'smooth_area_dual', 'bar_race_top', 'thick_line_glow', 'layered_pies',
+            'range_area', 'pixel_bars', 'curved_scatter', 'staircase_line', 'floating_bars',
+            'hollow_pie', 'dual_axis_tech', 'jagged_peak', 'dot_matrix_chart'
+        ],
+        'shadcn_indicator': [
+            'metric_tile', 'tech_badge', 'activity_ring', 'crypto_card', 'server_status',
+            'user_profile_stat', 'weather_glass', 'storage_pill', 'upload_cloud', 'score_board',
+            'notification_stack', 'data_ticker', 'network_ping', 'step_indicator_glass',
+            'battery_pack', 'media_controls', 'social_stats', 'tech_folder', 'system_cpu',
+            'location_tag', 'search_bar_glass', 'badge_collection', 'data_download', 'wifi_radar',
+            'system_lock', 'clock_modern', 'status_grid', 'floating_icon_text', 'mini_stat_card',
+            'activity_dots'
+        ],
+        'chart': [
+            'line', 'area', 'forecast', 'multiLine', 'stackedArea', 'bar', 'horizontalBar',
+            'verticalBar', 'groupedBar', 'stackedBar', 'barRace', 'pie', 'donut', 'bump',
+            'areaBump', 'heatmap', 'radar', 'radialBar', 'stream', 'swarmplot', 'waffle',
+            'funnel', 'marimekko', 'circlePacking', 'calendar', 'parallelCoordinates',
+            'voronoi', 'treemap', 'sunburst', 'scatter', 'bubble', 'network', 'chord',
+            'sankey', 'boxplot', 'violinPlot'
+        ],
+        'indicator': [
+            'kpi', 'counter', 'kpiNumber', 'percentageCounter', 'comparisonKPI', 'deltaIndicator',
+            'timer', 'countdown', 'progressBar', 'circularProgress', 'semiGauge', 'milestoneTracker',
+            'dashboardCard', 'timeline', 'milestoneTimeline', 'statGrid', 'techMetric', 'dataWave',
+            'scoreCard', 'batteryLevel', 'pulseRadar', 'multiProgress', 'speedometer', 'ringChart',
+            'statusBadge', 'metricRing', 'floatingTag', 'stepIndicator'
+        ],
+        'data_indicator': [
+             'kpi', 'counter', 'kpiNumber', 'percentageCounter', 'comparisonKPI', 'deltaIndicator',
+            'timer', 'countdown', 'progressBar', 'circularProgress', 'semiGauge', 'milestoneTracker',
+            'dashboardCard', 'timeline', 'milestoneTimeline', 'statGrid', 'techMetric', 'dataWave',
+            'scoreCard', 'batteryLevel', 'pulseRadar', 'multiProgress', 'speedometer', 'ringChart',
+            'statusBadge', 'metricRing', 'floatingTag', 'stepIndicator'
+        ],
+        'shape': ['circle', 'rect', 'line'],
+        'procedural_bg': ['dark_particles', 'liquid_gradient', 'neon_grid']
+    }
+
+    VALID_TEXT_HERO_ANIMS = [
+        'glow_pulse', 'isolate_zoom', 'bounce_pop', 'neon_flicker', 'shake_alert',
+        'rainbow_flow', 'ghost_trail', 'glitch_pop', 'wave_float', 'expand_contract',
+        'blur_reveal', 'color_shift', 'rotation_swing', 'shadow_pulse', 'letter_jump',
+        'skew_slide', 'tilt_pan', 'bounce_gravity', 'border_glow', 'glass_shimmer',
+        'heartbeat', 'strobe_flash', 'threed_flip', 'magnetic_pull', 'fire_glow',
+        'pixel_scatter', 'swing_pivot', 'depth_shadow', 'energy_beam', 'spiral_in',
+        'fly_in_z', 'typewriter_flicker', 'vibrate_intense', 'float_orbit',
+        'mirror_split', 'zoom_blur_pop', 'liquid_waver'
+    ]
+
+    # Font Detection
+    available_fonts = []
+    fonts_dir = os.path.join(public_dir, "fonts")
+    if os.path.exists(fonts_dir):
+        for f in os.listdir(fonts_dir):
+            if f.lower().endswith(('.ttf', '.otf', '.woff', '.woff2')):
+                name = os.path.splitext(f)[0]
+                clean_name = re.sub(r'-(Regular|Bold|Italic|Light|Medium|Thin|SemiBold|ExtraBold|Black)$', '', name, flags=re.IGNORECASE)
+                available_fonts.append(clean_name)
+    available_fonts = list(set(available_fonts))
+
     # Scoring Metrics (0-100)
     scores = {
         "layout": 100,
@@ -115,6 +187,12 @@ def test_manifest_quality(filepath, public_dir=None):
             scores["timing"] -= 50
 
         # 3. Overlay Validation
+        if scene.get('background_type') == 'procedural':
+            bg_var = scene.get('procedural_config', {}).get('variant')
+            if bg_var and bg_var not in ENGINE_VARIANTS['procedural_bg']:
+                issues.append(f"[{scene_id}] ASSET ERROR: Invalid procedural background variant '{bg_var}'. Valid: {ENGINE_VARIANTS['procedural_bg']}")
+                scores["assets"] -= 10
+
         overlay_ids = set()
         placed_geometries = []
         prev_ov_id = None
@@ -124,6 +202,57 @@ def test_manifest_quality(filepath, public_dir=None):
             ov_id = ov.get('id', f'overlay_{ov_idx}')
             overlay_ids.add(ov_id)
             o_type = str(ov.get('type', 'text')).lower()
+            if o_type not in VALID_TYPES:
+                issues.append(f"[{scene_id}] TYPE ERROR: Overlay '{ov_id}' has invalid type '{o_type}'. Valid: {VALID_TYPES}")
+                scores["composition"] -= 20
+
+            # Variant Validation
+            if o_type in ENGINE_VARIANTS:
+                variant_key = 'chart_type' if 'chart' in o_type else 'indicator_type' if 'indicator' in o_type else 'shape_type' if o_type == 'shape' else None
+                if variant_key:
+                    variant = ov.get(variant_key)
+                    if not variant:
+                        issues.append(f"[{scene_id}] CONFIG ERROR: Overlay '{ov_id}' of type '{o_type}' is missing '{variant_key}'.")
+                    elif variant not in ENGINE_VARIANTS[o_type]:
+                        issues.append(f"[{scene_id}] CONFIG ERROR: Overlay '{ov_id}' variant '{variant}' is invalid for type '{o_type}'. Valid: {ENGINE_VARIANTS[o_type]}")
+                        scores["composition"] -= 10
+                    else:
+                        # Deep Validation of specific fields per variant
+                        if variant == 'milestoneTracker' and 'milestones' not in ov:
+                            issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'milestones' array.")
+                        elif variant in ['timeline', 'milestoneTimeline'] and 'events' not in ov and 'milestones' not in ov:
+                            issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'events' or 'milestones' array.")
+                        elif variant == 'statGrid' and 'stats' not in ov:
+                            issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'stats' array.")
+                        elif variant in ['multiProgress', 'ringChart'] and 'items' not in ov and 'rings' not in ov:
+                            issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'items' or 'rings' array.")
+                        elif variant in ['stepIndicator', 'step_indicator_glass'] and 'steps' not in ov:
+                            issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'steps' array.")
+                        elif variant in ['kpi', 'metric_tile'] and 'value' not in ov:
+                            warnings.append(f"[{scene_id}] DATA WARNING: '{ov_id}' ({variant}) should have a 'value'.")
+
+            # Typography & Font Validation
+            if o_type in ['text', 'shadcn_chart', 'shadcn_indicator', 'chart', 'indicator', 'data_indicator', 'ui_panel']:
+                font = ov.get('font')
+                if font and font not in available_fonts:
+                    # Special check for system fallbacks or generic families
+                    if font not in ['Inter', 'Arial', 'sans-serif', 'serif', 'monospace']:
+                        warnings.append(f"[{scene_id}] FONT WARNING: Overlay '{ov_id}' uses font '{font}' which is not in /public/fonts. Render might fallback.")
+                        scores["typography"] -= 5
+
+            if o_type == 'text':
+                hero = ov.get('hero_config', {})
+                h_anim = hero.get('animation')
+                if h_anim and h_anim not in VALID_TEXT_HERO_ANIMS:
+                    issues.append(f"[{scene_id}] ANIMATION ERROR: Text '{ov_id}' hero animation '{h_anim}' is invalid. Valid: {VALID_TEXT_HERO_ANIMS[:5]}...")
+                    scores["typography"] -= 10
+
+                h_word = str(hero.get('word', '')).replace('[.।]', '')
+                content = str(ov.get('content', '')).replace('[.।]', '')
+                if h_word and h_word not in content:
+                    warnings.append(f"[{scene_id}] SYNC WARNING: Hero word '{h_word}' not found in content of '{ov_id}'. Reveal animation might skip.")
+                    scores["typography"] -= 5
+
             start = int(ov.get('start', 0))
 
             # 2.1 detailed SYNC ORDER Check
