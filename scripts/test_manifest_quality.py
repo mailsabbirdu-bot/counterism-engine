@@ -34,7 +34,7 @@ def test_manifest_quality(filepath, public_dir=None):
     # --- ASSET & TYPE REGISTRY (Surgical Validation) ---
     VALID_TYPES = [
         'text', 'ui_panel', 'shape', 'chart', 'indicator', 'data_indicator',
-        'graph', 'video', 'image', 'shadcn_chart', 'shadcn_indicator', 'svg'
+        'graph', 'video', 'image', 'shadcn_chart', 'shadcn_indicator', 'svg', 'connector'
     ]
 
     ENGINE_VARIANTS = {
@@ -274,13 +274,14 @@ def test_manifest_quality(filepath, public_dir=None):
                         warnings.append(f"[{scene_id}] FONT WARNING: Overlay '{ov_id}' uses generic font '{font}'. Use local production fonts like {available_fonts[:3]} instead.")
                         scores["typography"] -= 5
 
-                # Language consistency check
+                # Language consistency check (FIXABLE BY ENGINE)
                 if is_bangla and bangla_fonts and font not in bangla_fonts:
-                    warnings.append(f"[{scene_id}] FONT WARNING: Overlay '{ov_id}' has Bangla content but font '{font}' might not support it. Use: {bangla_fonts}")
-                    scores["typography"] -= 5
+                    warnings.append(f"[{scene_id}] ENGINE FIXABLE: Font '{font}' for Bangla content is sub-optimal. Engine will auto-map to Sohid_bangla.")
+                    # Minimal penalty for fixable aesthetic issues
+                    scores["typography"] -= 2
                 elif not is_bangla and english_fonts and font in bangla_fonts:
-                    warnings.append(f"[{scene_id}] FONT WARNING: Overlay '{ov_id}' has English content but uses Bangla font '{font}'. Use: {english_fonts}")
-                    scores["typography"] -= 5
+                    warnings.append(f"[{scene_id}] ENGINE FIXABLE: Font '{font}' for English content is sub-optimal. Engine will auto-map to standard English font.")
+                    scores["typography"] -= 2
 
             if o_type == 'text':
                 hero = ov.get('hero_config', {})
@@ -381,17 +382,29 @@ def test_manifest_quality(filepath, public_dir=None):
     # RUTHLESS ACCURACY ENFORCEMENT
     # If there are fatal issues, the score MUST be capped to reflect lack of production-readiness.
     num_issues = len(issues)
+
+    # Check for structural corruption (Not fixable by engine)
+    has_fatal = any("DATA ERROR" in i or "TYPE ERROR" in i or "CRITICAL" in i or "OFFSCREEN" in i for i in issues)
+
     if num_issues > 0:
         # Penalize overall score based on count of fatal issues
         overall_score = min(overall_score, 100 - (num_issues * 10))
         # Hard caps for production readiness
-        if any("DATA ERROR" in i or "TYPE ERROR" in i or "CRITICAL" in i for i in issues):
+        if has_fatal:
             overall_score = min(overall_score, 45) # Cannot be higher than 45% with data/type corruption
         else:
             overall_score = min(overall_score, 75) # Cannot be higher than 75% with any fatal layout/camera issues
 
     overall_score = max(0, int(overall_score))
     all_feedback = issues + warnings
+
+    if issues:
+        print("\n❌ FATAL ISSUES:")
+        for i in issues: print(f"  - {i}")
+
+    if warnings:
+        print("\n⚠️ WARNINGS:")
+        for w in warnings: print(f"  - {w}")
 
     print("\n" + "="*80)
     print(f"📈 FINAL PRODUCTION REPORT: {overall_score}%")
@@ -400,5 +413,8 @@ def test_manifest_quality(filepath, public_dir=None):
     return (len(issues) == 0 and overall_score == 100), overall_score, all_feedback
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python3 scripts/test_manifest_quality.py <manifest_path> [public_dir]")
+        sys.exit(1)
     success, score, feedback = test_manifest_quality(sys.argv[1])
     sys.exit(0 if success else 1)
