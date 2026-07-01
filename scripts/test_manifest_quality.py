@@ -227,9 +227,10 @@ def test_manifest_quality(filepath, public_dir=None):
                     variant = ov.get(variant_key)
                     if not variant:
                         issues.append(f"[{scene_id}] CONFIG ERROR: Overlay '{ov_id}' of type '{o_type}' is missing '{variant_key}'.")
+                        scores["assets"] -= 25 # Severe penalty for missing key config
                     elif variant not in ENGINE_VARIANTS[o_type]:
                         issues.append(f"[{scene_id}] CONFIG ERROR: Overlay '{ov_id}' variant '{variant}' is invalid for type '{o_type}'. Valid: {ENGINE_VARIANTS[o_type]}")
-                        scores["composition"] -= 10
+                        scores["assets"] -= 20
                     else:
                         # Deep Validation of specific fields per variant
                         variant_error = False

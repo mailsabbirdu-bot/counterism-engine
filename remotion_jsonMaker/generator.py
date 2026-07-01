@@ -232,6 +232,14 @@ class RemotionJsonMaker:
             raw_overlays = scene['overlays'] if isinstance(scene['overlays'], list) else [scene['overlays']]
             for ov in raw_overlays:
                 o_type = str(ov.get('type', 'text')).lower()
+
+                # PRODUCTION FIX: Map generic 'variant' to type-specific keys
+                if 'variant' in ov:
+                    v_val = ov['variant']
+                    if 'chart' in o_type: ov['chart_type'] = v_val
+                    elif 'indicator' in o_type: ov['indicator_type'] = v_val
+                    elif o_type == 'shape': ov['shape_type'] = v_val
+
                 if 'chart_type' in ov: o_type = 'shadcn_chart'
                 if 'indicator_type' in ov: o_type = 'shadcn_indicator'
 
@@ -458,17 +466,19 @@ class RemotionJsonMaker:
 
                 copy_payload = prompt
                 if previous_json:
-                    protocol = """
---- PRODUCTION CORRECTION PROTOCOL (STRICT) ---
-You have FAILED the quality assurance pass. You must REPAIR the manifest using the surgical feedback below.
-
-1. MANDATORY DIAGNOSTIC: List each error from the 'ERROR LIST' below and state the EXACT numerical change you are making to fix it.
-2. GEOMETRY: Use the suggested coordinates. Rule of Thirds Anchors: L_MID(550, 540), R_MID(1370, 540), C_TOP(960, 320), C_BOT(960, 760).
-3. SYNC: Re-order the 'overlays' array objects so that 'start' times strictly increase.
-4. INTEGRITY: Do NOT alter narration content, hero words, or timestamps unless fixing an out-of-bounds error.
-5. OUTPUT: Provide the Diagnostic List first, then the Entire Corrected RAW JSON Block. No conversational chatter.
-"""
-                    copy_payload = f"🚨 URGENT: PRODUCTION ERRORS DETECTED ({score}% ACCURACY)\n\n--- ERROR LIST ---\n{chr(10).join(errors)}\n\n{protocol}\n\n--- PREVIOUS JSON ---\n{previous_json}\n\n--- ORIGINAL TASK CONTEXT ---\n{prompt}"
+                    # SLIM RE-PROMPT (To save word count/tokens)
+                    copy_payload = (
+                        f"🚨 PRODUCTION REPAIR REQUIRED ({score}% ACCURACY)\n\n"
+                        f"--- ERROR LIST ---\n{chr(10).join(errors)}\n\n"
+                        f"--- REPAIR PROTOCOL ---\n"
+                        f"1. DIAGNOSTIC: List each error and its numerical fix.\n"
+                        f"2. GEOMETRY: Anchor to L_MID(550,540), R_MID(1370,540), C_TOP(960,320), C_BOT(960,760).\n"
+                        f"3. SCHEMA: Use the 'variant' key for ALL component types (shape/chart/indicator).\n"
+                        f"4. OUTPUT: Provide Diagnostic + Corrected RAW JSON block only.\n\n"
+                        f"--- PREVIOUS JSON ---\n{previous_json}\n\n"
+                        f"--- ORIGINAL SOURCE CONTENT ---\n"
+                        f"{re.search(r'--- SOURCE CONTENT ---.*?(?=--- PROJECT ASSETS ---)', prompt, re.DOTALL).group() if '--- SOURCE CONTENT ---' in prompt else prompt[:1000]}"
+                    )
 
                 js_code = f"""
                     (async () => {{
@@ -574,14 +584,15 @@ You have FAILED the quality assurance pass. You must REPAIR the manifest using t
             f"--- SYSTEM ROLE & CORE RULES ---\n"
             f"ROLE: WORLD-CLASS CINEMATIC MOTION DESIGNER (Vox/Polymatter Style).\n"
             f"1. TYPOGRAPHY: Bangla text MUST use a font from the BANGLA list. English uses ENGLISH list. Use concise 2-3 word headers.\n"
-            f"2. COMPOSITION: Use the Rule of Thirds. Stop centering everything. Use negative space identified in VISUAL PERCEPTION DATA.\n"
+            f"2. COMPOSITION: Use Rule of Thirds. Stop centering. Avoid stacking overlays. Use negative space from VISUAL PERCEPTION DATA.\n"
             f"3. SYNC: Match 'start' and 'duration' strictly to TIMESTAMPS. Sort overlays by entry time.\n"
-            f"4. BACKGROUND: Always use 'background_type': 'video'. video_path: 'renders/scene_SC_XX.mp4'. Set 'audio_enabled': false.\n"
+            f"4. BACKGROUND: Always 'background_type': 'video'. video_path: 'renders/scene_SC_XX.mp4'. Set 'audio_enabled': false.\n"
             f"5. CAMERA: Every scene MUST have a camera 'shot' targeting a valid overlay ID. Use 'slow_push' or 'cinematic_drift'.\n"
-            f"6. MOTION TRACKING: If a subject is 'TRACKABLE', use 'tracking': {{ 'enabled': true, 'target': 'hero_track', 'offset': {{ 'x': 0, 'y': -80 }} }}.\n\n"
-            f"--- COMPONENT PRESETS ---\n"
+            f"6. SCHEMA: For ALL components (charts/indicators/shapes), use the 'variant' key to specify the type.\n\n"
+            f"--- COMPONENT VARIANTS ---\n"
             f"CHARTS: glass_area, neon_bar, stacked_line, radial_score, radar_web, pie_donut_glass, step_area, multi_bar_stack, bar_race_top, thick_line_glow, area, bar, line.\n"
             f"INDICATORS: metric_tile, tech_badge, activity_ring, crypto_card, server_status, data_ticker, notification_stack, kpiNumber, deltaIndicator, semiGauge, milestoneTimeline, statGrid, batteryLevel.\n"
+            f"SHAPES: circle, rect, line.\n"
             f"HERO ANIMATIONS: glow_pulse, isolate_zoom, bounce_pop, neon_flicker, shake_alert, rainbow_flow, glitch_pop, wave_float, blur_reveal, glass_shimmer, heartbeat, fire_glow.\n\n"
             f"--- DATA SCHEMA ENFORCEMENT ---\n"
             f"- 'milestoneTimeline' requires 'events': [ {{ 'title': '...', 'date': '...', 'description': '...' }} ].\n"
@@ -679,7 +690,13 @@ def main():
         for scene in render_json.get('scenes', []):
             for ov in scene.get('overlays', []):
                 o_type = str(ov.get('type')).lower()
-                var = ov.get('indicator_type') or ov.get('chart_type')
+
+                # RE-FIX: Ensure specific keys exist even if variant was mapped earlier
+                if o_type == 'shape' and 'variant' in ov and 'shape_type' not in ov: ov['shape_type'] = ov['variant']
+                if 'chart' in o_type and 'variant' in ov and 'chart_type' not in ov: ov['chart_type'] = ov['variant']
+                if 'indicator' in o_type and 'variant' in ov and 'indicator_type' not in ov: ov['indicator_type'] = ov['variant']
+
+                var = ov.get('indicator_type') or ov.get('chart_type') or ov.get('shape_type')
                 if var == 'milestoneTracker' and 'milestones' not in ov:
                     ov['milestones'] = [{"label": "Milestone 1", "date": "T-0"}]
                 if var in ['timeline', 'milestoneTimeline'] and 'events' not in ov and 'milestones' not in ov:
