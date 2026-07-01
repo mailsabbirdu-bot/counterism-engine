@@ -10,6 +10,7 @@ import { MediaEngine } from './engines/MediaEngine';
 import { DataIndicatorEngine } from './engines/DataIndicatorEngine';
 import { ShadcnEngine } from './engines/ShadcnEngine';
 import { AnimatedSvg } from '../svg/components/AnimatedSvg';
+import { Connector } from './components/ConnectorEngine/Connector';
 import { resolvePosition } from './services/SmartPositionResolver';
 
 interface OverlayManagerProps {
@@ -71,6 +72,13 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays, analys
                   height={overlay.height || 300}
                   x={positionalOverlay.position?.x || 960}
                   y={positionalOverlay.position?.y || 540}
+                />
+              );
+            case 'connector':
+              return (
+                <Connector
+                  {...overlay}
+                  overlays={overlays}
                 />
               );
             default:

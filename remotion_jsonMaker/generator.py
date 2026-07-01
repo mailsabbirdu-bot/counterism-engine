@@ -466,18 +466,18 @@ class RemotionJsonMaker:
 
                 copy_payload = prompt
                 if previous_json:
-                    # SLIM RE-PROMPT (To save word count/tokens)
+                    # ULTRA-SLIM RE-PROMPT (To save word count/tokens)
                     copy_payload = (
-                        f"🚨 PRODUCTION REPAIR REQUIRED ({score}% ACCURACY)\n\n"
+                        f"🚨 REPAIR REQ ({score}%): {len(errors)} ERRORS.\n\n"
                         f"--- ERROR LIST ---\n{chr(10).join(errors)}\n\n"
-                        f"--- REPAIR PROTOCOL ---\n"
-                        f"1. DIAGNOSTIC: List each error and its numerical fix.\n"
-                        f"2. GEOMETRY: Anchor to L_MID(550,540), R_MID(1370,540), C_TOP(960,320), C_BOT(960,760).\n"
-                        f"3. SCHEMA: Use the 'variant' key for ALL component types (shape/chart/indicator).\n"
-                        f"4. OUTPUT: Provide Diagnostic + Corrected RAW JSON block only.\n\n"
+                        f"--- RULES ---\n"
+                        f"1. FIX: Root key only for data. NO 'data: {{}}' or 'styling: {{}}' nesting.\n"
+                        f"2. POS: L_MID(550,540), R_MID(1370,540), C_TOP(960,320), C_BOT(960,760).\n"
+                        f"3. VAR: Use 'variant' key for ALL subtypes.\n"
+                        f"4. OUTPUT: Diagnostic + Corrected RAW JSON only.\n\n"
                         f"--- PREVIOUS JSON ---\n{previous_json}\n\n"
-                        f"--- ORIGINAL SOURCE CONTENT ---\n"
-                        f"{re.search(r'--- SOURCE CONTENT ---.*?(?=--- PROJECT ASSETS ---)', prompt, re.DOTALL).group() if '--- SOURCE CONTENT ---' in prompt else prompt[:1000]}"
+                        f"--- STORY CONTEXT ---\n"
+                        f"{re.search(r'STORY:.*?(?=TIMESTAMPS:)', prompt, re.DOTALL).group() if 'STORY:' in prompt else prompt[:500]}"
                     )
 
                 js_code = f"""
@@ -588,11 +588,13 @@ class RemotionJsonMaker:
             f"3. SYNC: Match 'start' and 'duration' strictly to TIMESTAMPS. Sort overlays by entry time.\n"
             f"4. BACKGROUND: Always 'background_type': 'video'. video_path: 'renders/scene_SC_XX.mp4'. Set 'audio_enabled': false.\n"
             f"5. CAMERA: Every scene MUST have a camera 'shot' targeting a valid overlay ID. Use 'slow_push' or 'cinematic_drift'.\n"
-            f"6. SCHEMA: For ALL components (charts/indicators/shapes), use the 'variant' key to specify the type.\n\n"
+            f"6. SCHEMA: For ALL components (charts/indicators/shapes/connectors), use the 'variant' key to specify the type.\n"
+            f"7. RELATIONSHIPS: Use 'type': 'connector' to link components by their 'id'. Specify 'source' and 'target' IDs.\n\n"
             f"--- COMPONENT VARIANTS ---\n"
             f"CHARTS: glass_area, neon_bar, stacked_line, radial_score, radar_web, pie_donut_glass, step_area, multi_bar_stack, bar_race_top, thick_line_glow, area, bar, line.\n"
             f"INDICATORS: metric_tile, tech_badge, activity_ring, crypto_card, server_status, data_ticker, notification_stack, kpiNumber, deltaIndicator, semiGauge, milestoneTimeline, statGrid, batteryLevel.\n"
             f"SHAPES: circle, rect, line.\n"
+            f"CONNECTORS: smooth_curve, soft_arc, straight_flow, energy_flow, signal_beam, data_stream, s_curve, zigzag_soft, multi_branch, network_web, callout_line, camera_focus, timeline_path, route_path, curved_route, neon_connector, blueprint_connector, organic_connector.\n"
             f"HERO ANIMATIONS: glow_pulse, isolate_zoom, bounce_pop, neon_flicker, shake_alert, rainbow_flow, glitch_pop, wave_float, blur_reveal, glass_shimmer, heartbeat, fire_glow.\n\n"
             f"--- DATA SCHEMA ENFORCEMENT ---\n"
             f"- 'milestoneTimeline' requires 'events': [ {{ 'title': '...', 'date': '...', 'description': '...' }} ].\n"
@@ -691,12 +693,19 @@ def main():
             for ov in scene.get('overlays', []):
                 o_type = str(ov.get('type')).lower()
 
+                # DEEP DATA PROMOTION: Move fields from 'data' or 'styling' to root
+                for nest_key in ['data', 'styling', 'config']:
+                    if nest_key in ov and isinstance(ov[nest_key], dict):
+                        for sub_key, sub_val in ov[nest_key].items():
+                            if sub_key not in ov: ov[sub_key] = sub_val
+
                 # RE-FIX: Ensure specific keys exist even if variant was mapped earlier
                 if o_type == 'shape' and 'variant' in ov and 'shape_type' not in ov: ov['shape_type'] = ov['variant']
                 if 'chart' in o_type and 'variant' in ov and 'chart_type' not in ov: ov['chart_type'] = ov['variant']
                 if 'indicator' in o_type and 'variant' in ov and 'indicator_type' not in ov: ov['indicator_type'] = ov['variant']
+                if o_type == 'connector' and 'variant' in ov and 'preset' not in ov: ov['preset'] = ov['variant']
 
-                var = ov.get('indicator_type') or ov.get('chart_type') or ov.get('shape_type')
+                var = ov.get('indicator_type') or ov.get('chart_type') or ov.get('shape_type') or ov.get('preset')
                 if var == 'milestoneTracker' and 'milestones' not in ov:
                     ov['milestones'] = [{"label": "Milestone 1", "date": "T-0"}]
                 if var in ['timeline', 'milestoneTimeline'] and 'events' not in ov and 'milestones' not in ov:
@@ -716,7 +725,7 @@ def main():
         current_score = score
 
         # Track best result
-        if score > best_score:
+        if score > best_score or best_json is None:
             best_score = score
             best_json = render_json
             print(f"   🏆 New Best Score: {best_score}%")
