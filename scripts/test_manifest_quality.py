@@ -165,6 +165,7 @@ def test_manifest_quality(filepath, public_dir=None):
 
         if scene_id in all_scene_ids:
             issues.append(f"[{scene_id}] CRITICAL: Duplicate scene_id detected.")
+            scores["composition"] -= 20
         all_scene_ids.add(scene_id)
 
         # Reading Order & Sequencing
@@ -231,18 +232,28 @@ def test_manifest_quality(filepath, public_dir=None):
                         scores["composition"] -= 10
                     else:
                         # Deep Validation of specific fields per variant
+                        variant_error = False
                         if variant == 'milestoneTracker' and 'milestones' not in ov:
                             issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'milestones' array.")
+                            variant_error = True
                         elif variant in ['timeline', 'milestoneTimeline'] and 'events' not in ov and 'milestones' not in ov:
                             issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'events' or 'milestones' array.")
+                            variant_error = True
                         elif variant == 'statGrid' and 'stats' not in ov:
                             issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'stats' array.")
+                            variant_error = True
                         elif variant in ['multiProgress', 'ringChart'] and 'items' not in ov and 'rings' not in ov:
                             issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'items' or 'rings' array.")
+                            variant_error = True
                         elif variant in ['stepIndicator', 'step_indicator_glass'] and 'steps' not in ov:
                             issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'steps' array.")
+                            variant_error = True
                         elif variant in ['kpi', 'metric_tile'] and 'value' not in ov:
                             warnings.append(f"[{scene_id}] DATA WARNING: '{ov_id}' ({variant}) should have a 'value'.")
+                            scores["assets"] -= 5
+
+                        if variant_error:
+                            scores["assets"] -= 20
 
             # Typography & Font Validation
             if o_type in ['text', 'shadcn_chart', 'shadcn_indicator', 'chart', 'indicator', 'data_indicator', 'ui_panel']:
@@ -362,6 +373,7 @@ def test_manifest_quality(filepath, public_dir=None):
         for line in scene.get('infographic_lines', []):
             if line.get('from_id') not in overlay_ids or line.get('to_id') not in overlay_ids:
                 issues.append(f"[{scene_id}] Infographic line references missing ID.")
+                scores["composition"] -= 15
 
     overall_score = sum(scores.values()) / len(scores)
     all_feedback = issues + warnings

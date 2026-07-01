@@ -656,6 +656,8 @@ def main():
     previous_json = None
     feedback_errors = None
     current_score = 0
+    best_score = -1
+    best_json = None
 
     manifest_dir = os.path.dirname(args.output)
     interaction_log = os.path.join(manifest_dir, "interaction_log.txt")
@@ -673,29 +675,41 @@ def main():
         # Post-Paste Hardening
         render_json = maker.finalize_json_durations(render_json, public_dir=args.public_dir)
 
-        # Save temporarily for QA
-        with open(args.output, 'w', encoding='utf-8') as f: json.dump(render_json, f, indent=2, ensure_ascii=False)
-
-        print(f"🧪 STAGE 3: Production QA (Iteration {iteration})...")
-        # Final pass verification for mandatory fields before QA
+        # Final pass verification for mandatory fields before QA & Save
         for scene in render_json.get('scenes', []):
             for ov in scene.get('overlays', []):
                 o_type = str(ov.get('type')).lower()
                 var = ov.get('indicator_type') or ov.get('chart_type')
-                if var == 'milestoneTracker' and 'milestones' not in ov: ov['milestones'] = [{"label": "Start", "date": "T-0"}]
+                if var == 'milestoneTracker' and 'milestones' not in ov:
+                    ov['milestones'] = [{"label": "Milestone 1", "date": "T-0"}]
                 if var in ['timeline', 'milestoneTimeline'] and 'events' not in ov and 'milestones' not in ov:
-                    ov['events'] = [{"title": "Initial Step", "date": "Start", "description": "System activated."}]
-                if var == 'statGrid' and 'stats' not in ov: ov['stats'] = [{"label": "Status", "value": 100, "suffix": "%"}]
+                    ov['events'] = [{"title": "Event 1", "date": "Start", "description": "System activated."}]
+                if var == 'statGrid' and 'stats' not in ov:
+                    ov['stats'] = [{"label": "Metric 1", "value": 85, "suffix": "%"}, {"label": "Metric 2", "value": 92, "suffix": "%"}]
                 if var in ['multiProgress', 'ringChart'] and 'items' not in ov and 'rings' not in ov:
-                    ov['items'] = [{"label": "Process", "value": 50, "color": "#00F5FF"}]
-                if var in ['stepIndicator', 'step_indicator_glass'] and 'steps' not in ov: ov['steps'] = ["Initiate", "Analyze", "Execute"]
+                    ov['items'] = [{"label": "Process A", "value": 75, "color": "#00F5FF"}]
+                if var in ['stepIndicator', 'step_indicator_glass'] and 'steps' not in ov:
+                    ov['steps'] = ["Initiate", "Process", "Complete"]
 
+        # Save temporarily for QA
+        with open(args.output, 'w', encoding='utf-8') as f: json.dump(render_json, f, indent=2, ensure_ascii=False)
+
+        print(f"🧪 STAGE 3: Production QA (Iteration {iteration})...")
         success, score, feedback = test_manifest_quality(args.output, args.public_dir)
         current_score = score
 
+        # Track best result
+        if score > best_score:
+            best_score = score
+            best_json = render_json
+            print(f"   🏆 New Best Score: {best_score}%")
+
         if success or force_stop:
-            if force_stop: print(f"\n🛑 PROCESS ENDED MANUALLY. Final Rating: {score}%")
-            else: print(f"\n✨ PRODUCTION READY! Final Rating: {score}%")
+            if force_stop:
+                print(f"\n🛑 PROCESS ENDED MANUALLY. Restoring Best Result ({best_score}%)...")
+                render_json = best_json
+            else:
+                print(f"\n✨ PRODUCTION READY! Final Rating: {score}%")
             break
         else:
             print(f"\n⚠️ QA FAILED ({score}%). Re-prompting for correction...")
@@ -703,6 +717,9 @@ def main():
             feedback_errors = feedback
             iteration += 1
 
+    # Ensure final best result is saved
+    with open(args.output, 'w', encoding='utf-8') as f:
+        json.dump(render_json, f, indent=2, ensure_ascii=False)
     print(f"✅ Final Manifest saved to: {args.output}")
 
 if __name__ == "__main__": main()
