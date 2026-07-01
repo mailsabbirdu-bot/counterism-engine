@@ -94,13 +94,26 @@ def test_manifest_quality(filepath, public_dir=None):
 
     # Font Detection
     available_fonts = []
+    bangla_fonts = []
+    english_fonts = []
+    BANGLA_KEYWORDS = ['solaiman', 'kalpurush', 'nikosh', 'hind', 'siliguri', 'adorsho', 'sutonny', 'shonar', 'vrinda', 'bangla', 'liyakats', 'anshu', 'charukola', 'galada', 'mina', 'mukti', 'atreyee', 'benisen', 'bengali', 'shishir', 'shorif', 'maharaj', '_bangla', 'bangla']
+
     fonts_dir = os.path.join(public_dir, "fonts")
     if os.path.exists(fonts_dir):
         for f in os.listdir(fonts_dir):
             if f.lower().endswith(('.ttf', '.otf', '.woff', '.woff2')):
                 name = os.path.splitext(f)[0]
-                clean_name = re.sub(r'-(Regular|Bold|Italic|Light|Medium|Thin|SemiBold|ExtraBold|Black)$', '', name, flags=re.IGNORECASE)
+                # Try both original and clean name for availability
+                available_fonts.append(name)
+                clean_name = re.sub(r'(_english|_bangla)$', '', name, flags=re.IGNORECASE)
+                clean_name = re.sub(r'-(Regular|Bold|Italic|Light|Medium|Thin|SemiBold|ExtraBold|Black)$', '', clean_name, flags=re.IGNORECASE)
                 available_fonts.append(clean_name)
+
+                if any(kw in name.lower() for kw in BANGLA_KEYWORDS):
+                    bangla_fonts.append(name)
+                else:
+                    english_fonts.append(name)
+
     available_fonts = list(set(available_fonts))
 
     # Scoring Metrics (0-100)
@@ -234,11 +247,28 @@ def test_manifest_quality(filepath, public_dir=None):
             # Typography & Font Validation
             if o_type in ['text', 'shadcn_chart', 'shadcn_indicator', 'chart', 'indicator', 'data_indicator', 'ui_panel']:
                 font = ov.get('font')
-                if font and font not in available_fonts:
+                content = str(ov.get('content', ov.get('text', ov.get('label', ov.get('title', '')))))
+                is_bangla = any('\u0980' <= c <= '\u09FF' for c in content)
+
+                if not font:
+                    issues.append(f"[{scene_id}] FONT ERROR: Overlay '{ov_id}' is missing 'font' field.")
+                    scores["typography"] -= 10
+                elif font not in available_fonts:
                     # Special check for system fallbacks or generic families
                     if font not in ['Inter', 'Arial', 'sans-serif', 'serif', 'monospace']:
-                        warnings.append(f"[{scene_id}] FONT WARNING: Overlay '{ov_id}' uses font '{font}' which is not in /public/fonts. Render might fallback.")
+                        issues.append(f"[{scene_id}] FONT ERROR: Overlay '{ov_id}' uses font '{font}' which is NOT in /public/fonts. Valid: {available_fonts}")
+                        scores["typography"] -= 15
+                    else:
+                        warnings.append(f"[{scene_id}] FONT WARNING: Overlay '{ov_id}' uses generic font '{font}'. Use local production fonts like {available_fonts[:3]} instead.")
                         scores["typography"] -= 5
+
+                # Language consistency check
+                if is_bangla and bangla_fonts and font not in bangla_fonts:
+                    warnings.append(f"[{scene_id}] FONT WARNING: Overlay '{ov_id}' has Bangla content but font '{font}' might not support it. Use: {bangla_fonts}")
+                    scores["typography"] -= 5
+                elif not is_bangla and english_fonts and font in bangla_fonts:
+                    warnings.append(f"[{scene_id}] FONT WARNING: Overlay '{ov_id}' has English content but uses Bangla font '{font}'. Use: {english_fonts}")
+                    scores["typography"] -= 5
 
             if o_type == 'text':
                 hero = ov.get('hero_config', {})
