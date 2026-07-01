@@ -144,7 +144,16 @@ class RemotionJsonMaker:
         MIN_SVG_W, MIN_SVG_H = 100, 100
         MIN_SPACING = 30
         MODERN_COLORS = ["#00F5FF", "#FFD700", "#FF3E6C", "#00FFAB"]
-        VALID_TEXT_ANIMS = ["glow_pulse", "neon_flicker", "glitch_pop", "bounce_pop", "word_by_word", "slide_up", "typewriter"]
+        VALID_TEXT_ANIMS = [
+            'glow_pulse', 'isolate_zoom', 'bounce_pop', 'neon_flicker', 'shake_alert',
+            'rainbow_flow', 'ghost_trail', 'glitch_pop', 'wave_float', 'expand_contract',
+            'blur_reveal', 'color_shift', 'rotation_swing', 'shadow_pulse', 'letter_jump',
+            'skew_slide', 'tilt_pan', 'bounce_gravity', 'border_glow', 'glass_shimmer',
+            'heartbeat', 'strobe_flash', 'threed_flip', 'magnetic_pull', 'fire_glow',
+            'pixel_scatter', 'swing_pivot', 'depth_shadow', 'energy_beam', 'spiral_in',
+            'fly_in_z', 'typewriter_flicker', 'vibrate_intense', 'float_orbit',
+            'mirror_split', 'zoom_blur_pop', 'liquid_waver'
+        ]
         LOCKED_FIELDS = ["content", "hero_config", "tracking"]
 
         # Production-Grade Grid Anchors (Rule of Thirds)
@@ -530,6 +539,19 @@ You have FAILED the quality assurance pass. You must REPAIR the manifest using t
             "MOTION TRACKING RULE: Use tracking when the narration mentions a specific moving subject. "
             "To attach an overlay to a subject, use: 'tracking': { 'enabled': true, 'target': 'hero_track', 'offset': { 'x': 0, 'y': -80 } }. "
             "The target 'hero_track' follows the primary subject. Offset is in pixels relative to object center.\n"
+            "\n--- ASSET PRESETS (Surgical Precision Required) ---\n"
+            "CHART TYPES: line, area, forecast, bar, horizontalBar, pie, donut, bump, heatmap, radar, radialBar, swarmplot, waffle, funnel, marimekko, treemap, sunburst, scatter, bubble, network, sankey, boxplot, violinPlot\n"
+            "SHADCN CHART TYPES: glass_area, neon_bar, stacked_line, radial_score, radar_web, composed_tech, pie_donut_glass, scatter_bubble, horizontal_pill_bar, step_area, multi_bar_stack, double_radar, funnel_glass, smooth_area_dual, bar_race_top, thick_line_glow, layered_pies, range_area, floating_bars, dual_axis_tech, jagged_peak\n"
+            "SHADCN INDICATORS: metric_tile, tech_badge, activity_ring, crypto_card, server_status, user_profile_stat, weather_glass, storage_pill, upload_cloud, score_board, notification_stack, data_ticker, network_ping, step_indicator_glass, battery_pack, media_controls, social_stats, tech_folder, system_cpu, location_tag, search_bar_glass, badge_collection, data_download, system_lock, clock_modern, floating_icon_text, mini_stat_card, activity_dots\n"
+            "INDICATOR TYPES: kpiNumber, percentageCounter, comparisonKPI, deltaIndicator, countdown, progressBar, circularProgress, semiGauge, milestoneTracker, dashboardCard, timeline, statGrid, techMetric, batteryLevel, pulseRadar, speedometer, metricRing, floatingTag, stepIndicator\n"
+            "HERO ANIMATIONS: glow_pulse, isolate_zoom, bounce_pop, neon_flicker, shake_alert, rainbow_flow, glitch_pop, wave_float, expand_contract, blur_reveal, glass_shimmer, heartbeat, fire_glow, spiral_in, zoom_blur_pop, liquid_waver\n"
+            "PROCEDURAL VARIANTS: dark_particles, liquid_gradient, neon_grid\n"
+            "\n--- CRITICAL: DATA SCHEMA ENFORCEMENT ---\n"
+            "- 'milestoneTracker' requires 'milestones' array: [ { 'label': '...', 'date': '...' } ].\n"
+            "- 'timeline' / 'milestoneTimeline' requires 'events': [ { 'title': '...', 'date': '...', 'description': '...' } ].\n"
+            "- 'statGrid' requires 'stats': [ { 'label': '...', 'value': 80, 'suffix': '%' } ].\n"
+            "- 'multiProgress' / 'ringChart' requires 'items' or 'rings': [ { 'label': '...', 'value': 60, 'color': '#...' } ].\n"
+            "- 'stepIndicator' / 'step_indicator_glass' requires 'steps': [ 'Step 1', 'Step 2', ... ].\n"
             "OUTPUT RAW JSON BLOCK ONLY."
         )
         if prompt_output_path:
@@ -607,6 +629,11 @@ def main():
         render_json, force_stop = maker.generate(story, args.prompt_output, ts_content, scene_durations, args.drive_prompt,
                                      previous_json, feedback_errors, current_score, interaction_log_path=interaction_log)
 
+        if not render_json and not force_stop:
+            print("⚠️ Failed to parse AI output. Retrying...")
+            iteration += 1
+            continue
+
         # Post-Paste Hardening
         render_json = maker.finalize_json_durations(render_json, public_dir=args.public_dir)
 
@@ -614,6 +641,19 @@ def main():
         with open(args.output, 'w', encoding='utf-8') as f: json.dump(render_json, f, indent=2, ensure_ascii=False)
 
         print(f"🧪 STAGE 3: Production QA (Iteration {iteration})...")
+        # Final pass verification for mandatory fields before QA
+        for scene in render_json.get('scenes', []):
+            for ov in scene.get('overlays', []):
+                o_type = str(ov.get('type')).lower()
+                var = ov.get('indicator_type') or ov.get('chart_type')
+                if var == 'milestoneTracker' and 'milestones' not in ov: ov['milestones'] = [{"label": "Start", "date": "T-0"}]
+                if var in ['timeline', 'milestoneTimeline'] and 'events' not in ov and 'milestones' not in ov:
+                    ov['events'] = [{"title": "Initial Step", "date": "Start", "description": "System activated."}]
+                if var == 'statGrid' and 'stats' not in ov: ov['stats'] = [{"label": "Status", "value": 100, "suffix": "%"}]
+                if var in ['multiProgress', 'ringChart'] and 'items' not in ov and 'rings' not in ov:
+                    ov['items'] = [{"label": "Process", "value": 50, "color": "#00F5FF"}]
+                if var in ['stepIndicator', 'step_indicator_glass'] and 'steps' not in ov: ov['steps'] = ["Initiate", "Analyze", "Execute"]
+
         success, score, feedback = test_manifest_quality(args.output, args.public_dir)
         current_score = score
 
