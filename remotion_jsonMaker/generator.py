@@ -212,7 +212,8 @@ class RemotionJsonMaker:
             filename = os.path.basename(str(scene.get('video_path', '')))
             if filename in self.fps_cache: scene_duration = self.fps_cache[filename]
             scene['duration_in_frames'] = scene_duration
-            if 'audio_enabled' not in scene: scene['audio_enabled'] = True
+            # PRODUCTION OVERRIDE: Always mute background video to prevent double-audio with narration
+            scene['audio_enabled'] = False
 
             pattern = f"SC_{id_num:02d}".lower()
             narration_file = next((f for f in self.narration_files if pattern in f.lower()), None)
@@ -575,7 +576,7 @@ You have FAILED the quality assurance pass. You must REPAIR the manifest using t
             f"1. TYPOGRAPHY: Bangla text MUST use a font from the BANGLA list. English uses ENGLISH list. Use concise 2-3 word headers.\n"
             f"2. COMPOSITION: Use the Rule of Thirds. Stop centering everything. Use negative space identified in VISUAL PERCEPTION DATA.\n"
             f"3. SYNC: Match 'start' and 'duration' strictly to TIMESTAMPS. Sort overlays by entry time.\n"
-            f"4. BACKGROUND: Always use 'background_type': 'video'. video_path: 'renders/scene_SC_XX.mp4'. Set 'audio_enabled': true.\n"
+            f"4. BACKGROUND: Always use 'background_type': 'video'. video_path: 'renders/scene_SC_XX.mp4'. Set 'audio_enabled': false.\n"
             f"5. CAMERA: Every scene MUST have a camera 'shot' targeting a valid overlay ID. Use 'slow_push' or 'cinematic_drift'.\n"
             f"6. MOTION TRACKING: If a subject is 'TRACKABLE', use 'tracking': {{ 'enabled': true, 'target': 'hero_track', 'offset': {{ 'x': 0, 'y': -80 }} }}.\n\n"
             f"--- COMPONENT PRESETS ---\n"

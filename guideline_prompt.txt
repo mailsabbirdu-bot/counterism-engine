@@ -15,7 +15,7 @@ Produce high-end documentary motion graphics (Vox/Polymatter aesthetic). Every s
    - Targets MUST be valid overlay IDs.
    - RESTING TIME: Camera must stay on target for 45+ frames after `inDuration`.
 5. **DENSITY**: Maximum 1 focal element (Chart/KPI) per 60 frames. Do not crowd.
-6. **AUDIO/VIDEO**: Always `background_type: "video"`, `audio_enabled: true`.
+6. **AUDIO/VIDEO**: Always `background_type: "video"`, `audio_enabled: false`.
 
 ## 🎨 CINEMATIC DIRECTION: STUDIO V4
 - **VISUAL STORYTELLING**: Build complex, interconnected scene hierarchies. Use 'shape' and 'graph' to create technical depth.
