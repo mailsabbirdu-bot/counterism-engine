@@ -377,13 +377,27 @@ def test_manifest_quality(filepath, public_dir=None):
                 scores["composition"] -= 15
 
     overall_score = sum(scores.values()) / len(scores)
+
+    # RUTHLESS ACCURACY ENFORCEMENT
+    # If there are fatal issues, the score MUST be capped to reflect lack of production-readiness.
+    num_issues = len(issues)
+    if num_issues > 0:
+        # Penalize overall score based on count of fatal issues
+        overall_score = min(overall_score, 100 - (num_issues * 10))
+        # Hard caps for production readiness
+        if any("DATA ERROR" in i or "TYPE ERROR" in i or "CRITICAL" in i for i in issues):
+            overall_score = min(overall_score, 45) # Cannot be higher than 45% with data/type corruption
+        else:
+            overall_score = min(overall_score, 75) # Cannot be higher than 75% with any fatal layout/camera issues
+
+    overall_score = max(0, int(overall_score))
     all_feedback = issues + warnings
 
     print("\n" + "="*80)
-    print(f"📈 FINAL PRODUCTION REPORT: {int(overall_score)}%")
+    print(f"📈 FINAL PRODUCTION REPORT: {overall_score}%")
     print("="*80)
 
-    return (len(issues) == 0 and overall_score == 100), int(overall_score), all_feedback
+    return (len(issues) == 0 and overall_score == 100), overall_score, all_feedback
 
 if __name__ == "__main__":
     success, score, feedback = test_manifest_quality(sys.argv[1])
