@@ -92,18 +92,27 @@ class RemotionJsonMaker:
     def scan_assets(self, public_dir: str = "../public"):
         abs_public = os.path.abspath(public_dir)
         fonts_dir = os.path.join(abs_public, "fonts")
+        print(f"🎬 SCANNING ASSETS in {abs_public}...")
         self.bangla_fonts = []
         self.english_fonts = []
-        BANGLA_KEYWORDS = ['solaiman', 'kalpurush', 'nikosh', 'hind', 'siliguri', 'adorsho', 'sutonny', 'shonar', 'vrinda', 'bangla', 'liyakats', 'anshu', 'charukola', 'galada', 'mina', 'mukti', 'atreyee', 'benisen', 'bengali', 'shishir', 'shorif', 'maharaj', '_bangla']
+        BANGLA_KEYWORDS = ['solaiman', 'kalpurush', 'nikosh', 'hind', 'siliguri', 'adorsho', 'sutonny', 'shonar', 'vrinda', 'bangla', 'liyakats', 'anshu', 'charukola', 'galada', 'mina', 'mukti', 'atreyee', 'benisen', 'bengali', 'shishir', 'shorif', 'maharaj', '_bangla', 'bangla']
 
         if os.path.exists(fonts_dir):
+            print(f"🔍 Font Detection: Scanning {fonts_dir}...")
             for root, dirs, files in os.walk(fonts_dir, followlinks=True):
                 for file in files:
                     if file.lower().endswith(('.ttf', '.otf', '.woff', '.woff2')):
                         name = os.path.splitext(file)[0]
-                        clean_name = re.sub(r'-(Regular|Bold|Italic|Light|Medium|Thin|SemiBold|ExtraBold|Black)$', '', name, flags=re.IGNORECASE)
-                        if any(kw in clean_name.lower() for kw in BANGLA_KEYWORDS): self.bangla_fonts.append(clean_name)
-                        else: self.english_fonts.append(clean_name)
+                        # Robustly clean font names by removing common suffixes
+                        clean_name = re.sub(r'(_english|_bangla)$', '', name, flags=re.IGNORECASE)
+                        clean_name = re.sub(r'-(Regular|Bold|Italic|Light|Medium|Thin|SemiBold|ExtraBold|Black)$', '', clean_name, flags=re.IGNORECASE)
+
+                        if any(kw in name.lower() for kw in BANGLA_KEYWORDS):
+                            self.bangla_fonts.append(name) # Keep original name for Remotion loading
+                            print(f"   🇧🇩 Found Bangla Font: {name}")
+                        else:
+                            self.english_fonts.append(name)
+                            print(f"   🇬🇧 Found English Font: {name}")
         self.bangla_fonts = sorted(list(set(self.bangla_fonts)))
         self.english_fonts = sorted(list(set(self.english_fonts)))
 
@@ -224,10 +233,14 @@ class RemotionJsonMaker:
                 o_type = str(ov.get('type', 'text')).lower()
                 if 'chart_type' in ov: o_type = 'shadcn_chart'
                 if 'indicator_type' in ov: o_type = 'shadcn_indicator'
+
+                # Extract content for font decision
+                content = str(ov.get('content', ov.get('text', ov.get('label', ov.get('title', ''))))).strip()
+                is_content_bangla = self._is_bangla(content)
+
                 if o_type == 'text':
                     if text_count >= 3: continue
                     text_count += 1
-                    content = str(ov.get('content', ov.get('text', ''))).strip()
                     if not content:
                         story_text = self.story_scenes.get(s_id, "")
                         content = " ".join(story_text.split()[:6]) if story_text else "STUDIO V4"
@@ -241,13 +254,29 @@ class RemotionJsonMaker:
                     svg_count += 1
 
                 if not ov.get('id'): ov['id'] = f"ov_{id_num}_{len(valid_overlays)+1}"
-                ai_font = ov.get('font')
+
+                # SURGICAL FONT ENFORCEMENT
                 all_scanned_fonts = self.bangla_fonts + self.english_fonts
-                if ai_font and ai_font in all_scanned_fonts: pass
-                elif (self._is_bangla(str(ov.get('content', ''))) or is_scene_bangla) and self.bangla_fonts:
+                ai_font = ov.get('font')
+
+                # Logic: Content Language > Scene Language > First Scanned Font > Fallback
+                if is_content_bangla and self.bangla_fonts:
+                    # Content is Bangla: Use Bangla font
+                    if ai_font in self.bangla_fonts: pass
+                    else: ov['font'] = "Sohid_bangla" if "Sohid_bangla" in self.bangla_fonts else self.bangla_fonts[0]
+                elif not is_content_bangla and self.english_fonts:
+                    # Content is English/Latin: Use English font
+                    if ai_font in self.english_fonts: pass
+                    else: ov['font'] = self.english_fonts[0]
+                elif is_scene_bangla and self.bangla_fonts:
+                    # Content is neutral but scene is Bangla
                     ov['font'] = "Sohid_bangla" if "Sohid_bangla" in self.bangla_fonts else self.bangla_fonts[0]
+                elif self.english_fonts:
+                    # Last resort: first English font
+                    if ai_font in self.english_fonts: pass
+                    else: ov['font'] = self.english_fonts[0]
                 elif not ov.get('font') or ov.get('font') not in all_scanned_fonts:
-                    ov['font'] = self.english_fonts[0] if self.english_fonts else "Arial"
+                    ov['font'] = "Arial"
 
                 if ov['type'] == 'text':
                     ov['maxWidth'] = ov.get('maxWidth', 800)
@@ -505,7 +534,7 @@ You have FAILED the quality assurance pass. You must REPAIR the manifest using t
     def generate(self, story: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None, drive_prompt_path: str = None,
                  previous_json: str = None, feedback_errors: List[str] = None, current_score: int = 0, interaction_log_path: str = None) -> Tuple[Dict[str, Any], bool]:
         pattern = r'(?:Scene|দৃশ্য)\s+[0-9০-৯]+[:\s]*'
-        story_parts = [p.strip().lstrip(':').strip() for p in re.split(pattern, story) if p.strip()]
+        story_parts = [p.strip().lstrip(':').strip() for p in re.split(pattern, story, flags=re.IGNORECASE) if p.strip()]
         for i, n in enumerate(story_parts, 1): self.story_scenes[f"SCENE_{i:02d}"] = n
         compact_ts = self._compact_timestamps(timestamp_context)
         duration_context = ", ".join([f"SCENE_{i+1:02d}:{d}f" for i, d in enumerate(scene_durations)]) if scene_durations else ""
@@ -534,6 +563,9 @@ You have FAILED the quality assurance pass. You must REPAIR the manifest using t
         full_prompt = (
             f"TASK: GENERATE AN EXPERT DOCUMENTARY MOTION GRAPHICS MANIFEST FOR {len(self.story_scenes)} SCENES.\n"
             f"STORY: {story}\nTIMESTAMPS: {compact_ts}\nDURATIONS: {duration_context}\n{visual_context}{drive_guideline}"
+            f"\n--- LOCAL ASSETS (MANDATORY USE) ---\n"
+            f"ENV_FONTS: BANGLA FONTS: {self.bangla_fonts} | ENGLISH FONTS: {self.english_fonts}\n"
+            f"ENV_VIDEOS: {self.video_files}\n"
             "SYSTEM: WORLD-CLASS CINEMATIC MOTION DESIGNER.\n"
             "DIRECTOR'S RULES: 1. INFORMATION FLOW. 2. CINEMATIC BEATS. 3. VISUAL HIERARCHY. 4. PROGRESSIVE REVEAL. 5. SEMANTIC CONNECTORS. 6. STORY-DRIVEN CAMERA. 7. CAUSE-AND-EFFECT. 8. RULE OF THIRDS. 9. TYPOGRAPHY. 10. METAPHOR. 11. MOTION TRACKING.\n"
             "MOTION TRACKING RULE: Use tracking when the narration mentions a specific moving subject. "
