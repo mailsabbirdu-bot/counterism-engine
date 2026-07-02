@@ -536,6 +536,8 @@ class SceneSupervisor:
 
     def __init__(self, scene_json: Dict[str, Any], manifest_memory: Optional[Dict[str, Any]] = None):
         self.scene = scene_json
+        # Jules v5 Hybrid: Ingest Intelligence if already computed
+        self.intelligence = scene_json.get('intelligence', {})
         self.overlays = scene_json.get('overlays', [])
         self.duration = scene_json.get('duration_in_frames', 180)
         self.scene_id = scene_json.get('scene_id', 'UNKNOWN')
@@ -580,6 +582,11 @@ class SceneSupervisor:
         """Core analysis pipeline: runs all modules and aggregates reports."""
         # 0. Internal Preparation
         self._simulate_timeline()
+
+        # v5 Hybrid: If intelligence is missing, compute it locally
+        if not self.intelligence:
+            from .intelligence import SceneIntelligenceEngine
+            self.intelligence = SceneIntelligenceEngine().analyze_scene(self.scene)
 
         # 1. Run Analysis Modules (v4 + v5 Fusion)
         modules = [
@@ -708,12 +715,19 @@ class SceneSupervisor:
         if total_errors > 2 or self.scores['overall_cinematic_score'] < 5.0: status = "OVERLOADED"
         elif total_errors > 0 or self.scores['overall_cinematic_score'] < 7.5: status = "ACCEPTABLE"
 
+        # Integrate Jules Intelligence into scores
+        if self.intelligence:
+            intel_scores = self.intelligence.get('score_estimates', {})
+            for k, v in intel_scores.items():
+                if k in self.scores: self.scores[k] = (self.scores[k] + v) / 2.0
+
         return {
             "scene_id": self.scene_id,
             "status": status,
             "scores": {k: round(v, 1) for k, v in self.scores.items()},
             "legacy_scores": {k: round(v, 1) for k, v in self.legacy_scores.items()},
             "findings": all_findings,
+            "intelligence": self.intelligence, # Jules v5 Hybrid
             "issues": list(set(all_issues)), # backward compat
             "director_notes": list(set(all_notes)),
             "fix_suggestions": list(set(all_fixes)),
