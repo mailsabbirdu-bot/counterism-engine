@@ -124,8 +124,24 @@ def test_manifest_quality(filepath, public_dir=None):
         "timing": 100,
         "composition": 100,
         "assets": 100,
-        "typography": 100
+        "typography": 100,
+        "structure": 100
     }
+
+    # --- ROOT STRUCTURE VALIDATION ---
+    if 'global_settings' not in data:
+        issues.append("CRITICAL: Missing 'global_settings' at root.")
+        scores["structure"] -= 50
+    else:
+        gs = data['global_settings']
+        for field in ['width', 'height', 'fps']:
+            if field not in gs:
+                issues.append(f"CRITICAL: 'global_settings' missing required field '{field}'.")
+                scores["structure"] -= 20
+
+    if 'project_id' not in data and 'project_name' not in data:
+        warnings.append("Missing 'project_id' or 'project_name' at root.")
+        scores["structure"] -= 5
 
     scenes = data.get('scenes', [])
     if not scenes:
