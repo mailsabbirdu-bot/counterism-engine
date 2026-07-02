@@ -125,8 +125,9 @@ class RemotionJsonMaker:
             self.camera_files = sorted([f for f in all_f if re.match(r'^camera', f, re.I)])
             self.narration_files = sorted([f for f in all_f if re.match(r'^SC_\d+', f, re.I)])
 
-        video_dir = os.path.join(abs_public, "renders")
-        self.video_files = sorted([f for f in os.listdir(video_dir) if f.lower().endswith('.mp4')]) if os.path.exists(video_dir) else []
+        renders_dir = os.path.join(abs_public, "renders")
+        self.video_files = sorted([f for f in os.listdir(renders_dir) if f.lower().endswith('.mp4')]) if os.path.exists(renders_dir) else []
+        self.image_files = sorted([f for f in os.listdir(renders_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]) if os.path.exists(renders_dir) else []
         self.load_visual_analysis(abs_public)
 
     def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
@@ -138,6 +139,12 @@ class RemotionJsonMaker:
 
         # --- DEEP PROMOTION & INTERNAL FIXES PASS (STAGE 0) ---
         for scene in data.get('scenes', []):
+            # Normalize Scene duration
+            if 'duration' in scene and 'duration_in_frames' not in scene:
+                scene['duration_in_frames'] = scene['duration']
+            if 'duration' in scene:
+                del scene['duration']
+
             if not scene.get('overlays'):
                 for k in ['elements', 'layers', 'visuals']:
                     if scene.get(k) and isinstance(scene[k], list):
@@ -146,7 +153,19 @@ class RemotionJsonMaker:
             if not scene.get('overlays'): scene['overlays'] = []
 
             for ov in scene['overlays']:
+                # Unify Typography keys early
+                if 'size' in ov:
+                    if 'fontSize' not in ov:
+                        ov['fontSize'] = f"{ov['size']}px" if isinstance(ov['size'], (int, float)) else str(ov['size'])
+                    del ov['size']
+
+                # Unify Z-Index keys
+                if 'z_index' in ov:
+                    if 'zIndex' not in ov: ov['zIndex'] = ov['z_index']
+                    del ov['z_index']
+
                 # UNIFICATION: Standardize content keys before promotion
+                o_type = str(ov.get('type', 'text')).lower()
                 if 'text' in ov and 'content' not in ov: ov['content'] = ov['text']
                 if 'label' in ov and 'content' not in ov: ov['content'] = ov['label']
                 if 'title' in ov and 'content' not in ov and o_type == 'text': ov['content'] = ov['title']
@@ -158,6 +177,12 @@ class RemotionJsonMaker:
                         # Unify nested too
                         if 'text' in nested and 'content' not in nested: nested['content'] = nested['text']
                         if 'label' in nested and 'content' not in nested: nested['content'] = nested['label']
+                        if 'size' in nested:
+                             if 'fontSize' not in nested: nested['fontSize'] = f"{nested['size']}px" if isinstance(nested['size'], (int, float)) else str(nested['size'])
+                             del nested['size']
+                        if 'z_index' in nested:
+                             if 'zIndex' not in nested: nested['zIndex'] = nested['z_index']
+                             del nested['z_index']
 
                         for sub_key, sub_val in nested.items():
                             # OVERWRITE: Nested properties are usually the AI's intended correction
@@ -165,20 +190,20 @@ class RemotionJsonMaker:
                         # OPTIMIZATION: Remove redundant nested objects
                         del ov[nest_key]
 
-                o_type = str(ov.get('type', 'text')).lower()
-                # Standardize variant mapping
+                # Standardize variant mapping and DELETE 'variant' to avoid duplication
                 if 'variant' in ov:
                     v_val = ov['variant']
                     if 'chart' in o_type: ov['chart_type'] = v_val
                     elif 'indicator' in o_type: ov['indicator_type'] = v_val
                     elif o_type == 'shape': ov['shape_type'] = v_val
                     elif o_type == 'connector': ov['preset'] = v_val
+                    del ov['variant']
 
                 # RE-FIX: Ensure type-specific variant keys exist
-                if o_type == 'shape' and 'variant' in ov and 'shape_type' not in ov: ov['shape_type'] = ov['variant']
-                if 'chart' in o_type and 'variant' in ov and 'chart_type' not in ov: ov['chart_type'] = ov['variant']
-                if 'indicator' in o_type and 'variant' in ov and 'indicator_type' not in ov: ov['indicator_type'] = ov['variant']
-                if o_type == 'connector' and 'variant' in ov and 'preset' not in ov: ov['preset'] = ov['variant']
+                if o_type == 'shape' and 'shape_type' not in ov: ov['shape_type'] = 'rect'
+                if 'chart' in o_type and 'chart_type' not in ov: ov['chart_type'] = 'bar'
+                if 'indicator' in o_type and 'indicator_type' not in ov: ov['indicator_type'] = 'kpiNumber'
+                if o_type == 'connector' and 'preset' not in ov: ov['preset'] = 'smooth_curve'
 
                 # Mandatory Data Injector
                 var = ov.get('indicator_type') or ov.get('chart_type') or ov.get('shape_type') or ov.get('preset')
@@ -318,6 +343,25 @@ class RemotionJsonMaker:
                 elif o_type in ['svg', 'label', 'callout', 'data_indicator', 'shadcn_indicator', 'shape', 'graph', 'ambient_graphic', 'connector']:
                     if svg_count >= 15: continue # Increased budget for connectors
                     svg_count += 1
+                elif o_type in ['image', 'video']:
+                    # Normalize source keys to 'src' for MediaEngine
+                    src = ov.get('src', ov.get('image_path', ov.get('video_path')))
+                    if not src:
+                        if o_type == 'video' and self.video_files:
+                            src = f"renders/{self.video_files[0]}"
+                        elif o_type == 'image' and self.image_files:
+                            src = f"renders/{self.image_files[0]}"
+                        else:
+                            # Final fallback to a placeholder or omit if no assets found
+                            src = "renders/placeholder.png"
+
+                    if src and not str(src).startswith('renders/'):
+                        src = f"renders/{os.path.basename(src)}"
+
+                    ov['src'] = src
+                    # Clean up redundant keys
+                    for k in ['image_path', 'video_path']:
+                        if k in ov: del ov[k]
 
                 if not ov.get('id'): ov['id'] = f"ov_{id_num}_{len(valid_overlays)+1}"
 
@@ -462,20 +506,35 @@ class RemotionJsonMaker:
             if 'beats' not in scene: scene['beats'] = [{"frame": o['start'], "event": f"{o['id']}_reveal"} for o in valid_overlays if PRIORITY.get(o['type'], 0) >= 50]
             if 'connections' not in scene: scene['connections'] = []
 
-            hero_ids = [o['id'] for o in valid_overlays if str(o.get('importance', '')).lower() == 'hero' or PRIORITY.get(o['type'], 0) >= 100]
-            focal_ids = [o['id'] for o in valid_overlays if PRIORITY.get(str(o.get('type')).lower(), 0) >= 50 and o['id'] not in hero_ids]
+            # Identify true HERO targets (explicitly marked or with hero_config)
+            true_hero_ids = [o['id'] for o in valid_overlays if str(o.get('importance', '')).lower() == 'hero' or o.get('hero_config')]
+            hero_ids = [o['id'] for o in valid_overlays if PRIORITY.get(o['type'], 0) >= 100]
+            focal_ids = [o['id'] for o in valid_overlays if PRIORITY.get(str(o.get('type')).lower(), 0) >= 50 and o['id'] not in hero_ids and o['id'] not in true_hero_ids]
             background_ids = [o['id'] for o in valid_overlays if PRIORITY.get(str(o.get('type')).lower(), 0) < 50]
 
             ai_shots = scene.get('camera', {}).get('shots', [])
+            # Priority-based camera targeting: Prefer true heroes, then standard heroes, then focal elements.
             if not ai_shots or not all(s.get('targetId') in [o['id'] for o in valid_overlays] for s in ai_shots):
                 CAM_STYLES = ["cinematic_drift", "slow_push", "pan_right", "orbit", "rack_focus", "dramatic_reveal"]
                 shots = []
+                # Start with ambient drift on background if present
                 if background_ids: shots.append({"targetId": background_ids[0], "startFrame": 0, "duration": 45, "style": "cinematic_drift", "zoom": 1.05, "inDuration": 15})
-                ordered_targets = sorted([o for o in valid_overlays if o['id'] in (hero_ids + focal_ids)], key=lambda x: x['start'])
+
+                # Prioritize TRUE HEROES first, then other important elements
+                camera_targets = sorted([o for o in valid_overlays if o['id'] in true_hero_ids], key=lambda x: x['start'])
+                other_targets = sorted([o for o in valid_overlays if o['id'] in (hero_ids + focal_ids) and o['id'] not in true_hero_ids], key=lambda x: x['start'])
+
+                ordered_targets = camera_targets + other_targets
                 for i, ov in enumerate(ordered_targets[:4]):
                     start = max(shots[-1]['startFrame'] + 10, ov['start']) if shots else ov['start']
                     if shots: shots[-1]['duration'] = max(20, start - shots[-1]['startFrame'])
-                    shots.append({"targetId": ov['id'], "startFrame": start, "duration": 60, "style": CAM_STYLES[(scene_idx + i) % len(CAM_STYLES)], "zoom": 1.1 + (i * 0.05), "inDuration": 20, "ease": "cubicOut"})
+
+                    # More aggressive zoom for true heroes
+                    zoom_level = 1.15 + (i * 0.05) if ov['id'] in true_hero_ids else 1.1 + (i * 0.05)
+                    style = CAM_STYLES[(scene_idx + i) % len(CAM_STYLES)]
+                    if ov['id'] in true_hero_ids and i == 0: style = "dramatic_reveal"
+
+                    shots.append({"targetId": ov['id'], "startFrame": start, "duration": 60, "style": style, "zoom": zoom_level, "inDuration": 20, "ease": "cubicOut"})
                 if shots: shots[-1]['duration'] = max(30, scene_duration - shots[-1]['startFrame'])
                 scene['camera'] = {"enabled": True, "shots": shots}
             else:
@@ -652,12 +711,13 @@ class RemotionJsonMaker:
             f"4. [REQUIRED] BACKGROUND: Always 'background_type': 'video'. video_path: 'renders/scene_SC_XX.mp4'. Set 'audio_enabled': false.\n"
             f"5. [REQUIRED] CAMERA: Every scene MUST have a camera 'shot' sequence targeting valid overlay IDs. Every shot MUST have a 'targetId'.\n"
             f"6. [REQUIRED] SCHEMA: Use the 'variant' key for subtypes. NEVER invent a variant; use ONLY those listed below.\n"
-            f"7. [REQUIRED] RELATIONSHIPS: Use 'type': 'connector' to link components by their 'id'. Specify 'source' and 'target' IDs.\n"
-            f"8. [RECOMMENDED] CHOREOGRAPHY: Sequence reveals (Wave 1: Text, Wave 2: Visuals, Wave 3: Connectors/Details).\n"
-            f"9. [OPTIONAL] PARALLAX: Add slight 'parallax' values (-20 to 50) to create technical depth.\n\n"
+            f"7. [REQUIRED] RELATIONSHIPS: Use 'type': 'connector' to link components by their 'id'. Specify 'source' and 'target' IDs. Also populate the scene-level 'connections' array with [{{'from': 'ID', 'to': 'ID'}}] objects.\n"
+            f"8. [REQUIRED] UI_PANELS: Use 'type': 'ui_panel' with 'variant': 'glass' to frame important data or create technical overlays.\n"
+            f"9. [RECOMMENDED] CHOREOGRAPHY: Sequence reveals (Wave 1: Text, Wave 2: Visuals, Wave 3: Connectors/Details).\n"
+            f"10. [OPTIONAL] PARALLAX: Add slight 'parallax' values (-20 to 50) to create technical depth.\n\n"
             f"--- [REQUIRED] VARIANT AUTHORITY (USE ONLY THESE) ---\n"
             f"CHARTS: glass_area, neon_bar, stacked_line, radial_score, radar_web, pie_donut_glass, step_area, multi_bar_stack, bar_race_top, thick_line_glow, area, bar, line.\n"
-            f"INDICATORS: metric_tile, tech_badge, activity_ring, crypto_card, server_status, data_ticker, notification_stack, kpiNumber, deltaIndicator, semiGauge, milestoneTimeline, statGrid, batteryLevel.\n"
+            f"INDICATORS: metric_tile, tech_badge, activity_ring, crypto_card, server_status, data_ticker, notification_stack, kpiNumber, deltaIndicator, semiGauge, milestoneTimeline, statGrid, batteryLevel, statusBadge, stepIndicator, pulseRadar, multiProgress.\n"
             f"SHAPES: circle, rect, line.\n"
             f"CONNECTORS: smooth_curve, soft_arc, straight_flow, energy_flow, signal_beam, data_stream, s_curve, zigzag_soft, multi_branch, network_web, callout_line, camera_focus, timeline_path, route_path, curved_route, neon_connector, blueprint_connector, organic_connector.\n"
             f"HERO ANIMATIONS: glow_pulse, isolate_zoom, bounce_pop, neon_flicker, shake_alert, rainbow_flow, glitch_pop, wave_float, blur_reveal, glass_shimmer, heartbeat, fire_glow.\n\n"
