@@ -162,6 +162,8 @@ class RemotionJsonMaker:
                         for sub_key, sub_val in nested.items():
                             # OVERWRITE: Nested properties are usually the AI's intended correction
                             ov[sub_key] = sub_val
+                        # OPTIMIZATION: Remove redundant nested objects
+                        del ov[nest_key]
 
                 o_type = str(ov.get('type', 'text')).lower()
                 # Standardize variant mapping
@@ -397,6 +399,11 @@ class RemotionJsonMaker:
                         if abs(ax - grid_x) < 180 and abs(ay - grid_y) < 180:
                             ax, ay = grid_x, grid_y; break
 
+                # OPTIMIZATION: Standardize position and remove redundant x/y keys
+                ov['position'] = {"x": ax, "y": ay}
+                for k in ['x', 'y', 'left', 'top']:
+                    if k in ov: del ov[k]
+
                 found = False
                 best_pos, final_w, final_h = (ax, ay), base_w, base_h
                 fs = int(re.search(r'\d+', str(ov.get('fontSize', '120'))).group()) if o_type == 'text' else 120
@@ -518,11 +525,12 @@ class RemotionJsonMaker:
                     copy_payload = (
                         f"🚨 REPAIR REQ ({score}%): {len(errors)} ERRORS.\n\n"
                         f"--- ERROR LIST ---\n{chr(10).join(errors)}\n\n"
-                        f"--- RULES ---\n"
-                        f"1. FIX: Root key only for data. NO 'data: {{}}' or 'styling: {{}}' nesting.\n"
-                        f"2. POS: L_MID(550,540), R_MID(1370,540), C_TOP(960,320), C_BOT(960,760).\n"
-                        f"3. VAR: Use 'variant' key for ALL subtypes.\n"
-                        f"4. OUTPUT: Diagnostic + Corrected RAW JSON only.\n\n"
+                        f"--- [REQUIRED] REPAIR RULES ---\n"
+                        f"1. [REQUIRED] FIX: Root key only for data. NO 'data: {{}}' or 'styling: {{}}' nesting.\n"
+                        f"2. [REQUIRED] POS: L_MID(550,540), R_MID(1370,540), C_TOP(960,320), C_BOT(960,760). STOP CENTERING at (960, 700).\n"
+                        f"3. [REQUIRED] VAR: Use ONLY approved variants. Never invent names.\n"
+                        f"4. [REQUIRED] DATA: Every chart/indicator must have a 'title' and 'data'/'value'.\n"
+                        f"5. [REQUIRED] VALIDATION: Run the FINAL VALIDATION CHECKLIST before outputting.\n\n"
                         f"--- PREVIOUS JSON ---\n{previous_json}\n\n"
                         f"--- STORY CONTEXT ---\n"
                         f"{re.search(r'STORY:.*?(?=TIMESTAMPS:)', prompt, re.DOTALL).group() if 'STORY:' in prompt else prompt[:500]}"
@@ -629,25 +637,50 @@ class RemotionJsonMaker:
             f"--- PROJECT ASSETS ---\n"
             f"ENV_FONTS: BANGLA: {self.bangla_fonts} | ENGLISH: {self.english_fonts}\n"
             f"ENV_VIDEOS: {self.video_files}\n\n"
+            f"--- [REQUIRED] DESIGN TOKENS ---\n"
+            f"RESOLUTION: 1920x1080 (Center is 960, 540)\n"
+            f"SAFE_MARGIN: 150px from all edges\n"
+            f"GRID: Rule of Thirds (X: 640, 1280 | Y: 360, 720)\n"
+            f"HEADER_SIZE: 120px | BODY_SIZE: 64px\n"
+            f"Z_INDEX_HIERARCHY: Shapes (10), Charts/Indicators (40), Text (60), Hero (100)\n"
+            f"COLORS: PRIMARY: #00F5FF, ACCENT: #FF3E6C, WARN: #FFD700, SUCCESS: #00FFAB\n\n"
             f"--- SYSTEM ROLE & CORE RULES ---\n"
             f"ROLE: WORLD-CLASS CINEMATIC MOTION DESIGNER (Vox/Polymatter Style).\n"
-            f"1. TYPOGRAPHY: Bangla text MUST use a font from the BANGLA list. English uses ENGLISH list. Use concise 2-3 word headers.\n"
-            f"2. COMPOSITION: Use Rule of Thirds. Stop centering. Avoid stacking overlays. Use negative space from VISUAL PERCEPTION DATA.\n"
-            f"3. SYNC: Match 'start' and 'duration' strictly to TIMESTAMPS. Sort overlays by entry time.\n"
-            f"4. BACKGROUND: Always 'background_type': 'video'. video_path: 'renders/scene_SC_XX.mp4'. Set 'audio_enabled': false.\n"
-            f"5. CAMERA: Every scene MUST have a camera 'shot' targeting a valid overlay ID. Use 'slow_push' or 'cinematic_drift'.\n"
-            f"6. SCHEMA: For ALL components (charts/indicators/shapes/connectors), use the 'variant' key to specify the type.\n"
-            f"7. RELATIONSHIPS: Use 'type': 'connector' to link components by their 'id'. Specify 'source' and 'target' IDs.\n\n"
-            f"--- COMPONENT VARIANTS ---\n"
+            f"1. [REQUIRED] TYPOGRAPHY: Bangla text MUST use a font from the BANGLA list. English uses ENGLISH list. Use concise 2-3 word headers.\n"
+            f"2. [REQUIRED] COMPOSITION: Use Rule of Thirds. STOP CENTERING. NEVER use generic (960, 700) or (960, 540) coordinates for focal elements. Use negative space from VISUAL PERCEPTION DATA.\n"
+            f"3. [REQUIRED] SYNC: Match 'start' and 'duration' strictly to TIMESTAMPS. Sort overlays by entry time.\n"
+            f"4. [REQUIRED] BACKGROUND: Always 'background_type': 'video'. video_path: 'renders/scene_SC_XX.mp4'. Set 'audio_enabled': false.\n"
+            f"5. [REQUIRED] CAMERA: Every scene MUST have a camera 'shot' sequence targeting valid overlay IDs. Every shot MUST have a 'targetId'.\n"
+            f"6. [REQUIRED] SCHEMA: Use the 'variant' key for subtypes. NEVER invent a variant; use ONLY those listed below.\n"
+            f"7. [REQUIRED] RELATIONSHIPS: Use 'type': 'connector' to link components by their 'id'. Specify 'source' and 'target' IDs.\n"
+            f"8. [RECOMMENDED] CHOREOGRAPHY: Sequence reveals (Wave 1: Text, Wave 2: Visuals, Wave 3: Connectors/Details).\n"
+            f"9. [OPTIONAL] PARALLAX: Add slight 'parallax' values (-20 to 50) to create technical depth.\n\n"
+            f"--- [REQUIRED] VARIANT AUTHORITY (USE ONLY THESE) ---\n"
             f"CHARTS: glass_area, neon_bar, stacked_line, radial_score, radar_web, pie_donut_glass, step_area, multi_bar_stack, bar_race_top, thick_line_glow, area, bar, line.\n"
             f"INDICATORS: metric_tile, tech_badge, activity_ring, crypto_card, server_status, data_ticker, notification_stack, kpiNumber, deltaIndicator, semiGauge, milestoneTimeline, statGrid, batteryLevel.\n"
             f"SHAPES: circle, rect, line.\n"
             f"CONNECTORS: smooth_curve, soft_arc, straight_flow, energy_flow, signal_beam, data_stream, s_curve, zigzag_soft, multi_branch, network_web, callout_line, camera_focus, timeline_path, route_path, curved_route, neon_connector, blueprint_connector, organic_connector.\n"
             f"HERO ANIMATIONS: glow_pulse, isolate_zoom, bounce_pop, neon_flicker, shake_alert, rainbow_flow, glitch_pop, wave_float, blur_reveal, glass_shimmer, heartbeat, fire_glow.\n\n"
-            f"--- DATA SCHEMA ENFORCEMENT ---\n"
-            f"- 'milestoneTimeline' requires 'events': [ {{ 'title': '...', 'date': '...', 'description': '...' }} ].\n"
-            f"- 'statGrid' requires 'stats': [ {{ 'label': '...', 'value': 80, 'suffix': '%' }} ].\n"
-            f"- 'stepIndicator' requires 'steps': [ 'Step 1', 'Step 2' ].\n\n"
+            f"--- [REQUIRED] MANDATORY SCHEMA FIELDS ---\n"
+            f"- 'chart': requires 'chart_type', 'title', and 'data' array.\n"
+            f"- 'indicator': requires 'indicator_type', 'title', and 'value'.\n"
+            f"- 'milestoneTimeline': requires 'events': [ {{ 'title': '...', 'date': '...', 'description': '...' }} ].\n"
+            f"- 'statGrid': requires 'stats': [ {{ 'label': '...', 'value': 80, 'suffix': '%' }} ].\n"
+            f"- 'connector': requires 'source' (ID), 'target' (ID), and 'variant'.\n\n"
+            f"--- OPTIMIZATION OBJECTIVES ---\n"
+            f"- Eliminate redundant coordinates: use root 'position': {{x,y}} OR properties.x/y, never both.\n"
+            f"- Minimize nesting: prefer root-level fields where possible.\n"
+            f"- Maintain broadcast legibility: 1 focal element per 60 frames max.\n\n"
+            f"--- FINAL VALIDATION CHECKLIST ---\n"
+            f"Before outputting JSON, verify:\n"
+            f"✓ Every overlay id is unique and descriptive.\n"
+            f"✓ Every camera targetId exists in the overlays array.\n"
+            f"✓ Every connector source/target ID exists.\n"
+            f"✓ NO overlapping focal graphics; use Rule of Thirds anchors.\n"
+            f"✓ Overlays array is sorted CHRONOLOGICALLY by 'start' time.\n"
+            f"✓ Duration never exceeds scene duration.\n"
+            f"✓ Hero word exists in text content.\n"
+            f"✓ Only approved component variants used.\n\n"
             f"{drive_guideline}\n"
             f"OUTPUT RAW JSON BLOCK ONLY. NO PREAMBLE. NO CHATTER."
         )

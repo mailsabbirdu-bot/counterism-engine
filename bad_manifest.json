@@ -1,0 +1,125 @@
+{
+  "scenes": [
+    {
+      "scene_id": "SCENE_01",
+      "duration": 160,
+      "background_type": "video",
+      "video_path": "renders/scene_SC_01.mp4",
+      "overlays": [
+        {
+          "id": "txt_dhaka",
+          "type": "text",
+          "content": "ঢাকা: মেগাসিটি",
+          "font": "Sohid_bangla",
+          "start": 15,
+          "duration": 145,
+          "position": {
+            "x": 960,
+            "y": 300
+          },
+          "hero_config": {
+            "word": "মেগাসিটি",
+            "animation": "zoom_blur_reveal",
+            "color": "#FF3B30",
+            "start": 45
+          },
+          "fontSize": "120px",
+          "color": "#00F5FF",
+          "style": "text-#00F5FF"
+        },
+        {
+          "id": "chart_density",
+          "type": "shadcn_chart",
+          "chart_type": "glass_area",
+          "title": "Population Density Comparison",
+          "data": [
+            {
+              "label": "Dhaka",
+              "value": 44500
+            },
+            {
+              "label": "Mumbai",
+              "value": 31700
+            },
+            {
+              "label": "Tokyo",
+              "value": 6200
+            }
+          ],
+          "start": 15,
+          "duration": 145,
+          "position": {
+            "x": 960,
+            "y": 700
+          },
+          "font": "Sohid_bangla",
+          "color": "#FF3E6C",
+          "colors": {
+            "scheme": "nivo"
+          }
+        }
+      ],
+      "infographic_lines": [
+        {
+          "from_id": "txt_dhaka",
+          "to_id": "chart_density",
+          "style": "dashed",
+          "color": "#A0A0A0",
+          "from": "txt_dhaka",
+          "to": "chart_density"
+        }
+      ],
+      "camera": {
+        "shots": [
+          {
+            "targetId": "chart_density",
+            "style": "cinematic_drift",
+            "zoom": 1.1,
+            "startFrame": 0,
+            "duration": 75,
+            "inDuration": 15,
+            "easing": {
+              "type": "bezier",
+              "bezier": [
+                0.65,
+                0,
+                0.35,
+                1
+              ]
+            }
+          },
+          {
+            "targetId": "chart_density",
+            "style": "rack_focus",
+            "zoom": 1.2,
+            "startFrame": 75,
+            "duration": 85,
+            "inDuration": 30,
+            "easing": {
+              "type": "bezier",
+              "bezier": [
+                0.65,
+                0,
+                0.35,
+                1
+              ]
+            }
+          }
+        ],
+        "motionBlur": {
+          "enabled": true,
+          "intensity": 1.0
+        }
+      },
+      "duration_in_frames": 160,
+      "audio_enabled": false
+    }
+  ],
+  "audio_sfx_manifest": [],
+  "project_name": "Counterism_Studio_V4_Automated_Render",
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  }
+}

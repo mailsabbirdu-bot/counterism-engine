@@ -1,0 +1,61 @@
+{
+  "scenes": [
+    {
+      "scene_id": "SCENE_01",
+      "duration_in_frames": 160,
+      "background_type": "video",
+      "video_path": "renders/scene_SC_01.mp4",
+      "overlays": [
+        {
+          "id": "txt_dhaka",
+          "type": "text",
+          "content": "ঢাকা: মেগাসিটি",
+          "font": "Sohid_bangla",
+          "start": 15,
+          "duration": 145,
+          "position": { "x": 550, "y": 540 },
+          "hero_config": {
+            "word": "মেগাসিটি",
+            "animation": "glow_pulse",
+            "color": "#FF3B30",
+            "start": 45
+          },
+          "fontSize": "120px",
+          "color": "#00F5FF"
+        },
+        {
+          "id": "chart_density",
+          "type": "shadcn_chart",
+          "variant": "glass_area",
+          "title": "Population Density Comparison",
+          "data": [
+            { "label": "Dhaka", "value": 44500 },
+            { "label": "Mumbai", "value": 31700 }
+          ],
+          "start": 45,
+          "duration": 115,
+          "position": { "x": 1370, "y": 540 },
+          "font": "Audiowide-Regular_english"
+        }
+      ],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "txt_dhaka",
+            "style": "cinematic_drift",
+            "zoom": 1.1,
+            "startFrame": 0,
+            "duration": 75,
+            "inDuration": 15
+          }
+        ]
+      },
+      "transition": { "type": "cinematicMatchCut", "duration": 15 },
+      "beats": [ { "frame": 15, "event": "txt_dhaka_reveal" } ]
+    }
+  ],
+  "audio_sfx_manifest": [],
+  "project_name": "Studio_V4_Production_Verified",
+  "global_settings": { "width": 1920, "height": 1080, "fps": 30 }
+}
