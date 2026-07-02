@@ -179,7 +179,16 @@ def test_manifest_quality(filepath, public_dir=None):
             scores["composition"] -= 5
 
         duration = scene.get('duration_in_frames', 180)
+        if 'duration' in scene:
+            issues.append(f"[{scene_id}] SCHEMA ERROR: Redundant 'duration' key found. Use 'duration_in_frames'.")
+            scores["timing"] -= 5
+
         overlays = scene.get('overlays', [])
+        connections = scene.get('connections', [])
+        has_connector = any(str(o.get('type', '')).lower() == 'connector' for o in overlays)
+        if has_connector and not connections:
+            warnings.append(f"[{scene_id}] RELATIONSHIP WARNING: Scene has connectors but 'connections' array is empty.")
+            scores["composition"] -= 10
 
         # 1. Asset Verification
         if scene.get('background_type') == 'video':
@@ -219,6 +228,30 @@ def test_manifest_quality(filepath, public_dir=None):
             if o_type not in VALID_TYPES:
                 issues.append(f"[{scene_id}] TYPE ERROR: Overlay '{ov_id}' has invalid type '{o_type}'. Valid: {VALID_TYPES}")
                 scores["composition"] -= 20
+
+            # Redundant Typography/Z-index check
+            if 'size' in ov:
+                issues.append(f"[{scene_id}] SCHEMA ERROR: Overlay '{ov_id}' has redundant 'size' key. Use 'fontSize'.")
+                scores["typography"] -= 5
+            if 'z_index' in ov:
+                issues.append(f"[{scene_id}] SCHEMA ERROR: Overlay '{ov_id}' has redundant 'z_index' key. Use 'zIndex'.")
+                scores["composition"] -= 5
+            if 'variant' in ov:
+                issues.append(f"[{scene_id}] SCHEMA ERROR: Overlay '{ov_id}' has redundant 'variant' key. Use type-specific variant keys (e.g. 'chart_type').")
+                scores["assets"] -= 5
+
+            # Media Asset Verification
+            if o_type in ['video', 'image']:
+                src = ov.get('src')
+                if not src:
+                    issues.append(f"[{scene_id}] ASSET ERROR: Overlay '{ov_id}' ({o_type}) is missing 'src' path.")
+                    scores["assets"] -= 20
+                else:
+                    rel_src = src.replace('renders/', '') if src.startswith('renders/') else src
+                    abs_src = os.path.join(public_dir, "renders", rel_src.lstrip('/'))
+                    if not os.path.exists(abs_src):
+                        warnings.append(f"[{scene_id}] ASSET WARNING: Overlay asset missing: '{src}'")
+                        scores["assets"] -= 10
 
             # Variant Validation
             if o_type in ENGINE_VARIANTS:
