@@ -132,7 +132,23 @@ class RemotionJsonMaker:
 
     def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
         """Hardens layout, timing, camera, and assets with Geometry-Aware Logic and Adaptive Scaling."""
-        if not data or not data.get('scenes'): return data
+        if not data: return data
+
+        # --- ROOT LEVEL HARDENING ---
+        if 'global_settings' not in data:
+            data['global_settings'] = {"width": 1920, "height": 1080, "fps": 30}
+
+        if 'resolution' in data:
+            res = str(data['resolution']).lower()
+            if 'x' in res:
+                try:
+                    w, h = map(int, res.split('x'))
+                    data['global_settings']['width'] = w
+                    data['global_settings']['height'] = h
+                except: pass
+            del data['resolution']
+
+        if not data.get('scenes'): return data
 
         abs_public = os.path.abspath(public_dir)
         print(f"🛠️ HARDENING ENGINE: Resolving spatial collisions and cinematic timing...")
@@ -722,6 +738,7 @@ class RemotionJsonMaker:
             f"CONNECTORS: smooth_curve, soft_arc, straight_flow, energy_flow, signal_beam, data_stream, s_curve, zigzag_soft, multi_branch, network_web, callout_line, camera_focus, timeline_path, route_path, curved_route, neon_connector, blueprint_connector, organic_connector.\n"
             f"HERO ANIMATIONS: glow_pulse, isolate_zoom, bounce_pop, neon_flicker, shake_alert, rainbow_flow, glitch_pop, wave_float, blur_reveal, glass_shimmer, heartbeat, fire_glow.\n\n"
             f"--- [REQUIRED] MANDATORY SCHEMA FIELDS ---\n"
+            f"- ROOT: requires 'project_id', 'global_settings': {{ 'width': 1920, 'height': 1080, 'fps': 30 }}.\n"
             f"- 'chart': requires 'chart_type', 'title', and 'data' array.\n"
             f"- 'indicator': requires 'indicator_type', 'title', and 'value'.\n"
             f"- 'milestoneTimeline': requires 'events': [ {{ 'title': '...', 'date': '...', 'description': '...' }} ].\n"

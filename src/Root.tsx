@@ -93,9 +93,9 @@ export const RemotionRoot: React.FC = () => {
             id={scene.scene_id.replace(/_/g, '-')}
             component={Scene}
             durationInFrames={scene.duration_in_frames}
-            fps={template.global_settings.fps}
-            width={template.global_settings.width}
-            height={template.global_settings.height}
+            fps={template.global_settings?.fps || 30}
+            width={template.global_settings?.width || 1920}
+            height={template.global_settings?.height || 1080}
             defaultProps={{
               sceneData: processedScene
             }}
