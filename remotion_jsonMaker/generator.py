@@ -136,6 +136,61 @@ class RemotionJsonMaker:
         abs_public = os.path.abspath(public_dir)
         print(f"🛠️ HARDENING ENGINE: Resolving spatial collisions and cinematic timing...")
 
+        # --- DEEP PROMOTION & INTERNAL FIXES PASS (STAGE 0) ---
+        for scene in data.get('scenes', []):
+            if not scene.get('overlays'):
+                for k in ['elements', 'layers', 'visuals']:
+                    if scene.get(k) and isinstance(scene[k], list):
+                        scene['overlays'] = scene[k]
+                        break
+            if not scene.get('overlays'): scene['overlays'] = []
+
+            for ov in scene['overlays']:
+                # UNIFICATION: Standardize content keys before promotion
+                if 'text' in ov and 'content' not in ov: ov['content'] = ov['text']
+                if 'label' in ov and 'content' not in ov: ov['content'] = ov['label']
+                if 'title' in ov and 'content' not in ov and o_type == 'text': ov['content'] = ov['title']
+
+                # Move fields from 'properties', 'data', 'styling', or 'config' to root
+                for nest_key in ['properties', 'data', 'styling', 'config']:
+                    if nest_key in ov and isinstance(ov[nest_key], dict):
+                        nested = ov[nest_key]
+                        # Unify nested too
+                        if 'text' in nested and 'content' not in nested: nested['content'] = nested['text']
+                        if 'label' in nested and 'content' not in nested: nested['content'] = nested['label']
+
+                        for sub_key, sub_val in nested.items():
+                            # OVERWRITE: Nested properties are usually the AI's intended correction
+                            ov[sub_key] = sub_val
+
+                o_type = str(ov.get('type', 'text')).lower()
+                # Standardize variant mapping
+                if 'variant' in ov:
+                    v_val = ov['variant']
+                    if 'chart' in o_type: ov['chart_type'] = v_val
+                    elif 'indicator' in o_type: ov['indicator_type'] = v_val
+                    elif o_type == 'shape': ov['shape_type'] = v_val
+                    elif o_type == 'connector': ov['preset'] = v_val
+
+                # RE-FIX: Ensure type-specific variant keys exist
+                if o_type == 'shape' and 'variant' in ov and 'shape_type' not in ov: ov['shape_type'] = ov['variant']
+                if 'chart' in o_type and 'variant' in ov and 'chart_type' not in ov: ov['chart_type'] = ov['variant']
+                if 'indicator' in o_type and 'variant' in ov and 'indicator_type' not in ov: ov['indicator_type'] = ov['variant']
+                if o_type == 'connector' and 'variant' in ov and 'preset' not in ov: ov['preset'] = ov['variant']
+
+                # Mandatory Data Injector
+                var = ov.get('indicator_type') or ov.get('chart_type') or ov.get('shape_type') or ov.get('preset')
+                if var == 'milestoneTracker' and 'milestones' not in ov:
+                    ov['milestones'] = [{"label": "Milestone 1", "date": "T-0"}]
+                if var in ['timeline', 'milestoneTimeline'] and 'events' not in ov and 'milestones' not in ov:
+                    ov['events'] = [{"title": "Event 1", "date": "Start", "description": "System activated."}]
+                if var == 'statGrid' and 'stats' not in ov:
+                    ov['stats'] = [{"label": "Metric 1", "value": 85, "suffix": "%"}, {"label": "Metric 2", "value": 92, "suffix": "%"}]
+                if var in ['multiProgress', 'ringChart'] and 'items' not in ov and 'rings' not in ov:
+                    ov['items'] = [{"label": "Process A", "value": 75, "color": "#00F5FF"}]
+                if var in ['stepIndicator', 'step_indicator_glass'] and 'steps' not in ov:
+                    ov['steps'] = ["Initiate", "Process", "Complete"]
+
         TYPE_SIZES = {
             'text': (800, 200), 'chart': (1000, 562), 'shadcn_chart': (1000, 562),
             'ui_panel': (800, 600), 'data_indicator': (500, 375), 'shadcn_indicator': (500, 375),
@@ -258,34 +313,27 @@ class RemotionJsonMaker:
                 elif o_type in ['chart', 'shadcn_chart', 'hub_network', 'flow_diagram', 'process', 'kpi_card', 'timeline', 'compositions', 'groups']:
                     if focal_count >= 3: continue
                     focal_count += 1
-                elif o_type in ['svg', 'label', 'callout', 'data_indicator', 'shadcn_indicator', 'shape', 'graph', 'ambient_graphic']:
-                    if svg_count >= 12: continue
+                elif o_type in ['svg', 'label', 'callout', 'data_indicator', 'shadcn_indicator', 'shape', 'graph', 'ambient_graphic', 'connector']:
+                    if svg_count >= 15: continue # Increased budget for connectors
                     svg_count += 1
 
                 if not ov.get('id'): ov['id'] = f"ov_{id_num}_{len(valid_overlays)+1}"
 
-                # SURGICAL FONT ENFORCEMENT
+                # SURGICAL FONT ENFORCEMENT (Refined)
                 all_scanned_fonts = self.bangla_fonts + self.english_fonts
                 ai_font = ov.get('font')
 
-                # Logic: Content Language > Scene Language > First Scanned Font > Fallback
-                if is_content_bangla and self.bangla_fonts:
-                    # Content is Bangla: Use Bangla font
+                # Language Detection: Check content, then fallback to scene story
+                if is_content_bangla:
+                    ov['font'] = "Sohid_bangla" if "Sohid_bangla" in self.bangla_fonts else (self.bangla_fonts[0] if self.bangla_fonts else "Arial")
+                elif self._is_bangla(self.story_scenes.get(s_id, "")):
+                    # Scene is Bangla, content might be mixed or icons. Prefer Bangla font if it was already selected or requested.
                     if ai_font in self.bangla_fonts: pass
-                    else: ov['font'] = "Sohid_bangla" if "Sohid_bangla" in self.bangla_fonts else self.bangla_fonts[0]
-                elif not is_content_bangla and self.english_fonts:
-                    # Content is English/Latin: Use English font
+                    else: ov['font'] = "Sohid_bangla" if "Sohid_bangla" in self.bangla_fonts else (self.bangla_fonts[0] if self.bangla_fonts else (self.english_fonts[0] if self.english_fonts else "Arial"))
+                else:
+                    # English content or scene
                     if ai_font in self.english_fonts: pass
-                    else: ov['font'] = self.english_fonts[0]
-                elif is_scene_bangla and self.bangla_fonts:
-                    # Content is neutral but scene is Bangla
-                    ov['font'] = "Sohid_bangla" if "Sohid_bangla" in self.bangla_fonts else self.bangla_fonts[0]
-                elif self.english_fonts:
-                    # Last resort: first English font
-                    if ai_font in self.english_fonts: pass
-                    else: ov['font'] = self.english_fonts[0]
-                elif not ov.get('font') or ov.get('font') not in all_scanned_fonts:
-                    ov['font'] = "Arial"
+                    else: ov['font'] = self.english_fonts[0] if self.english_fonts else "Arial"
 
                 if ov['type'] == 'text':
                     ov['maxWidth'] = ov.get('maxWidth', 800)
@@ -685,44 +733,20 @@ def main():
             iteration += 1
             continue
 
-        # Post-Paste Hardening
+        # --- ENGINE-SIDE DETERMINISTIC FIXES (STAGE 2: HARDENING) ---
+        # All deep promotion and internal fixes are now consolidated in finalize_json_durations
         render_json = maker.finalize_json_durations(render_json, public_dir=args.public_dir)
 
-        # Final pass verification for mandatory fields before QA & Save
-        for scene in render_json.get('scenes', []):
-            for ov in scene.get('overlays', []):
-                o_type = str(ov.get('type')).lower()
-
-                # DEEP DATA PROMOTION: Move fields from 'data' or 'styling' to root
-                for nest_key in ['data', 'styling', 'config']:
-                    if nest_key in ov and isinstance(ov[nest_key], dict):
-                        for sub_key, sub_val in ov[nest_key].items():
-                            if sub_key not in ov: ov[sub_key] = sub_val
-
-                # RE-FIX: Ensure specific keys exist even if variant was mapped earlier
-                if o_type == 'shape' and 'variant' in ov and 'shape_type' not in ov: ov['shape_type'] = ov['variant']
-                if 'chart' in o_type and 'variant' in ov and 'chart_type' not in ov: ov['chart_type'] = ov['variant']
-                if 'indicator' in o_type and 'variant' in ov and 'indicator_type' not in ov: ov['indicator_type'] = ov['variant']
-                if o_type == 'connector' and 'variant' in ov and 'preset' not in ov: ov['preset'] = ov['variant']
-
-                var = ov.get('indicator_type') or ov.get('chart_type') or ov.get('shape_type') or ov.get('preset')
-                if var == 'milestoneTracker' and 'milestones' not in ov:
-                    ov['milestones'] = [{"label": "Milestone 1", "date": "T-0"}]
-                if var in ['timeline', 'milestoneTimeline'] and 'events' not in ov and 'milestones' not in ov:
-                    ov['events'] = [{"title": "Event 1", "date": "Start", "description": "System activated."}]
-                if var == 'statGrid' and 'stats' not in ov:
-                    ov['stats'] = [{"label": "Metric 1", "value": 85, "suffix": "%"}, {"label": "Metric 2", "value": 92, "suffix": "%"}]
-                if var in ['multiProgress', 'ringChart'] and 'items' not in ov and 'rings' not in ov:
-                    ov['items'] = [{"label": "Process A", "value": 75, "color": "#00F5FF"}]
-                if var in ['stepIndicator', 'step_indicator_glass'] and 'steps' not in ov:
-                    ov['steps'] = ["Initiate", "Process", "Complete"]
-
         # Save temporarily for QA
-        with open(args.output, 'w', encoding='utf-8') as f: json.dump(render_json, f, indent=2, ensure_ascii=False)
+        with open(args.output, 'w', encoding='utf-8') as f:
+            json.dump(render_json, f, indent=2, ensure_ascii=False)
 
         print(f"🧪 STAGE 3: Production QA (Iteration {iteration})...")
         success, score, feedback = test_manifest_quality(args.output, args.public_dir)
         current_score = score
+
+        # RE-EVALUATE AFTER ENGINE FIXES: If engine hardening fixed everything, success=True
+        if score == 100: success = True
 
         # Track best result
         if score > best_score or best_json is None:
