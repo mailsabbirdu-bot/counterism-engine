@@ -11,6 +11,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from playwright.sync_api import sync_playwright
 import playwright_stealth
 from .supervisor import supervise_manifest
+from .intelligence import SceneIntelligenceEngine
 
 class RemotionJsonMaker:
     def __init__(self, user_data_dir: str = None, headless: bool = True, manual: bool = False):
@@ -566,10 +567,25 @@ class RemotionJsonMaker:
         return data
 
     def supervise(self, data: Dict[str, Any]) -> List[str]:
-        """Runs the Element Supervisor on the manifest and returns formatted feedback."""
-        print(f"🧠 SUPERVISOR: Evaluating cognitive load and motion clarity...")
+        """Runs the Element Supervisor and Intelligence Engine on the manifest."""
+        print(f"🧠 INTELLIGENCE: Predicting human perception and attention flow...")
+        intel_engine = SceneIntelligenceEngine()
         reports = supervise_manifest(data)
         all_feedback = []
+
+        # v5 HYBRID: Process intelligence for each scene
+        for scene in data.get('scenes', []):
+            s_id = scene.get('scene_id')
+            try:
+                intel_report = intel_engine.analyze_scene(scene)
+                # Format Jules' intelligence as director feedback
+                all_feedback.append(f"[{s_id}] DIRECTOR'S INTELLIGENCE: {intel_report['final_verdict']['summary']}")
+                for conflict in intel_report['critical_conflicts']:
+                    all_feedback.append(f"[{s_id}] CRITICAL CONFLICT ({conflict['type']}): {conflict['explanation']}")
+                for adj in intel_report['overlay_adjustments']:
+                    all_feedback.append(f"[{s_id}] REQUIRED ADJUSTMENT: {adj}")
+            except Exception as e:
+                print(f"⚠️ Intelligence Engine error on {s_id}: {e}")
 
         for report in reports:
             s_id = report['scene_id']
