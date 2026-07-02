@@ -10,6 +10,7 @@ import math
 from typing import Dict, Any, List, Optional, Tuple
 from playwright.sync_api import sync_playwright
 import playwright_stealth
+from .supervisor import supervise_manifest
 
 class RemotionJsonMaker:
     def __init__(self, user_data_dir: str = None, headless: bool = True, manual: bool = False):
@@ -564,6 +565,34 @@ class RemotionJsonMaker:
         data['audio_sfx_manifest'] = sfx_manifest
         return data
 
+    def supervise(self, data: Dict[str, Any]) -> List[str]:
+        """Runs the Element Supervisor on the manifest and returns formatted feedback."""
+        print(f"🧠 SUPERVISOR: Evaluating cognitive load and motion clarity...")
+        reports = supervise_manifest(data)
+        all_feedback = []
+
+        for report in reports:
+            s_id = report['scene_id']
+            if report['status'] != 'CLEAN':
+                # Add overall status and scores
+                scores = report['scores']
+                all_feedback.append(f"[{s_id}] DIRECTOR'S REPORT: Status={report['status']}, Clarity={scores['clarity']}, Motion={scores['motion_quality']}, Comprehension={scores['comprehension']}")
+
+                # Add specific issues
+                for issue in report['issues']:
+                    all_feedback.append(f"[{s_id}] COGNITIVE ISSUE: {issue}")
+                for issue in report['motion_issues']:
+                    all_feedback.append(f"[{s_id}] MOTION ISSUE: {issue}")
+                for issue in report['resting_time_violations']:
+                    all_feedback.append(f"[{s_id}] PACING ISSUE: {issue}")
+
+                # Add suggestions if high severity
+                if report['status'] == 'OVERLOADED':
+                    for sugg in report['fix_suggestions'][:3]:
+                        all_feedback.append(f"[{s_id}] DIRECTOR FIX: {sugg}")
+
+        return all_feedback
+
     def _get_scene_hero_word(self, scene_id: str, overlay_content: str, scene_duration: int = 180):
         if not self.raw_timestamps or not overlay_content: return None
         matches = re.findall(fr'{scene_id}:.*?\[30fps:\s*(\d+)f\s*-\s*\d+f\]\s*"(.*?)"', self.raw_timestamps)
@@ -730,7 +759,9 @@ class RemotionJsonMaker:
             f"7. [REQUIRED] RELATIONSHIPS: Use 'type': 'connector' to link components by their 'id'. Specify 'source' and 'target' IDs. Also populate the scene-level 'connections' array with [{{'from': 'ID', 'to': 'ID'}}] objects.\n"
             f"8. [REQUIRED] UI_PANELS: Use 'type': 'ui_panel' with 'variant': 'glass' to frame important data or create technical overlays.\n"
             f"9. [RECOMMENDED] CHOREOGRAPHY: Sequence reveals (Wave 1: Text, Wave 2: Visuals, Wave 3: Connectors/Details).\n"
-            f"10. [OPTIONAL] PARALLAX: Add slight 'parallax' values (-20 to 50) to create technical depth.\n\n"
+            f"10. [OPTIONAL] PARALLAX: Add slight 'parallax' values (-20 to 50) to create technical depth.\n"
+            f"11. [DIRECTOR RULE] COGNITIVE LOAD: Max 1 focal point per moment. Ensure 12-20 frames of 'RESTING TIME' after any major animation before the next event. Avoid simultaneous animations of more than 2 elements.\n"
+            f"12. [DIRECTOR RULE] READABILITY: Hold text on screen for at least (words * 0.3) seconds.\n\n"
             f"--- [REQUIRED] VARIANT AUTHORITY (USE ONLY THESE) ---\n"
             f"CHARTS: glass_area, neon_bar, stacked_line, radial_score, radar_web, pie_donut_glass, step_area, multi_bar_stack, bar_race_top, thick_line_glow, area, bar, line.\n"
             f"INDICATORS: metric_tile, tech_badge, activity_ring, crypto_card, server_status, data_ticker, notification_stack, kpiNumber, deltaIndicator, semiGauge, milestoneTimeline, statGrid, batteryLevel, statusBadge, stepIndicator, pulseRadar, multiProgress.\n"
@@ -852,8 +883,17 @@ def main():
             json.dump(render_json, f, indent=2, ensure_ascii=False)
 
         print(f"🧪 STAGE 3: Production QA (Iteration {iteration})...")
-        success, score, feedback = test_manifest_quality(args.output, args.public_dir)
+        success, score, qa_feedback = test_manifest_quality(args.output, args.public_dir)
         current_score = score
+
+        # --- STAGE 4: ELEMENT SUPERVISOR (DIRECTOR REVIEW) ---
+        supervisor_feedback = maker.supervise(render_json)
+        feedback = qa_feedback + supervisor_feedback
+
+        # If supervisor found issues but QA passed, we still might want to iterate
+        if supervisor_feedback and score == 100:
+            print(f"   ⚠️ QA Passed but Supervisor found cognitive issues. Refining...")
+            success = False
 
         # RE-EVALUATE AFTER ENGINE FIXES: If engine hardening fixed everything, success=True
         if score == 100: success = True
