@@ -203,6 +203,7 @@ class RemotionJsonMaker:
                              del nested['z_index']
 
                         for sub_key, sub_val in nested.items():
+                            if sub_key in LOCKED_FIELDS: continue
                             # OVERWRITE: Nested properties are usually the AI's intended correction
                             ov[sub_key] = sub_val
                         # OPTIMIZATION: Remove redundant nested objects

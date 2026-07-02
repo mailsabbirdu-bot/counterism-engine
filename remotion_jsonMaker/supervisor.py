@@ -16,6 +16,7 @@ class PerceptionFinding:
     viewer_impact: str
     fix_suggestion: str
     expected_quality_gain: float
+    category: str = "general" # layout, motion, cognitive, composition, readability, narrative
 
 @dataclass
 class PerceptionObservation:
@@ -29,21 +30,33 @@ class PerceptionObservation:
     scores: Dict[str, float] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+@dataclass
+class SceneState:
+    """Read-only container for frame-by-frame simulation data."""
+    frame_load: List[float]
+    motion_events: List[int]
+    active_elements_per_frame: List[int]
+    visual_noise_per_frame: List[float]
+    energy_curve: List[float]
+    duration: int
+    focus_timeline: List[Optional[str]] = field(default_factory=list)
+    tone: str = "neutral"
+
 class AnalysisModule:
     """Base class for all Cinematic Perception modules."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         raise NotImplementedError
 
 class VisualSaliencyEngine(AnalysisModule):
     """MODULE 1: Dynamic Visual Saliency (Eye Catching Score)."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Visual Saliency")
         focus_timeline = []
 
-        for f in range(supervisor.duration):
+        for f in range(state.duration):
             candidates = []
             for ov in supervisor.overlays:
-                start, end = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', supervisor.duration)
+                start, end = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', state.duration)
                 if start <= f < end:
                     # Saliency Factors
                     size = (ov.get('width', 400) * ov.get('height', 400)) / (1920 * 1080)
@@ -69,12 +82,12 @@ class VisualSaliencyEngine(AnalysisModule):
                     obs.director_notes.append(f"Viewer attention is split at {f}f. Make the hero element more dominant.")
                     obs.fix_suggestions.append(f"Increase opacity or scale of hero relative to '{candidates[1]['id']}'.")
 
-        supervisor.focus_timeline = focus_timeline
+        state.focus_timeline.extend(focus_timeline)
         return obs
 
 class EyeMovementSimulator(AnalysisModule):
     """MODULE 2: Simulates Fixations, Saccades, and Reading Flow."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Eye Flow")
         last_pos = None
         travel_distance = 0
@@ -95,9 +108,9 @@ class EyeMovementSimulator(AnalysisModule):
 
 class VisualNoiseDetector(AnalysisModule):
     """MODULE 3: Decorative graphics competing with info."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Visual Noise")
-        avg_noise = sum(supervisor.visual_noise_per_frame) / supervisor.duration if supervisor.duration > 0 else 0
+        avg_noise = sum(state.visual_noise_per_frame) / state.duration if state.duration > 0 else 0
         if avg_noise > 0.8: # Calibrated threshold
             obs.issues.append(f"Visual Noise Too High ({round(avg_noise, 1)}). Decorative elements distracting from content.")
             obs.director_notes.append("Background particles or shapes are too active. Simplify decorative layers.")
@@ -105,7 +118,7 @@ class VisualNoiseDetector(AnalysisModule):
 
 class VisualCompositionEngine(AnalysisModule):
     """MODULE 3: Judges Layout via Rule of Thirds and Golden Ratio."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Composition")
         centerX, centerY = 0, 0
         for ov in supervisor.overlays:
@@ -125,7 +138,7 @@ class VisualCompositionEngine(AnalysisModule):
 
 class GestaltAnalyzer(AnalysisModule):
     """MODULE 4: Proximity and Similarity Grouping."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Gestalt")
         # Logic to detect accidentally close objects
         for i, o1 in enumerate(supervisor.overlays):
@@ -139,7 +152,7 @@ class GestaltAnalyzer(AnalysisModule):
 
 class MotionPsychologyEngine(AnalysisModule):
     """MODULE 5: Purpose-driven animation evaluation."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Motion Psychology")
         motion_count = 0
         for ov in supervisor.overlays:
@@ -158,9 +171,9 @@ class MotionPsychologyEngine(AnalysisModule):
 
 class RhythmEngine(AnalysisModule):
     """MODULE 6: Beat spacing and tempo analysis."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Rhythm")
-        events = [i for i, count in enumerate(supervisor.motion_events) if count > 0]
+        events = [i for i, count in enumerate(state.motion_events) if count > 0]
         if len(events) < 2: return obs
 
         gaps = [events[i+1] - events[i] for i in range(len(events)-1)]
@@ -173,10 +186,10 @@ class RhythmEngine(AnalysisModule):
 
 class EnergyCurveEngine(AnalysisModule):
     """MODULE 7: Tracks scene intensity peaks and valleys."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Energy Curve")
-        max_e = max(supervisor.energy_curve) if supervisor.energy_curve else 0
-        min_e = min(supervisor.energy_curve) if supervisor.energy_curve else 0
+        max_e = max(state.energy_curve) if state.energy_curve else 0
+        min_e = min(state.energy_curve) if state.energy_curve else 0
 
         if max_e > 0 and (max_e - min_e) < 1.5:
             obs.issues.append("Flat Energy: Scene lacks dynamic variation.")
@@ -185,7 +198,7 @@ class EnergyCurveEngine(AnalysisModule):
 
 class CameraDirector(AnalysisModule):
     """MODULE 8: Cinematic movement evaluation."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Camera")
         camera = supervisor.scene.get('camera', {})
         shots = camera.get('shots', [])
@@ -202,7 +215,7 @@ class CameraDirector(AnalysisModule):
 
 class InformationDensityEngine(AnalysisModule):
     """MODULE 9: Bits of info per second."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Info Density")
         total_bits = 0
         for ov in supervisor.overlays:
@@ -211,7 +224,7 @@ class InformationDensityEngine(AnalysisModule):
             elif 'chart' in o_type: total_bits += 15
             elif 'indicator' in o_type: total_bits += 8
 
-        bits_per_sec = total_bits / (supervisor.duration / 30.0) if supervisor.duration > 0 else 0
+        bits_per_sec = total_bits / (state.duration / 30.0) if state.duration > 0 else 0
         obs.metadata['bits_per_sec'] = bits_per_sec
         if bits_per_sec > 10:
             obs.issues.append(f"Extreme Info Density: {round(bits_per_sec, 1)} bits/sec.")
@@ -220,7 +233,7 @@ class InformationDensityEngine(AnalysisModule):
 
 class ReadabilityEngine(AnalysisModule):
     """MODULE 10: Multi-language reading speed estimation."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Readability")
         for ov in supervisor.overlays:
             if ov.get('type') == 'text':
@@ -230,14 +243,14 @@ class ReadabilityEngine(AnalysisModule):
                 if any('\u0980' <= c <= '\u09FF' for c in content): lang = 'bangla'
                 speed = supervisor.READING_SPEEDS.get(lang, 0.3)
                 req_sec = words * speed
-                actual_sec = ov.get('duration', supervisor.duration) / 30.0
+                actual_sec = ov.get('duration', state.duration) / 30.0
                 if actual_sec < req_sec:
                     obs.issues.append(f"Text too fast: '{ov.get('id')}' needs {round(req_sec, 1)}s.")
         return obs
 
 class NarrativeEngine(AnalysisModule):
     """MODULE 11: Story structure validation."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Narrative")
         has_hero = any(str(o.get('importance','')).lower() == 'hero' for o in supervisor.overlays)
         has_evidence = any(o.get('type') in ['chart', 'indicator', 'graph'] for o in supervisor.overlays)
@@ -247,17 +260,17 @@ class NarrativeEngine(AnalysisModule):
 
 class EmotionalPacingEngine(AnalysisModule):
     """MODULE 12: Tone estimation."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Emotional Pacing")
-        avg_e = sum(supervisor.energy_curve) / supervisor.duration if supervisor.duration > 0 else 0
-        if avg_e > 3.0: supervisor.tone = "chaotic"
-        elif avg_e > 1.5: supervisor.tone = "dramatic"
-        else: supervisor.tone = "calm"
+        avg_e = sum(state.energy_curve) / state.duration if state.duration > 0 else 0
+        if avg_e > 3.0: state.tone = "chaotic"
+        elif avg_e > 1.5: state.tone = "dramatic"
+        else: state.tone = "calm"
         return obs
 
 class DirectorStyleEngine(AnalysisModule):
     """MODULE 13: Project-specific style presets (Vox, Apple, BBC)."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Style")
         style = str(supervisor.project_style).lower()
 
@@ -278,7 +291,7 @@ class DirectorStyleEngine(AnalysisModule):
 
 class VisualConsistencyEngine(AnalysisModule):
     """MODULE 14: Uniformity check (Radii, Fonts, Colors)."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Consistency")
         fonts = {ov.get('font') for ov in supervisor.overlays if ov.get('font')}
         if len(fonts) > 2:
@@ -287,7 +300,7 @@ class VisualConsistencyEngine(AnalysisModule):
 
 class SceneMemoryEngine(AnalysisModule):
     """MODULE 15: Cross-scene recurring element tracking."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Memory")
         # Track Hero Continuity
         current_hero = next((o.get('id') for o in supervisor.overlays if str(o.get('importance','')).lower() == 'hero'), None)
@@ -301,12 +314,12 @@ class SceneMemoryEngine(AnalysisModule):
 
 class DocumentarySupervisor(AnalysisModule):
     """MODULE 16: Manifest-wide pacing and progression."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Film Score")
         # Logic to evaluate the "Story Arc"
         scene_index = supervisor.manifest_memory.get('scene_index', 0)
         if scene_index == 0:
-            if sum(supervisor.energy_curve) / supervisor.duration < 1.0:
+            if sum(state.energy_curve) / state.duration < 1.0:
                  obs.issues.append("Weak Opening: First scene energy is too low.")
 
         supervisor.manifest_memory['scene_index'] = scene_index + 1
@@ -314,7 +327,7 @@ class DocumentarySupervisor(AnalysisModule):
 
 class AutoFixEngine(AnalysisModule):
     """MODULE 17: Frame-accurate actionable recommendations."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Auto Fix")
         # Logic to generate frame-specific delays and moves
         for i, ov in enumerate(supervisor.overlays):
@@ -327,7 +340,7 @@ class AutoFixEngine(AnalysisModule):
 
 class BackgroundOverlayHarmonyEngine(AnalysisModule):
     """MODULE 1 (v5): Detects conflicts between background intent and overlays."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Background-Overlay Harmony")
         bg = supervisor.bg_intel
         neg_space = bg.get('composition', {}).get('negative_space', 'center')
@@ -364,7 +377,7 @@ class BackgroundOverlayHarmonyEngine(AnalysisModule):
                 ov_hero = str(ov.get('importance','')).lower() == 'hero'
                 if ov_hero and bg_hero.get('position') == 'center' and abs(pos['x'] - 960) < 200:
                     obs.findings.append(PerceptionFinding(
-                        severity="error", confidence=0.9, frame_range=(ov.get('start',0), supervisor.duration),
+                        severity="error", confidence=0.9, frame_range=(ov.get('start',0), state.duration),
                         affected_elements=[ov.get('id')],
                         human_explanation="Overlay hero competes with background hero.",
                         technical_explanation="Both background and overlay hero occupy center focal zone.",
@@ -376,12 +389,12 @@ class BackgroundOverlayHarmonyEngine(AnalysisModule):
 
 class SemanticEnvironmentLoadEngine(AnalysisModule):
     """MODULE 2 (v5): Computes total load (background + overlays)."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Semantic Load")
         bg_busy = supervisor.bg_intel.get('composition', {}).get('busy_score', 0.2)
 
-        for f in range(supervisor.duration):
-            ov_load = supervisor.frame_load[f] / 4.0 # normalized
+        for f in range(state.duration):
+            ov_load = state.frame_load[f] / 4.0 # normalized
             total_load = bg_busy + ov_load
             if total_load > 1.2 and f % 60 == 0:
                 obs.findings.append(PerceptionFinding(
@@ -397,7 +410,7 @@ class SemanticEnvironmentLoadEngine(AnalysisModule):
 
 class ColorContrastIntelligenceEngine(AnalysisModule):
     """MODULE 3 (v5): Evaluates readability risk and color clashes."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Color & Contrast")
         bg_style = supervisor.bg_intel.get('visual_style', {})
         brightness = bg_style.get('brightness', 0.5)
@@ -408,7 +421,7 @@ class ColorContrastIntelligenceEngine(AnalysisModule):
                 is_bright_text = color in ['#ffffff', '#00f5ff', '#00ffab', 'white', 'cyan']
                 if brightness > 0.7 and is_bright_text:
                     obs.findings.append(PerceptionFinding(
-                        severity="error", confidence=0.85, frame_range=(ov.get('start',0), supervisor.duration),
+                        severity="error", confidence=0.85, frame_range=(ov.get('start',0), state.duration),
                         affected_elements=[ov.get('id')],
                         human_explanation="Text is unreadable on bright background.",
                         technical_explanation=f"Bright text({color}) on high-brightness bg({brightness}).",
@@ -420,7 +433,7 @@ class ColorContrastIntelligenceEngine(AnalysisModule):
 
 class CompositionConstraintEngine(AnalysisModule):
     """MODULE 4 (v5): Rule of Thirds and Negative Space usage."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Composition Constraint")
         bg_comp = supervisor.bg_intel.get('composition', {})
         neg_space = bg_comp.get('negative_space')
@@ -435,11 +448,11 @@ class CompositionConstraintEngine(AnalysisModule):
 
 class AttentionFieldSimulator(AnalysisModule):
     """MODULE 5 (v5): Upgraded attention scoring with background bias."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Attention Field")
         bg_hero = supervisor.bg_intel.get('hero_subject', {})
 
-        for f in range(supervisor.duration):
+        for f in range(state.duration):
             if bg_hero.get('confidence', 0) > 0.8:
                 # Background bias: viewer is already looking at background hero
                 pass
@@ -447,13 +460,13 @@ class AttentionFieldSimulator(AnalysisModule):
 
 class CinematicIntentValidator(AnalysisModule):
     """MODULE 6 (v5): Interprets shot purpose and validates overlays."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Cinematic Intent")
         scene_type = supervisor.bg_intel.get('scene_type', 'generic')
 
         if scene_type == 'highway' and len(supervisor.overlays) > 5:
             obs.findings.append(PerceptionFinding(
-                severity="warning", confidence=0.8, frame_range=(0, supervisor.duration),
+                severity="warning", confidence=0.8, frame_range=(0, state.duration),
                 affected_elements=[],
                 human_explanation="Wide shots should breathe.",
                 technical_explanation="High overlay count on 'highway' scene type.",
@@ -465,14 +478,14 @@ class CinematicIntentValidator(AnalysisModule):
 
 class CognitiveLoadFusionEngine(AnalysisModule):
     """MODULE 7 (v5): Dynamic fusion cognitive load."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Cognitive Fusion")
         bg_busy = supervisor.bg_intel.get('composition', {}).get('busy_score', 0.2)
 
-        for f in range(supervisor.duration):
+        for f in range(state.duration):
             # Formula: cognitive_load = overlay_load + bg_busy + motion + conflict
-            ov_load = supervisor.frame_load[f] / 4.0
-            motion = sum(supervisor.motion_events[max(0, f-10):f+1]) * 0.2
+            ov_load = state.frame_load[f] / 4.0
+            motion = sum(state.motion_events[max(0, f-10):f+1]) * 0.2
 
             fusion_load = ov_load + bg_busy + motion
             if fusion_load > 1.5 and f % 60 == 0:
@@ -489,7 +502,7 @@ class CognitiveLoadFusionEngine(AnalysisModule):
 
 class TextPlacementIntelligenceEngine(AnalysisModule):
     """MODULE 8 (v5): Validates text against preferred regions."""
-    def run(self, supervisor: 'SceneSupervisor') -> PerceptionObservation:
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Text Placement")
         pref_region = supervisor.bg_intel.get('text_region', {}).get('preferred', 'center')
 
@@ -497,6 +510,39 @@ class TextPlacementIntelligenceEngine(AnalysisModule):
             if ov.get('type') == 'text':
                 # Simplified region check (v5)
                 pass
+        return obs
+
+class ScoringSynthesisEngine(AnalysisModule):
+    """FINAL SYNTHESIS: Combines all observations into production-grade scores."""
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
+        obs = PerceptionObservation("Scoring Synthesis")
+
+        # Categorize all findings
+        categories = ["layout", "motion", "cognitive", "composition", "readability", "narrative", "fusion"]
+        cat_scores = {c: 10.0 for c in categories}
+
+        all_findings = []
+        for o in supervisor.observations:
+            all_findings.extend(o.findings)
+
+        for finding in all_findings:
+            penalty = 0.5
+            if finding.severity == "critical": penalty = 2.0
+            elif finding.severity == "error": penalty = 1.0
+            elif finding.severity == "warning": penalty = 0.5
+
+            cat = finding.category if finding.category in cat_scores else "layout"
+            cat_scores[cat] -= penalty
+
+        # Map to supervisor scores
+        supervisor.scores["visual_harmony"] = cat_scores["fusion"]
+        supervisor.scores["composition_integrity"] = cat_scores["composition"]
+        supervisor.scores["attention_clarity"] = cat_scores["layout"]
+        supervisor.scores["cognitive_load"] = cat_scores["cognitive"]
+        supervisor.scores["readability_score"] = cat_scores["readability"]
+        supervisor.scores["motion_discipline"] = cat_scores["motion"]
+        supervisor.scores["narrative"] = cat_scores["narrative"]
+
         return obs
 
 class SceneSupervisor:
@@ -569,19 +615,25 @@ class SceneSupervisor:
         # Backward compatibility maps
         self.legacy_scores = {"clarity": 10.0, "motion_quality": 10.0, "comprehension": 10.0, "modernity": 10.0}
 
-        # Simulation data
+        # Simulation data (Populated by _simulate_timeline)
         self.frame_load = [0.0] * self.duration
         self.motion_events = [0] * self.duration
         self.active_elements_per_frame = [0] * self.duration
         self.visual_noise_per_frame = [0.0] * self.duration
         self.energy_curve = [0.0] * self.duration
-        self.focus_timeline = []
-        self.tone = "neutral"
 
     def analyze(self) -> Dict[str, Any]:
         """Core analysis pipeline: runs all modules and aggregates reports."""
-        # 0. Internal Preparation
+        # 0. Internal Preparation (Simulation)
         self._simulate_timeline()
+        state = SceneState(
+            frame_load=self.frame_load,
+            motion_events=self.motion_events,
+            active_elements_per_frame=self.active_elements_per_frame,
+            visual_noise_per_frame=self.visual_noise_per_frame,
+            energy_curve=self.energy_curve,
+            duration=self.duration
+        )
 
         # v5 Hybrid: If intelligence is missing, compute it locally
         if not self.intelligence:
@@ -604,14 +656,13 @@ class SceneSupervisor:
             CognitiveLoadFusionEngine(), TextPlacementIntelligenceEngine()
         ]
         for mod in modules:
-            self.observations.append(mod.run(self))
+            self.observations.append(mod.run(self, state))
 
-        # 2. Legacy Adapters (For compatibility)
-        self._check_cognitive_load()
-        self._check_resting_time()
+        # 2. Synthesis (Scoring)
+        self.observations.append(ScoringSynthesisEngine().run(self, state))
 
-        # 3. Final Scoring & Report Generation
-        return self._generate_report()
+        # 3. Final Report Generation
+        return self._generate_report(state)
 
     def _simulate_timeline(self):
         """Timeline Simulator: frame-by-frame activity tracking."""
@@ -664,7 +715,7 @@ class SceneSupervisor:
             if actual_rest < required_rest:
                 self.legacy_scores['comprehension'] -= 0.2
 
-    def _generate_report(self) -> Dict[str, Any]:
+    def _generate_report(self, state: SceneState) -> Dict[str, Any]:
         """Generates the comprehensive v5 production-grade report."""
         all_issues, all_m_issues, all_notes, all_fixes, all_findings = [], [], [], [], []
 
@@ -732,8 +783,8 @@ class SceneSupervisor:
             "director_notes": list(set(all_notes)),
             "fix_suggestions": list(set(all_fixes)),
             "motion_issues": list(set(all_m_issues + [i for i in all_issues if "Motion" in i or "Animation" in i])),
-            "perceived_tone": self.tone,
-            "focus_timeline": self.focus_timeline[::10],
+            "perceived_tone": state.tone,
+            "focus_timeline": state.focus_timeline[::10],
             "attention_budget_used": sum(self.ATTENTION_COSTS.get(str(ov.get('type','')).lower(), 20) for ov in self.overlays),
             "background_overlay_fusion_score": round(self.scores['background_overlay_fusion'], 1),
             "professional_verdict": f"Senior Director Review: {status}. Composite score {round(self.scores['overall_cinematic_score'],1)}."
