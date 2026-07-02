@@ -298,6 +298,12 @@ def test_manifest_quality(filepath, public_dir=None):
                         elif variant in ['stepIndicator', 'step_indicator_glass'] and 'steps' not in ov:
                             issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'steps' array.")
                             variant_error = True
+                        elif variant in ['kpi', 'kpiNumber', 'counter', 'percentageCounter', 'deltaIndicator', 'semiGauge', 'metricRing'] and 'value' in ov:
+                            try:
+                                float(str(ov['value']).replace('%', '').replace(',', ''))
+                            except ValueError:
+                                warnings.append(f"[{scene_id}] DATA WARNING: '{ov_id}' ({variant}) value '{ov['value']}' is non-numeric. Animation may fail.")
+                                scores["assets"] -= 10
                         elif variant in ['kpi', 'metric_tile'] and 'value' not in ov:
                             warnings.append(f"[{scene_id}] DATA WARNING: '{ov_id}' ({variant}) should have a 'value'.")
                             scores["assets"] -= 5

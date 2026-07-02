@@ -740,7 +740,7 @@ class RemotionJsonMaker:
             f"--- [REQUIRED] MANDATORY SCHEMA FIELDS ---\n"
             f"- ROOT: requires 'project_id', 'global_settings': {{ 'width': 1920, 'height': 1080, 'fps': 30 }}.\n"
             f"- 'chart': requires 'chart_type', 'title', and 'data' array.\n"
-            f"- 'indicator': requires 'indicator_type', 'title', and 'value'.\n"
+            f"- 'indicator': requires 'indicator_type', 'title', and 'value' (PURE NUMBER for animation, e.g., 20 NOT '20M').\n"
             f"- 'milestoneTimeline': requires 'events': [ {{ 'title': '...', 'date': '...', 'description': '...' }} ].\n"
             f"- 'statGrid': requires 'stats': [ {{ 'label': '...', 'value': 80, 'suffix': '%' }} ].\n"
             f"- 'connector': requires 'source' (ID), 'target' (ID), and 'variant'.\n\n"

@@ -123,11 +123,14 @@ const StatGrid = ({ overlay, relativeFrame, fps }: any) => {
     <div className="grid grid-cols-2 gap-4 bg-zinc-900/60 backdrop-blur-2xl p-6 rounded-[2rem] border border-white/10 shadow-2xl" style={fontStyle}>
       {(overlay.stats || []).map((stat: any, i: number) => {
         const reveal = spring({ frame: safeFrame - i * 10, fps, config: { damping: 12 } });
-        const val = interpolate(safeFrame - 20 - i * 10, [0, 50], [0, stat.value || 0], { extrapolateRight: 'clamp' });
+        const targetValue = safeNumber(stat.value, 0);
+        const val = interpolate(safeFrame - 20 - i * 10, [0, 50], [0, targetValue], { extrapolateRight: 'clamp' });
         return (
           <div key={i} className="p-4 bg-white/5 rounded-2xl border border-white/5" style={{ opacity: reveal, transform: `translateY(${(1-reveal)*20}px)` }}>
             <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">{stat.label}</p>
-            <p className="text-white text-2xl font-black tabular-nums">{Math.round(val)}{stat.suffix}</p>
+            <p className="text-white text-2xl font-black tabular-nums">
+                {isNaN(Number(stat.value)) ? stat.value : Math.round(val)}{stat.suffix}
+            </p>
           </div>
         );
       })}
@@ -139,6 +142,7 @@ const TechMetric = ({ overlay, relativeFrame, fps }: any) => {
   const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
   const fontStyle = { fontFamily: overlay.font || 'Inter' };
   const pulse = Math.sin(safeFrame * 0.1) * 0.1 + 0.9;
+  const targetValue = safeNumber(overlay.value, 85);
   return (
     <div className="flex items-center gap-6 bg-blue-950/40 backdrop-blur-3xl p-8 rounded-full border-2 border-blue-500/30 shadow-[0_0_50px_rgba(59,130,246,0.2)]" style={fontStyle}>
        <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center shadow-lg animate-pulse" style={{ transform: `scale(${pulse})` }}>
@@ -147,7 +151,7 @@ const TechMetric = ({ overlay, relativeFrame, fps }: any) => {
        <div className="flex flex-col">
           <span className="text-blue-400 text-xs font-black uppercase tracking-widest leading-none mb-1">{overlay.label || 'SYSTEM LOAD'}</span>
           <div className="text-white text-6xl font-black tabular-nums leading-none tracking-tighter">
-            {Math.round(interpolate(safeFrame, [10, 60], [0, overlay.value || 85], { extrapolateRight: 'clamp' }))}%
+            {isNaN(Number(overlay.value)) ? overlay.value : Math.round(interpolate(safeFrame, [10, 60], [0, targetValue], { extrapolateRight: 'clamp' }))}%
           </div>
        </div>
     </div>
@@ -173,7 +177,8 @@ const DataWave = ({ overlay, relativeFrame, fps }: any) => {
 
 const BatteryLevel = ({ overlay, relativeFrame, fps }: any) => {
     const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
-    const progress = interpolate(safeFrame, [0, 80], [0, overlay.value || 100], { extrapolateRight: 'clamp' });
+    const targetValue = safeNumber(overlay.value, 100);
+    const progress = interpolate(safeFrame, [0, 80], [0, targetValue], { extrapolateRight: 'clamp' });
     const fontStyle = { fontFamily: overlay.font || 'Inter' };
     return (
         <div className="flex flex-col items-center gap-4 bg-zinc-900/80 p-8 rounded-3xl border border-white/10" style={fontStyle}>
@@ -192,7 +197,8 @@ const BatteryLevel = ({ overlay, relativeFrame, fps }: any) => {
 const ScoreCard = ({ overlay, relativeFrame, fps }: any) => {
   const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
   const fontStyle = { fontFamily: overlay.font || 'Inter' };
-  const val = interpolate(safeFrame, [20, 70], [0, overlay.value || 10], { extrapolateRight: 'clamp' });
+  const targetValue = safeNumber(overlay.value, 10);
+  const val = interpolate(safeFrame, [20, 70], [0, targetValue], { extrapolateRight: 'clamp' });
   return (
     <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-1 rounded-3xl shadow-2xl">
        <div className="bg-zinc-900/90 backdrop-blur-xl p-10 rounded-[1.4rem] flex flex-col items-center min-w-[280px]" style={fontStyle}>
@@ -228,7 +234,8 @@ const MultiProgress = ({ overlay, relativeFrame, fps }: any) => {
     return (
         <div className="flex flex-col gap-6 bg-black/40 backdrop-blur-xl p-10 rounded-[3rem] border border-white/10 w-96" style={fontStyle}>
             {(overlay.items || []).map((item: any, i: number) => {
-                const progress = interpolate(safeFrame - i * 15, [0, 60], [0, item.value || 0], { extrapolateRight: 'clamp' });
+                const targetValue = safeNumber(item.value, 0);
+                const progress = interpolate(safeFrame - i * 15, [0, 60], [0, targetValue], { extrapolateRight: 'clamp' });
                 return (
                     <div key={i} className="flex flex-col gap-2">
                         <div className="flex justify-between text-[10px] font-black uppercase text-white/40 tracking-widest">
@@ -247,7 +254,8 @@ const MultiProgress = ({ overlay, relativeFrame, fps }: any) => {
 
 const Speedometer = ({ overlay, relativeFrame, fps }: any) => {
     const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
-    const val = interpolate(safeFrame, [10, 80], [0, overlay.value || 120], { extrapolateRight: 'clamp' });
+    const targetValue = safeNumber(overlay.value, 120);
+    const val = interpolate(safeFrame, [10, 80], [0, targetValue], { extrapolateRight: 'clamp' });
     const rotation = (val / (overlay.max || 200)) * 240 - 120;
     const fontStyle = { fontFamily: overlay.font || 'Inter' };
     return (
@@ -266,7 +274,8 @@ const RingChart = ({ overlay, relativeFrame, fps }: any) => {
     return (
         <div className="relative w-80 h-80 flex items-center justify-center" style={fontStyle}>
             {(overlay.rings || []).map((ring: any, i: number) => {
-                const progress = interpolate(safeFrame - i * 20, [0, 80], [0, ring.value || 0], { extrapolateRight: 'clamp' });
+                const targetValue = safeNumber(ring.value, 0);
+                const progress = interpolate(safeFrame - i * 20, [0, 80], [0, targetValue], { extrapolateRight: 'clamp' });
                 const size = 280 - i * 45;
                 return (
                     <div key={i} className="absolute rounded-full border-[12px] border-white/5" style={{
@@ -347,7 +356,8 @@ const StepIndicator = ({ overlay, relativeFrame, fps }: any) => {
 
 const DashboardCard = ({ overlay, relativeFrame, fps }: any) => {
   const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
-  const value = interpolate(safeFrame, [20, 80], [0, overlay.value || 0], { extrapolateRight: 'clamp' });
+  const targetValue = safeNumber(overlay.value, 0);
+  const value = interpolate(safeFrame, [20, 80], [0, targetValue], { extrapolateRight: 'clamp' });
   const fontStyle = { fontFamily: overlay.font || 'Inter' };
   return (
     <div className="bg-zinc-900/80 backdrop-blur-xl p-8 rounded-3xl border border-white/20 w-80 shadow-2xl overflow-hidden relative" style={fontStyle}>
@@ -356,7 +366,7 @@ const DashboardCard = ({ overlay, relativeFrame, fps }: any) => {
       </div>
       <h4 className="text-white/40 text-sm font-bold uppercase tracking-widest mb-2" style={fontStyle}>{overlay.label}</h4>
       <div className="text-white text-5xl font-black mb-4 tabular-nums" style={fontStyle}>
-        {overlay.prefix}{Math.round(value).toLocaleString()}{overlay.suffix}
+        {overlay.prefix}{isNaN(Number(overlay.value)) ? overlay.value : Math.round(value).toLocaleString()}{overlay.suffix}
       </div>
       <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold" style={fontStyle}>
          <ArrowUp size={16} />
@@ -430,13 +440,14 @@ const MilestoneTimeline = ({ overlay, relativeFrame, fps }: any) => {
 
 const ProgressBar = ({ overlay, relativeFrame, fps }: any) => {
   const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
-  const progress = interpolate(safeFrame, [10, 70], [0, overlay.value || 100], { extrapolateRight: 'clamp' });
+  const targetValue = safeNumber(overlay.value, 100);
+  const progress = interpolate(safeFrame, [10, 70], [0, targetValue], { extrapolateRight: 'clamp' });
   const fontStyle = { fontFamily: overlay.font || 'Inter' };
   return (
     <div className="bg-zinc-900/90 backdrop-blur-xl p-10 rounded-3xl border border-white/10 w-[600px]" style={fontStyle}>
       <div className="flex justify-between items-end mb-4">
         <span className="text-white text-2xl font-black uppercase tracking-widest" style={fontStyle}>{overlay.label}</span>
-        <span className="text-blue-400 text-4xl font-black" style={fontStyle}>{Math.round(progress)}%</span>
+        <span className="text-blue-400 text-4xl font-black" style={fontStyle}>{isNaN(Number(overlay.value)) ? overlay.value : Math.round(progress)}%</span>
       </div>
       <div className="h-6 w-full bg-white/10 rounded-full overflow-hidden border-2 border-white/5">
         <div
@@ -450,7 +461,8 @@ const ProgressBar = ({ overlay, relativeFrame, fps }: any) => {
 
 const CircularProgress = ({ overlay, relativeFrame, fps }: any) => {
   const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
-  const progress = interpolate(safeFrame, [0, 80], [0, overlay.value || 100], { extrapolateRight: 'clamp' });
+  const targetValue = safeNumber(overlay.value, 100);
+  const progress = interpolate(safeFrame, [0, 80], [0, targetValue], { extrapolateRight: 'clamp' });
   const fontStyle = { fontFamily: overlay.font || 'Inter' };
   return (
     <div className="relative flex items-center justify-center w-80 h-80" style={fontStyle}>
@@ -467,7 +479,7 @@ const CircularProgress = ({ overlay, relativeFrame, fps }: any) => {
         }}
       />
       <div className="flex flex-col items-center justify-center z-10" style={fontStyle}>
-         <span className="text-white text-7xl font-black tabular-nums" style={fontStyle}>{Math.round(progress)}%</span>
+         <span className="text-white text-7xl font-black tabular-nums" style={fontStyle}>{isNaN(Number(overlay.value)) ? overlay.value : Math.round(progress)}%</span>
          <span className="text-white/40 text-xs font-bold uppercase tracking-[0.2em]" style={fontStyle}>{overlay.label}</span>
       </div>
     </div>
@@ -476,7 +488,8 @@ const CircularProgress = ({ overlay, relativeFrame, fps }: any) => {
 
 const SemiGauge = ({ overlay, relativeFrame, fps }: any) => {
   const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
-  const progress = interpolate(safeFrame, [0, 90], [0, overlay.value || 100], { extrapolateRight: 'clamp' });
+  const targetValue = safeNumber(overlay.value, 100);
+  const progress = interpolate(safeFrame, [0, 90], [0, targetValue], { extrapolateRight: 'clamp' });
   const rotation = (progress / 100) * 180 - 90;
   const fontStyle = { fontFamily: overlay.font || 'Inter' };
 
@@ -500,7 +513,7 @@ const SemiGauge = ({ overlay, relativeFrame, fps }: any) => {
       />
       <div className="absolute bottom-4 flex flex-col items-center" style={fontStyle}>
          <div className="text-white text-5xl font-black" style={fontStyle}>
-            <span style={fontStyle}>{overlay.value}</span>
+            <span style={fontStyle}>{isNaN(Number(overlay.value)) ? overlay.value : Math.round(progress)}</span>
             <span style={fontStyle}>{overlay.suffix}</span>
          </div>
          <div className="text-white/40 text-sm font-bold uppercase" style={fontStyle}>{overlay.label}</div>
@@ -548,7 +561,8 @@ const MilestoneTracker = ({ overlay, relativeFrame, fps }: any) => {
 
 const KPINumber = ({ overlay, relativeFrame, fps }: any) => {
   const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
-  const value = interpolate(safeFrame, [0, 45], [0, overlay.value || 0], {
+  const targetValue = safeNumber(overlay.value, 0);
+  const value = interpolate(safeFrame, [0, 45], [0, targetValue], {
     extrapolateRight: 'clamp',
   });
 
@@ -559,7 +573,7 @@ const KPINumber = ({ overlay, relativeFrame, fps }: any) => {
     <div className="flex flex-col items-center justify-center bg-zinc-900/80 backdrop-blur-xl p-12 rounded-[3rem] border border-white/20 shadow-2xl min-w-[500px]" style={fontStyle}>
       <span className="text-white/60 text-3xl uppercase tracking-[0.4em] mb-8 font-black" style={fontStyle}>{overlay.label}</span>
       <div className="text-9xl font-black tracking-tighter tabular-nums flex items-baseline" style={{ ...fontStyle, color: overlay.color || 'white' }}>
-        <span style={fontStyle}>{Math.round(value).toLocaleString()}</span>
+        <span style={fontStyle}>{isNaN(Number(overlay.value)) ? overlay.value : Math.round(value).toLocaleString()}</span>
         {overlay.suffix && <span className="ml-4 text-6xl" style={fontStyle}>{overlay.suffix}</span>}
       </div>
     </div>
@@ -568,7 +582,8 @@ const KPINumber = ({ overlay, relativeFrame, fps }: any) => {
 
 const PercentageCounter = ({ overlay, relativeFrame, fps }: any) => {
   const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
-  const value = interpolate(safeFrame, [0, 60], [0, overlay.value || 0], {
+  const targetValue = safeNumber(overlay.value, 0);
+  const value = interpolate(safeFrame, [0, 60], [0, targetValue], {
     extrapolateRight: 'clamp',
   });
   const fontStyle = { fontFamily: overlay.font || 'Inter' };
@@ -576,7 +591,7 @@ const PercentageCounter = ({ overlay, relativeFrame, fps }: any) => {
   return (
     <div className="flex items-center justify-center bg-blue-600 p-16 rounded-full shadow-[0_0_80px_rgba(37,99,235,0.4)] border-4 border-white/30" style={{ ...fontStyle, backgroundColor: overlay.color || '#2563eb' }}>
        <div className="text-white text-9xl font-black tabular-nums" style={fontStyle}>
-         {Math.round(value)}%
+         {isNaN(Number(overlay.value)) ? overlay.value : Math.round(value)}%
        </div>
     </div>
   );
@@ -584,20 +599,26 @@ const PercentageCounter = ({ overlay, relativeFrame, fps }: any) => {
 
 const ComparisonKPI = ({ overlay, relativeFrame, fps }: any) => {
   const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
-  const v1 = interpolate(safeFrame, [10, 50], [0, overlay.value1 || 0], { extrapolateRight: 'clamp' });
-  const v2 = interpolate(safeFrame, [20, 60], [0, overlay.value2 || 0], { extrapolateRight: 'clamp' });
+  const targetValue1 = safeNumber(overlay.value1, 0);
+  const targetValue2 = safeNumber(overlay.value2, 0);
+  const v1 = interpolate(safeFrame, [10, 50], [0, targetValue1], { extrapolateRight: 'clamp' });
+  const v2 = interpolate(safeFrame, [20, 60], [0, targetValue2], { extrapolateRight: 'clamp' });
   const fontStyle = { fontFamily: overlay.font || 'Inter' };
 
   return (
     <div className="flex gap-12 bg-black/60 backdrop-blur-2xl p-10 rounded-3xl border border-white/10" style={fontStyle}>
       <div className="flex flex-col items-center" style={fontStyle}>
         <span className="text-white/40 text-sm font-bold uppercase mb-2" style={fontStyle}>{overlay.label1}</span>
-        <div className="text-white text-6xl font-black tabular-nums" style={fontStyle}>{Math.round(v1).toLocaleString()}</div>
+        <div className="text-white text-6xl font-black tabular-nums" style={fontStyle}>
+            {isNaN(Number(overlay.value1)) ? overlay.value1 : Math.round(v1).toLocaleString()}
+        </div>
       </div>
       <div className="w-[2px] bg-white/10 self-stretch" />
       <div className="flex flex-col items-center" style={fontStyle}>
         <span className="text-white/40 text-sm font-bold uppercase mb-2" style={fontStyle}>{overlay.label2}</span>
-        <div className="text-blue-400 text-6xl font-black tabular-nums" style={fontStyle}>{Math.round(v2).toLocaleString()}</div>
+        <div className="text-blue-400 text-6xl font-black tabular-nums" style={fontStyle}>
+            {isNaN(Number(overlay.value2)) ? overlay.value2 : Math.round(v2).toLocaleString()}
+        </div>
       </div>
     </div>
   );
@@ -606,7 +627,8 @@ const ComparisonKPI = ({ overlay, relativeFrame, fps }: any) => {
 const DeltaIndicator = ({ overlay, relativeFrame, fps }: any) => {
   const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
   const progress = spring({ frame: safeFrame, fps, config: { damping: 12 } });
-  const isPositive = (overlay.value || 0) >= 0;
+  const targetValue = safeNumber(overlay.value, 0);
+  const isPositive = targetValue >= 0;
   const fontStyle = { fontFamily: overlay.font || 'Inter' };
 
   return (
@@ -617,7 +639,7 @@ const DeltaIndicator = ({ overlay, relativeFrame, fps }: any) => {
       <div className="flex flex-col" style={fontStyle}>
         <span className="text-white/40 text-xs font-bold uppercase tracking-widest" style={fontStyle}>{overlay.label || 'Change'}</span>
         <div className={`text-6xl font-black tabular-nums ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`} style={{ ...fontStyle, opacity: progress, transform: `translateX(${(1-progress) * -20}px)` }}>
-          {isPositive ? '+' : ''}{overlay.value}%
+          {isPositive ? '+' : ''}{targetValue}%
         </div>
       </div>
     </div>
