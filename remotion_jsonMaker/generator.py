@@ -67,12 +67,20 @@ class RemotionJsonMaker:
     def _flatten_value(self, val, key):
         """Forcefully flattens hallucinated dictionary values into strings."""
         if not isinstance(val, dict): return val
-        if key == 'font': return str(val.get('family', val.get('name', val)))
-        if key == 'animation': return str(val.get('type', val.get('name', val)))
-        if key == 'color': return str(val.get('hex', val.get('code', val.get('value', val))))
-        if key in ['content', 'text', 'label', 'title']:
-            return str(val.get('text', val.get('value', val.get('content', val))))
-        return str(val)
+        if not val: return ""
+
+        try:
+            if key == 'font':
+                return str(val.get('family') or val.get('name') or (next(iter(val.values()), "Arial") if val else "Arial"))
+            if key == 'animation':
+                return str(val.get('type') or val.get('name') or (next(iter(val.values()), "fade") if val else "fade"))
+            if key == 'color':
+                return str(val.get('hex') or val.get('code') or val.get('value') or (next(iter(val.values()), "#ffffff") if val else "#ffffff"))
+            if key in ['content', 'text', 'label', 'title']:
+                return str(val.get('text') or val.get('value') or val.get('content') or (next(iter(val.values()), "") if val else ""))
+            return str(next(iter(val.values()), val) if val else "")
+        except:
+            return str(val)
     CLAMP_MIN_X, CLAMP_MAX_X = 150, 1770
     CLAMP_MIN_Y, CLAMP_MAX_Y = 150, 930
     MIN_SPACING = 30
@@ -591,6 +599,12 @@ class RemotionJsonMaker:
                         collision = False
                         for p_id, p_l, p_t, p_r, p_b, p_s, p_e, p_imp in placed_boxes:
                             if max(ov['start'], p_s) < min(ov['start'] + ov.get('duration', 60), p_e):
+                                # Skip collision check if one is Hero/Secondary and the other is Background/Ambient
+                                # This allows backgrounds to sit behind focal elements without triggering nudging
+                                if (imp in ['background', 'ambient'] and p_imp in ['hero', 'secondary']) or \
+                                   (p_imp in ['background', 'ambient'] and imp in ['hero', 'secondary']):
+                                    continue
+
                                 if not (r + self.MIN_SPACING < p_l or l - self.MIN_SPACING > p_r or b + self.MIN_SPACING < p_t or t - self.MIN_SPACING > p_b):
                                     collision = True; break
                         if not collision:
@@ -611,7 +625,7 @@ class RemotionJsonMaker:
             ov['position'] = {"x": int(best_pos[0]), "y": int(best_pos[1])}
             ov['visual_anchor'] = True
             if ov.get('hero_config'): ov['hero_config']['start'] = max(ov['start'] + 10, ov['hero_config'].get('start', 0))
-            placed_boxes.append((ov['id'], best_pos[0]-final_w/2, best_pos[1]-final_h/2, best_pos[0]+final_w/2, best_pos[1]+final_h/2, ov['start'], ov['start']+ov['duration']))
+            placed_boxes.append((ov['id'], best_pos[0]-final_w/2, best_pos[1]-final_h/2, best_pos[0]+final_w/2, best_pos[1]+final_h/2, ov['start'], ov['start']+ov['duration'], imp))
 
     def supervise(self, data: Dict[str, Any]) -> List[str]:
         """Runs the Element Supervisor and Intelligence Engine on the manifest."""
