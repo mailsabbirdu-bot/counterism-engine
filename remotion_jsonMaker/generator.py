@@ -140,6 +140,8 @@ class RemotionJsonMaker:
         """Hardens layout, timing, camera, and assets with Geometry-Aware Logic and Adaptive Scaling."""
         if not data: return data
 
+        LOCKED_FIELDS = ["content", "hero_config", "tracking"]
+
         # --- ROOT LEVEL HARDENING ---
         if 'global_settings' not in data:
             data['global_settings'] = {"width": 1920, "height": 1080, "fps": 30}
@@ -200,11 +202,11 @@ class RemotionJsonMaker:
                         if 'text' in nested and 'content' not in nested: nested['content'] = nested['text']
                         if 'label' in nested and 'content' not in nested: nested['content'] = nested['label']
                         if 'size' in nested:
-                             if 'fontSize' not in nested: nested['fontSize'] = f"{nested['size']}px" if isinstance(nested['size'], (int, float)) else str(nested['size'])
-                             del nested['size']
+                            if 'fontSize' not in nested: nested['fontSize'] = f"{nested['size']}px" if isinstance(nested['size'], (int, float)) else str(nested['size'])
+                            del nested['size']
                         if 'z_index' in nested:
-                             if 'zIndex' not in nested: nested['zIndex'] = nested['z_index']
-                             del nested['z_index']
+                            if 'zIndex' not in nested: nested['zIndex'] = nested['z_index']
+                            del nested['z_index']
 
                         for sub_key, sub_val in nested.items():
                             if sub_key in LOCKED_FIELDS: continue
@@ -268,7 +270,6 @@ class RemotionJsonMaker:
             'fly_in_z', 'typewriter_flicker', 'vibrate_intense', 'float_orbit',
             'mirror_split', 'zoom_blur_pop', 'liquid_waver'
         ]
-        LOCKED_FIELDS = ["content", "hero_config", "tracking"]
 
         # Production-Grade Grid Anchors (Rule of Thirds)
         ANCHORS = {

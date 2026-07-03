@@ -438,12 +438,19 @@ class CompositionConstraintEngine(AnalysisModule):
         bg_comp = supervisor.bg_intel.get('composition', {})
         neg_space = bg_comp.get('negative_space')
 
-        if neg_space:
+        if neg_space and neg_space != 'none':
             placed_in_neg = False
             for ov in supervisor.overlays:
-                # check if placed in neg_space region
-                pass
-            # If nothing in neg_space, it's a wasted opportunity
+                pos = ov.get('position', {'x': 960, 'y': 540})
+                region = 'center'
+                if pos['x'] < 640: region = 'left'
+                elif pos['x'] > 1280: region = 'right'
+
+                if region in neg_space.lower():
+                    placed_in_neg = True; break
+
+            if not placed_in_neg and len(supervisor.overlays) > 0:
+                obs.director_notes.append(f"Composition Opportunity: Negative space '{neg_space}' is available but overlays are centered.")
         return obs
 
 class AttentionFieldSimulator(AnalysisModule):
@@ -452,10 +459,11 @@ class AttentionFieldSimulator(AnalysisModule):
         obs = PerceptionObservation("Attention Field")
         bg_hero = supervisor.bg_intel.get('hero_subject', {})
 
-        for f in range(state.duration):
-            if bg_hero.get('confidence', 0) > 0.8:
-                # Background bias: viewer is already looking at background hero
-                pass
+        if bg_hero.get('confidence', 0) > 0.8:
+            obs.metadata['bg_attention_anchor'] = bg_hero.get('type')
+            for ov in supervisor.overlays:
+                if ov.get('start', 0) < 30 and str(ov.get('importance','')).lower() == 'hero':
+                    obs.issues.append(f"Attention Conflict: Immediate overlay hero '{ov.get('id')}' competes with strong background subject.")
         return obs
 
 class CinematicIntentValidator(AnalysisModule):

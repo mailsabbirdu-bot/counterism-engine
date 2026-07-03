@@ -16,6 +16,7 @@
           "id": "lbl_tracking",
           "type": "text",
           "content": "TRACKING BUS",
+          "font": "Audiowide-Regular_english",
           "tracking": {
             "enabled": true,
             "target": "track_001",
