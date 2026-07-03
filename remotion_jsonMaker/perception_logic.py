@@ -1,6 +1,19 @@
 import math
 from typing import Dict, Any, List, Tuple, Optional
 
+class VisionConstants:
+    """Centralized constants for human perception and cinematography."""
+    CENTER_X = 960
+    CENTER_Y = 540
+    SACCADE_LIMIT = 1000
+    NOVELTY_DECAY = 12.0
+    MIN_RESTING_FRAMES = 15
+    GESTALT_PROXIMITY = 150
+    VISUAL_NOISE_THRESHOLD = 0.8
+    READING_SPEED_EN = 0.35
+    READING_SPEED_BN = 0.45
+    READING_SPEED_MIXED = 0.40
+
 class StyleThresholds:
     """Adaptive thresholds for different cinematic styles."""
     PRESETS = {
@@ -46,12 +59,13 @@ class CognitiveLoadModel:
     def calculate_fused_load(bg_busy_score: float, overlays: List[Dict[str, Any]], motion_intensity: float = 0.0) -> float:
         """Fused cognitive load with quadratic motion interference and nonlinear density."""
         # Base density with nonlinear scaling (simultaneous motion interference)
-        num_moving = len([o for o in overlays if o.get('animation') and o.get('animation') != 'static'])
+        num_moving = len([o for o in overlays if o.get('animation', 'static') != 'static'])
+
+        # PRODUCTION: Use log1p for more stable motion interference modeling
+        motion_interference = min(2.0, math.log1p(num_moving) * 0.9)
 
         # PRODUCTION: Add normalization clamps to prevent explosion in dense scenes
-        motion_interference = min(2.5, (num_moving ** 1.8) / 8.0)
-
-        ov_density = min(2.0, (len(overlays) / 6.0) ** 1.2)
+        ov_density = min(2.0, len(overlays) / 8.0)
 
         # Area-based load (total screen coverage)
         total_area_load = 0
@@ -126,6 +140,10 @@ class CompositionAnalyzer:
                 })
         return violations
 
+def safe_div(a: float, b: float) -> float:
+    """Standard division safety for perception engines."""
+    return a / b if b and b != 0 else 0.0
+
 class NarrativeLogic:
     """Models professional documentary story arcs."""
     DOCUMENTARY_STAGES = ['hook', 'context', 'conflict', 'evidence', 'payoff']
@@ -169,14 +187,11 @@ class MotionVectorLogic:
         return (0.0, 0.0)
 
     @staticmethod
-    def check_continuity(bg_pan: str, overlay_anim: str) -> bool:
-        """Returns True if motion is consistent, False if conflicting."""
+    def check_continuity(bg_pan: str, overlay_anim: str) -> float:
+        """Returns directionality alignment score (-1.0 to 1.0)."""
         bg_vec = MotionVectorLogic.get_vector(bg_pan)
         ov_vec = MotionVectorLogic.get_vector(overlay_anim)
 
         # Dot product for direction alignment
         dot = bg_vec[0] * ov_vec[0] + bg_vec[1] * ov_vec[1]
-
-        # If dot product is strongly negative, motion is opposing (jarring)
-        if dot < -0.5: return False
-        return True
+        return max(-1.0, min(1.0, dot))

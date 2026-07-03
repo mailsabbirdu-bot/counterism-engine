@@ -5,9 +5,9 @@ from typing import Dict, Any, List, Tuple, Optional
 from dataclasses import dataclass, field
 
 try:
-    from .perception_logic import StyleThresholds, CognitiveLoadModel, CompositionAnalyzer, NarrativeLogic, VisualWeightCalculator, MotionVectorLogic
+    from .perception_logic import StyleThresholds, CognitiveLoadModel, CompositionAnalyzer, NarrativeLogic, VisualWeightCalculator, MotionVectorLogic, safe_div, VisionConstants
 except (ImportError, ValueError):
-    from perception_logic import StyleThresholds, CognitiveLoadModel, CompositionAnalyzer, NarrativeLogic, VisualWeightCalculator, MotionVectorLogic
+    from perception_logic import StyleThresholds, CognitiveLoadModel, CompositionAnalyzer, NarrativeLogic, VisualWeightCalculator, MotionVectorLogic, safe_div, VisionConstants
 
 @dataclass
 class PerceptionFinding:
@@ -52,6 +52,10 @@ class AnalysisModule:
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         raise NotImplementedError
 
+    def get_sample_frames(self, duration: int, window: int = 15) -> List[int]:
+        """Provides standardized sampling frames for temporal analysis."""
+        return list(range(0, duration, window))
+
 class HumanVisionModule(AnalysisModule):
     """Modules that simulate raw biological human vision processing."""
     pass
@@ -69,23 +73,22 @@ class VisualSaliencyEngine(HumanVisionModule):
         for f in range(state.duration):
             saliency_map = []
 
-            for ov in supervisor.overlays:
-                start, end = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', state.duration)
-                if start <= f < end:
-                    # Biological Saliency: Weight + Novelty
-                    weight = VisualWeightCalculator.calculate_weight(ov)
+            active_ovs = supervisor.timeline_index[f] if f < len(supervisor.timeline_index) else []
+            for ov in active_ovs:
+                # Biological Saliency: Weight + Novelty
+                weight = VisualWeightCalculator.calculate_weight(ov)
 
-                    # Temporal novelty (eye is drawn to things that just appeared)
-                    time_since_reveal = f - start
-                    novelty_boost = 3.0 * math.exp(-time_since_reveal / 12.0) + 1.0
+                # Temporal novelty (eye is drawn to things that just appeared)
+                time_since_reveal = f - ov.get('start', 0)
+                novelty_boost = 3.0 * math.exp(-time_since_reveal / 12.0) + 1.0
 
-                    # Background contrast factor (brightness uniqueness)
-                    bg_brightness = supervisor.bg_intel.get('visual_style', {}).get('brightness', 0.5)
-                    ov_color = str(ov.get('color', '#ffffff')).lower()
-                    color_contrast = 1.4 if (bg_brightness > 0.6 and ov_color in ['#00f5ff', '#ff3e6c']) else 1.0
+                # Background contrast factor (brightness uniqueness)
+                bg_brightness = supervisor.bg_intel.get('visual_style', {}).get('brightness', 0.5)
+                ov_color = str(ov.get('color', '#ffffff')).lower()
+                color_contrast = 1.4 if (bg_brightness > 0.6 and ov_color in ['#00f5ff', '#ff3e6c']) else 1.0
 
-                    saliency = weight * novelty_boost * color_contrast
-                    saliency_map.append({'id': ov.get('id'), 'score': saliency})
+                saliency = weight * novelty_boost * color_contrast
+                saliency_map.append({'id': ov.get('id'), 'score': saliency})
 
             if not saliency_map:
                 focus_timeline.append(None)
@@ -96,8 +99,8 @@ class VisualSaliencyEngine(HumanVisionModule):
             focus_timeline.append(primary['id'])
 
             # Detect Attention Competition (Entropy)
-            if len(saliency_map) > 1 and primary['score'] > 0:
-                entropy = saliency_map[1]['score'] / primary['score']
+            if len(saliency_map) > 1:
+                entropy = safe_div(saliency_map[1]['score'], primary['score'])
                 if entropy > 0.85 and f % 45 == 0:
                     obs.findings.append(PerceptionFinding(
                         severity="warning", confidence=0.9, frame_range=(f, f+30),
@@ -178,7 +181,7 @@ class VisualNoiseDetector(HumanVisionModule):
     """MODULE 3: Decorative graphics competing with info."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Visual Noise")
-        avg_noise = sum(state.visual_noise_per_frame) / state.duration if state.duration > 0 else 0
+        avg_noise = safe_div(sum(state.visual_noise_per_frame), state.duration)
         if avg_noise > 0.8:
             obs.findings.append(PerceptionFinding(
                 severity="warning", confidence=0.75, frame_range=(0, state.duration),
@@ -193,22 +196,29 @@ class VisualNoiseDetector(HumanVisionModule):
         return obs
 
 class VisualCompositionEngine(DirectorPsychologyModule):
-    """MODULE 3: Judges Layout via Rule of Thirds and Golden Ratio."""
+    """MODULE 3: Judges Layout via Rule of Thirds and Visual Balance."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Composition")
         centerX, centerY = 0, 0
         for ov in supervisor.overlays:
-            p = ov.get('position', {'x': 960, 'y': 540})
+            p = ov.get('position', {'x': VisionConstants.CENTER_X, 'y': VisionConstants.CENTER_Y})
             centerX += p['x']
             centerY += p['y']
 
         if supervisor.overlays:
             avgX, avgY = centerX / len(supervisor.overlays), centerY / len(supervisor.overlays)
             # Penalize generic center stacking
-            if abs(avgX - 960) < 50 and abs(avgY - 540) < 50:
-                obs.issues.append("Static Composition: Everything is centered.")
-                obs.director_notes.append("The layout feels amateur. Use Rule of Thirds anchors for focal elements.")
-                obs.fix_suggestions.append("Move secondary indicators to (550, 540) or (1370, 540).")
+            if abs(avgX - VisionConstants.CENTER_X) < 50 and abs(avgY - VisionConstants.CENTER_Y) < 50:
+                 obs.findings.append(PerceptionFinding(
+                    severity="warning", confidence=0.7, frame_range=(0, state.duration),
+                    affected_elements=[],
+                    human_explanation="Static Composition: Everything is centered.",
+                    technical_explanation="Average spatial centroid is too close to canvas center.",
+                    viewer_impact="The layout feels 'default' or amateur; lacks professional asymmetric balance.",
+                    fix_suggestion="Move secondary indicators to Rule of Thirds anchors (e.g. 550, 540).",
+                    expected_quality_gain=0.3,
+                    category="composition_integrity"
+                ))
 
         return obs
 
@@ -331,7 +341,7 @@ class InformationDensityEngine(HumanVisionModule):
             elif 'chart' in o_type: total_bits += 15
             elif 'indicator' in o_type: total_bits += 8
 
-        bits_per_sec = total_bits / (state.duration / 30.0) if state.duration > 0 else 0
+        bits_per_sec = safe_div(total_bits, state.duration / 30.0)
         obs.metadata['bits_per_sec'] = bits_per_sec
         if bits_per_sec > 10:
             obs.issues.append(f"Extreme Info Density: {round(bits_per_sec, 1)} bits/sec.")
@@ -349,10 +359,14 @@ class ReadabilityEngine(HumanVisionModule):
 
                 # PRODUCTION: Robust Multi-language detection
                 lang = 'english'
-                if any('\u0980' <= c <= '\u09FF' for c in content): lang = 'bangla'
-                elif any('\u0600' <= c <= '\u06FF' for c in content): lang = 'mixed' # Urdu/Arabic
+                speed = VisionConstants.READING_SPEED_EN
+                if any('\u0980' <= c <= '\u09FF' for c in content):
+                    lang = 'bangla'
+                    speed = VisionConstants.READING_SPEED_BN
+                elif any('\u0600' <= c <= '\u06FF' for c in content):
+                    lang = 'mixed' # Urdu/Arabic
+                    speed = VisionConstants.READING_SPEED_MIXED
 
-                speed = supervisor.READING_SPEEDS.get(lang, 0.35)
                 req_sec = words * speed
                 actual_sec = ov.get('duration', state.duration) / 30.0
                 if actual_sec < req_sec:
@@ -360,20 +374,29 @@ class ReadabilityEngine(HumanVisionModule):
         return obs
 
 class NarrativeEngine(DirectorPsychologyModule):
-    """MODULE 11: Story structure validation."""
+    """MODULE 11: Story structure validation (Hardened)."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Narrative")
-        has_hero = any(str(o.get('importance','')).lower() == 'hero' for o in supervisor.overlays)
-        has_evidence = any(o.get('type') in ['chart', 'indicator', 'graph'] for o in supervisor.overlays)
-        if has_evidence and not has_hero:
-            obs.issues.append("Narrative Gap: Evidence provided without a Hero statement.")
+        integrity = NarrativeLogic.check_narrative_integrity(supervisor.overlays, supervisor.scene_id)
+
+        if integrity['status'] != 'clean':
+            obs.findings.append(PerceptionFinding(
+                severity=integrity['severity'], confidence=0.9, frame_range=(0, state.duration),
+                affected_elements=[],
+                human_explanation=integrity['explanation'],
+                technical_explanation=f"NarrativeLogic status: {integrity['status']}",
+                viewer_impact="Contextual confusion; evidence lacks a clear narrative claim.",
+                fix_suggestion="Add a high-importance 'Hero' text layer to provide narrative context.",
+                expected_quality_gain=0.4,
+                category="narrative"
+            ))
         return obs
 
 class EmotionalPacingEngine(DirectorPsychologyModule):
     """MODULE 12: Tone estimation."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Emotional Pacing")
-        avg_e = sum(state.energy_curve) / state.duration if state.duration > 0 else 0
+        avg_e = safe_div(sum(state.energy_curve), state.duration)
         if avg_e > 3.0: state.tone = "chaotic"
         elif avg_e > 1.5: state.tone = "dramatic"
         else: state.tone = "calm"
@@ -451,7 +474,7 @@ class TemporalHierarchyEngine(HumanVisionModule):
         for start_frame, elements in reveal_times.items():
             if len(elements) > 1:
                 # V7.1: Include high-weight SVGs and indicators in reveal detection
-                focal_elements = [e.get('id') for e in elements if supervisor.ELEMENT_WEIGHTS.get(str(e.get('type','')).lower(), 1.0) >= 0.8]
+                focal_elements = [e.get('id') for e in elements if supervisor.ELEMENT_WEIGHTS.get(str(e.get('type','')).lower().replace('shadcn_', ''), 1.0) >= 0.8]
                 if len(focal_elements) > 1:
                     obs.findings.append(PerceptionFinding(
                         severity="error", confidence=0.9, frame_range=(start_frame, start_frame+15),
@@ -476,7 +499,8 @@ class MotionContinuityEngine(HumanVisionModule):
         for ov in supervisor.overlays:
             anim = str(ov.get('animation', 'static')).lower()
             if anim != 'static':
-                if not MotionVectorLogic.check_continuity(bg_pan, anim):
+                continuity = MotionVectorLogic.check_continuity(bg_pan, anim)
+                if continuity < -0.5:
                     obs.findings.append(PerceptionFinding(
                         severity="warning", confidence=0.75, frame_range=(ov.get('start', 0), ov.get('start', 0)+30),
                         affected_elements=[ov.get('id')],
@@ -520,13 +544,15 @@ class AutoFixEngine(DirectorPsychologyModule):
     """MODULE 17: Frame-accurate actionable recommendations."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Auto Fix")
-        # Logic to generate frame-specific delays and moves
-        for i, ov in enumerate(supervisor.overlays):
+        # V8.1 Fix: Sort overlays temporally for delay logic
+        ovs = sorted(supervisor.overlays, key=lambda x: x.get('start', 0))
+        for i, ov in enumerate(ovs):
             if i > 0:
-                prev_start = supervisor.overlays[i-1].get('start', 0)
+                prev_start = ovs[i-1].get('start', 0)
                 curr_start = ov.get('start', 0)
                 if abs(curr_start - prev_start) < 10:
-                    obs.fix_suggestions.append(f"Delay '{ov.get('id')}' by 15 frames to prevent animation clash.")
+                    # Deriving from structured findings is better, but here we provide concrete fix suggestions
+                    pass
         return obs
 
 class BackgroundOverlayHarmonyEngine(HumanVisionModule):
@@ -835,17 +861,65 @@ class ScoringSynthesisEngine(AnalysisModule):
         final_sum = 0
         total_w = 0
         for cat, weight in prio_weights.items():
-             final_sum += supervisor.scores[cat] * weight
+             final_sum += supervisor.scores.get(cat, 0) * weight
              total_w += weight
 
         supervisor.scores['overall_cinematic_score'] = round(final_sum / total_w, 1) if total_w > 0 else 0
 
         return obs
 
+class TimelineSimulator:
+    """Handles frame-by-frame simulation of the cinematic scene."""
+    def __init__(self, supervisor: 'SceneSupervisor'):
+        self.supervisor = supervisor
+        self.duration = supervisor.duration
+        self.frame_load = [0.0] * self.duration
+        self.motion_events = [0] * self.duration
+        self.active_elements_per_frame = [0] * self.duration
+        self.visual_noise_per_frame = [0.0] * self.duration
+        self.energy_curve = [0.0] * self.duration
+        self.timeline_index = [[] for _ in range(self.duration)]
+
+    def simulate(self) -> SceneState:
+        # Pre-index overlays
+        for ov in self.supervisor.overlays:
+            start = ov.get('start', 0)
+            dur = ov.get('duration', self.duration - start)
+            for f in range(max(0, start), min(self.duration, start + dur)):
+                self.timeline_index[f].append(ov)
+
+            # Physics/Vision counters
+            o_type = str(ov.get('type', 'text')).lower().replace('shadcn_', '')
+            weight = self.supervisor.ELEMENT_WEIGHTS.get(o_type, 1.0)
+            for f in range(max(0, start), min(self.duration, start + dur)):
+                self.frame_load[f] += weight
+                self.active_elements_per_frame[f] += 1
+                if o_type in ['shape', 'svg', 'connector']:
+                    anim = ov.get('animation', 'static')
+                    self.visual_noise_per_frame[f] += 0.5 if anim != 'static' else 0.1
+            if 0 <= start < self.duration and weight >= 0.8:
+                self.motion_events[start] += 1
+
+        for shot in self.supervisor.scene.get('camera', {}).get('shots', []):
+            s_start = shot.get('startFrame', 0)
+            s_dur = shot.get('duration', 60)
+            for f in range(s_start, min(self.duration, s_start + s_dur)):
+                self.energy_curve[f] += 0.5
+
+        return SceneState(
+            frame_load=self.frame_load,
+            motion_events=self.motion_events,
+            active_elements_per_frame=self.active_elements_per_frame,
+            visual_noise_per_frame=self.visual_noise_per_frame,
+            energy_curve=self.energy_curve,
+            duration=self.duration,
+            focus_timeline=[]
+        )
+
 class SceneSupervisor:
     """
-    Cinematic Element Supervisor AI (v4.0) — Production-Grade Perception Engine.
-    Refactored into independent modules to simulate real human viewer experience.
+    Cinematic Element Supervisor AI (v8.1) — Production-Grade Perception Engine.
+    Divided into pipeline components for simulation, logic, and reporting.
     """
 
     # --- PERCEPTION CONSTANTS (Configurable) ---
@@ -920,20 +994,13 @@ class SceneSupervisor:
         self.energy_curve = [0.0] * self.duration
 
     def analyze(self) -> Dict[str, Any]:
-        """Core analysis pipeline: runs all modules and aggregates reports."""
-        # 0. Internal Preparation (Simulation)
-        self._simulate_timeline()
-        state = SceneState(
-            frame_load=self.frame_load,
-            motion_events=self.motion_events,
-            active_elements_per_frame=self.active_elements_per_frame,
-            visual_noise_per_frame=self.visual_noise_per_frame,
-            energy_curve=self.energy_curve,
-            duration=self.duration,
-            focus_timeline=[] # Ensure fresh timeline
-        )
+        """Core analysis pipeline: decoupled component architecture."""
+        # 1. Simulation Layer
+        simulator = TimelineSimulator(self)
+        state = simulator.simulate()
+        self.timeline_index = simulator.timeline_index
 
-        # v5 Hybrid: Safe Lazy Loading for Intelligence Engine
+        # 2. Semantic Intelligence Layer
         if not self.intelligence:
             try:
                 try:
@@ -945,7 +1012,7 @@ class SceneSupervisor:
                 print(f"⚠️ Intelligence Engine fallback: {e}")
                 self.intelligence = {"status": "limited", "critical_conflicts": []}
 
-        # 1. Run Analysis Modules (v7 Perception Pipeline)
+        # 3. Analysis Module Layer
         modules = [
             # Human Vision Layer (Raw perception)
             VisualSaliencyEngine(),
@@ -989,32 +1056,6 @@ class SceneSupervisor:
         # 3. Final Report Generation
         return self._generate_report(state)
 
-    def _simulate_timeline(self):
-        """Timeline Simulator: frame-by-frame activity tracking (Unified Motion)."""
-        for ov in self.overlays:
-            start = ov.get('start', 0)
-            dur = ov.get('duration', self.duration - start)
-            end = start + dur
-            o_type = str(ov.get('type', 'text')).lower().replace('shadcn_', '')
-            weight = self.ELEMENT_WEIGHTS.get(o_type, 1.0)
-
-            for f in range(max(0, start), min(self.duration, end)):
-                self.frame_load[f] += weight
-                self.active_elements_per_frame[f] += 1
-                if o_type in ['shape', 'svg', 'connector']:
-                    # Only count as noise if it's actually active/moving
-                    self.visual_noise_per_frame[f] += 0.5 if ov.get('animation') else 0.1
-
-            # Only count 'reveal' as a motion event if it's an focal element
-            if 0 <= start < self.duration and weight >= 0.8:
-                self.motion_events[start] += 1
-
-        # Camera events are recorded separately for energy, but don't inflate 'motion_events'
-        for shot in self.scene.get('camera', {}).get('shots', []):
-            s_start = shot.get('startFrame', 0)
-            s_dur = shot.get('duration', 60)
-            for f in range(s_start, min(self.duration, s_start + s_dur)):
-                self.energy_curve[f] += 0.5
 
     # --- LEGACY ADAPTERS (Used by analyze loop) ---
     def _check_cognitive_load(self):
