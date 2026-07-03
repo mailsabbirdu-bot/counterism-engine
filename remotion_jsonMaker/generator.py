@@ -259,6 +259,12 @@ class RemotionJsonMaker:
 
     def _harden_overlay_data(self, ov: Dict[str, Any], scene_context: str = ""):
         """Stage 2: Deep Promotion and key unification for overlays."""
+        # Fix invalid types commonly hallucinated by AI
+        o_type = str(ov.get('type', 'text')).lower()
+        if o_type == 'hero_animation':
+             ov['type'] = 'text' # Usually AI means a text reveal
+             o_type = 'text'
+
         if ov.get('type') == 'text' and 'hero_config' in ov:
             self._repair_hero_animations(ov['hero_config'])
 
@@ -299,11 +305,21 @@ class RemotionJsonMaker:
                     ov[sub_key] = sub_val
                 del ov[nest_key]
 
-        # Standardize variant mapping
+        # Standardize variant mapping (Hardened for SHADCN vs Standard)
         if 'variant' in ov:
             v_val = ov['variant']
-            if 'chart' in o_type: ov['chart_type'] = v_val
-            elif 'indicator' in o_type: ov['indicator_type'] = v_val
+            if 'chart' in o_type:
+                # Map glass/neon variants to shadcn_chart
+                if any(x in v_val for x in ['glass', 'neon', 'stacked', 'web']):
+                    ov['type'] = 'shadcn_chart'
+                    o_type = 'shadcn_chart'
+                ov['chart_type'] = v_val
+            elif 'indicator' in o_type:
+                # Map tile/badge/status variants to shadcn_indicator
+                if any(x in v_val for x in ['tile', 'badge', 'status', 'crypto', 'card', 'ring']):
+                    ov['type'] = 'shadcn_indicator'
+                    o_type = 'shadcn_indicator'
+                ov['indicator_type'] = v_val
             elif o_type == 'shape': ov['shape_type'] = v_val
             elif o_type == 'connector': ov['preset'] = v_val
             del ov['variant']
@@ -542,31 +558,36 @@ class RemotionJsonMaker:
                     w = max(300 if 'chart' in o_type else 100, base_w * scale)
                     h = max(200 if 'chart' in o_type else 100, base_h * scale)
 
-                for step in range(0, 80):
-                    radius = step * 15
-                    angles = [0, 180, 90, 270, 45, 135, 225, 315] if radius > 0 else [0]
-                    for angle in angles:
-                        rad = math.radians(angle)
-                        cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
-                        l, t, r, b = cx-w/2, cy-h/2, cx+w/2, cy+h/2
-                        if l < self.CLAMP_MIN_X or r > self.CLAMP_MAX_X or t < self.CLAMP_MIN_Y or b > self.CLAMP_MAX_Y: continue
-                        collision = False
-                        for p_id, p_l, p_t, p_r, p_b, p_s, p_e in placed_boxes:
-                            if max(ov['start'], p_s) < min(ov['start']+ov['duration'], p_e):
-                                if not (r + self.MIN_SPACING < p_l or l - self.MIN_SPACING > p_r or b + self.MIN_SPACING < p_t or t - self.MIN_SPACING > p_b):
-                                    collision = True; break
-                        if not collision:
-                            best_pos, found = (cx, cy), True
-                            if radius > 80:
-                                print(f"   🔧 Expert Nudging {ov['id']} -> ({int(cx)}, {int(cy)})")
-                                if not ov.get('animation') or ov.get('animation') not in self.SEMANTIC_ANIMS:
-                                    ov['animation'] = self.SEMANTIC_ANIMS[scene_idx % len(self.SEMANTIC_ANIMS)]
-                            if scale < 1.0:
-                                print(f"   🔧 Scaling down {ov['id']} to {int(scale*100)}%")
-                                if o_type == 'text': ov['fontSize'] = f"{int(curr_fs)}px"
-                                else: ov['width'], ov['height'] = int(w), int(h)
-                            final_w, final_h = (w if o_type != 'text' else min(1600, len(ov['content']) * int(curr_fs) * 0.7)), (h if o_type != 'text' else int(curr_fs) * 1.5)
-                            break
+            for step in range(0, 120): # Increased search radius
+                radius = step * 10 # Finer granularity
+                # Search more angles for Rule of Thirds anchors
+                angles = [0, 180, 90, 270, 45, 135, 225, 315, 30, 60, 120, 150, 210, 240, 300, 330] if radius > 0 else [0]
+                for angle in angles:
+                    rad = math.radians(angle)
+                    cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
+                    l, t, r, b = cx-w/2, cy-h/2, cx+w/2, cy+h/2
+
+                    # PRODUCTION: Slightly more relaxed boundary checks if nudging is aggressive
+                    if l < 50 or r > 1870 or t < 50 or b > 1030: continue
+
+                    collision = False
+                    for p_id, p_l, p_t, p_r, p_b, p_s, p_e in placed_boxes:
+                        # Improved temporal collision check
+                        if max(ov['start'], p_s) < min(ov.get('start', 0) + ov.get('duration', 60), p_e):
+                            if not (r + self.MIN_SPACING < p_l or l - self.MIN_SPACING > p_r or b + self.MIN_SPACING < p_t or t - self.MIN_SPACING > p_b):
+                                collision = True; break
+                    if not collision:
+                        best_pos, found = (cx, cy), True
+                        if radius > 50:
+                            print(f"   🔧 Expert Nudging {ov['id']} -> ({int(cx)}, {int(cy)})")
+                            if not ov.get('animation') or ov.get('animation') not in self.SEMANTIC_ANIMS:
+                                ov['animation'] = self.SEMANTIC_ANIMS[scene_idx % len(self.SEMANTIC_ANIMS)]
+                        if scale < 1.0:
+                            print(f"   🔧 Scaling down {ov['id']} to {int(scale*100)}%")
+                            if o_type == 'text': ov['fontSize'] = f"{int(curr_fs)}px"
+                            else: ov['width'], ov['height'] = int(w), int(h)
+                        final_w, final_h = (w if o_type != 'text' else min(1600, len(ov['content']) * int(curr_fs) * 0.7)), (h if o_type != 'text' else int(curr_fs) * 1.5)
+                        break
                     if found: break
                 if found: break
 
@@ -599,9 +620,9 @@ class RemotionJsonMaker:
         for report in reports:
             s_id = report['scene_id']
             if report['status'] != 'CLEAN':
-                # Add overall status and scores
+                # Add overall status and scores (V8.1 Unified Categories)
                 scores = report['scores']
-                all_feedback.append(f"[{s_id}] DIRECTOR'S REPORT: Status={report['status']}, Clarity={scores['clarity']}, Motion={scores['motion_quality']}, Comprehension={scores['comprehension']}")
+                all_feedback.append(f"[{s_id}] DIRECTOR'S REPORT: Status={report['status']}, Clarity={scores.get('attention_clarity', 0)}, Motion={scores.get('motion_discipline', 0)}, Readability={scores.get('readability_score', 0)}")
 
                 # Add specific issues
                 for issue in report['issues']:
