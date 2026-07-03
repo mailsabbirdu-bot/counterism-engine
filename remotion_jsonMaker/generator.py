@@ -18,6 +18,56 @@ except (ImportError, ValueError):
     from intelligence import SceneIntelligenceEngine
 
 class RemotionJsonMaker:
+    # --- PRODUCTION-GRADE CONSTANTS ---
+    TYPE_SIZES = {
+        'text': (800, 200), 'chart': (1000, 562), 'shadcn_chart': (1000, 562),
+        'ui_panel': (800, 600), 'data_indicator': (500, 375), 'shadcn_indicator': (500, 375),
+        'svg': (400, 400), 'kpi': (450, 400), 'kpi_card': (450, 400),
+        'timeline': (1200, 300), 'hub_network': (800, 800), 'flow_diagram': (1000, 562), 'process': (1000, 562),
+        'media': (960, 540), 'image': (960, 540), 'video': (960, 540),
+        'label': (300, 100), 'callout': (400, 200), 'compositions': (1200, 675), 'groups': (1200, 675),
+        'graph': (1000, 700), 'shape': (400, 400), 'data_emphasis': (600, 200), 'ambient_graphic': (1920, 1080),
+        'connector': (400, 100)
+    }
+
+    SEMANTIC_ANIMS = [
+        "wordReveal", "glassReveal", "networkGrow", "barsRise", "cinematicGlow",
+        "fadeScale", "parallaxDrift", "maskReveal", "lineDraw", "particleAssembly",
+        "blurFocus", "svgMorph", "depthZoom"
+    ]
+
+    VALID_TEXT_ANIMS = [
+        'glow_pulse', 'isolate_zoom', 'bounce_pop', 'neon_flicker', 'shake_alert',
+        'rainbow_flow', 'ghost_trail', 'glitch_pop', 'wave_float', 'expand_contract',
+        'blur_reveal', 'color_shift', 'rotation_swing', 'shadow_pulse', 'letter_jump',
+        'skew_slide', 'tilt_pan', 'bounce_gravity', 'border_glow', 'glass_shimmer',
+        'heartbeat', 'strobe_flash', 'threed_flip', 'magnetic_pull', 'fire_glow',
+        'pixel_scatter', 'swing_pivot', 'depth_shadow', 'energy_beam', 'spiral_in',
+        'fly_in_z', 'typewriter_flicker', 'vibrate_intense', 'float_orbit',
+        'mirror_split', 'zoom_blur_pop', 'liquid_waver'
+    ]
+
+    PRIORITY = {
+        'hero': 1000, 'text': 100, 'hub_network': 90, 'flow_diagram': 90, 'process': 90,
+        'chart': 80, 'shadcn_chart': 80, 'kpi_card': 80, 'timeline': 75, 'ui_panel': 60,
+        'compositions': 55, 'groups': 55, 'data_indicator': 50, 'shadcn_indicator': 50,
+        'label': 45, 'callout': 45, 'svg': 40, 'kpi': 40, 'graph': 30, 'shape': 10, 'background': 0
+    }
+
+    # Rule of Thirds Anchors
+    ANCHORS = {
+        "L_TOP": (550, 320), "C_TOP": (960, 320), "R_TOP": (1370, 320),
+        "L_MID": (550, 540), "C_MID": (960, 540), "R_MID": (1370, 540),
+        "L_BOT": (550, 760), "C_BOT": (960, 760), "R_BOT": (1370, 760)
+    }
+
+    LOCKED_FIELDS = ["content", "hero_config", "tracking"]
+    MODERN_COLORS = ["#00F5FF", "#FFD700", "#FF3E6C", "#00FFAB"]
+    CLAMP_MIN_X, CLAMP_MAX_X = 150, 1770
+    CLAMP_MIN_Y, CLAMP_MAX_Y = 150, 930
+    MIN_SPACING = 30
+    MIN_FONT_SIZE = 40
+
     def __init__(self, user_data_dir: str = None, headless: bool = True, manual: bool = False):
         self.user_data_dir = user_data_dir
         self.headless = headless
@@ -136,11 +186,8 @@ class RemotionJsonMaker:
         self.image_files = sorted([f for f in os.listdir(renders_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]) if os.path.exists(renders_dir) else []
         self.load_visual_analysis(abs_public)
 
-    def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
-        """Hardens layout, timing, camera, and assets with Geometry-Aware Logic and Adaptive Scaling."""
-        if not data: return data
-
-        # --- ROOT LEVEL HARDENING ---
+    def _harden_root_settings(self, data: Dict[str, Any]):
+        """Stage 0: Root Level Hardening."""
         if 'global_settings' not in data:
             data['global_settings'] = {"width": 1920, "height": 1080, "fps": 30}
 
@@ -154,171 +201,170 @@ class RemotionJsonMaker:
                 except: pass
             del data['resolution']
 
-        if not data.get('scenes'): return data
+    def _harden_scene_metadata(self, scene: Dict[str, Any], scene_idx: int):
+        """Stage 1: Scene-level metadata and duration hardening."""
+        s_id = scene.get('scene_id', f"SCENE_{scene_idx+1}")
 
+        if 'duration' in scene and 'duration_in_frames' not in scene:
+            scene['duration_in_frames'] = scene['duration']
+        if 'duration' in scene:
+            del scene['duration']
+
+        raw_dur = scene.get('duration_in_frames', 180)
+        scene_duration = int(raw_dur * 30) if (isinstance(raw_dur, (float, int)) and raw_dur < 60) else int(raw_dur)
+
+        id_num_match = re.search(r'(\d+)', s_id)
+        id_num = int(id_num_match.group(1)) if id_num_match else (scene_idx + 1)
+
+        if not scene.get('background_type'): scene['background_type'] = 'video'
+        if scene['background_type'] == 'video':
+            if not scene.get('video_path'):
+                vname = f"scene_SC_{id_num:02d}.mp4"
+                if vname in self.video_files: scene['video_path'] = f"renders/{vname}"
+                else: scene['background_type'] = 'procedural'
+            elif not str(scene['video_path']).startswith('renders/'):
+                scene['video_path'] = f"renders/{os.path.basename(scene['video_path'])}"
+
+        if scene['background_type'] == 'procedural':
+            if not scene.get('procedural_config') or not isinstance(scene.get('procedural_config'), dict):
+                scene['procedural_config'] = {"variant": "neon_grid"}
+            scene['video_path'] = None
+
+        filename = os.path.basename(str(scene.get('video_path', '')))
+        if filename in self.fps_cache: scene_duration = self.fps_cache[filename]
+        scene['duration_in_frames'] = scene_duration
+        scene['audio_enabled'] = False # PRODUCTION OVERRIDE
+        return scene_duration, id_num
+
+    def _repair_hero_animations(self, hero_config: Dict[str, Any]):
+        """Automatically maps invalid animation names to the nearest valid variant."""
+        if not hero_config or 'animation' not in hero_config: return
+
+        anim = hero_config['animation']
+        if anim in self.VALID_TEXT_ANIMS: return
+
+        # Simple fuzzy match: check if any valid anim is contained within or contains the invalid one
+        for valid in self.VALID_TEXT_ANIMS:
+            if valid in anim or anim in valid:
+                print(f"   🔧 Repairing hero animation: '{anim}' -> '{valid}'")
+                hero_config['animation'] = valid
+                return
+
+        # Fallback to nearest logical match for common AI hallucinations
+        if 'blur' in anim and 'reveal' in anim: hero_config['animation'] = 'blur_reveal'
+        elif 'zoom' in anim: hero_config['animation'] = 'isolate_zoom'
+        elif 'glow' in anim: hero_config['animation'] = 'glow_pulse'
+        else: hero_config['animation'] = self.VALID_TEXT_ANIMS[0]
+        print(f"   🔧 Repairing unknown hero animation: '{anim}' -> '{hero_config['animation']}'")
+
+    def _harden_overlay_data(self, ov: Dict[str, Any], scene_context: str = ""):
+        """Stage 2: Deep Promotion and key unification for overlays."""
+        if ov.get('type') == 'text' and 'hero_config' in ov:
+            self._repair_hero_animations(ov['hero_config'])
+
+        # Unify Typography keys early
+        if 'size' in ov:
+            if 'fontSize' not in ov:
+                ov['fontSize'] = f"{ov['size']}px" if isinstance(ov['size'], (int, float)) else str(ov['size'])
+            del ov['size']
+
+        # Unify Z-Index keys
+        if 'z_index' in ov:
+            if 'zIndex' not in ov: ov['zIndex'] = ov['z_index']
+            del ov['z_index']
+
+        # UNIFICATION: Standardize content keys before promotion
+        o_type = str(ov.get('type', 'text')).lower()
+        if 'text' in ov and 'content' not in ov: ov['content'] = ov['text']
+        if 'label' in ov and 'content' not in ov: ov['content'] = ov['label']
+        if 'title' in ov and 'content' not in ov and o_type == 'text': ov['content'] = ov['title']
+
+        # Move fields from 'properties', 'data', 'styling', or 'config' to root
+        for nest_key in ['properties', 'data', 'styling', 'config']:
+            if nest_key in ov and isinstance(ov[nest_key], dict):
+                nested = ov[nest_key]
+                # Unify nested too
+                if 'text' in nested and 'content' not in nested: nested['content'] = nested['text']
+                if 'label' in nested and 'content' not in nested: nested['content'] = nested['label']
+                if 'size' in nested:
+                     if 'fontSize' not in nested: nested['fontSize'] = f"{nested['size']}px" if isinstance(nested['size'], (int, float)) else str(nested['size'])
+                     del nested['size']
+                if 'z_index' in nested:
+                     if 'zIndex' not in nested: nested['zIndex'] = nested['z_index']
+                     del nested['z_index']
+
+                for sub_key, sub_val in nested.items():
+                    if sub_key in self.LOCKED_FIELDS: continue
+                    ov[sub_key] = sub_val
+                del ov[nest_key]
+
+        # Standardize variant mapping
+        if 'variant' in ov:
+            v_val = ov['variant']
+            if 'chart' in o_type: ov['chart_type'] = v_val
+            elif 'indicator' in o_type: ov['indicator_type'] = v_val
+            elif o_type == 'shape': ov['shape_type'] = v_val
+            elif o_type == 'connector': ov['preset'] = v_val
+            del ov['variant']
+
+        # RE-FIX: Ensure type-specific variant keys exist
+        if o_type == 'shape' and 'shape_type' not in ov: ov['shape_type'] = 'rect'
+        if 'chart' in o_type and 'chart_type' not in ov: ov['chart_type'] = 'bar'
+        if 'indicator' in o_type and 'indicator_type' not in ov: ov['indicator_type'] = 'kpiNumber'
+        if o_type == 'connector' and 'preset' not in ov: ov['preset'] = 'smooth_curve'
+
+        # Mandatory Data Injection
+        var = ov.get('indicator_type') or ov.get('chart_type') or ov.get('shape_type') or ov.get('preset')
+        if var == 'milestoneTracker' and 'milestones' not in ov:
+            ov['milestones'] = [{"label": "Milestone 1", "date": "T-0"}]
+        if var in ['timeline', 'milestoneTimeline'] and 'events' not in ov and 'milestones' not in ov:
+            ov['events'] = [{"title": "Event 1", "date": "Start", "description": "System activated."}]
+        if var == 'statGrid' and 'stats' not in ov:
+            ov['stats'] = [{"label": "Metric 1", "value": 85, "suffix": "%"}, {"label": "Metric 2", "value": 92, "suffix": "%"}]
+        if var in ['multiProgress', 'ringChart'] and 'items' not in ov and 'rings' not in ov:
+            ov['items'] = [{"label": "Process A", "value": 75, "color": "#00F5FF"}]
+        if var in ['stepIndicator', 'step_indicator_glass'] and 'steps' not in ov:
+            ov['steps'] = ["Initiate", "Process", "Complete"]
+
+        # Font Decision Logic (Hardened)
+        content = str(ov.get('content', '')).strip()
+        is_content_bangla = self._is_bangla(content)
+        ai_font = ov.get('font')
+
+        if is_content_bangla:
+            # Content is Bangla: MUST use a Bangla font.
+            if ai_font not in self.bangla_fonts:
+                ov['font'] = "Sohid_bangla" if "Sohid_bangla" in self.bangla_fonts else (self.bangla_fonts[0] if self.bangla_fonts else "Arial")
+        else:
+            # Content is NOT Bangla: English/Mixed content should use English font for clarity.
+            if ai_font not in self.english_fonts:
+                # If scene is Bangla, AI might have tried a Bangla font, override it.
+                ov['font'] = self.english_fonts[0] if self.english_fonts else "Arial"
+
+        # New variant injections
+        if var == 'activity_ring' and 'rings' not in ov:
+            ov['rings'] = [{"label": "Active", "value": 80, "color": "#00F5FF"}]
+        if var == 'radar_web' and 'data' not in ov:
+            ov['data'] = [{"subject": "Speed", "A": 120, "B": 110}, {"subject": "Reliability", "A": 98, "B": 130}]
+        if var == 'crypto_card' and 'sparkline' not in ov:
+            ov['sparkline'] = [10, 25, 15, 45, 30, 60]
+
+    def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
+        """Hardens layout, timing, camera, and assets with Geometry-Aware Logic and Adaptive Scaling."""
+        if not data: return data
         abs_public = os.path.abspath(public_dir)
+        self._harden_root_settings(data)
+
+        if not data.get('scenes'): return data
         print(f"🛠️ HARDENING ENGINE: Resolving spatial collisions and cinematic timing...")
-
-        # --- DEEP PROMOTION & INTERNAL FIXES PASS (STAGE 0) ---
-        for scene in data.get('scenes', []):
-            # Normalize Scene duration
-            if 'duration' in scene and 'duration_in_frames' not in scene:
-                scene['duration_in_frames'] = scene['duration']
-            if 'duration' in scene:
-                del scene['duration']
-
-            if not scene.get('overlays'):
-                for k in ['elements', 'layers', 'visuals']:
-                    if scene.get(k) and isinstance(scene[k], list):
-                        scene['overlays'] = scene[k]
-                        break
-            if not scene.get('overlays'): scene['overlays'] = []
-
-            for ov in scene['overlays']:
-                # Unify Typography keys early
-                if 'size' in ov:
-                    if 'fontSize' not in ov:
-                        ov['fontSize'] = f"{ov['size']}px" if isinstance(ov['size'], (int, float)) else str(ov['size'])
-                    del ov['size']
-
-                # Unify Z-Index keys
-                if 'z_index' in ov:
-                    if 'zIndex' not in ov: ov['zIndex'] = ov['z_index']
-                    del ov['z_index']
-
-                # UNIFICATION: Standardize content keys before promotion
-                o_type = str(ov.get('type', 'text')).lower()
-                if 'text' in ov and 'content' not in ov: ov['content'] = ov['text']
-                if 'label' in ov and 'content' not in ov: ov['content'] = ov['label']
-                if 'title' in ov and 'content' not in ov and o_type == 'text': ov['content'] = ov['title']
-
-                # Move fields from 'properties', 'data', 'styling', or 'config' to root
-                for nest_key in ['properties', 'data', 'styling', 'config']:
-                    if nest_key in ov and isinstance(ov[nest_key], dict):
-                        nested = ov[nest_key]
-                        # Unify nested too
-                        if 'text' in nested and 'content' not in nested: nested['content'] = nested['text']
-                        if 'label' in nested and 'content' not in nested: nested['content'] = nested['label']
-                        if 'size' in nested:
-                             if 'fontSize' not in nested: nested['fontSize'] = f"{nested['size']}px" if isinstance(nested['size'], (int, float)) else str(nested['size'])
-                             del nested['size']
-                        if 'z_index' in nested:
-                             if 'zIndex' not in nested: nested['zIndex'] = nested['z_index']
-                             del nested['z_index']
-
-                        for sub_key, sub_val in nested.items():
-                            if sub_key in LOCKED_FIELDS: continue
-                            # OVERWRITE: Nested properties are usually the AI's intended correction
-                            ov[sub_key] = sub_val
-                        # OPTIMIZATION: Remove redundant nested objects
-                        del ov[nest_key]
-
-                # Standardize variant mapping and DELETE 'variant' to avoid duplication
-                if 'variant' in ov:
-                    v_val = ov['variant']
-                    if 'chart' in o_type: ov['chart_type'] = v_val
-                    elif 'indicator' in o_type: ov['indicator_type'] = v_val
-                    elif o_type == 'shape': ov['shape_type'] = v_val
-                    elif o_type == 'connector': ov['preset'] = v_val
-                    del ov['variant']
-
-                # RE-FIX: Ensure type-specific variant keys exist
-                if o_type == 'shape' and 'shape_type' not in ov: ov['shape_type'] = 'rect'
-                if 'chart' in o_type and 'chart_type' not in ov: ov['chart_type'] = 'bar'
-                if 'indicator' in o_type and 'indicator_type' not in ov: ov['indicator_type'] = 'kpiNumber'
-                if o_type == 'connector' and 'preset' not in ov: ov['preset'] = 'smooth_curve'
-
-                # Mandatory Data Injector
-                var = ov.get('indicator_type') or ov.get('chart_type') or ov.get('shape_type') or ov.get('preset')
-                if var == 'milestoneTracker' and 'milestones' not in ov:
-                    ov['milestones'] = [{"label": "Milestone 1", "date": "T-0"}]
-                if var in ['timeline', 'milestoneTimeline'] and 'events' not in ov and 'milestones' not in ov:
-                    ov['events'] = [{"title": "Event 1", "date": "Start", "description": "System activated."}]
-                if var == 'statGrid' and 'stats' not in ov:
-                    ov['stats'] = [{"label": "Metric 1", "value": 85, "suffix": "%"}, {"label": "Metric 2", "value": 92, "suffix": "%"}]
-                if var in ['multiProgress', 'ringChart'] and 'items' not in ov and 'rings' not in ov:
-                    ov['items'] = [{"label": "Process A", "value": 75, "color": "#00F5FF"}]
-                if var in ['stepIndicator', 'step_indicator_glass'] and 'steps' not in ov:
-                    ov['steps'] = ["Initiate", "Process", "Complete"]
-
-        TYPE_SIZES = {
-            'text': (800, 200), 'chart': (1000, 562), 'shadcn_chart': (1000, 562),
-            'ui_panel': (800, 600), 'data_indicator': (500, 375), 'shadcn_indicator': (500, 375),
-            'svg': (400, 400), 'kpi': (450, 400), 'kpi_card': (450, 400),
-            'timeline': (1200, 300), 'hub_network': (800, 800), 'flow_diagram': (1000, 562), 'process': (1000, 562),
-            'media': (960, 540), 'image': (960, 540), 'video': (960, 540),
-            'label': (300, 100), 'callout': (400, 200), 'compositions': (1200, 675), 'groups': (1200, 675),
-            'graph': (1000, 700), 'shape': (400, 400), 'data_emphasis': (600, 200), 'ambient_graphic': (1920, 1080),
-            'connector': (400, 100)
-        }
-
-        SEMANTIC_ANIMS = ["wordReveal", "glassReveal", "networkGrow", "barsRise", "cinematicGlow", "fadeScale", "parallaxDrift", "maskReveal", "lineDraw", "particleAssembly", "blurFocus", "svgMorph", "depthZoom"]
-        MIN_FONT_SIZE = 40
-        MIN_CHART_W, MIN_CHART_H = 300, 200
-        MIN_SVG_W, MIN_SVG_H = 100, 100
-        MIN_SPACING = 30
-        MODERN_COLORS = ["#00F5FF", "#FFD700", "#FF3E6C", "#00FFAB"]
-        VALID_TEXT_ANIMS = [
-            'glow_pulse', 'isolate_zoom', 'bounce_pop', 'neon_flicker', 'shake_alert',
-            'rainbow_flow', 'ghost_trail', 'glitch_pop', 'wave_float', 'expand_contract',
-            'blur_reveal', 'color_shift', 'rotation_swing', 'shadow_pulse', 'letter_jump',
-            'skew_slide', 'tilt_pan', 'bounce_gravity', 'border_glow', 'glass_shimmer',
-            'heartbeat', 'strobe_flash', 'threed_flip', 'magnetic_pull', 'fire_glow',
-            'pixel_scatter', 'swing_pivot', 'depth_shadow', 'energy_beam', 'spiral_in',
-            'fly_in_z', 'typewriter_flicker', 'vibrate_intense', 'float_orbit',
-            'mirror_split', 'zoom_blur_pop', 'liquid_waver'
-        ]
-        LOCKED_FIELDS = ["content", "hero_config", "tracking"]
-
-        # Production-Grade Grid Anchors (Rule of Thirds)
-        ANCHORS = {
-            "L_TOP": (550, 320), "C_TOP": (960, 320), "R_TOP": (1370, 320),
-            "L_MID": (550, 540), "C_MID": (960, 540), "R_MID": (1370, 540),
-            "L_BOT": (550, 760), "C_BOT": (960, 760), "R_BOT": (1370, 760)
-        }
-
-        CLAMP_MIN_X, CLAMP_MAX_X = 150, 1770
-        CLAMP_MIN_Y, CLAMP_MAX_Y = 150, 930
-
-        PRIORITY = {
-            'hero': 1000, 'text': 100, 'hub_network': 90, 'flow_diagram': 90, 'process': 90,
-            'chart': 80, 'shadcn_chart': 80, 'kpi_card': 80, 'timeline': 75, 'ui_panel': 60,
-            'compositions': 55, 'groups': 55, 'data_indicator': 50, 'shadcn_indicator': 50,
-            'label': 45, 'callout': 45, 'svg': 40, 'kpi': 40, 'graph': 30, 'shape': 10, 'background': 0
-        }
 
         sfx_manifest = []
         in_ptr = 0
 
         for scene_idx, scene in enumerate(data['scenes']):
+            scene_duration, id_num = self._harden_scene_metadata(scene, scene_idx)
             s_id = scene.get('scene_id', f"SCENE_{scene_idx+1}")
             print(f"   🎬 Processing: {s_id}")
-
-            if 'duration' in scene and 'duration_in_frames' not in scene: scene['duration_in_frames'] = scene['duration']
-            raw_dur = scene.get('duration_in_frames', 180)
-            scene_duration = int(raw_dur * 30) if (isinstance(raw_dur, (float, int)) and raw_dur < 60) else int(raw_dur)
-
-            id_num_match = re.search(r'(\d+)', s_id)
-            id_num = int(id_num_match.group(1)) if id_num_match else (scene_idx + 1)
-
-            if not scene.get('background_type'): scene['background_type'] = 'video'
-            if scene['background_type'] == 'video':
-                if not scene.get('video_path'):
-                    vname = f"scene_SC_{id_num:02d}.mp4"
-                    if vname in self.video_files: scene['video_path'] = f"renders/{vname}"
-                    else: scene['background_type'] = 'procedural'
-                elif not str(scene['video_path']).startswith('renders/'):
-                    scene['video_path'] = f"renders/{os.path.basename(scene['video_path'])}"
-            if scene['background_type'] == 'procedural':
-                if not scene.get('procedural_config') or not isinstance(scene.get('procedural_config'), dict):
-                    scene['procedural_config'] = {"variant": "neon_grid"}
-                scene['video_path'] = None
-
-            filename = os.path.basename(str(scene.get('video_path', '')))
-            if filename in self.fps_cache: scene_duration = self.fps_cache[filename]
-            scene['duration_in_frames'] = scene_duration
-            # PRODUCTION OVERRIDE: Always mute background video to prevent double-audio with narration
-            scene['audio_enabled'] = False
 
             pattern = f"SC_{id_num:02d}".lower()
             narration_file = next((f for f in self.narration_files if pattern in f.lower()), None)
@@ -332,26 +378,15 @@ class RemotionJsonMaker:
 
             valid_overlays = []
             text_count, focal_count, svg_count = 0, 0, 0
-            is_scene_bangla = self._is_bangla(self.story_scenes.get(s_id, ""))
 
             raw_overlays = scene['overlays'] if isinstance(scene['overlays'], list) else [scene['overlays']]
             for ov in raw_overlays:
+                self._harden_overlay_data(ov, scene_context=self.story_scenes.get(s_id, ""))
                 o_type = str(ov.get('type', 'text')).lower()
-
-                # PRODUCTION FIX: Map generic 'variant' to type-specific keys
-                if 'variant' in ov:
-                    v_val = ov['variant']
-                    if 'chart' in o_type: ov['chart_type'] = v_val
-                    elif 'indicator' in o_type: ov['indicator_type'] = v_val
-                    elif o_type == 'shape': ov['shape_type'] = v_val
-
                 if 'chart_type' in ov: o_type = 'shadcn_chart'
                 if 'indicator_type' in ov: o_type = 'shadcn_indicator'
 
-                # Extract content for font decision
-                content = str(ov.get('content', ov.get('text', ov.get('label', ov.get('title', ''))))).strip()
-                is_content_bangla = self._is_bangla(content)
-
+                content = str(ov.get('content', '')).strip()
                 if o_type == 'text':
                     if text_count >= 3: continue
                     text_count += 1
@@ -364,199 +399,71 @@ class RemotionJsonMaker:
                     if focal_count >= 3: continue
                     focal_count += 1
                 elif o_type in ['svg', 'label', 'callout', 'data_indicator', 'shadcn_indicator', 'shape', 'graph', 'ambient_graphic', 'connector']:
-                    if svg_count >= 15: continue # Increased budget for connectors
+                    if svg_count >= 15: continue
                     svg_count += 1
                 elif o_type in ['image', 'video']:
-                    # Normalize source keys to 'src' for MediaEngine
                     src = ov.get('src', ov.get('image_path', ov.get('video_path')))
                     if not src:
-                        if o_type == 'video' and self.video_files:
-                            src = f"renders/{self.video_files[0]}"
-                        elif o_type == 'image' and self.image_files:
-                            src = f"renders/{self.image_files[0]}"
-                        else:
-                            # Final fallback to a placeholder or omit if no assets found
-                            src = "renders/placeholder.png"
-
+                        if o_type == 'video' and self.video_files: src = f"renders/{self.video_files[0]}"
+                        elif o_type == 'image' and self.image_files: src = f"renders/{self.image_files[0]}"
+                        else: src = "renders/placeholder.png"
                     if src and not str(src).startswith('renders/'):
                         src = f"renders/{os.path.basename(src)}"
-
                     ov['src'] = src
-                    # Clean up redundant keys
                     for k in ['image_path', 'video_path']:
                         if k in ov: del ov[k]
 
                 if not ov.get('id'): ov['id'] = f"ov_{id_num}_{len(valid_overlays)+1}"
 
-                # SURGICAL FONT ENFORCEMENT (Refined)
-                all_scanned_fonts = self.bangla_fonts + self.english_fonts
-                ai_font = ov.get('font')
-
-                # Language Detection: Check content, then fallback to scene story
-                if is_content_bangla:
-                    ov['font'] = "Sohid_bangla" if "Sohid_bangla" in self.bangla_fonts else (self.bangla_fonts[0] if self.bangla_fonts else "Arial")
-                elif self._is_bangla(self.story_scenes.get(s_id, "")):
-                    # Scene is Bangla, content might be mixed or icons. Prefer Bangla font if it was already selected or requested.
-                    if ai_font in self.bangla_fonts: pass
-                    else: ov['font'] = "Sohid_bangla" if "Sohid_bangla" in self.bangla_fonts else (self.bangla_fonts[0] if self.bangla_fonts else (self.english_fonts[0] if self.english_fonts else "Arial"))
-                else:
-                    # English content or scene
-                    if ai_font in self.english_fonts: pass
-                    else: ov['font'] = self.english_fonts[0] if self.english_fonts else "Arial"
 
                 if ov['type'] == 'text':
                     ov['maxWidth'] = ov.get('maxWidth', 800)
                     if not ov.get('hero_config'):
                         hero = self._get_scene_hero_word(s_id, ov['content'], scene_duration)
                         if not hero: hero = self._get_fallback_hero(ov['content'])
-                        if hero: ov['hero_config'] = {"word": hero['word'], "start": hero['start'], "color": MODERN_COLORS[(scene_idx + 2) % len(MODERN_COLORS)], "animation": VALID_TEXT_ANIMS[scene_idx % len(VALID_TEXT_ANIMS)]}
-                    ov['color'] = MODERN_COLORS[scene_idx % len(MODERN_COLORS)]
+                        if hero: ov['hero_config'] = {"word": hero['word'], "start": hero['start'], "color": self.MODERN_COLORS[(scene_idx + 2) % len(self.MODERN_COLORS)], "animation": self.VALID_TEXT_ANIMS[scene_idx % len(self.VALID_TEXT_ANIMS)]}
+                    ov['color'] = self.MODERN_COLORS[scene_idx % len(self.MODERN_COLORS)]
                     ov['fontSize'] = ov.get('fontSize', "120px")
                 valid_overlays.append(ov)
 
-            valid_overlays.sort(key=lambda o: PRIORITY.get(str(o.get('type')).lower(), 0), reverse=True)
-            placed_boxes = []
-            stagger_step = min(30, max(10, scene_duration // (len(valid_overlays) + 2)))
+            valid_overlays.sort(key=lambda o: self.PRIORITY.get(str(o.get('type')).lower(), 0), reverse=True)
 
-            # PROACTIVE ANTI-CENTERING & ANCHORING
+            # Resolve Collisions and Layout
+            filename = os.path.basename(str(scene.get('video_path', '')))
             scene_analysis = self.visual_analysis.get(filename, {})
             recommended_region = scene_analysis.get("text_region", {}).get("preferred", "center")
 
-            for i, ov in enumerate(valid_overlays):
-                o_type = str(ov.get('type', 'text')).lower()
-                if o_type in ['graph', 'shape']: ov['start'] = 0
-                elif PRIORITY.get(o_type, 0) < 50: ov['start'] = 5
-                else: ov['start'] = 15 + i * stagger_step
-                ov['duration'] = max(30, scene_duration - ov['start'] - 30)
-                if not ov.get('exitAnimation'): ov['exitAnimation'] = "fade_out" if o_type != 'text' else "slide_down"
+            self._resolve_spatial_collisions(valid_overlays, scene_duration, scene_idx, recommended_region)
 
-                base_w, base_h = TYPE_SIZES.get(o_type, (600, 400))
-                imp = str(ov.get('importance', '')).lower()
-                if imp == 'hero': ov['depth'], ov['parallax'] = 100, 1.0
-                elif imp == 'secondary': ov['depth'], ov['parallax'] = 50, 0.8
-                elif imp == 'ambient': ov['depth'], ov['parallax'] = -50, 0.5
-                elif imp == 'background': ov['depth'], ov['parallax'] = -100, 0.2
-                else:
-                    prio = PRIORITY.get(o_type, 40)
-                    ov['depth'], ov['parallax'] = prio - 50, max(0.2, min(1.0, prio / 100.0))
-
-                pos = ov.get('position', {})
-                ax, ay = int(pos.get('x', 960)), int(pos.get('y', 540))
-
-                # Pre-Hardening Safety Clamp: Ensure initial pos isn't crazy
-                ax = max(CLAMP_MIN_X, min(CLAMP_MAX_X, ax))
-                ay = max(CLAMP_MIN_Y, min(CLAMP_MAX_Y, ay))
-
-                # Studio V4 Aggressive Anti-Centering (Studio-Grade Layouts)
-                # Widened "Death Zone" to +/- 200px to force Rule of Thirds variety
-                if abs(ax - 960) < 200 and (abs(ay - 540) < 150 or abs(ay - 700) < 150):
-                    # Force elements away from the generic center "death zone"
-                    if "left" in recommended_region: ax, ay = ANCHORS["L_MID"]
-                    elif "right" in recommended_region: ax, ay = ANCHORS["R_MID"]
-                    elif "top" in recommended_region: ax, ay = ANCHORS["C_TOP"]
-                    elif "bottom" in recommended_region: ax, ay = ANCHORS["C_BOT"]
-                    else:
-                        # Cyclic distribution based on index to ensure professional spacing
-                        layout_targets = [ANCHORS["L_MID"], ANCHORS["R_MID"], ANCHORS["L_TOP"], ANCHORS["R_BOT"]]
-                        ax, ay = layout_targets[i % len(layout_targets)]
-
-                # Snapping to closest production grid anchor
-                if not ov.get('tracking', {}).get('enabled'):
-                    for anchor_name, (grid_x, grid_y) in ANCHORS.items():
-                        if abs(ax - grid_x) < 180 and abs(ay - grid_y) < 180:
-                            ax, ay = grid_x, grid_y; break
-
-                # OPTIMIZATION: Standardize position and remove redundant x/y keys
-                ov['position'] = {"x": ax, "y": ay}
-                for k in ['x', 'y', 'left', 'top']:
-                    if k in ov: del ov[k]
-
-                found = False
-                best_pos, final_w, final_h = (ax, ay), base_w, base_h
-                fs = int(re.search(r'\d+', str(ov.get('fontSize', '120'))).group()) if o_type == 'text' else 120
-
-                for scale_step in range(7):
-                    scale = 1.0 - (scale_step * 0.15)
-                    # Protect Hero elements from downscaling
-                    if imp == 'hero' and scale < 1.0: break
-
-                    if o_type in ['graph', 'shape']: scale = min(scale, 0.8)
-                    if o_type == 'text':
-                        curr_fs = max(MIN_FONT_SIZE, int(fs * scale))
-                        w = min(ov.get('maxWidth', 800), len(ov['content']) * curr_fs * 0.7)
-                        h = curr_fs * 1.5
-                    else:
-                        w = max(MIN_CHART_W if 'chart' in o_type else MIN_SVG_W, base_w * scale)
-                        h = max(MIN_CHART_H if 'chart' in o_type else MIN_SVG_H, base_h * scale)
-
-                    for step in range(0, 80):
-                        radius = step * 15
-                        angles = [0, 180, 90, 270, 45, 135, 225, 315] if radius > 0 else [0]
-                        for angle in angles:
-                            rad = math.radians(angle)
-                            cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
-                            l, t, r, b = cx-w/2, cy-h/2, cx+w/2, cy+h/2
-                            if l < CLAMP_MIN_X or r > CLAMP_MAX_X or t < CLAMP_MIN_Y or b > CLAMP_MAX_Y: continue
-                            collision = False
-                            for p_id, p_l, p_t, p_r, p_b, p_s, p_e in placed_boxes:
-                                if max(ov['start'], p_s) < min(ov['start']+ov['duration'], p_e):
-                                    if not (r + MIN_SPACING < p_l or l - MIN_SPACING > p_r or b + MIN_SPACING < p_t or t - MIN_SPACING > p_b):
-                                        collision = True; break
-                            if not collision:
-                                best_pos, found = (cx, cy), True
-                                if radius > 80:
-                                    print(f"   🔧 Expert Nudging {ov['id']} to resolve overlap -> New Pos: ({int(cx)}, {int(cy)})")
-                                    if not ov.get('animation') or ov.get('animation') not in SEMANTIC_ANIMS:
-                                        ov['animation'] = SEMANTIC_ANIMS[scene_idx % len(SEMANTIC_ANIMS)]
-                                if scale < 1.0:
-                                    print(f"   🔧 Scaling down {ov['id']} to {int(scale*100)}% to fit")
-                                    if o_type == 'text': ov['fontSize'] = f"{int(curr_fs)}px"
-                                    else: ov['width'], ov['height'] = int(w), int(h)
-                                final_w, final_h = (w if o_type != 'text' else min(1600, len(ov['content']) * int(curr_fs) * 0.7)), (h if o_type != 'text' else int(curr_fs) * 1.5)
-                                break
-                        if found: break
-                    if found: break
-
-                ov['position'] = {"x": int(best_pos[0]), "y": int(best_pos[1])}
-                ov['visual_anchor'] = True
-                if ov.get('hero_config'): ov['hero_config']['start'] = max(ov['start'] + 10, ov['hero_config'].get('start', 0))
-                placed_boxes.append((ov['id'], best_pos[0]-final_w/2, best_pos[1]-final_h/2, best_pos[0]+final_w/2, best_pos[1]+final_h/2, ov['start'], ov['start']+ov['duration']))
-
-            # PRODUCTION SYNC: Auto-sort overlays by 'start' time to prevent chronological array sequence errors.
-            valid_overlays.sort(key=lambda o: (int(o.get('start', 0)), PRIORITY.get(str(o.get('type')).lower(), 0)))
+            # Finalize Scene-level sequencing
+            valid_overlays.sort(key=lambda o: (int(o.get('start', 0)), self.PRIORITY.get(str(o.get('type')).lower(), 0)))
             scene['overlays'] = valid_overlays
             if 'transition' not in scene: scene['transition'] = {"type": "cinematicMatchCut", "duration": 15}
-            if 'beats' not in scene: scene['beats'] = [{"frame": o['start'], "event": f"{o['id']}_reveal"} for o in valid_overlays if PRIORITY.get(o['type'], 0) >= 50]
+            if 'beats' not in scene: scene['beats'] = [{"frame": o['start'], "event": f"{o['id']}_reveal"} for o in valid_overlays if self.PRIORITY.get(o['type'], 0) >= 50]
             if 'connections' not in scene: scene['connections'] = []
 
-            # Identify true HERO targets (explicitly marked or with hero_config)
+            # Identify true HERO targets
             true_hero_ids = [o['id'] for o in valid_overlays if str(o.get('importance', '')).lower() == 'hero' or o.get('hero_config')]
-            hero_ids = [o['id'] for o in valid_overlays if PRIORITY.get(o['type'], 0) >= 100]
-            focal_ids = [o['id'] for o in valid_overlays if PRIORITY.get(str(o.get('type')).lower(), 0) >= 50 and o['id'] not in hero_ids and o['id'] not in true_hero_ids]
-            background_ids = [o['id'] for o in valid_overlays if PRIORITY.get(str(o.get('type')).lower(), 0) < 50]
+            hero_ids = [o['id'] for o in valid_overlays if self.PRIORITY.get(o['type'], 0) >= 100]
+            focal_ids = [o['id'] for o in valid_overlays if self.PRIORITY.get(str(o.get('type')).lower(), 0) >= 50 and o['id'] not in hero_ids and o['id'] not in true_hero_ids]
+            background_ids = [o['id'] for o in valid_overlays if self.PRIORITY.get(str(o.get('type')).lower(), 0) < 50]
 
             ai_shots = scene.get('camera', {}).get('shots', [])
-            # Priority-based camera targeting: Prefer true heroes, then standard heroes, then focal elements.
             if not ai_shots or not all(s.get('targetId') in [o['id'] for o in valid_overlays] for s in ai_shots):
                 CAM_STYLES = ["cinematic_drift", "slow_push", "pan_right", "orbit", "rack_focus", "dramatic_reveal"]
                 shots = []
-                # Start with ambient drift on background if present
                 if background_ids: shots.append({"targetId": background_ids[0], "startFrame": 0, "duration": 45, "style": "cinematic_drift", "zoom": 1.05, "inDuration": 15})
 
-                # Prioritize TRUE HEROES first, then other important elements
                 camera_targets = sorted([o for o in valid_overlays if o['id'] in true_hero_ids], key=lambda x: x['start'])
                 other_targets = sorted([o for o in valid_overlays if o['id'] in (hero_ids + focal_ids) and o['id'] not in true_hero_ids], key=lambda x: x['start'])
-
                 ordered_targets = camera_targets + other_targets
+
                 for i, ov in enumerate(ordered_targets[:4]):
                     start = max(shots[-1]['startFrame'] + 10, ov['start']) if shots else ov['start']
                     if shots: shots[-1]['duration'] = max(20, start - shots[-1]['startFrame'])
-
-                    # More aggressive zoom for true heroes
                     zoom_level = 1.15 + (i * 0.05) if ov['id'] in true_hero_ids else 1.1 + (i * 0.05)
                     style = CAM_STYLES[(scene_idx + i) % len(CAM_STYLES)]
                     if ov['id'] in true_hero_ids and i == 0: style = "dramatic_reveal"
-
                     shots.append({"targetId": ov['id'], "startFrame": start, "duration": 60, "style": style, "zoom": zoom_level, "inDuration": 20, "ease": "cubicOut"})
                 if shots: shots[-1]['duration'] = max(30, scene_duration - shots[-1]['startFrame'])
                 scene['camera'] = {"enabled": True, "shots": shots}
@@ -570,6 +477,102 @@ class RemotionJsonMaker:
 
         data['audio_sfx_manifest'] = sfx_manifest
         return data
+
+    def _resolve_spatial_collisions(self, valid_overlays: List[Dict[str, Any]], scene_duration: int, scene_idx: int, recommended_region: str):
+        """Stage 3: Resolves spatial collisions with expert nudging and scaling."""
+        placed_boxes = []
+        stagger_step = min(30, max(10, scene_duration // (len(valid_overlays) + 2)))
+
+        for i, ov in enumerate(valid_overlays):
+            o_type = str(ov.get('type', 'text')).lower()
+            if o_type in ['graph', 'shape']: ov['start'] = 0
+            elif self.PRIORITY.get(o_type, 0) < 50: ov['start'] = 5
+            else: ov['start'] = 15 + i * stagger_step
+            ov['duration'] = max(30, scene_duration - ov['start'] - 30)
+            if not ov.get('exitAnimation'): ov['exitAnimation'] = "fade_out" if o_type != 'text' else "slide_down"
+
+            base_w, base_h = self.TYPE_SIZES.get(o_type, (600, 400))
+            imp = str(ov.get('importance', '')).lower()
+            if imp == 'hero': ov['depth'], ov['parallax'] = 100, 1.0
+            elif imp == 'secondary': ov['depth'], ov['parallax'] = 50, 0.8
+            elif imp == 'ambient': ov['depth'], ov['parallax'] = -50, 0.5
+            elif imp == 'background': ov['depth'], ov['parallax'] = -100, 0.2
+            else:
+                prio = self.PRIORITY.get(o_type, 40)
+                ov['depth'], ov['parallax'] = prio - 50, max(0.2, min(1.0, prio / 100.0))
+
+            pos = ov.get('position', {})
+            ax, ay = int(pos.get('x', 960)), int(pos.get('y', 540))
+            ax = max(self.CLAMP_MIN_X, min(self.CLAMP_MAX_X, ax))
+            ay = max(self.CLAMP_MIN_Y, min(self.CLAMP_MAX_Y, ay))
+
+            if abs(ax - 960) < 200 and (abs(ay - 540) < 150 or abs(ay - 700) < 150):
+                if "left" in recommended_region: ax, ay = self.ANCHORS["L_MID"]
+                elif "right" in recommended_region: ax, ay = self.ANCHORS["R_MID"]
+                elif "top" in recommended_region: ax, ay = self.ANCHORS["C_TOP"]
+                elif "bottom" in recommended_region: ax, ay = self.ANCHORS["C_BOT"]
+                else:
+                    targets = [self.ANCHORS["L_MID"], self.ANCHORS["R_MID"], self.ANCHORS["L_TOP"], self.ANCHORS["R_BOT"]]
+                    ax, ay = targets[i % len(targets)]
+
+            if not ov.get('tracking', {}).get('enabled'):
+                for grid_x, grid_y in self.ANCHORS.values():
+                    if abs(ax - grid_x) < 180 and abs(ay - grid_y) < 180:
+                        ax, ay = grid_x, grid_y; break
+
+            ov['position'] = {"x": ax, "y": ay}
+            for k in ['x', 'y', 'left', 'top']:
+                if k in ov: del ov[k]
+
+            found = False
+            best_pos, final_w, final_h = (ax, ay), base_w, base_h
+            fs = int(re.search(r'\d+', str(ov.get('fontSize', '120'))).group()) if o_type == 'text' else 120
+
+            for scale_step in range(7):
+                scale = 1.0 - (scale_step * 0.15)
+                if imp == 'hero' and scale < 1.0: break
+                if o_type in ['graph', 'shape']: scale = min(scale, 0.8)
+
+                if o_type == 'text':
+                    curr_fs = max(self.MIN_FONT_SIZE, int(fs * scale))
+                    w = min(ov.get('maxWidth', 800), len(ov['content']) * curr_fs * 0.7)
+                    h = curr_fs * 1.5
+                else:
+                    w = max(300 if 'chart' in o_type else 100, base_w * scale)
+                    h = max(200 if 'chart' in o_type else 100, base_h * scale)
+
+                for step in range(0, 80):
+                    radius = step * 15
+                    angles = [0, 180, 90, 270, 45, 135, 225, 315] if radius > 0 else [0]
+                    for angle in angles:
+                        rad = math.radians(angle)
+                        cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
+                        l, t, r, b = cx-w/2, cy-h/2, cx+w/2, cy+h/2
+                        if l < self.CLAMP_MIN_X or r > self.CLAMP_MAX_X or t < self.CLAMP_MIN_Y or b > self.CLAMP_MAX_Y: continue
+                        collision = False
+                        for p_id, p_l, p_t, p_r, p_b, p_s, p_e in placed_boxes:
+                            if max(ov['start'], p_s) < min(ov['start']+ov['duration'], p_e):
+                                if not (r + self.MIN_SPACING < p_l or l - self.MIN_SPACING > p_r or b + self.MIN_SPACING < p_t or t - self.MIN_SPACING > p_b):
+                                    collision = True; break
+                        if not collision:
+                            best_pos, found = (cx, cy), True
+                            if radius > 80:
+                                print(f"   🔧 Expert Nudging {ov['id']} -> ({int(cx)}, {int(cy)})")
+                                if not ov.get('animation') or ov.get('animation') not in self.SEMANTIC_ANIMS:
+                                    ov['animation'] = self.SEMANTIC_ANIMS[scene_idx % len(self.SEMANTIC_ANIMS)]
+                            if scale < 1.0:
+                                print(f"   🔧 Scaling down {ov['id']} to {int(scale*100)}%")
+                                if o_type == 'text': ov['fontSize'] = f"{int(curr_fs)}px"
+                                else: ov['width'], ov['height'] = int(w), int(h)
+                            final_w, final_h = (w if o_type != 'text' else min(1600, len(ov['content']) * int(curr_fs) * 0.7)), (h if o_type != 'text' else int(curr_fs) * 1.5)
+                            break
+                    if found: break
+                if found: break
+
+            ov['position'] = {"x": int(best_pos[0]), "y": int(best_pos[1])}
+            ov['visual_anchor'] = True
+            if ov.get('hero_config'): ov['hero_config']['start'] = max(ov['start'] + 10, ov['hero_config'].get('start', 0))
+            placed_boxes.append((ov['id'], best_pos[0]-final_w/2, best_pos[1]-final_h/2, best_pos[0]+final_w/2, best_pos[1]+final_h/2, ov['start'], ov['start']+ov['duration']))
 
     def supervise(self, data: Dict[str, Any]) -> List[str]:
         """Runs the Element Supervisor and Intelligence Engine on the manifest."""

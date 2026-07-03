@@ -761,10 +761,10 @@ class SceneSupervisor:
         self.scores['background_overlay_fusion'] = (self.scores['visual_harmony'] + self.scores['cinematic_intent_alignment']) / 2.0
 
         status = "CLEAN"
-        # v5 status rules
+        # v5 status rules (Stricter for production grade)
         total_errors = len([f for f in all_findings if f['severity'] in ['error', 'critical']])
-        if total_errors > 2 or self.scores['overall_cinematic_score'] < 5.0: status = "OVERLOADED"
-        elif total_errors > 0 or self.scores['overall_cinematic_score'] < 7.5: status = "ACCEPTABLE"
+        if total_errors > 1 or self.scores['overall_cinematic_score'] < 6.0: status = "OVERLOADED"
+        elif total_errors > 0 or self.scores['overall_cinematic_score'] < 8.0: status = "ACCEPTABLE"
 
         # Integrate Jules Intelligence into scores
         if self.intelligence:

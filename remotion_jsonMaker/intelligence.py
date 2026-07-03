@@ -53,8 +53,18 @@ class SceneIntelligenceEngine:
         # Composition conflicts
         neg_space = bg.get('composition', {}).get('negative_space')
         if neg_space:
-            # Check if any overlay ignores negative space and crowds a busy area
-            pass # Simplified for v1 logic
+            for ov in overlays:
+                pos = ov.get('position', {'x': 960, 'y': 540})
+                # If negative space is defined but overlay is centered or on opposite side
+                if abs(pos['x'] - 960) < 100 and abs(pos['y'] - 540) < 100:
+                    conflicts.append({
+                        "type": "composition_conflict", "severity": "warning",
+                        "affected_elements": [ov.get('id')],
+                        "explanation": f"Overlay '{ov.get('id')}' is centered, ignoring background negative space ({neg_space}).",
+                        "viewer_impact": "Composition feels unbalanced or 'amateur'.",
+                        "fix_recommendation": f"Move element to the {neg_space} region.",
+                        "expected_gain": 0.2
+                    })
 
         # 3. Adjustments and Recommendations
         adjustments = []
@@ -113,12 +123,24 @@ class SceneIntelligenceEngine:
         neg = bg.get('composition', {}).get('negative_space', 'none')
         return f"Negative space is {neg}. Rule of Thirds check pending spatial resolution."
 
-    def _calculate_cognitive_load(self, bg: Dict[str, Any], overlays: List[Dict[str, Any]], duration: int) -> tuple:
+    def _calculate_cognitive_load(self, bg: Dict[str, Any], overlays: List[Dict[str, Any]], duration: int, style: str = "vox") -> tuple:
         bg_busy = bg.get('composition', {}).get('busy_score', 0.2)
         ov_density = len(overlays) / 5.0 # normalized
+
+        # Style-based thresholds
+        max_load = 1.5
+        if style == "apple": max_load = 0.8
+        elif style == "johnny_harris": max_load = 1.8
+
         motion_intensity = 0.3 # estimate
         load = bg_busy + ov_density + motion_intensity
-        msg = f"Fused load {round(load, 2)}. " + ("Overload risk." if load > 1.5 else "Stable.")
+
+        msg = f"Fused load {round(load, 2)}. "
+        if load > max_load:
+            msg += f"Overload risk for '{style}' style."
+        else:
+            msg += "Stable."
+
         return load, msg
 
     def _assess_motion_discipline(self, scene: Dict[str, Any], overlays: List[Dict[str, Any]]) -> str:
