@@ -5,9 +5,9 @@ from typing import Dict, Any, List, Tuple, Optional
 from dataclasses import dataclass, field
 
 try:
-    from .perception_logic import StyleThresholds, CognitiveLoadModel, CompositionAnalyzer, NarrativeLogic
+    from .perception_logic import StyleThresholds, CognitiveLoadModel, CompositionAnalyzer, NarrativeLogic, VisualWeightCalculator, MotionVectorLogic
 except (ImportError, ValueError):
-    from perception_logic import StyleThresholds, CognitiveLoadModel, CompositionAnalyzer, NarrativeLogic
+    from perception_logic import StyleThresholds, CognitiveLoadModel, CompositionAnalyzer, NarrativeLogic, VisualWeightCalculator, MotionVectorLogic
 
 @dataclass
 class PerceptionFinding:
@@ -52,35 +52,39 @@ class AnalysisModule:
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         raise NotImplementedError
 
-class VisualSaliencyEngine(AnalysisModule):
-    """MODULE 1: Continuous Visual Saliency Heatmap simulation."""
+class HumanVisionModule(AnalysisModule):
+    """Modules that simulate raw biological human vision processing."""
+    pass
+
+class DirectorPsychologyModule(AnalysisModule):
+    """Modules that judge cinematic intent, aesthetics, and professional standards."""
+    pass
+
+class VisualSaliencyEngine(HumanVisionModule):
+    """MODULE 1: Continuous Visual Saliency with Visual Weight modeling."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Visual Saliency")
         focus_timeline = []
 
         for f in range(state.duration):
-            # Calculate a simplified continuous saliency map for this frame
-            saliency_map = [] # List of (overlay_id, saliency_value)
+            saliency_map = []
 
             for ov in supervisor.overlays:
                 start, end = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', state.duration)
                 if start <= f < end:
-                    # Multi-factor saliency calculation
-                    size_factor = (ov.get('width', 400) * ov.get('height', 400)) / (1920 * 1080)
-                    opacity = ov.get('opacity', 1.0)
+                    # Biological Saliency: Weight + Novelty
+                    weight = VisualWeightCalculator.calculate_weight(ov)
 
-                    # Importance weighting
-                    imp = str(ov.get('importance','')).lower()
-                    importance_boost = 2.5 if imp == 'hero' else 1.5 if imp == 'secondary' else 1.0
-
-                    # Motion saliency (novelty boost)
+                    # Temporal novelty (eye is drawn to things that just appeared)
                     time_since_reveal = f - start
-                    novelty_boost = 2.0 * math.exp(-time_since_reveal / 15.0) + 1.0
+                    novelty_boost = 3.0 * math.exp(-time_since_reveal / 12.0) + 1.0
 
-                    # Type-based inherent saliency (e.g. bright colors or indicators)
-                    type_boost = 1.2 if 'indicator' in str(ov.get('type','')) else 1.0
+                    # Background contrast factor (brightness uniqueness)
+                    bg_brightness = supervisor.bg_intel.get('visual_style', {}).get('brightness', 0.5)
+                    ov_color = str(ov.get('color', '#ffffff')).lower()
+                    color_contrast = 1.4 if (bg_brightness > 0.6 and ov_color in ['#00f5ff', '#ff3e6c']) else 1.0
 
-                    saliency = size_factor * opacity * importance_boost * novelty_boost * type_boost
+                    saliency = weight * novelty_boost * color_contrast
                     saliency_map.append({'id': ov.get('id'), 'score': saliency})
 
             if not saliency_map:
@@ -109,36 +113,40 @@ class VisualSaliencyEngine(AnalysisModule):
         state.focus_timeline.extend(focus_timeline)
         return obs
 
-class EyeMovementSimulator(AnalysisModule):
-    """MODULE 2: Simulates frame-by-frame gaze fixations and saccades."""
+class EyeMovementSimulator(HumanVisionModule):
+    """MODULE 2: Semantic Scanpath Simulator (Gaze prediction)."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Eye Flow")
 
-        current_gaze_pos = {'x': 960, 'y': 540} # Start at center
+        current_gaze_pos = {'x': 960, 'y': 540}
         fixation_target = None
         fixation_frames = 0
         total_saccade_dist = 0
+        scanpath = [] # sequence of semantic roles visited
 
         for f in range(state.duration):
-            # Authoritative focus from Saliency Engine
             focal_id = state.focus_timeline[f] if f < len(state.focus_timeline) else None
 
             if focal_id and focal_id != fixation_target:
-                # Trigger a Saccade
                 target_ov = next((o for o in supervisor.overlays if o.get('id') == focal_id), None)
                 if target_ov:
                     target_pos = target_ov.get('position', {'x': 960, 'y': 540})
                     dist = math.sqrt((target_pos['x'] - current_gaze_pos['x'])**2 + (target_pos['y'] - current_gaze_pos['y'])**2)
                     total_saccade_dist += dist
 
+                    # Log semantic scanpath
+                    role = str(target_ov.get('semantic_role', target_ov.get('type', 'generic'))).lower()
+                    if not scanpath or scanpath[-1] != role:
+                        scanpath.append(role)
+
                     if dist > 1000 and f % 60 == 0:
                         obs.findings.append(PerceptionFinding(
                             severity="error", confidence=0.8, frame_range=(f, f+10),
                             affected_elements=[focal_id],
-                            human_explanation="Extreme eye jump required.",
-                            technical_explanation=f"Saccade distance of {int(dist)}px exceeds comfortable threshold.",
-                            viewer_impact="Disorientation and visual fatigue.",
-                            fix_suggestion="Adjust layout to create a more natural scanning path (Z-pattern or F-pattern).",
+                            human_explanation="Disjointed scanning path.",
+                            technical_explanation=f"Saccade distance ({int(dist)}px) exceeds biological comfort zone.",
+                            viewer_impact="Gaze disorientation; the viewer 'loses their place' in the scene.",
+                            fix_suggestion="Use leading lines or proximity to guide the eye from the previous anchor.",
                             expected_quality_gain=0.4,
                             category="layout"
                         ))
@@ -149,23 +157,25 @@ class EyeMovementSimulator(AnalysisModule):
             elif focal_id == fixation_target:
                 fixation_frames += 1
 
-                # Check for "Stale" Fixations (Boredom)
-                if fixation_frames > 150 and f % 90 == 0:
-                    obs.findings.append(PerceptionFinding(
-                        severity="info", confidence=0.5, frame_range=(f, f+30),
-                        affected_elements=[fixation_target],
-                        human_explanation="Stale visual anchor.",
-                        technical_explanation="Viewer gaze fixed on same element for >5 seconds.",
-                        viewer_impact="Audience engagement may drop.",
-                        fix_suggestion="Introduce a subtle secondary animation or camera drift to maintain interest.",
-                        expected_quality_gain=0.1,
-                        category="narrative"
-                    ))
+                # Semantic Reading Sequence check (e.g. caption before header is bad)
+                if len(scanpath) >= 2:
+                    if scanpath[-2] == 'caption' and scanpath[-1] == 'header':
+                         if f % 90 == 0:
+                            obs.findings.append(PerceptionFinding(
+                                severity="warning", confidence=0.7, frame_range=(f, f+30),
+                                affected_elements=[fixation_target],
+                                human_explanation="Inverted reading hierarchy.",
+                                technical_explanation="Viewer gaze predicted to visit caption before primary header.",
+                                viewer_impact="Delayed comprehension; audience works harder to understand context.",
+                                fix_suggestion="Increase visual weight of header or reveal it 15 frames earlier.",
+                                expected_quality_gain=0.3,
+                                category="readability"
+                            ))
 
         obs.scores['eye_flow'] = max(0, 10 - (total_saccade_dist / 3000))
         return obs
 
-class VisualNoiseDetector(AnalysisModule):
+class VisualNoiseDetector(HumanVisionModule):
     """MODULE 3: Decorative graphics competing with info."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Visual Noise")
@@ -183,7 +193,7 @@ class VisualNoiseDetector(AnalysisModule):
             ))
         return obs
 
-class VisualCompositionEngine(AnalysisModule):
+class VisualCompositionEngine(DirectorPsychologyModule):
     """MODULE 3: Judges Layout via Rule of Thirds and Golden Ratio."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Composition")
@@ -203,7 +213,7 @@ class VisualCompositionEngine(AnalysisModule):
 
         return obs
 
-class GestaltAnalyzer(AnalysisModule):
+class GestaltAnalyzer(HumanVisionModule):
     """MODULE 4: Proximity and Similarity Grouping."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Gestalt")
@@ -225,7 +235,7 @@ class GestaltAnalyzer(AnalysisModule):
                     ))
         return obs
 
-class MotionPsychologyEngine(AnalysisModule):
+class MotionPsychologyEngine(DirectorPsychologyModule):
     """MODULE 5: Purpose-driven animation evaluation."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Motion Psychology")
@@ -244,7 +254,7 @@ class MotionPsychologyEngine(AnalysisModule):
             obs.scores['motion_psychology'] = 5.0
         return obs
 
-class RhythmEngine(AnalysisModule):
+class RhythmEngine(DirectorPsychologyModule):
     """MODULE 6: Beat spacing and tempo analysis."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Rhythm")
@@ -259,7 +269,7 @@ class RhythmEngine(AnalysisModule):
 
         return obs
 
-class EnergyCurveEngine(AnalysisModule):
+class EnergyCurveEngine(DirectorPsychologyModule):
     """MODULE 7: Tracks scene intensity peaks and valleys."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Energy Curve")
@@ -271,7 +281,7 @@ class EnergyCurveEngine(AnalysisModule):
             obs.director_notes.append("The pacing is monotonic. Use rest phases to create energy valleys.")
         return obs
 
-class CameraDirector(AnalysisModule):
+class CameraDirector(DirectorPsychologyModule):
     """MODULE 8: Cinematic movement evaluation."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Camera")
@@ -288,7 +298,7 @@ class CameraDirector(AnalysisModule):
                         obs.director_notes.append("Camera movement distracts from reading.")
         return obs
 
-class InformationDensityEngine(AnalysisModule):
+class InformationDensityEngine(HumanVisionModule):
     """MODULE 9: Bits of info per second."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Info Density")
@@ -306,7 +316,7 @@ class InformationDensityEngine(AnalysisModule):
             obs.director_notes.append("The viewer cannot absorb this much information at once.")
         return obs
 
-class ReadabilityEngine(AnalysisModule):
+class ReadabilityEngine(HumanVisionModule):
     """MODULE 10: Multi-language reading speed estimation."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Readability")
@@ -323,7 +333,7 @@ class ReadabilityEngine(AnalysisModule):
                     obs.issues.append(f"Text too fast: '{ov.get('id')}' needs {round(req_sec, 1)}s.")
         return obs
 
-class NarrativeEngine(AnalysisModule):
+class NarrativeEngine(DirectorPsychologyModule):
     """MODULE 11: Story structure validation."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Narrative")
@@ -333,7 +343,7 @@ class NarrativeEngine(AnalysisModule):
             obs.issues.append("Narrative Gap: Evidence provided without a Hero statement.")
         return obs
 
-class EmotionalPacingEngine(AnalysisModule):
+class EmotionalPacingEngine(DirectorPsychologyModule):
     """MODULE 12: Tone estimation."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Emotional Pacing")
@@ -343,7 +353,7 @@ class EmotionalPacingEngine(AnalysisModule):
         else: state.tone = "calm"
         return obs
 
-class DirectorStyleEngine(AnalysisModule):
+class DirectorStyleEngine(DirectorPsychologyModule):
     """MODULE 13: Project-specific style presets (Vox, Apple, BBC)."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Style")
@@ -364,16 +374,95 @@ class DirectorStyleEngine(AnalysisModule):
 
         return obs
 
-class VisualConsistencyEngine(AnalysisModule):
+class VisualConsistencyEngine(DirectorPsychologyModule):
     """MODULE 14: Uniformity check (Radii, Fonts, Colors)."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Consistency")
         fonts = {ov.get('font') for ov in supervisor.overlays if ov.get('font')}
         if len(fonts) > 2:
-            obs.issues.append("Font Inconsistency: Too many font families.")
+            obs.findings.append(PerceptionFinding(
+                severity="warning", confidence=0.9, frame_range=(0, state.duration),
+                affected_elements=[],
+                human_explanation="Too many font families.",
+                technical_explanation=f"Detected {len(fonts)} fonts, exceeding professional limit of 2.",
+                viewer_impact="Visual clutter and lack of brand cohesion.",
+                fix_suggestion="Unify typography to a single primary and secondary font.",
+                expected_quality_gain=0.2,
+                category="consistency"
+            ))
         return obs
 
-class SceneMemoryEngine(AnalysisModule):
+class AnimationConsistencyEngine(DirectorPsychologyModule):
+    """MODULE 19: Penalizes excessive variety in animation styles."""
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
+        obs = PerceptionObservation("Animation Consistency")
+        anims = {ov.get('animation', 'static') for ov in supervisor.overlays if ov.get('animation') != 'static'}
+
+        if len(anims) > 3:
+            obs.findings.append(PerceptionFinding(
+                severity="error", confidence=0.85, frame_range=(0, state.duration),
+                affected_elements=[],
+                human_explanation="Inconsistent animation language.",
+                technical_explanation=f"Detected {len(anims)} different animation styles in one scene.",
+                viewer_impact="Jarring visual experience; the video feels like a 'template' rather than a design.",
+                fix_suggestion="Pick 2-3 standard animation styles (e.g., slide_up and fade) and use them throughout.",
+                expected_quality_gain=0.5,
+                category="motion"
+            ))
+        return obs
+
+class TemporalHierarchyEngine(HumanVisionModule):
+    """MODULE 20: Ensures elements appear in a logical temporal order."""
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
+        obs = PerceptionObservation("Temporal Hierarchy")
+
+        reveal_times = {} # start_frame -> list of IDs
+        for ov in supervisor.overlays:
+            start = ov.get('start', 0)
+            if start not in reveal_times: reveal_times[start] = []
+            reveal_times[start].append(ov)
+
+        for start_frame, elements in reveal_times.items():
+            if len(elements) > 2:
+                focal_elements = [e.get('id') for e in elements if supervisor.ELEMENT_WEIGHTS.get(str(e.get('type','')).lower(), 1.0) >= 1.0]
+                if len(focal_elements) > 1:
+                    obs.findings.append(PerceptionFinding(
+                        severity="error", confidence=0.9, frame_range=(start_frame, start_frame+15),
+                        affected_elements=focal_elements,
+                        human_explanation="Simultaneous focal reveals.",
+                        technical_explanation=f"Multiple elements with high weight reveal on frame {start_frame}.",
+                        viewer_impact="Attention saturation; the eye doesn't know where to lock first.",
+                        fix_suggestion="Stagger focal reveals by at least 12-15 frames.",
+                        expected_quality_gain=0.6,
+                        category="cognitive"
+                    ))
+        return obs
+
+class MotionContinuityEngine(HumanVisionModule):
+    """MODULE 21: Detects conflicting motion vectors between layers and background."""
+    def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
+        obs = PerceptionObservation("Motion Continuity")
+
+        bg_pan = str(supervisor.bg_intel.get('camera_motion', 'static')).lower()
+        if bg_pan == 'static': return obs
+
+        for ov in supervisor.overlays:
+            anim = str(ov.get('animation', 'static')).lower()
+            if anim != 'static':
+                if not MotionVectorLogic.check_continuity(bg_pan, anim):
+                    obs.findings.append(PerceptionFinding(
+                        severity="warning", confidence=0.75, frame_range=(ov.get('start', 0), ov.get('start', 0)+30),
+                        affected_elements=[ov.get('id')],
+                        human_explanation="Conflicting motion direction.",
+                        technical_explanation=f"Overlay animation '{anim}' opposes background motion '{bg_pan}'.",
+                        viewer_impact="Jarring movement; viewer may feel 'motion sickness' or visual discomfort.",
+                        fix_suggestion="Align overlay movement direction with background pan direction.",
+                        expected_quality_gain=0.4,
+                        category="motion"
+                    ))
+        return obs
+
+class SceneMemoryEngine(HumanVisionModule):
     """MODULE 15: Cross-scene recurring element tracking."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Memory")
@@ -387,7 +476,7 @@ class SceneMemoryEngine(AnalysisModule):
         supervisor.manifest_memory['last_hero'] = current_hero
         return obs
 
-class DocumentarySupervisor(AnalysisModule):
+class DocumentarySupervisor(DirectorPsychologyModule):
     """MODULE 16: Manifest-wide pacing and progression."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Film Score")
@@ -400,7 +489,7 @@ class DocumentarySupervisor(AnalysisModule):
         supervisor.manifest_memory['scene_index'] = scene_index + 1
         return obs
 
-class AutoFixEngine(AnalysisModule):
+class AutoFixEngine(DirectorPsychologyModule):
     """MODULE 17: Frame-accurate actionable recommendations."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Auto Fix")
@@ -413,7 +502,7 @@ class AutoFixEngine(AnalysisModule):
                     obs.fix_suggestions.append(f"Delay '{ov.get('id')}' by 15 frames to prevent animation clash.")
         return obs
 
-class BackgroundOverlayHarmonyEngine(AnalysisModule):
+class BackgroundOverlayHarmonyEngine(HumanVisionModule):
     """MODULE 1 (v5): Detects conflicts between background intent and overlays."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Background-Overlay Harmony")
@@ -462,7 +551,7 @@ class BackgroundOverlayHarmonyEngine(AnalysisModule):
                     ))
         return obs
 
-class SemanticEnvironmentLoadEngine(AnalysisModule):
+class SemanticEnvironmentLoadEngine(HumanVisionModule):
     """MODULE 2 (v5): Computes total load (background + overlays)."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Semantic Load")
@@ -493,7 +582,7 @@ class SemanticEnvironmentLoadEngine(AnalysisModule):
                 ))
         return obs
 
-class ColorContrastIntelligenceEngine(AnalysisModule):
+class ColorContrastIntelligenceEngine(HumanVisionModule):
     """MODULE 3 (v5): Evaluates readability risk and color clashes."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Color & Contrast")
@@ -516,7 +605,7 @@ class ColorContrastIntelligenceEngine(AnalysisModule):
                     ))
         return obs
 
-class CompositionConstraintEngine(AnalysisModule):
+class CompositionConstraintEngine(DirectorPsychologyModule):
     """MODULE 4 (v5): Rule of Thirds and Negative Space usage."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Composition Constraint")
@@ -562,7 +651,7 @@ class CompositionConstraintEngine(AnalysisModule):
 
         return obs
 
-class AttentionFieldSimulator(AnalysisModule):
+class AttentionFieldSimulator(HumanVisionModule):
     """MODULE 5 (v5): Upgraded attention scoring with background bias."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Attention Field")
@@ -595,7 +684,7 @@ class AttentionFieldSimulator(AnalysisModule):
                                 has_attention_conflict = True
         return obs
 
-class CinematicIntentValidator(AnalysisModule):
+class CinematicIntentValidator(DirectorPsychologyModule):
     """MODULE 6 (v5): Interprets shot purpose and validates overlays."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Cinematic Intent")
@@ -613,7 +702,7 @@ class CinematicIntentValidator(AnalysisModule):
             ))
         return obs
 
-class CognitiveLoadFusionEngine(AnalysisModule):
+class CognitiveLoadFusionEngine(HumanVisionModule):
     """MODULE 7 (v5): Dynamic fusion cognitive load."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Cognitive Fusion")
@@ -640,7 +729,7 @@ class CognitiveLoadFusionEngine(AnalysisModule):
                 ))
         return obs
 
-class TextPlacementIntelligenceEngine(AnalysisModule):
+class TextPlacementIntelligenceEngine(DirectorPsychologyModule):
     """MODULE 8 (v5): Validates text against preferred regions."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Text Placement")
@@ -802,20 +891,40 @@ class SceneSupervisor:
             from .intelligence import SceneIntelligenceEngine
             self.intelligence = SceneIntelligenceEngine().analyze_scene(self.scene)
 
-        # 1. Run Analysis Modules (v4 + v5 Fusion)
+        # 1. Run Analysis Modules (v7 Perception Pipeline)
         modules = [
-            # v4 Modules
-            VisualSaliencyEngine(), EyeMovementSimulator(), VisualNoiseDetector(),
-            VisualCompositionEngine(), GestaltAnalyzer(), MotionPsychologyEngine(),
-            RhythmEngine(), EnergyCurveEngine(), CameraDirector(),
-            InformationDensityEngine(), ReadabilityEngine(), NarrativeEngine(),
-            EmotionalPacingEngine(), DirectorStyleEngine(), VisualConsistencyEngine(),
-            SceneMemoryEngine(), DocumentarySupervisor(), AutoFixEngine(),
-            # v5 Fusion Modules
-            BackgroundOverlayHarmonyEngine(), SemanticEnvironmentLoadEngine(),
-            ColorContrastIntelligenceEngine(), CompositionConstraintEngine(),
-            AttentionFieldSimulator(), CinematicIntentValidator(),
-            CognitiveLoadFusionEngine(), TextPlacementIntelligenceEngine()
+            # Human Vision Layer (Raw perception)
+            VisualSaliencyEngine(),
+            EyeMovementSimulator(),
+            VisualNoiseDetector(),
+            GestaltAnalyzer(),
+            InformationDensityEngine(),
+            ReadabilityEngine(),
+            BackgroundOverlayHarmonyEngine(),
+            SemanticEnvironmentLoadEngine(),
+            ColorContrastIntelligenceEngine(),
+            AttentionFieldSimulator(),
+            CognitiveLoadFusionEngine(),
+            TemporalHierarchyEngine(),
+            MotionContinuityEngine(),
+            SceneMemoryEngine(),
+
+            # Director Psychology Layer (Cinematic judgment)
+            VisualCompositionEngine(),
+            MotionPsychologyEngine(),
+            RhythmEngine(),
+            EnergyCurveEngine(),
+            CameraDirector(),
+            NarrativeEngine(),
+            EmotionalPacingEngine(),
+            DirectorStyleEngine(),
+            VisualConsistencyEngine(),
+            DocumentarySupervisor(),
+            AutoFixEngine(),
+            CompositionConstraintEngine(),
+            CinematicIntentValidator(),
+            TextPlacementIntelligenceEngine(),
+            AnimationConsistencyEngine()
         ]
         for mod in modules:
             self.observations.append(mod.run(self, state))
