@@ -22,7 +22,7 @@
             "color": "#FF3B30",
             "start": 45
           },
-          "fontSize": "40px",
+          "fontSize": "48px",
           "color": "#00F5FF",
           "style": "text-#00F5FF",
           "maxWidth": 800,
@@ -64,8 +64,8 @@
           "exitAnimation": "fade_out",
           "depth": 30,
           "parallax": 0.8,
-          "width": 300,
-          "height": 200,
+          "width": 400,
+          "height": 224,
           "visual_anchor": true
         }
       ],
