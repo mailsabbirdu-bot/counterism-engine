@@ -89,7 +89,8 @@ class ProductionMemoryManager:
         normalized = re.sub(r"Overlay '.*?'", 'An overlay', normalized)
         normalized = re.sub(r"font '.*?'", 'a specific font', normalized)
         normalized = re.sub(r"shot \d+", 'a camera shot', normalized)
-        normalized = normalized.strip()
+        normalized = re.sub(r"CRITICAL|ERROR|WARNING|INFO", '', normalized)
+        normalized = normalized.strip(': ')
 
         if not normalized: return None
 

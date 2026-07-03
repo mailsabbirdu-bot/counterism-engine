@@ -425,13 +425,9 @@ class DirectorStyleEngine(DirectorPsychologyModule):
 
 class VisualConsistencyEngine(DirectorPsychologyModule):
     """MODULE 14: Uniformity check (Radii, Fonts, Colors)."""
-    def _to_str(self, val):
-        if isinstance(val, dict): return str(val.get('family', val.get('name', val)))
-        return str(val)
-
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Consistency")
-        fonts = {self._to_str(ov.get('font')) for ov in supervisor.overlays if ov.get('font')}
+        fonts = {VisionConstants.to_str(ov.get('font')) for ov in supervisor.overlays if ov.get('font')}
         if len(fonts) > 2:
             obs.findings.append(PerceptionFinding(
                 severity="warning", confidence=0.9, frame_range=(0, state.duration),
@@ -447,13 +443,9 @@ class VisualConsistencyEngine(DirectorPsychologyModule):
 
 class AnimationConsistencyEngine(DirectorPsychologyModule):
     """MODULE 19: Penalizes excessive variety in animation styles."""
-    def _to_str(self, val):
-        if isinstance(val, dict): return str(val.get('type', val.get('name', val)))
-        return str(val)
-
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Animation Consistency")
-        anims = {self._to_str(ov.get('animation', 'static')) for ov in supervisor.overlays if ov.get('animation') != 'static'}
+        anims = {VisionConstants.to_str(ov.get('animation', 'static')) for ov in supervisor.overlays if ov.get('animation') != 'static'}
 
         if len(anims) > 3:
             obs.findings.append(PerceptionFinding(
