@@ -96,7 +96,7 @@ class VisualSaliencyEngine(HumanVisionModule):
             focus_timeline.append(primary['id'])
 
             # Detect Attention Competition (Entropy)
-            if len(saliency_map) > 1:
+            if len(saliency_map) > 1 and primary['score'] > 0:
                 entropy = saliency_map[1]['score'] / primary['score']
                 if entropy > 0.85 and f % 45 == 0:
                     obs.findings.append(PerceptionFinding(
@@ -134,10 +134,9 @@ class EyeMovementSimulator(HumanVisionModule):
                     dist = math.sqrt((target_pos['x'] - current_gaze_pos['x'])**2 + (target_pos['y'] - current_gaze_pos['y'])**2)
                     total_saccade_dist += dist
 
-                    # Log semantic scanpath
+                    # Log semantic scanpath (Allowing repeated revisits for realism)
                     role = str(target_ov.get('semantic_role', target_ov.get('type', 'generic'))).lower()
-                    if not scanpath or scanpath[-1] != role:
-                        scanpath.append(role)
+                    scanpath.append(role)
 
                     if dist > 1000 and f % 60 == 0:
                         obs.findings.append(PerceptionFinding(
@@ -340,16 +339,20 @@ class InformationDensityEngine(HumanVisionModule):
         return obs
 
 class ReadabilityEngine(HumanVisionModule):
-    """MODULE 10: Multi-language reading speed estimation."""
+    """MODULE 10: Multi-language reading speed estimation (Hardened)."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Readability")
         for ov in supervisor.overlays:
             if ov.get('type') == 'text':
                 content = str(ov.get('content', ''))
                 words = len(re.sub(r'[.।]', '', content).split())
+
+                # PRODUCTION: Robust Multi-language detection
                 lang = 'english'
                 if any('\u0980' <= c <= '\u09FF' for c in content): lang = 'bangla'
-                speed = supervisor.READING_SPEEDS.get(lang, 0.3)
+                elif any('\u0600' <= c <= '\u06FF' for c in content): lang = 'mixed' # Urdu/Arabic
+
+                speed = supervisor.READING_SPEEDS.get(lang, 0.35)
                 req_sec = words * speed
                 actual_sec = ov.get('duration', state.duration) / 30.0
                 if actual_sec < req_sec:
@@ -777,7 +780,7 @@ class ScoringSynthesisEngine(AnalysisModule):
 
         # Initial categorical probabilities (1.0 = perfect quality)
         # Unified category list matching internal score keys
-        categories = ["attention_clarity", "motion_discipline", "cognitive_load", "composition_integrity", "readability_score", "narrative", "visual_harmony"]
+        categories = ["attention_clarity", "motion_discipline", "cognitive_load", "composition_integrity", "readability_score", "narrative", "visual_harmony", "cinematic_intent_alignment", "environmental_coherence"]
         category_quality = {c: 1.0 for c in categories}
 
         all_findings = []
@@ -800,13 +803,42 @@ class ScoringSynthesisEngine(AnalysisModule):
             # Apply impact based on confidence (probabilistic reduction)
             deduction = impact * finding.confidence
 
-            cat = finding.category if finding.category in category_quality else "attention_clarity"
+            # Category Mapping: Unify all findings into production buckets
+            cat_map = {
+                "layout": "attention_clarity",
+                "motion": "motion_discipline",
+                "cognitive": "cognitive_load",
+                "composition": "composition_integrity",
+                "composition_integrity": "composition_integrity",
+                "readability": "readability_score",
+                "narrative": "narrative",
+                "fusion": "visual_harmony",
+                "cinematic": "cinematic_intent_alignment",
+                "environment": "environmental_coherence"
+            }
+
+            cat = cat_map.get(finding.category, "attention_clarity")
             category_quality[cat] = max(0, category_quality[cat] - deduction)
 
         # Convert quality probabilities to 10-point scores
         for cat in categories:
             if cat in supervisor.scores:
                 supervisor.scores[cat] = round(category_quality[cat] * 10.0, 1)
+
+        # Calculate Cinematic Score as weighted average of primary buckets
+        prio_weights = {
+            "visual_harmony": 0.2, "cognitive_load": 0.15, "attention_clarity": 0.15,
+            "composition_integrity": 0.1, "motion_discipline": 0.1, "readability_score": 0.1,
+            "cinematic_intent_alignment": 0.1, "environmental_coherence": 0.1
+        }
+
+        final_sum = 0
+        total_w = 0
+        for cat, weight in prio_weights.items():
+             final_sum += supervisor.scores[cat] * weight
+             total_w += weight
+
+        supervisor.scores['overall_cinematic_score'] = round(final_sum / total_w, 1) if total_w > 0 else 0
 
         return obs
 
@@ -958,28 +990,29 @@ class SceneSupervisor:
         return self._generate_report(state)
 
     def _simulate_timeline(self):
-        """Timeline Simulator: frame-by-frame activity tracking."""
+        """Timeline Simulator: frame-by-frame activity tracking (Unified Motion)."""
         for ov in self.overlays:
             start = ov.get('start', 0)
             dur = ov.get('duration', self.duration - start)
             end = start + dur
-            o_type = str(ov.get('type', 'text')).lower()
+            o_type = str(ov.get('type', 'text')).lower().replace('shadcn_', '')
             weight = self.ELEMENT_WEIGHTS.get(o_type, 1.0)
 
             for f in range(max(0, start), min(self.duration, end)):
                 self.frame_load[f] += weight
                 self.active_elements_per_frame[f] += 1
                 if o_type in ['shape', 'svg', 'connector']:
+                    # Only count as noise if it's actually active/moving
                     self.visual_noise_per_frame[f] += 0.5 if ov.get('animation') else 0.1
 
-            if 0 <= start < self.duration:
+            # Only count 'reveal' as a motion event if it's an focal element
+            if 0 <= start < self.duration and weight >= 0.8:
                 self.motion_events[start] += 1
 
+        # Camera events are recorded separately for energy, but don't inflate 'motion_events'
         for shot in self.scene.get('camera', {}).get('shots', []):
             s_start = shot.get('startFrame', 0)
             s_dur = shot.get('duration', 60)
-            if 0 <= s_start < self.duration:
-                self.motion_events[s_start] += 1
             for f in range(s_start, min(self.duration, s_start + s_dur)):
                 self.energy_curve[f] += 0.5
 
@@ -1038,17 +1071,6 @@ class SceneSupervisor:
         self.legacy_scores['motion_quality'] = self.scores['motion_discipline']
         self.legacy_scores['comprehension'] = self.scores['readability_score']
 
-        # v5 Scoring Logic (Fusion Weighted)
-        self.scores['overall_cinematic_score'] = (
-            self.scores['visual_harmony'] * 0.15 +
-            self.scores['composition_integrity'] * 0.10 +
-            self.scores['attention_clarity'] * 0.15 +
-            self.scores['cognitive_load'] * 0.15 +
-            self.scores['cinematic_intent_alignment'] * 0.10 +
-            self.scores['readability_score'] * 0.10 +
-            self.scores['motion_discipline'] * 0.10 +
-            self.scores['environmental_coherence'] * 0.15
-        )
         self.scores['background_overlay_fusion'] = (self.scores['visual_harmony'] + self.scores['cinematic_intent_alignment']) / 2.0
 
         status = "CLEAN"

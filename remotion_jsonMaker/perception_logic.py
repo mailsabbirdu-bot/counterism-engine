@@ -47,9 +47,11 @@ class CognitiveLoadModel:
         """Fused cognitive load with quadratic motion interference and nonlinear density."""
         # Base density with nonlinear scaling (simultaneous motion interference)
         num_moving = len([o for o in overlays if o.get('animation') and o.get('animation') != 'static'])
-        motion_interference = (num_moving ** 1.8) / 6.0 # more aggressive nonlinear
 
-        ov_density = (len(overlays) / 6.0) ** 1.2
+        # PRODUCTION: Add normalization clamps to prevent explosion in dense scenes
+        motion_interference = min(2.5, (num_moving ** 1.8) / 8.0)
+
+        ov_density = min(2.0, (len(overlays) / 6.0) ** 1.2)
 
         # Area-based load (total screen coverage)
         total_area_load = 0
