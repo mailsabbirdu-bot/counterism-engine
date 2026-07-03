@@ -315,6 +315,10 @@ class RemotionJsonMaker:
                     o_type = 'shadcn_chart'
                 ov['chart_type'] = v_val
             elif 'indicator' in o_type:
+                # PRODUCTION: Repair deprecated variants
+                if v_val == 'statusBadge':
+                    v_val = 'tech_badge'
+
                 # Map tile/badge/status variants to shadcn_indicator
                 if any(x in v_val for x in ['tile', 'badge', 'status', 'crypto', 'card', 'ring']):
                     ov['type'] = 'shadcn_indicator'
@@ -545,9 +549,9 @@ class RemotionJsonMaker:
             best_pos, final_w, final_h = (ax, ay), base_w, base_h
             fs = int(re.search(r'\d+', str(ov.get('fontSize', '120'))).group()) if o_type == 'text' else 120
 
-            for scale_step in range(7):
-                scale = 1.0 - (scale_step * 0.15)
-                if imp == 'hero' and scale < 1.0: break
+            for scale_step in range(5): # Fewer steps, higher floor
+                scale = max(0.4, 1.0 - (scale_step * 0.15)) # Floor at 40%
+                if imp == 'hero' and scale < 0.8: break # Hero floor at 80%
                 if o_type in ['graph', 'shape']: scale = min(scale, 0.8)
 
                 if o_type == 'text':
@@ -624,12 +628,15 @@ class RemotionJsonMaker:
                 scores = report['scores']
                 all_feedback.append(f"[{s_id}] DIRECTOR'S REPORT: Status={report['status']}, Clarity={scores.get('attention_clarity', 0)}, Motion={scores.get('motion_discipline', 0)}, Readability={scores.get('readability_score', 0)}")
 
-                # Add specific issues
-                for issue in report['issues']:
+                # Add specific issues (V8.1 Structured derived)
+                for issue in report.get('issues', []):
                     all_feedback.append(f"[{s_id}] COGNITIVE ISSUE: {issue}")
-                for issue in report['motion_issues']:
+                for issue in report.get('motion_issues', []):
                     all_feedback.append(f"[{s_id}] MOTION ISSUE: {issue}")
-                for issue in report['resting_time_violations']:
+
+                # Derive pacing from cognitive findings
+                pacing_issues = [f['human_explanation'] for f in report.get('findings', []) if f.get('category') == 'cognitive' and 'reveal' in f['human_explanation'].lower()]
+                for issue in pacing_issues:
                     all_feedback.append(f"[{s_id}] PACING ISSUE: {issue}")
 
                 # Add suggestions if high severity
