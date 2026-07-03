@@ -34,10 +34,18 @@ def test_manifest_quality(filepath, public_dir=None):
     # --- ASSET & TYPE REGISTRY (Surgical Validation) ---
     VALID_TYPES = [
         'text', 'ui_panel', 'shape', 'chart', 'indicator', 'data_indicator',
-        'graph', 'video', 'image', 'shadcn_chart', 'shadcn_indicator', 'svg', 'connector'
+        'graph', 'video', 'image', 'shadcn_chart', 'shadcn_indicator', 'svg', 'connector',
+        'hub_network', 'flow_diagram', 'process', 'kpi_card', 'timeline', 'compositions', 'groups',
+        'ambient_graphic', 'callout', 'label'
     ]
 
     ENGINE_VARIANTS = {
+        'connector': [
+            'smooth_curve', 'soft_arc', 'straight_flow', 'energy_flow', 'signal_beam',
+            'data_stream', 's_curve', 'zigzag_soft', 'multi_branch', 'network_web',
+            'callout_line', 'camera_focus', 'timeline_path', 'route_path', 'curved_route',
+            'neon_connector', 'blueprint_connector', 'organic_connector'
+        ],
         'shadcn_chart': [
             'glass_area', 'neon_bar', 'stacked_line', 'radial_score', 'radar_web', 'composed_tech',
             'pie_donut_glass', 'scatter_bubble', 'horizontal_pill_bar', 'step_area', 'multi_bar_stack',
@@ -89,7 +97,7 @@ def test_manifest_quality(filepath, public_dir=None):
         'heartbeat', 'strobe_flash', 'threed_flip', 'magnetic_pull', 'fire_glow',
         'pixel_scatter', 'swing_pivot', 'depth_shadow', 'energy_beam', 'spiral_in',
         'fly_in_z', 'typewriter_flicker', 'vibrate_intense', 'float_orbit',
-        'mirror_split', 'zoom_blur_pop', 'liquid_waver'
+        'mirror_split', 'zoom_blur_pop', 'liquid_waver', 'wordReveal', 'glassReveal'
     ]
 
     # Font Detection
@@ -353,11 +361,11 @@ def test_manifest_quality(filepath, public_dir=None):
 
             start = int(ov.get('start', 0))
 
-            # 2.1 detailed SYNC ORDER Check
+            # 2.1 detailed SYNC ORDER Check (Strict Chronological Enforcement)
             if prev_start != -1 and start < prev_start:
-                msg = f"[{scene_id}] SYNC ORDER ERROR: Overlay '{ov_id}' (start={start}) appears AFTER '{prev_ov_id}' (start={prev_start}) in the array. Fx: Increase '{ov_id}.start' to >= {prev_start} or move '{ov_id}' earlier in the array."
+                msg = f"[{scene_id}] SYNC ORDER ERROR: Overlay '{ov_id}' (start={start}) appears AFTER '{prev_ov_id}' (start={prev_start}) in the array. Fix: Ensure the overlays array is sorted by 'start' time."
                 issues.append(msg)
-                scores["timing"] -= 15
+                scores["timing"] -= 25 # Increased penalty for sync errors
 
             prev_start = start
             prev_ov_id = ov_id
