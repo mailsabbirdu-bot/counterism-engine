@@ -214,16 +214,39 @@ class VisualCompositionEngine(DirectorPsychologyModule):
         return obs
 
 class GestaltAnalyzer(HumanVisionModule):
-    """MODULE 4: Proximity and Similarity Grouping."""
+    """MODULE 4: Proximity and Similarity Grouping (Spatial grid optimized)."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Gestalt")
-        # Logic to detect accidentally close objects
-        for i, o1 in enumerate(supervisor.overlays):
-            for o2 in supervisor.overlays[i+1:]:
-                p1, p2 = o1.get('position', {'x':0,'y':0}), o2.get('position', {'x':999,'y':999})
-                dist = math.sqrt((p1['x']-p2['x'])**2 + (p1['y']-p2['y'])**2)
-                if dist < 120:
-                    obs.findings.append(PerceptionFinding(
+
+        # V7.1 Optimized Spatial Grid check (O(n))
+        grid = {} # grid_cell -> list of elements
+        cell_size = 200
+
+        for ov in supervisor.overlays:
+            p = ov.get('position', {'x': 960, 'y': 540})
+            gx, gy = p['x'] // cell_size, p['y'] // cell_size
+            cell = (gx, gy)
+            if cell not in grid: grid[cell] = []
+            grid[cell].append(ov)
+
+        checked_pairs = set()
+        for cell, elements in grid.items():
+            # Check neighbors
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    neighbor = (cell[0]+dx, cell[1]+dy)
+                    if neighbor in grid:
+                        for o1 in elements:
+                            for o2 in grid[neighbor]:
+                                if o1['id'] == o2['id']: continue
+                                pair = tuple(sorted([o1['id'], o2['id']]))
+                                if pair in checked_pairs: continue
+                                checked_pairs.add(pair)
+
+                                p1, p2 = o1.get('position', {'x':0,'y':0}), o2.get('position', {'x':999,'y':999})
+                                dist = math.sqrt((p1['x']-p2['x'])**2 + (p1['y']-p2['y'])**2)
+                                if dist < 120:
+                                    obs.findings.append(PerceptionFinding(
                         severity="warning", confidence=0.8, frame_range=(max(o1.get('start', 0), o2.get('start', 0)), state.duration),
                         affected_elements=[o1.get('id'), o2.get('id')],
                         human_explanation=f"Accidental Grouping: '{o1.get('id')}' and '{o2.get('id')}' are too close.",
@@ -423,8 +446,9 @@ class TemporalHierarchyEngine(HumanVisionModule):
             reveal_times[start].append(ov)
 
         for start_frame, elements in reveal_times.items():
-            if len(elements) > 2:
-                focal_elements = [e.get('id') for e in elements if supervisor.ELEMENT_WEIGHTS.get(str(e.get('type','')).lower(), 1.0) >= 1.0]
+            if len(elements) > 1:
+                # V7.1: Include high-weight SVGs and indicators in reveal detection
+                focal_elements = [e.get('id') for e in elements if supervisor.ELEMENT_WEIGHTS.get(str(e.get('type','')).lower(), 1.0) >= 0.8]
                 if len(focal_elements) > 1:
                     obs.findings.append(PerceptionFinding(
                         severity="error", confidence=0.9, frame_range=(start_frame, start_frame+15),
@@ -507,33 +531,26 @@ class BackgroundOverlayHarmonyEngine(HumanVisionModule):
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Background-Overlay Harmony")
         bg = supervisor.bg_intel
-        neg_space = bg.get('composition', {}).get('negative_space', 'center')
+        neg_space = bg.get('composition', {}).get('negative_space', 'none')
 
+        # V7.1: Resolve dead logic. Actively reward negative space utilization in ScoringSynthesis.
+        # Here we only detect CRITICAL composition conflicts.
         for ov in supervisor.overlays:
-            # Conflict: UI in Negative Space?
             pos = ov.get('position', {'x': 960, 'y': 540})
-            region = 'center'
-            if pos['x'] < 640:
-                if pos['y'] < 360: region = 'top_left'
-                elif pos['y'] > 720: region = 'bottom_left'
-                else: region = 'mid_left'
-            elif pos['x'] > 1280:
-                if pos['y'] < 360: region = 'top_right'
-                elif pos['y'] > 720: region = 'bottom_right'
-                else: region = 'mid_right'
+            region = CompositionAnalyzer.detect_region(pos['x'], pos['y'])
 
-            if region == neg_space:
-                # This is actually GOOD - negative space is where we want overlays!
-                # BUT the prompt says "If overlays occupy top_left heavily -> violation"
-                # Wait, "background defines top_left negative_space, overlays occupy top_left heavily -> violation"?
-                # Usually negative space is for placement. Let's re-read carefully.
-                # "negative_space: top_left" + "overlays occupy top_left heavily -> violation"
-                # This seems contradictory to standard design (negative space is for text).
-                # Re-reading prompt: "Background says: top_left is negative space. Overlay places chart at center -> composition conflict"
-                # Okay, if it defines negative space, it means "Place here".
-                # Wait: "overlays occupy top_left heavily -> violation" vs "Overlay places chart at center -> composition conflict"
-                # If negative space is top_left, we SHOULD place there.
-                pass
+            # If background is busy and element ignores negative space -> violation
+            if neg_space != 'none' and region == 'center':
+                obs.findings.append(PerceptionFinding(
+                    severity="warning", confidence=0.8, frame_range=(ov.get('start', 0), state.duration),
+                    affected_elements=[ov.get('id')],
+                    human_explanation=f"Overlay '{ov.get('id')}' ignores available negative space.",
+                    technical_explanation=f"Element placed in 'center' while background offers '{neg_space}' zone.",
+                    viewer_impact="Visual clutter; important background detail may be obscured.",
+                    fix_suggestion=f"Move overlay to the '{neg_space}' region.",
+                    expected_quality_gain=0.3,
+                    category="composition_integrity"
+                ))
 
             # Real conflict: Background Hero vs Overlay Hero
             bg_hero = bg.get('hero_subject', {})
@@ -759,7 +776,8 @@ class ScoringSynthesisEngine(AnalysisModule):
         obs = PerceptionObservation("Scoring Synthesis")
 
         # Initial categorical probabilities (1.0 = perfect quality)
-        categories = ["layout", "motion", "cognitive", "composition", "readability", "narrative", "fusion"]
+        # Unified category list matching internal score keys
+        categories = ["attention_clarity", "motion_discipline", "cognitive_load", "composition_integrity", "readability_score", "narrative", "visual_harmony"]
         category_quality = {c: 1.0 for c in categories}
 
         all_findings = []
@@ -767,7 +785,13 @@ class ScoringSynthesisEngine(AnalysisModule):
             all_findings.extend(o.findings)
 
         for finding in all_findings:
-            # Impact factor based on severity
+            # V7.1 Recovery Mechanism: Positive signals reward the score
+            if finding.severity == "info" and "utilize" in finding.human_explanation.lower():
+                reward = 0.05 * finding.confidence
+                category_quality[finding.category] = min(1.0, category_quality.get(finding.category, 0.5) + reward)
+                continue
+
+            # Impact factor based on severity (Penalties)
             impact = 0.05 # info
             if finding.severity == "critical": impact = 0.35
             elif finding.severity == "error": impact = 0.20
@@ -776,23 +800,13 @@ class ScoringSynthesisEngine(AnalysisModule):
             # Apply impact based on confidence (probabilistic reduction)
             deduction = impact * finding.confidence
 
-            cat = finding.category if finding.category in category_quality else "layout"
+            cat = finding.category if finding.category in category_quality else "attention_clarity"
             category_quality[cat] = max(0, category_quality[cat] - deduction)
 
         # Convert quality probabilities to 10-point scores
         for cat in categories:
-            score_key = {
-                "fusion": "visual_harmony",
-                "composition": "composition_integrity",
-                "layout": "attention_clarity",
-                "cognitive": "cognitive_load",
-                "readability": "readability_score",
-                "motion": "motion_discipline",
-                "narrative": "narrative"
-            }.get(cat, "overall_cinematic_score")
-
-            if score_key in supervisor.scores:
-                supervisor.scores[score_key] = round(category_quality[cat] * 10.0, 1)
+            if cat in supervisor.scores:
+                supervisor.scores[cat] = round(category_quality[cat] * 10.0, 1)
 
         return obs
 
@@ -883,13 +897,21 @@ class SceneSupervisor:
             active_elements_per_frame=self.active_elements_per_frame,
             visual_noise_per_frame=self.visual_noise_per_frame,
             energy_curve=self.energy_curve,
-            duration=self.duration
+            duration=self.duration,
+            focus_timeline=[] # Ensure fresh timeline
         )
 
-        # v5 Hybrid: If intelligence is missing, compute it locally
+        # v5 Hybrid: Safe Lazy Loading for Intelligence Engine
         if not self.intelligence:
-            from .intelligence import SceneIntelligenceEngine
-            self.intelligence = SceneIntelligenceEngine().analyze_scene(self.scene)
+            try:
+                try:
+                    from .intelligence import SceneIntelligenceEngine
+                except (ImportError, ValueError):
+                    from intelligence import SceneIntelligenceEngine
+                self.intelligence = SceneIntelligenceEngine().analyze_scene(self.scene)
+            except Exception as e:
+                print(f"⚠️ Intelligence Engine fallback: {e}")
+                self.intelligence = {"status": "limited", "critical_conflicts": []}
 
         # 1. Run Analysis Modules (v7 Perception Pipeline)
         modules = [
@@ -987,16 +1009,10 @@ class SceneSupervisor:
                 self.legacy_scores['comprehension'] -= 0.2
 
     def _generate_report(self, state: SceneState) -> Dict[str, Any]:
-        """Generates the comprehensive v5 production-grade report."""
-        all_issues, all_m_issues, all_notes, all_fixes, all_findings = [], [], [], [], []
-
-        # Aggregate Modular Data
+        """Generates the comprehensive V7 production-grade report."""
+        all_findings = []
+        # Final aggregation logic
         for obs in self.observations:
-            all_issues.extend(obs.issues)
-            all_m_issues.extend(obs.motion_issues)
-            all_notes.extend(obs.director_notes)
-            all_fixes.extend(obs.fix_suggestions)
-            # v5 Findings
             for finding in obs.findings:
                 all_findings.append({
                     "severity": finding.severity,
@@ -1007,16 +1023,20 @@ class SceneSupervisor:
                     "technical_explanation": finding.technical_explanation,
                     "viewer_impact": finding.viewer_impact,
                     "fix_suggestion": finding.fix_suggestion,
-                    "expected_quality_gain": finding.expected_quality_gain
+                    "expected_quality_gain": finding.expected_quality_gain,
+                    "category": finding.category
                 })
 
-            for k, v in obs.scores.items():
-                if k in self.scores: self.scores[k] = min(self.scores[k], v)
+        # Derived legacy reporting from V7 structured findings
+        all_issues = [f['human_explanation'] for f in all_findings if f['severity'] in ['error', 'critical']]
+        all_notes = [f['viewer_impact'] for f in all_findings]
+        all_fixes = [f['fix_suggestion'] for f in all_findings if f['fix_suggestion']]
+        all_m_issues = [f['human_explanation'] for f in all_findings if f['category'] == 'motion']
 
-        # Legacy score fallback calculation
-        self.legacy_scores['clarity'] = self.scores['visual_hierarchy']
-        self.legacy_scores['motion_quality'] = self.scores['motion_psychology']
-        self.legacy_scores['comprehension'] = self.scores['readability']
+        # Legacy score fallback calculation (Mapped from V7 categories)
+        self.legacy_scores['clarity'] = self.scores['attention_clarity']
+        self.legacy_scores['motion_quality'] = self.scores['motion_discipline']
+        self.legacy_scores['comprehension'] = self.scores['readability_score']
 
         # v5 Scoring Logic (Fusion Weighted)
         self.scores['overall_cinematic_score'] = (
@@ -1056,7 +1076,7 @@ class SceneSupervisor:
             "motion_issues": list(set(all_m_issues + [i for i in all_issues if "Motion" in i or "Animation" in i])),
             "perceived_tone": state.tone,
             "focus_timeline": state.focus_timeline[::10],
-            "attention_budget_used": sum(self.ATTENTION_COSTS.get(str(ov.get('type','')).lower(), 20) for ov in self.overlays),
+            "attention_budget_used": sum(self.ATTENTION_COSTS.get(str(ov.get('type','')).lower().replace('shadcn_', ''), 20) for ov in self.overlays),
             "background_overlay_fusion_score": round(self.scores['background_overlay_fusion'], 1),
             "professional_verdict": f"Senior Director Review: {status}. Composite score {round(self.scores['overall_cinematic_score'],1)}."
         }

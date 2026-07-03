@@ -43,10 +43,11 @@ class StyleThresholds:
 class CognitiveLoadModel:
     """Nonlinear cognitive load calculation based on perceptual interference."""
     @staticmethod
-    def calculate_fused_load(bg_busy_score: float, overlays: List[Dict[str, Any]], motion_intensity: float = 0.3) -> float:
+    def calculate_fused_load(bg_busy_score: float, overlays: List[Dict[str, Any]], motion_intensity: float = 0.0) -> float:
+        """Fused cognitive load with quadratic motion interference and nonlinear density."""
         # Base density with nonlinear scaling (simultaneous motion interference)
         num_moving = len([o for o in overlays if o.get('animation') and o.get('animation') != 'static'])
-        motion_interference = (num_moving ** 1.5) / 5.0
+        motion_interference = (num_moving ** 1.8) / 6.0 # more aggressive nonlinear
 
         ov_density = (len(overlays) / 6.0) ** 1.2
 
