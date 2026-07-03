@@ -10,8 +10,12 @@ import math
 from typing import Dict, Any, List, Optional, Tuple
 from playwright.sync_api import sync_playwright
 import playwright_stealth
-from .supervisor import supervise_manifest
-from .intelligence import SceneIntelligenceEngine
+try:
+    from .supervisor import supervise_manifest
+    from .intelligence import SceneIntelligenceEngine
+except (ImportError, ValueError):
+    from supervisor import supervise_manifest
+    from intelligence import SceneIntelligenceEngine
 
 class RemotionJsonMaker:
     def __init__(self, user_data_dir: str = None, headless: bool = True, manual: bool = False):
