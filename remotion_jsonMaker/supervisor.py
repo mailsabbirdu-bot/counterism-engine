@@ -822,21 +822,6 @@ class ScoringSynthesisEngine(AnalysisModule):
             all_findings.extend(o.findings)
 
         for finding in all_findings:
-            # V7.1 Recovery Mechanism: Positive signals reward the score
-            if finding.severity == "info" and "utilize" in finding.human_explanation.lower():
-                reward = 0.05 * finding.confidence
-                category_quality[finding.category] = min(1.0, category_quality.get(finding.category, 0.5) + reward)
-                continue
-
-            # Impact factor based on severity (Penalties)
-            impact = 0.05 # info
-            if finding.severity == "critical": impact = 0.35
-            elif finding.severity == "error": impact = 0.20
-            elif finding.severity == "warning": impact = 0.10
-
-            # Apply impact based on confidence (probabilistic reduction)
-            deduction = impact * finding.confidence
-
             # Category Mapping: Unify all findings into production buckets
             cat_map = {
                 "layout": "attention_clarity",
@@ -851,8 +836,23 @@ class ScoringSynthesisEngine(AnalysisModule):
                 "environment": "environmental_coherence"
             }
 
-            cat = cat_map.get(finding.category, "attention_clarity")
-            category_quality[cat] = max(0, category_quality[cat] - deduction)
+            mapped_cat = cat_map.get(finding.category, "attention_clarity")
+
+            # V7.1 Recovery Mechanism: Positive signals reward the score
+            if finding.severity == "info" and "utilize" in finding.human_explanation.lower():
+                reward = 0.05 * finding.confidence
+                category_quality[mapped_cat] = min(1.0, category_quality.get(mapped_cat, 0.5) + reward)
+                continue
+
+            # Impact factor based on severity (Penalties)
+            impact = 0.05 # info
+            if finding.severity == "critical": impact = 0.35
+            elif finding.severity == "error": impact = 0.20
+            elif finding.severity == "warning": impact = 0.10
+
+            # Apply impact based on confidence (probabilistic reduction)
+            deduction = impact * finding.confidence
+            category_quality[mapped_cat] = max(0, category_quality[mapped_cat] - deduction)
 
         # Convert quality probabilities to 10-point scores
         for cat in categories:
