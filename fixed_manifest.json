@@ -22,7 +22,7 @@
             "color": "#FF3B30",
             "start": 45
           },
-          "fontSize": "120px",
+          "fontSize": "40px",
           "color": "#00F5FF",
           "style": "text-#00F5FF",
           "maxWidth": 800,
@@ -53,8 +53,8 @@
           "start": 45,
           "duration": 85,
           "position": {
-            "x": 1221,
-            "y": 688
+            "x": 1370,
+            "y": 540
           },
           "font": "Audiowide-Regular_english",
           "color": "#FF3E6C",
@@ -64,9 +64,8 @@
           "exitAnimation": "fade_out",
           "depth": 30,
           "parallax": 0.8,
-          "animation": "wordReveal",
-          "width": 850,
-          "height": 477,
+          "width": 300,
+          "height": 200,
           "visual_anchor": true
         }
       ],
