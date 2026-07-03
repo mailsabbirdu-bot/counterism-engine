@@ -3,6 +3,11 @@ import re
 import math
 from typing import Dict, Any, List, Optional
 
+try:
+    from .perception_logic import StyleThresholds, CognitiveLoadModel, CompositionAnalyzer, NarrativeLogic
+except (ImportError, ValueError):
+    from perception_logic import StyleThresholds, CognitiveLoadModel, CompositionAnalyzer, NarrativeLogic
+
 class SceneIntelligenceEngine:
     """
     Jules: Senior Cinematic Intelligence Director AI.
@@ -121,21 +126,17 @@ class SceneIntelligenceEngine:
 
     def _assess_composition(self, bg: Dict[str, Any], overlays: List[Dict[str, Any]]) -> str:
         neg = bg.get('composition', {}).get('negative_space', 'none')
-        return f"Negative space is {neg}. Rule of Thirds check pending spatial resolution."
+        violations = CompositionAnalyzer.check_negative_space_violation(neg, overlays)
+        if violations:
+            return f"Composition issues: {violations[0]['explanation']}"
+        return f"Negative space is {neg}. Spatial balance within normal parameters."
 
     def _calculate_cognitive_load(self, bg: Dict[str, Any], overlays: List[Dict[str, Any]], duration: int, style: str = "vox") -> tuple:
         bg_busy = bg.get('composition', {}).get('busy_score', 0.2)
-        ov_density = len(overlays) / 5.0 # normalized
+        load = CognitiveLoadModel.calculate_fused_load(bg_busy, overlays)
+        max_load = StyleThresholds.get(style, 'max_cognitive_load')
 
-        # Style-based thresholds
-        max_load = 1.5
-        if style == "apple": max_load = 0.8
-        elif style == "johnny_harris": max_load = 1.8
-
-        motion_intensity = 0.3 # estimate
-        load = bg_busy + ov_density + motion_intensity
-
-        msg = f"Fused load {round(load, 2)}. "
+        msg = f"Fused load {load}. "
         if load > max_load:
             msg += f"Overload risk for '{style}' style."
         else:
@@ -151,10 +152,9 @@ class SceneIntelligenceEngine:
         return "Text durations appear sufficient for estimated word counts."
 
     def _assess_narrative(self, overlays: List[Dict[str, Any]]) -> str:
-        has_chart = any(o.get('type') in ['chart', 'indicator'] for o in overlays)
-        has_hero = any(str(o.get('importance','')).lower() == 'hero' for o in overlays)
-        if has_chart and not has_hero:
-            return "Narrative Gap: Data provided without a clear Hero statement."
+        integrity = NarrativeLogic.check_narrative_integrity(overlays)
+        if integrity['status'] == 'gap':
+            return integrity['explanation']
         return "Narrative flow is consistent."
 
 if __name__ == "__main__":

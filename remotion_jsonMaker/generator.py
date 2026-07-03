@@ -275,6 +275,7 @@ class RemotionJsonMaker:
 
         # UNIFICATION: Standardize content keys before promotion
         o_type = str(ov.get('type', 'text')).lower()
+        ov['type'] = o_type # Ensure key exists for priority checks
         if 'text' in ov and 'content' not in ov: ov['content'] = ov['text']
         if 'label' in ov and 'content' not in ov: ov['content'] = ov['label']
         if 'title' in ov and 'content' not in ov and o_type == 'text': ov['content'] = ov['title']

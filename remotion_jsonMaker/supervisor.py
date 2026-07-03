@@ -4,6 +4,11 @@ import math
 from typing import Dict, Any, List, Tuple, Optional
 from dataclasses import dataclass, field
 
+try:
+    from .perception_logic import StyleThresholds, CognitiveLoadModel, CompositionAnalyzer, NarrativeLogic
+except (ImportError, ValueError):
+    from perception_logic import StyleThresholds, CognitiveLoadModel, CompositionAnalyzer, NarrativeLogic
+
 @dataclass
 class PerceptionFinding:
     """v5 schema for individual perception observations."""
@@ -48,62 +53,116 @@ class AnalysisModule:
         raise NotImplementedError
 
 class VisualSaliencyEngine(AnalysisModule):
-    """MODULE 1: Dynamic Visual Saliency (Eye Catching Score)."""
+    """MODULE 1: Continuous Visual Saliency Heatmap simulation."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Visual Saliency")
         focus_timeline = []
 
         for f in range(state.duration):
-            candidates = []
+            # Calculate a simplified continuous saliency map for this frame
+            saliency_map = [] # List of (overlay_id, saliency_value)
+
             for ov in supervisor.overlays:
                 start, end = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', state.duration)
                 if start <= f < end:
-                    # Saliency Factors
-                    size = (ov.get('width', 400) * ov.get('height', 400)) / (1920 * 1080)
+                    # Multi-factor saliency calculation
+                    size_factor = (ov.get('width', 400) * ov.get('height', 400)) / (1920 * 1080)
                     opacity = ov.get('opacity', 1.0)
-                    is_hero = 2.0 if str(ov.get('importance','')).lower() == 'hero' else 1.0
-                    anim_boost = 1.5 if (f - start) < 30 else 1.0
 
-                    saliency = size * opacity * is_hero * anim_boost
-                    candidates.append({'id': ov.get('id'), 'score': saliency})
+                    # Importance weighting
+                    imp = str(ov.get('importance','')).lower()
+                    importance_boost = 2.5 if imp == 'hero' else 1.5 if imp == 'secondary' else 1.0
 
-            if not candidates:
+                    # Motion saliency (novelty boost)
+                    time_since_reveal = f - start
+                    novelty_boost = 2.0 * math.exp(-time_since_reveal / 15.0) + 1.0
+
+                    # Type-based inherent saliency (e.g. bright colors or indicators)
+                    type_boost = 1.2 if 'indicator' in str(ov.get('type','')) else 1.0
+
+                    saliency = size_factor * opacity * importance_boost * novelty_boost * type_boost
+                    saliency_map.append({'id': ov.get('id'), 'score': saliency})
+
+            if not saliency_map:
                 focus_timeline.append(None)
                 continue
 
-            candidates.sort(key=lambda x: x['score'], reverse=True)
-            primary = candidates[0]
+            saliency_map.sort(key=lambda x: x['score'], reverse=True)
+            primary = saliency_map[0]
             focus_timeline.append(primary['id'])
 
-            # Detect Conflict
-            if len(candidates) > 1 and candidates[1]['score'] > primary['score'] * 0.85:
-                if f % 30 == 0:
-                    obs.issues.append(f"Attention Conflict at frame {f}: '{primary['id']}' vs '{candidates[1]['id']}'.")
-                    obs.director_notes.append(f"Viewer attention is split at {f}f. Make the hero element more dominant.")
-                    obs.fix_suggestions.append(f"Increase opacity or scale of hero relative to '{candidates[1]['id']}'.")
+            # Detect Attention Competition (Entropy)
+            if len(saliency_map) > 1:
+                entropy = saliency_map[1]['score'] / primary['score']
+                if entropy > 0.85 and f % 45 == 0:
+                    obs.findings.append(PerceptionFinding(
+                        severity="warning", confidence=0.9, frame_range=(f, f+30),
+                        affected_elements=[primary['id'], saliency_map[1]['id']],
+                        human_explanation="High attention entropy: two elements are competing for dominance.",
+                        technical_explanation=f"Saliency ratio ({round(entropy, 2)}) exceeds 0.85 threshold.",
+                        viewer_impact="Visual confusion; audience may miss critical information.",
+                        fix_suggestion=f"Make '{primary['id']}' more dominant via scale or color contrast.",
+                        expected_quality_gain=0.3,
+                        category="cognitive"
+                    ))
 
         state.focus_timeline.extend(focus_timeline)
         return obs
 
 class EyeMovementSimulator(AnalysisModule):
-    """MODULE 2: Simulates Fixations, Saccades, and Reading Flow."""
+    """MODULE 2: Simulates frame-by-frame gaze fixations and saccades."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Eye Flow")
-        last_pos = None
-        travel_distance = 0
 
-        sorted_overlays = sorted(supervisor.overlays, key=lambda x: x.get('start', 0))
-        for ov in sorted_overlays:
-            pos = ov.get('position', {'x': 960, 'y': 540})
-            if last_pos:
-                dist = math.sqrt((pos['x']-last_pos['x'])**2 + (pos['y']-last_pos['y'])**2)
-                travel_distance += dist
-                if dist > 800:
-                    obs.issues.append(f"Erratic Eye Jump: Rapid shift to {ov.get('id')}.")
-                    obs.director_notes.append(f"The eye has to jump too far ({int(dist)}px). Maintain a natural scan path.")
-            last_pos = pos
+        current_gaze_pos = {'x': 960, 'y': 540} # Start at center
+        fixation_target = None
+        fixation_frames = 0
+        total_saccade_dist = 0
 
-        obs.scores['eye_flow'] = max(0, 10 - (travel_distance / 2000))
+        for f in range(state.duration):
+            # Authoritative focus from Saliency Engine
+            focal_id = state.focus_timeline[f] if f < len(state.focus_timeline) else None
+
+            if focal_id and focal_id != fixation_target:
+                # Trigger a Saccade
+                target_ov = next((o for o in supervisor.overlays if o.get('id') == focal_id), None)
+                if target_ov:
+                    target_pos = target_ov.get('position', {'x': 960, 'y': 540})
+                    dist = math.sqrt((target_pos['x'] - current_gaze_pos['x'])**2 + (target_pos['y'] - current_gaze_pos['y'])**2)
+                    total_saccade_dist += dist
+
+                    if dist > 1000 and f % 60 == 0:
+                        obs.findings.append(PerceptionFinding(
+                            severity="error", confidence=0.8, frame_range=(f, f+10),
+                            affected_elements=[focal_id],
+                            human_explanation="Extreme eye jump required.",
+                            technical_explanation=f"Saccade distance of {int(dist)}px exceeds comfortable threshold.",
+                            viewer_impact="Disorientation and visual fatigue.",
+                            fix_suggestion="Adjust layout to create a more natural scanning path (Z-pattern or F-pattern).",
+                            expected_quality_gain=0.4,
+                            category="layout"
+                        ))
+
+                    current_gaze_pos = target_pos
+                    fixation_target = focal_id
+                    fixation_frames = 0
+            elif focal_id == fixation_target:
+                fixation_frames += 1
+
+                # Check for "Stale" Fixations (Boredom)
+                if fixation_frames > 150 and f % 90 == 0:
+                    obs.findings.append(PerceptionFinding(
+                        severity="info", confidence=0.5, frame_range=(f, f+30),
+                        affected_elements=[fixation_target],
+                        human_explanation="Stale visual anchor.",
+                        technical_explanation="Viewer gaze fixed on same element for >5 seconds.",
+                        viewer_impact="Audience engagement may drop.",
+                        fix_suggestion="Introduce a subtle secondary animation or camera drift to maintain interest.",
+                        expected_quality_gain=0.1,
+                        category="narrative"
+                    ))
+
+        obs.scores['eye_flow'] = max(0, 10 - (total_saccade_dist / 3000))
         return obs
 
 class VisualNoiseDetector(AnalysisModule):
@@ -111,9 +170,17 @@ class VisualNoiseDetector(AnalysisModule):
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Visual Noise")
         avg_noise = sum(state.visual_noise_per_frame) / state.duration if state.duration > 0 else 0
-        if avg_noise > 0.8: # Calibrated threshold
-            obs.issues.append(f"Visual Noise Too High ({round(avg_noise, 1)}). Decorative elements distracting from content.")
-            obs.director_notes.append("Background particles or shapes are too active. Simplify decorative layers.")
+        if avg_noise > 0.8:
+            obs.findings.append(PerceptionFinding(
+                severity="warning", confidence=0.75, frame_range=(0, state.duration),
+                affected_elements=[],
+                human_explanation=f"Visual Noise Too High ({round(avg_noise, 1)}). Decorative elements distracting from content.",
+                technical_explanation=f"Average visual noise per frame ({round(avg_noise, 2)}) exceeds 0.8 threshold.",
+                viewer_impact="Decreased information retention; decorative elements overpower the message.",
+                fix_suggestion="Simplify decorative layers (shapes/SVGs) or reduce their animation speed.",
+                expected_quality_gain=0.25,
+                category="cognitive"
+            ))
         return obs
 
 class VisualCompositionEngine(AnalysisModule):
@@ -145,9 +212,17 @@ class GestaltAnalyzer(AnalysisModule):
             for o2 in supervisor.overlays[i+1:]:
                 p1, p2 = o1.get('position', {'x':0,'y':0}), o2.get('position', {'x':999,'y':999})
                 dist = math.sqrt((p1['x']-p2['x'])**2 + (p1['y']-p2['y'])**2)
-                if dist < 100:
-                    obs.issues.append(f"Accidental Grouping: '{o1.get('id')}' and '{o2.get('id')}' are too close.")
-                    obs.fix_suggestions.append(f"Add breathing space between '{o1.get('id')}' and '{o2.get('id')}'.")
+                if dist < 120:
+                    obs.findings.append(PerceptionFinding(
+                        severity="warning", confidence=0.8, frame_range=(max(o1.get('start', 0), o2.get('start', 0)), state.duration),
+                        affected_elements=[o1.get('id'), o2.get('id')],
+                        human_explanation=f"Accidental Grouping: '{o1.get('id')}' and '{o2.get('id')}' are too close.",
+                        technical_explanation=f"Spatial distance ({int(dist)}px) between elements triggers unintentional Gestalt proximity grouping.",
+                        viewer_impact="Cognitive load; viewer perceives elements as a single unit when they should be distinct.",
+                        fix_suggestion=f"Add breathing space (at least 150px) between '{o1.get('id')}' and '{o2.get('id')}'.",
+                        expected_quality_gain=0.3,
+                        category="layout"
+                    ))
         return obs
 
 class MotionPsychologyEngine(AnalysisModule):
@@ -392,19 +467,29 @@ class SemanticEnvironmentLoadEngine(AnalysisModule):
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Semantic Load")
         bg_busy = supervisor.bg_intel.get('composition', {}).get('busy_score', 0.2)
+        style = supervisor.project_style
+        max_load = StyleThresholds.get(style, 'max_cognitive_load')
 
         for f in range(state.duration):
-            ov_load = state.frame_load[f] / 4.0 # normalized
-            total_load = bg_busy + ov_load
-            if total_load > 1.2 and f % 60 == 0:
+            # Dynamic overlay detection for this frame
+            active_ovs = []
+            for ov in supervisor.overlays:
+                start, end = ov.get('start', 0), ov.get('start', 0) + ov.get('duration', state.duration)
+                if start <= f < end:
+                    active_ovs.append(ov)
+
+            total_load = CognitiveLoadModel.calculate_fused_load(bg_busy, active_ovs)
+
+            if total_load > max_load and f % 60 == 0:
                 obs.findings.append(PerceptionFinding(
                     severity="critical", confidence=1.0, frame_range=(f, f+60),
-                    affected_elements=[],
-                    human_explanation="Total visual load is too high.",
-                    technical_explanation=f"bg_busy({bg_busy}) + ov_load({round(ov_load,2)}) > 1.2",
+                    affected_elements=[o.get('id') for o in active_ovs],
+                    human_explanation=f"Total visual load ({total_load}) is too high for {style} style.",
+                    technical_explanation=f"Fused load exceeds adaptive threshold ({max_load}).",
                     viewer_impact="Visual overwhelm and abandonment.",
-                    fix_suggestion="Simplify overlays because background is already busy.",
-                    expected_quality_gain=0.5
+                    fix_suggestion="Simplify overlays or use a less busy background segment.",
+                    expected_quality_gain=0.5,
+                    category="cognitive"
                 ))
         return obs
 
@@ -436,14 +521,45 @@ class CompositionConstraintEngine(AnalysisModule):
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Composition Constraint")
         bg_comp = supervisor.bg_intel.get('composition', {})
-        neg_space = bg_comp.get('negative_space')
+        neg_space = bg_comp.get('negative_space', 'none')
 
-        if neg_space:
+        if neg_space and neg_space != 'none':
             placed_in_neg = False
             for ov in supervisor.overlays:
-                # check if placed in neg_space region
-                pass
-            # If nothing in neg_space, it's a wasted opportunity
+                pos = ov.get('position', {'x': 960, 'y': 540})
+                region = CompositionAnalyzer.detect_region(pos['x'], pos['y'])
+                if region == neg_space:
+                    placed_in_neg = True
+                    break
+
+            if not placed_in_neg:
+                obs.findings.append(PerceptionFinding(
+                    severity="info", confidence=0.7, frame_range=(0, state.duration),
+                    affected_elements=[],
+                    human_explanation=f"Wasted opportunity: {neg_space} negative space is not utilized.",
+                    technical_explanation=f"Background defines {neg_space} as negative space but no overlays are placed there.",
+                    viewer_impact="Composition feels slightly unbalanced or cluttered in busy areas.",
+                    fix_suggestion=f"Move primary text or indicator to the {neg_space} region.",
+                    expected_quality_gain=0.2,
+                    category="composition"
+                ))
+
+        # Rule of Thirds Check
+        for ov in supervisor.overlays:
+            if str(ov.get('importance', '')).lower() == 'hero':
+                pos = ov.get('position', {'x': 960, 'y': 540})
+                if abs(pos['x'] - 960) < 50:
+                    obs.findings.append(PerceptionFinding(
+                        severity="warning", confidence=0.8, frame_range=(ov.get('start', 0), state.duration),
+                        affected_elements=[ov.get('id')],
+                        human_explanation="Hero element is centered.",
+                        technical_explanation="Hero element X-coordinate is too close to center (960).",
+                        viewer_impact="Layout feels 'standard' and lacks cinematic asymmetry.",
+                        fix_suggestion="Move hero to a Rule of Thirds vertical anchor (640 or 1280).",
+                        expected_quality_gain=0.3,
+                        category="composition"
+                    ))
+
         return obs
 
 class AttentionFieldSimulator(AnalysisModule):
@@ -452,10 +568,31 @@ class AttentionFieldSimulator(AnalysisModule):
         obs = PerceptionObservation("Attention Field")
         bg_hero = supervisor.bg_intel.get('hero_subject', {})
 
+        has_attention_conflict = False
         for f in range(state.duration):
-            if bg_hero.get('confidence', 0) > 0.8:
-                # Background bias: viewer is already looking at background hero
-                pass
+            # Simulate background subject bias
+            if bg_hero.get('confidence', 0) > 0.8 and not has_attention_conflict:
+                bg_pos = bg_hero.get('position', 'center')
+                for ov in supervisor.overlays:
+                    start = ov.get('start', 0)
+                    if f >= start and f < start + 30: # Check first second of reveal
+                        ov_pos = ov.get('position', {'x': 960, 'y': 540})
+                        ov_region = CompositionAnalyzer.detect_region(ov_pos['x'], ov_pos['y'])
+
+                        # If overlay appears in a different region than bg hero, it forces a saccade
+                        if ov_region != bg_pos:
+                            if f % 60 == 0:
+                                obs.findings.append(PerceptionFinding(
+                                    severity="info", confidence=0.6, frame_range=(f, f+30),
+                                    affected_elements=[ov.get('id')],
+                                    human_explanation=f"Attention split between background {bg_pos} and overlay {ov_region}.",
+                                    technical_explanation="Viewer gaze forced to jump between semantic anchors.",
+                                    viewer_impact="Increased cognitive load due to rapid saccades.",
+                                    fix_suggestion="Sync overlay appearance with a calmer background moment.",
+                                    expected_quality_gain=0.1,
+                                    category="cognitive"
+                                ))
+                                has_attention_conflict = True
         return obs
 
 class CinematicIntentValidator(AnalysisModule):
@@ -481,22 +618,25 @@ class CognitiveLoadFusionEngine(AnalysisModule):
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Cognitive Fusion")
         bg_busy = supervisor.bg_intel.get('composition', {}).get('busy_score', 0.2)
+        style = supervisor.project_style
+        max_load = StyleThresholds.get(style, 'max_cognitive_load')
 
         for f in range(state.duration):
-            # Formula: cognitive_load = overlay_load + bg_busy + motion + conflict
-            ov_load = state.frame_load[f] / 4.0
-            motion = sum(state.motion_events[max(0, f-10):f+1]) * 0.2
+            active_ovs = [o for o in supervisor.overlays if o.get('start', 0) <= f < o.get('start', 0) + o.get('duration', state.duration)]
+            motion_impact = sum(state.motion_events[max(0, f-15):f+1]) * 0.1
 
-            fusion_load = ov_load + bg_busy + motion
-            if fusion_load > 1.5 and f % 60 == 0:
+            fusion_load = CognitiveLoadModel.calculate_fused_load(bg_busy, active_ovs, motion_intensity=motion_impact)
+
+            if fusion_load > max_load and f % 60 == 0:
                 obs.findings.append(PerceptionFinding(
                     severity="error", confidence=0.9, frame_range=(f, f+60),
-                    affected_elements=[],
-                    human_explanation="Perceptual overload.",
-                    technical_explanation=f"Fusion Load {round(fusion_load, 2)} exceeds dynamic threshold.",
+                    affected_elements=[o.get('id') for o in active_ovs],
+                    human_explanation=f"Perceptual overload ({fusion_load}) during motion events.",
+                    technical_explanation=f"Dynamic fusion load exceeds {style} threshold ({max_load}).",
                     viewer_impact="Information drop-off.",
-                    fix_suggestion="Delay overlay entry to a calmer background segment.",
-                    expected_quality_gain=0.6
+                    fix_suggestion="Reduce simultaneous animations or simplify content.",
+                    expected_quality_gain=0.6,
+                    category="cognitive"
                 ))
         return obs
 
@@ -508,40 +648,62 @@ class TextPlacementIntelligenceEngine(AnalysisModule):
 
         for ov in supervisor.overlays:
             if ov.get('type') == 'text':
-                # Simplified region check (v5)
-                pass
+                pos = ov.get('position', {'x': 960, 'y': 540})
+                region = CompositionAnalyzer.detect_region(pos['x'], pos['y'])
+
+                if pref_region != 'center' and region != pref_region:
+                    obs.findings.append(PerceptionFinding(
+                        severity="warning", confidence=0.85, frame_range=(ov.get('start', 0), state.duration),
+                        affected_elements=[ov.get('id')],
+                        human_explanation=f"Text placed in {region} despite preferred region being {pref_region}.",
+                        technical_explanation=f"Background analysis suggests '{pref_region}' for text, but overlay is in '{region}'.",
+                        viewer_impact="Text might overlap with critical background subjects or be harder to read.",
+                        fix_suggestion=f"Move text overlay to {pref_region}.",
+                        expected_quality_gain=0.4,
+                        category="readability"
+                    ))
         return obs
 
 class ScoringSynthesisEngine(AnalysisModule):
-    """FINAL SYNTHESIS: Combines all observations into production-grade scores."""
+    """FINAL SYNTHESIS: Probabilistic weighted scoring model."""
     def run(self, supervisor: 'SceneSupervisor', state: SceneState) -> PerceptionObservation:
         obs = PerceptionObservation("Scoring Synthesis")
 
-        # Categorize all findings
+        # Initial categorical probabilities (1.0 = perfect quality)
         categories = ["layout", "motion", "cognitive", "composition", "readability", "narrative", "fusion"]
-        cat_scores = {c: 10.0 for c in categories}
+        category_quality = {c: 1.0 for c in categories}
 
         all_findings = []
         for o in supervisor.observations:
             all_findings.extend(o.findings)
 
         for finding in all_findings:
-            penalty = 0.5
-            if finding.severity == "critical": penalty = 2.0
-            elif finding.severity == "error": penalty = 1.0
-            elif finding.severity == "warning": penalty = 0.5
+            # Impact factor based on severity
+            impact = 0.05 # info
+            if finding.severity == "critical": impact = 0.35
+            elif finding.severity == "error": impact = 0.20
+            elif finding.severity == "warning": impact = 0.10
 
-            cat = finding.category if finding.category in cat_scores else "layout"
-            cat_scores[cat] -= penalty
+            # Apply impact based on confidence (probabilistic reduction)
+            deduction = impact * finding.confidence
 
-        # Map to supervisor scores
-        supervisor.scores["visual_harmony"] = cat_scores["fusion"]
-        supervisor.scores["composition_integrity"] = cat_scores["composition"]
-        supervisor.scores["attention_clarity"] = cat_scores["layout"]
-        supervisor.scores["cognitive_load"] = cat_scores["cognitive"]
-        supervisor.scores["readability_score"] = cat_scores["readability"]
-        supervisor.scores["motion_discipline"] = cat_scores["motion"]
-        supervisor.scores["narrative"] = cat_scores["narrative"]
+            cat = finding.category if finding.category in category_quality else "layout"
+            category_quality[cat] = max(0, category_quality[cat] - deduction)
+
+        # Convert quality probabilities to 10-point scores
+        for cat in categories:
+            score_key = {
+                "fusion": "visual_harmony",
+                "composition": "composition_integrity",
+                "layout": "attention_clarity",
+                "cognitive": "cognitive_load",
+                "readability": "readability_score",
+                "motion": "motion_discipline",
+                "narrative": "narrative"
+            }.get(cat, "overall_cinematic_score")
+
+            if score_key in supervisor.scores:
+                supervisor.scores[score_key] = round(category_quality[cat] * 10.0, 1)
 
         return obs
 
