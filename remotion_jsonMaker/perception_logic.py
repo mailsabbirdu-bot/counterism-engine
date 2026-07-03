@@ -14,6 +14,21 @@ class VisionConstants:
     READING_SPEED_BN = 0.45
     READING_SPEED_MIXED = 0.40
 
+    # Rule of Thirds Anchors (Production standard)
+    ANCHORS = {
+        "L_TOP": (550, 320), "C_TOP": (960, 320), "R_TOP": (1370, 320),
+        "L_MID": (550, 540), "C_MID": (960, 540), "R_MID": (1370, 540),
+        "L_BOT": (550, 760), "C_BOT": (960, 760), "R_BOT": (1370, 760)
+    }
+
+    @staticmethod
+    def to_str(val: Any) -> str:
+        """Safely flattens potentially hallucinated dictionary values into strings."""
+        if not val: return ""
+        if not isinstance(val, dict): return str(val)
+        # Try common keys used by hallucinating AIs
+        return str(val.get('family') or val.get('name') or val.get('type') or val.get('value') or next(iter(val.values()), str(val)))
+
 class StyleThresholds:
     """Adaptive thresholds for different cinematic styles."""
     PRESETS = {

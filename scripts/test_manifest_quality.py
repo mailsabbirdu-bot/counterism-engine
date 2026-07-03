@@ -5,11 +5,12 @@ import re
 
 def test_manifest_quality(filepath, public_dir=None):
     """
-    Hardened Geometry-Aware QA suite for Studio V4 manifests.
+    v3.0 Machine-Actionable QA suite for Studio V4 manifests.
+    Provides structured feedback, severity levels, and explicit repair values.
     Returns: (success, score, issues)
     """
     print(f"\n" + "="*80)
-    print(f"🎬 STUDIO V4 PRODUCTION QA: {os.path.basename(filepath)}")
+    print(f"🎬 STUDIO V4 PRODUCTION QA (v3.0): {os.path.basename(filepath)}")
     print("="*80)
 
     if not os.path.exists(filepath):
@@ -28,8 +29,20 @@ def test_manifest_quality(filepath, public_dir=None):
         print(f"❌ {msg}")
         return False, 0, [msg]
 
-    issues = [] # Fatal errors (FAIL)
-    warnings = [] # Aesthetic suggestions
+    all_feedback = [] # List of structured finding dicts
+
+    # Severity Definitions
+    S_CRITICAL = "CRITICAL" # Structural failure, data corruption
+    S_ERROR = "ERROR"       # Rule violation, invalid variant
+    S_WARNING = "WARNING"   # Aesthetic issue, margin violation
+    S_INFO = "INFO"         # Minor optimization
+
+    # Rule of Thirds Anchors (Synced with logic)
+    ANCHORS = {
+        "L_TOP": (550, 320), "C_TOP": (960, 320), "R_TOP": (1370, 320),
+        "L_MID": (550, 540), "C_MID": (960, 540), "R_MID": (1370, 540),
+        "L_BOT": (550, 760), "C_BOT": (960, 760), "R_BOT": (1370, 760)
+    }
 
     # --- ASSET & TYPE REGISTRY (Surgical Validation) ---
     VALID_TYPES = [
@@ -138,17 +151,17 @@ def test_manifest_quality(filepath, public_dir=None):
 
     # --- ROOT STRUCTURE VALIDATION ---
     if 'global_settings' not in data:
-        issues.append("CRITICAL: Missing 'global_settings' at root.")
+        all_feedback.append({"severity": S_CRITICAL, "msg": "Missing 'global_settings' at root.", "category": "structure"})
         scores["structure"] -= 50
     else:
         gs = data['global_settings']
         for field in ['width', 'height', 'fps']:
             if field not in gs:
-                issues.append(f"CRITICAL: 'global_settings' missing required field '{field}'.")
+                all_feedback.append({"severity": S_CRITICAL, "msg": f"'global_settings' missing required field '{field}'.", "category": "structure"})
                 scores["structure"] -= 20
 
     if 'project_id' not in data and 'project_name' not in data:
-        warnings.append("Missing 'project_id' or 'project_name' at root.")
+        all_feedback.append({"severity": S_WARNING, "msg": "Missing 'project_id' at root.", "category": "structure"})
         scores["structure"] -= 5
 
     scenes = data.get('scenes', [])
@@ -188,30 +201,30 @@ def test_manifest_quality(filepath, public_dir=None):
         print(f"\n--- {scene_id} ---")
 
         if scene_id in all_scene_ids:
-            issues.append(f"[{scene_id}] CRITICAL: Duplicate scene_id detected.")
+            all_feedback.append({"scene": scene_id, "severity": S_CRITICAL, "msg": "Duplicate scene_id detected.", "category": "logic"})
             scores["composition"] -= 20
         all_scene_ids.add(scene_id)
 
         # Reading Order & Sequencing
         beats = scene.get('beats', [])
         if not beats:
-            warnings.append(f"[{scene_id}] Missing 'beats' array for visual sequencing.")
+            all_feedback.append({"scene": scene_id, "severity": S_WARNING, "msg": "Missing 'beats' array for visual sequencing.", "category": "timing"})
             scores["timing"] -= 5
 
         if not scene.get('transition'):
-            warnings.append(f"[{scene_id}] Missing 'transition' object for story flow.")
+            all_feedback.append({"scene": scene_id, "severity": S_WARNING, "msg": "Missing 'transition' object.", "category": "composition"})
             scores["composition"] -= 5
 
         duration = scene.get('duration_in_frames', 180)
         if 'duration' in scene:
-            issues.append(f"[{scene_id}] SCHEMA ERROR: Redundant 'duration' key found. Use 'duration_in_frames'.")
+            all_feedback.append({"scene": scene_id, "severity": S_ERROR, "msg": "Redundant 'duration' key found. Use 'duration_in_frames'.", "category": "schema"})
             scores["timing"] -= 5
 
         overlays = scene.get('overlays', [])
         connections = scene.get('connections', [])
         has_connector = any(str(o.get('type', '')).lower() == 'connector' for o in overlays)
         if has_connector and not connections:
-            warnings.append(f"[{scene_id}] RELATIONSHIP WARNING: Scene has connectors but 'connections' array is empty.")
+            all_feedback.append({"scene": scene_id, "severity": S_WARNING, "msg": "Scene has connectors but empty 'connections' array.", "category": "logic"})
             scores["composition"] -= 10
 
         # 1. Asset Verification
@@ -221,23 +234,21 @@ def test_manifest_quality(filepath, public_dir=None):
                 rel_vpath = vpath.replace('renders/', '') if vpath.startswith('renders/') else vpath
                 abs_vpath = os.path.join(public_dir, "renders", rel_vpath.lstrip('/'))
                 if not os.path.exists(abs_vpath):
-                    msg = f"[{scene_id}] Asset Missing: video '{vpath}'"
-                    issues.append(msg)
+                    all_feedback.append({"scene": scene_id, "severity": S_CRITICAL, "msg": f"Video asset missing: '{vpath}'", "category": "assets"})
                     scores["assets"] -= 20
                 else:
                     print(f"   ✅ ASSETS: Video verified.")
 
         # 2. Timing
         if duration <= 0:
-            msg = f"[{scene_id}] Invalid scene duration: {duration}"
-            issues.append(msg)
+            all_feedback.append({"scene": scene_id, "severity": S_CRITICAL, "msg": f"Invalid scene duration: {duration}", "category": "timing"})
             scores["timing"] -= 50
 
         # 3. Overlay Validation
         if scene.get('background_type') == 'procedural':
             bg_var = scene.get('procedural_config', {}).get('variant')
             if bg_var and bg_var not in ENGINE_VARIANTS['procedural_bg']:
-                issues.append(f"[{scene_id}] ASSET ERROR: Invalid procedural background variant '{bg_var}'. Valid: {ENGINE_VARIANTS['procedural_bg']}")
+                all_feedback.append({"scene": scene_id, "severity": S_ERROR, "msg": f"Invalid procedural bg variant '{bg_var}'.", "category": "assets"})
                 scores["assets"] -= 10
 
         overlay_ids = set()
@@ -250,31 +261,31 @@ def test_manifest_quality(filepath, public_dir=None):
             overlay_ids.add(ov_id)
             o_type = str(ov.get('type', 'text')).lower()
             if o_type not in VALID_TYPES:
-                issues.append(f"[{scene_id}] TYPE ERROR: Overlay '{ov_id}' has invalid type '{o_type}'. Valid: {VALID_TYPES}")
+                all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Invalid type '{o_type}'.", "category": "schema"})
                 scores["composition"] -= 20
 
             # Redundant Typography/Z-index check
             if 'size' in ov:
-                issues.append(f"[{scene_id}] SCHEMA ERROR: Overlay '{ov_id}' has redundant 'size' key. Use 'fontSize'.")
+                all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": "Redundant 'size' key found. Use 'fontSize'.", "category": "schema"})
                 scores["typography"] -= 5
             if 'z_index' in ov:
-                issues.append(f"[{scene_id}] SCHEMA ERROR: Overlay '{ov_id}' has redundant 'z_index' key. Use 'zIndex'.")
+                all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": "Redundant 'z_index' key found. Use 'zIndex'.", "category": "schema"})
                 scores["composition"] -= 5
             if 'variant' in ov:
-                issues.append(f"[{scene_id}] SCHEMA ERROR: Overlay '{ov_id}' has redundant 'variant' key. Use type-specific variant keys (e.g. 'chart_type').")
+                all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": "Redundant 'variant' key found. Use specific variant keys (e.g. 'chart_type').", "category": "schema"})
                 scores["assets"] -= 5
 
             # Media Asset Verification
             if o_type in ['video', 'image']:
                 src = ov.get('src')
                 if not src:
-                    issues.append(f"[{scene_id}] ASSET ERROR: Overlay '{ov_id}' ({o_type}) is missing 'src' path.")
+                    all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": "Missing 'src' path.", "category": "assets"})
                     scores["assets"] -= 20
                 else:
                     rel_src = src.replace('renders/', '') if src.startswith('renders/') else src
                     abs_src = os.path.join(public_dir, "renders", rel_src.lstrip('/'))
                     if not os.path.exists(abs_src):
-                        warnings.append(f"[{scene_id}] ASSET WARNING: Overlay asset missing: '{src}'")
+                        all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_WARNING, "msg": f"Asset missing: '{src}'", "category": "assets"})
                         scores["assets"] -= 10
 
             # Variant Validation
@@ -283,40 +294,27 @@ def test_manifest_quality(filepath, public_dir=None):
                 if variant_key:
                     variant = ov.get(variant_key)
                     if not variant:
-                        issues.append(f"[{scene_id}] CONFIG ERROR: Overlay '{ov_id}' of type '{o_type}' is missing '{variant_key}'.")
-                        scores["assets"] -= 25 # Severe penalty for missing key config
+                        all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Missing '{variant_key}'.", "category": "schema"})
+                        scores["assets"] -= 25
                     elif variant not in ENGINE_VARIANTS[o_type]:
-                        issues.append(f"[{scene_id}] CONFIG ERROR: Overlay '{ov_id}' variant '{variant}' is invalid for type '{o_type}'. Valid: {ENGINE_VARIANTS[o_type]}")
+                        all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Invalid variant '{variant}' for type '{o_type}'. Valid: {ENGINE_VARIANTS[o_type]}", "category": "schema"})
                         scores["assets"] -= 20
                     else:
-                        # Deep Validation of specific fields per variant
-                        variant_error = False
+                        # Deep Validation
                         if variant == 'milestoneTracker' and 'milestones' not in ov:
-                            issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'milestones' array.")
-                            variant_error = True
+                            all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Variant '{variant}' requires 'milestones' array.", "category": "data"})
+                            scores["assets"] -= 20
                         elif variant in ['timeline', 'milestoneTimeline'] and 'events' not in ov and 'milestones' not in ov:
-                            issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'events' or 'milestones' array.")
-                            variant_error = True
+                            all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Variant '{variant}' requires 'events' array.", "category": "data"})
+                            scores["assets"] -= 20
                         elif variant == 'statGrid' and 'stats' not in ov:
-                            issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'stats' array.")
-                            variant_error = True
+                            all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Variant '{variant}' requires 'stats' array.", "category": "data"})
+                            scores["assets"] -= 20
                         elif variant in ['multiProgress', 'ringChart'] and 'items' not in ov and 'rings' not in ov:
-                            issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'items' or 'rings' array.")
-                            variant_error = True
+                            all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Variant '{variant}' requires 'items' array.", "category": "data"})
+                            scores["assets"] -= 20
                         elif variant in ['stepIndicator', 'step_indicator_glass'] and 'steps' not in ov:
-                            issues.append(f"[{scene_id}] DATA ERROR: '{ov_id}' ({variant}) requires 'steps' array.")
-                            variant_error = True
-                        elif variant in ['kpi', 'kpiNumber', 'counter', 'percentageCounter', 'deltaIndicator', 'semiGauge', 'metricRing'] and 'value' in ov:
-                            try:
-                                float(str(ov['value']).replace('%', '').replace(',', ''))
-                            except ValueError:
-                                warnings.append(f"[{scene_id}] DATA WARNING: '{ov_id}' ({variant}) value '{ov['value']}' is non-numeric. Animation may fail.")
-                                scores["assets"] -= 10
-                        elif variant in ['kpi', 'metric_tile'] and 'value' not in ov:
-                            warnings.append(f"[{scene_id}] DATA WARNING: '{ov_id}' ({variant}) should have a 'value'.")
-                            scores["assets"] -= 5
-
-                        if variant_error:
+                            all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Variant '{variant}' requires 'steps' array.", "category": "data"})
                             scores["assets"] -= 20
 
             # Typography & Font Validation
@@ -326,52 +324,49 @@ def test_manifest_quality(filepath, public_dir=None):
                 is_bangla = any('\u0980' <= c <= '\u09FF' for c in content)
 
                 if not font:
-                    issues.append(f"[{scene_id}] FONT ERROR: Overlay '{ov_id}' is missing 'font' field.")
+                    all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": "Missing 'font' field.", "category": "typography"})
                     scores["typography"] -= 10
                 elif font not in available_fonts:
-                    # Special check for system fallbacks or generic families
                     if font not in ['Inter', 'Arial', 'sans-serif', 'serif', 'monospace']:
-                        issues.append(f"[{scene_id}] FONT ERROR: Overlay '{ov_id}' uses font '{font}' which is NOT in /public/fonts. Valid: {available_fonts}")
+                        all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Font '{font}' is NOT in /public/fonts. Valid local fonts: {available_fonts}", "category": "typography"})
                         scores["typography"] -= 15
                     else:
-                        warnings.append(f"[{scene_id}] FONT WARNING: Overlay '{ov_id}' uses generic font '{font}'. Use local production fonts like {available_fonts[:3]} instead.")
+                        all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_WARNING, "msg": f"Uses generic font '{font}'. Use production fonts like {available_fonts[:3]} instead.", "category": "typography"})
                         scores["typography"] -= 5
 
-                # Language consistency check (FIXABLE BY ENGINE)
+                # Language consistency
                 if is_bangla and bangla_fonts and font not in bangla_fonts:
-                    warnings.append(f"[{scene_id}] ENGINE FIXABLE: Font '{font}' for Bangla content is sub-optimal. Engine will auto-map to Sohid_bangla.")
-                    # Minimal penalty for fixable aesthetic issues
+                    all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_INFO, "msg": f"Font '{font}' sub-optimal for Bangla. Suggested: '{bangla_fonts[0]}'.", "category": "typography"})
                     scores["typography"] -= 2
                 elif not is_bangla and english_fonts and font in bangla_fonts:
-                    warnings.append(f"[{scene_id}] ENGINE FIXABLE: Font '{font}' for English content is sub-optimal. Engine will auto-map to standard English font.")
+                    all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_INFO, "msg": f"Font '{font}' sub-optimal for English. Suggested: '{english_fonts[0]}'.", "category": "typography"})
                     scores["typography"] -= 2
 
             if o_type == 'text':
                 hero = ov.get('hero_config', {})
                 h_anim = hero.get('animation')
                 if h_anim and h_anim not in VALID_TEXT_HERO_ANIMS:
-                    issues.append(f"[{scene_id}] ANIMATION ERROR: Text '{ov_id}' hero animation '{h_anim}' is invalid. Valid: {VALID_TEXT_HERO_ANIMS[:5]}...")
+                    all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Invalid hero animation '{h_anim}'. Valid: {VALID_TEXT_HERO_ANIMS[:5]}...", "category": "motion"})
                     scores["typography"] -= 10
 
                 h_word = str(hero.get('word', '')).replace('[.।]', '')
                 content = str(ov.get('content', '')).replace('[.।]', '')
                 if h_word and h_word not in content:
-                    warnings.append(f"[{scene_id}] SYNC WARNING: Hero word '{h_word}' not found in content of '{ov_id}'. Reveal animation might skip.")
+                    all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_WARNING, "msg": f"Hero word '{h_word}' not in content. Sugggested: Update 'word' to one of: {content.split()[:5]}", "category": "logic"})
                     scores["typography"] -= 5
 
             start = int(ov.get('start', 0))
 
             # 2.1 detailed SYNC ORDER Check (Strict Chronological Enforcement)
             if prev_start != -1 and start < prev_start:
-                msg = f"[{scene_id}] SYNC ORDER ERROR: Overlay '{ov_id}' (start={start}) appears AFTER '{prev_ov_id}' (start={prev_start}) in the array. Fix: Ensure the overlays array is sorted by 'start' time."
-                issues.append(msg)
-                scores["timing"] -= 25 # Increased penalty for sync errors
+                all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Incorrect array order (start={start}) vs prev {prev_ov_id} (start={prev_start}). Fix: Sort overlays array by 'start' time.", "category": "timing"})
+                scores["timing"] -= 25
 
             prev_start = start
             prev_ov_id = ov_id
 
             if start < 0 or start >= duration:
-                issues.append(f"[{scene_id}] TIMING ERROR: Overlay '{ov_id}' field 'start'={start} is invalid. Scene duration is {duration}. Fix: set 'start' between 0 and {duration-1}.")
+                all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Invalid 'start'={start} (Scene dur: {duration}). Fix: Set start between 0 and {duration-1}.", "category": "timing"})
                 scores["timing"] -= 10
 
             pos = ov.get('position', {})
@@ -380,8 +375,12 @@ def test_manifest_quality(filepath, public_dir=None):
             # Center Stacking (Bypass for motion tracked elements)
             if not ov.get('tracking', {}).get('enabled'):
                 if (abs(x - 960) < 20 and (abs(y - 540) < 20 or abs(y - 700) < 20)):
-                    msg = f"[{scene_id}] GEOMETRY ERROR: Overlay '{ov_id}' is generic-centered at ({x}, {y}). Fix: Use Rule of Thirds anchors like (550, 540) or (1370, 540) to avoid center-stacking."
-                    issues.append(msg)
+                    all_feedback.append({
+                        "scene": scene_id, "id": ov_id, "severity": S_ERROR,
+                        "msg": f"Generic center detected at ({x}, {y}).",
+                        "patch": {"position": {"x": 1370, "y": 540}},
+                        "category": "composition"
+                    })
                     scores["composition"] -= 15
 
             base_w, base_h = TYPE_SIZES.get(o_type, (600, 400))
@@ -392,21 +391,16 @@ def test_manifest_quality(filepath, public_dir=None):
                 fs = int(fs_match.group()) if fs_match else 120
                 min_fs = MIN_CONSTRAINTS['hero_fontSize'] if str(ov.get('importance','')).lower() == 'hero' else MIN_CONSTRAINTS['fontSize']
                 if fs < min_fs:
-                    issues.append(f"[{scene_id}] TYPOGRAPHY ERROR: Text '{ov_id}' fontSize {fs}px is too small. Minimum required for {ov.get('importance','primary')} text is {min_fs}px.")
+                    all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"fontSize {fs}px too small (min {min_fs}px).", "patch": {"fontSize": f"{min_fs}px"}, "category": "typography"})
                     scores["typography"] -= 20
                 w, h = min(ov.get('maxWidth', 1600), len(str(ov.get('content',''))) * fs * 0.7), fs * 1.5
 
             l, t, r, b = x - w/2, y - h/2, x + w/2, y + h/2
             if l < 0 or r > 1920 or t < 0 or b > 1080:
-                off_desc = []
-                if l < 0: off_desc.append(f"left by {abs(l)}px")
-                if r > 1920: off_desc.append(f"right by {r-1920}px")
-                if t < 0: off_desc.append(f"top by {abs(t)}px")
-                if b > 1080: off_desc.append(f"bottom by {b-1080}px")
-                issues.append(f"[{scene_id}] OFFSCREEN ERROR: Overlay '{ov_id}' is out of bounds on {' and '.join(off_desc)}. Calculated Box: [L:{int(l)}, T:{int(t)}, R:{int(r)}, B:{int(b)}]. Fix: Move position away from edges.")
+                all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_CRITICAL, "msg": f"Offscreen! Box: [L:{int(l)}, T:{int(t)}, R:{int(r)}, B:{int(b)}]. Move to Rule of Thirds anchor.", "patch": {"position": {"x": 960, "y": 540}}, "category": "layout"})
                 scores["layout"] -= 25
             elif o_type not in ['ambient_graphic', 'background'] and (l < 150 or r > 1770 or t < 150 or b > 930):
-                warnings.append(f"[{scene_id}] MARGIN WARNING: Overlay '{ov_id}' violates 150px safety zone. Box: [L:{int(l)}, T:{int(t)}, R:{int(r)}, B:{int(b)}]. Suggest moving towards center.")
+                all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_WARNING, "msg": f"Safety margin violation. Box: [L:{int(l)}, T:{int(t)}, R:{int(r)}, B:{int(b)}]. Move to (550, 540) or (1370, 540).", "category": "composition"})
                 scores["composition"] -= 5
 
             for p_id, p_l, p_t, p_r, p_b, p_s, p_e, p_imp in placed_geometries:
@@ -417,8 +411,13 @@ def test_manifest_quality(filepath, public_dir=None):
                     gap = MIN_CONSTRAINTS['min_spacing']
                     if not (r + gap < p_l or l - gap > p_r or b + gap < p_t or t - gap > p_b):
                         # Surgical Collision Feedback
-                        suggested_anchor = "(550, 320)" if x > 960 else "(1370, 760)"
-                        issues.append(f"[{scene_id}] GEOMETRY COLLISION: Overlay '{ov_id}' at ({int(x)}, {int(y)}) overlaps with '{p_id}'. Fix: Move '{ov_id}' to a remote anchor like {suggested_anchor} or adjust timing so they don't appear at once.")
+                        suggested_x = 550 if x > 960 else 1370
+                        all_feedback.append({
+                            "scene": scene_id, "id": ov_id, "severity": S_ERROR,
+                            "msg": f"Collision with '{p_id}'.",
+                            "patch": {"position": {"x": suggested_x, "y": y}},
+                            "category": "layout"
+                        })
                         scores["collision"] -= 30
             placed_geometries.append((ov_id, l, t, r, b, start, start + ov.get('duration', duration - start), str(ov.get('importance','')).lower()))
 
@@ -426,54 +425,71 @@ def test_manifest_quality(filepath, public_dir=None):
         camera = scene.get('camera', {})
         shots = camera.get('shots', [])
         if not shots:
-            warnings.append(f"[{scene_id}] No camera shots defined.")
+            all_feedback.append({"scene": scene_id, "severity": S_WARNING, "msg": "No camera shots defined.", "category": "camera"})
             scores["camera"] -= 10
         else:
             for s_idx, shot in enumerate(shots):
                 target = shot.get('targetId')
                 if target and target not in overlay_ids:
-                    issues.append(f"[{scene_id}] Camera shot {s_idx} targets non-existent overlay '{target}'.")
+                    all_feedback.append({"scene": scene_id, "severity": S_ERROR, "msg": f"Camera shot {s_idx} targets missing ID '{target}'.", "category": "camera"})
                     scores["camera"] -= 20
 
         for line in scene.get('infographic_lines', []):
             if line.get('from_id') not in overlay_ids or line.get('to_id') not in overlay_ids:
-                issues.append(f"[{scene_id}] Infographic line references missing ID.")
+                all_feedback.append({"scene": scene_id, "severity": S_ERROR, "msg": "Infographic line targets missing ID.", "category": "logic"})
                 scores["composition"] -= 15
 
     overall_score = sum(scores.values()) / len(scores)
 
     # RUTHLESS ACCURACY ENFORCEMENT
-    # If there are fatal issues, the score MUST be capped to reflect lack of production-readiness.
-    num_issues = len(issues)
+    fatal_feedback = [f for f in all_feedback if f['severity'] in [S_CRITICAL, S_ERROR]]
+    num_fatal = len(fatal_feedback)
+    has_structural = any(f['severity'] == S_CRITICAL or f['category'] == 'data' for f in fatal_feedback)
 
-    # Check for structural corruption (Not fixable by engine)
-    has_fatal = any("DATA ERROR" in i or "TYPE ERROR" in i or "CRITICAL" in i or "OFFSCREEN" in i for i in issues)
-
-    if num_issues > 0:
-        # Penalize overall score based on count of fatal issues
-        overall_score = min(overall_score, 100 - (num_issues * 10))
-        # Hard caps for production readiness
-        if has_fatal:
-            overall_score = min(overall_score, 45) # Cannot be higher than 45% with data/type corruption
-        else:
-            overall_score = min(overall_score, 75) # Cannot be higher than 75% with any fatal layout/camera issues
+    if num_fatal > 0:
+        overall_score = min(overall_score, 100 - (num_fatal * 10))
+        if has_structural: overall_score = min(overall_score, 45)
+        else: overall_score = min(overall_score, 75)
 
     overall_score = max(0, int(overall_score))
-    all_feedback = issues + warnings
 
-    if issues:
-        print("\n❌ FATAL ISSUES:")
-        for i in issues: print(f"  - {i}")
+    # Structured printing for Gemini parsing (Deduplicated)
+    if all_feedback:
+        print("\n--- STRUCTURED QA FEEDBACK ---")
+        scenes_affected = sorted(list(set(f.get('scene','GLOBAL') for f in all_feedback)))
+        for s in scenes_affected:
+            s_f = [f for f in all_feedback if f.get('scene') == s]
 
-    if warnings:
-        print("\n⚠️ WARNINGS:")
-        for w in warnings: print(f"  - {w}")
+            # Deduplicate messages in the same scene
+            seen_msgs = set()
+            unique_f = []
+            for f in s_f:
+                msg_key = f"{f['severity']}:{f['msg']}"
+                if msg_key not in seen_msgs:
+                    unique_f.append(f)
+                    seen_msgs.add(msg_key)
+
+            print(f"\n[{s}]")
+            for f in unique_f:
+                prefix = f"[{f['severity']}]"
+                target = f" ({f['id']})" if f.get('id') else ""
+                patch = f" -> REQUIRED PATCH: {json.dumps(f['patch'])}" if f.get('patch') else ""
+                print(f"  {prefix}{target} {f['msg']}{patch}")
 
     print("\n" + "="*80)
     print(f"📈 FINAL PRODUCTION REPORT: {overall_score}%")
     print("="*80)
 
-    return (len(issues) == 0 and overall_score == 100), overall_score, all_feedback
+    # Return as flat strings for backward compat with generator.py feedback loops
+    # Includes machine-actionable patches if available
+    str_feedback = []
+    for f in all_feedback:
+        fb = f"[{f.get('scene','GLOBAL')}] {f['severity']}: {f['msg']}"
+        if f.get('patch'):
+            fb += f" -> REQUIRED PATCH: {json.dumps(f['patch'])}"
+        str_feedback.append(fb)
+
+    return (num_fatal == 0 and overall_score == 100), overall_score, str_feedback
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

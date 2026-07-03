@@ -14,12 +14,17 @@ try:
     from .supervisor import supervise_manifest
     from .intelligence import SceneIntelligenceEngine
     from .memory_manager import ProductionMemoryManager
+    from .perception_logic import VisionConstants
 except (ImportError, ValueError):
     from supervisor import supervise_manifest
     from intelligence import SceneIntelligenceEngine
     from memory_manager import ProductionMemoryManager
+    from perception_logic import VisionConstants
 
 class RemotionJsonMaker:
+    def _is_bangla(self, text: str) -> bool:
+        return any('\u0980' <= c <= '\u09FF' for c in str(text))
+
     # --- PRODUCTION-GRADE CONSTANTS ---
     TYPE_SIZES = {
         'text': (800, 200), 'chart': (1000, 562), 'shadcn_chart': (1000, 562),
@@ -56,33 +61,15 @@ class RemotionJsonMaker:
         'label': 45, 'callout': 45, 'svg': 40, 'kpi': 40, 'graph': 30, 'shape': 10, 'background': 0
     }
 
-    # Rule of Thirds Anchors
-    ANCHORS = {
-        "L_TOP": (550, 320), "C_TOP": (960, 320), "R_TOP": (1370, 320),
-        "L_MID": (550, 540), "C_MID": (960, 540), "R_MID": (1370, 540),
-        "L_BOT": (550, 760), "C_BOT": (960, 760), "R_BOT": (1370, 760)
-    }
+    # Rule of Thirds Anchors (Synced from VisionConstants)
+    ANCHORS = VisionConstants.ANCHORS
 
     LOCKED_FIELDS = ["content", "hero_config", "tracking"]
     MODERN_COLORS = ["#00F5FF", "#FFD700", "#FF3E6C", "#00FFAB"]
 
     def _flatten_value(self, val, key):
         """Forcefully flattens hallucinated dictionary values into strings."""
-        if not isinstance(val, dict): return val
-        if not val: return ""
-
-        try:
-            if key == 'font':
-                return str(val.get('family') or val.get('name') or (next(iter(val.values()), "Arial") if val else "Arial"))
-            if key == 'animation':
-                return str(val.get('type') or val.get('name') or (next(iter(val.values()), "fade") if val else "fade"))
-            if key == 'color':
-                return str(val.get('hex') or val.get('code') or val.get('value') or (next(iter(val.values()), "#ffffff") if val else "#ffffff"))
-            if key in ['content', 'text', 'label', 'title']:
-                return str(val.get('text') or val.get('value') or val.get('content') or (next(iter(val.values()), "") if val else ""))
-            return str(next(iter(val.values()), val) if val else "")
-        except:
-            return str(val)
+        return VisionConstants.to_str(val)
     CLAMP_MIN_X, CLAMP_MAX_X = 150, 1770
     CLAMP_MIN_Y, CLAMP_MAX_Y = 150, 930
     MIN_SPACING = 30
@@ -870,16 +857,14 @@ class RemotionJsonMaker:
             f"- Eliminate redundant coordinates: use root 'position': {{x,y}} OR properties.x/y, never both.\n"
             f"- Minimize nesting: prefer root-level fields where possible.\n"
             f"- Maintain broadcast legibility: 1 focal element per 60 frames max.\n\n"
-            f"--- FINAL VALIDATION CHECKLIST ---\n"
-            f"Before outputting JSON, verify:\n"
-            f"✓ Every overlay id is unique and descriptive.\n"
-            f"✓ Every camera targetId exists in the overlays array.\n"
-            f"✓ Every connector source/target ID exists.\n"
-            f"✓ NO overlapping focal graphics; use Rule of Thirds anchors.\n"
-            f"✓ Overlays array is sorted CHRONOLOGICALLY by 'start' time.\n"
-            f"✓ Duration never exceeds scene duration.\n"
-            f"✓ Hero word exists in text content.\n"
-            f"✓ Only approved component variants used.\n\n"
+            f"--- FINAL PRODUCTION CHECKLIST (MANDATORY) ---\n"
+            f"1. [FONT] No generic fonts. Use ONLY local production fonts from ENV_FONTS.\n"
+            f"2. [LAYOUT] Safety margins ≥150px. No offscreen elements.\n"
+            f"3. [SCHEMA] Approved variants only. Every 'chart' needs 'title' and 'data'. Every 'indicator' needs 'title' and 'value'.\n"
+            f"4. [PACING] No simultaneous focal reveals. Maintain 15-20 frames of resting time.\n"
+            f"5. [LOAD] Cognitive load < 2.2. Simplify if overloaded.\n"
+            f"6. [SYNC] Sort overlays array chronologically by 'start'.\n"
+            f"7. [REPAIR] If QA feedback provides a 'Sugggested Patch', apply it verbatim.\n\n"
             f"{drive_guideline}\n"
             f"{memory_context}\n"
             f"OUTPUT RAW JSON BLOCK ONLY. NO PREAMBLE. NO CHATTER."
