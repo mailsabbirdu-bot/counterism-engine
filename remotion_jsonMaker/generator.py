@@ -63,6 +63,16 @@ class RemotionJsonMaker:
 
     LOCKED_FIELDS = ["content", "hero_config", "tracking"]
     MODERN_COLORS = ["#00F5FF", "#FFD700", "#FF3E6C", "#00FFAB"]
+
+    def _flatten_value(self, val, key):
+        """Forcefully flattens hallucinated dictionary values into strings."""
+        if not isinstance(val, dict): return val
+        if key == 'font': return str(val.get('family', val.get('name', val)))
+        if key == 'animation': return str(val.get('type', val.get('name', val)))
+        if key == 'color': return str(val.get('hex', val.get('code', val.get('value', val))))
+        if key in ['content', 'text', 'label', 'title']:
+            return str(val.get('text', val.get('value', val.get('content', val))))
+        return str(val)
     CLAMP_MIN_X, CLAMP_MAX_X = 150, 1770
     CLAMP_MIN_Y, CLAMP_MAX_Y = 150, 930
     MIN_SPACING = 30
@@ -259,6 +269,10 @@ class RemotionJsonMaker:
 
     def _harden_overlay_data(self, ov: Dict[str, Any], scene_context: str = ""):
         """Stage 2: Deep Promotion and key unification for overlays."""
+        # --- PHASE 0: Flattening ---
+        for k in ['font', 'animation', 'content', 'text', 'label', 'title', 'color']:
+            if k in ov: ov[k] = self._flatten_value(ov[k], k)
+
         # Fix invalid types commonly hallucinated by AI
         o_type = str(ov.get('type', 'text')).lower()
         if o_type == 'hero_animation':
@@ -307,10 +321,10 @@ class RemotionJsonMaker:
 
         # Standardize variant mapping (Hardened for SHADCN vs Standard)
         if 'variant' in ov:
-            v_val = ov['variant']
+            v_val = str(ov['variant'])
             if 'chart' in o_type:
-                # Map glass/neon variants to shadcn_chart
-                if any(x in v_val for x in ['glass', 'neon', 'stacked', 'web']):
+                # Map glass/neon/glow variants to shadcn_chart
+                if any(x in v_val for x in ['glass', 'neon', 'stacked', 'web', 'glow', 'composed', 'thick', 'pixel', 'grid']):
                     ov['type'] = 'shadcn_chart'
                     o_type = 'shadcn_chart'
                 ov['chart_type'] = v_val
@@ -320,7 +334,7 @@ class RemotionJsonMaker:
                     v_val = 'tech_badge'
 
                 # Map tile/badge/status variants to shadcn_indicator
-                if any(x in v_val for x in ['tile', 'badge', 'status', 'crypto', 'card', 'ring']):
+                if any(x in v_val for x in ['tile', 'badge', 'status', 'crypto', 'card', 'ring', 'pill', 'pack', 'dots', 'tech']):
                     ov['type'] = 'shadcn_indicator'
                     o_type = 'shadcn_indicator'
                 ov['indicator_type'] = v_val
@@ -549,9 +563,9 @@ class RemotionJsonMaker:
             best_pos, final_w, final_h = (ax, ay), base_w, base_h
             fs = int(re.search(r'\d+', str(ov.get('fontSize', '120'))).group()) if o_type == 'text' else 120
 
-            for scale_step in range(5): # Fewer steps, higher floor
-                scale = max(0.4, 1.0 - (scale_step * 0.15)) # Floor at 40%
-                if imp == 'hero' and scale < 0.8: break # Hero floor at 80%
+            for scale_step in range(5):
+                scale = max(0.4, 1.0 - (scale_step * 0.15))
+                if imp == 'hero' and scale < 0.8: scale = 0.8
                 if o_type in ['graph', 'shape']: scale = min(scale, 0.8)
 
                 if o_type == 'text':
@@ -562,36 +576,35 @@ class RemotionJsonMaker:
                     w = max(300 if 'chart' in o_type else 100, base_w * scale)
                     h = max(200 if 'chart' in o_type else 100, base_h * scale)
 
-            for step in range(0, 120): # Increased search radius
-                radius = step * 10 # Finer granularity
-                # Search more angles for Rule of Thirds anchors
-                angles = [0, 180, 90, 270, 45, 135, 225, 315, 30, 60, 120, 150, 210, 240, 300, 330] if radius > 0 else [0]
-                for angle in angles:
-                    rad = math.radians(angle)
-                    cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
-                    l, t, r, b = cx-w/2, cy-h/2, cx+w/2, cy+h/2
+                for step in range(0, 120): # Search radius per scale level
+                    radius = step * 10
+                    angles = [0, 180, 90, 270, 45, 135, 225, 315, 30, 60, 120, 150, 210, 240, 300, 330] if radius > 0 else [0]
+                    for angle in angles:
+                        rad = math.radians(angle)
+                        cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
+                        l, t, r, b = cx-w/2, cy-h/2, cx+w/2, cy+h/2
 
-                    # PRODUCTION: Slightly more relaxed boundary checks if nudging is aggressive
-                    if l < 50 or r > 1870 or t < 50 or b > 1030: continue
+                        # Use 150px safety margin for first 30 radius steps, then relax
+                        margin = 150 if step < 30 else 50
+                        if l < margin or r > (1920 - margin) or t < margin or b > (1080 - margin): continue
 
-                    collision = False
-                    for p_id, p_l, p_t, p_r, p_b, p_s, p_e in placed_boxes:
-                        # Improved temporal collision check
-                        if max(ov['start'], p_s) < min(ov.get('start', 0) + ov.get('duration', 60), p_e):
-                            if not (r + self.MIN_SPACING < p_l or l - self.MIN_SPACING > p_r or b + self.MIN_SPACING < p_t or t - self.MIN_SPACING > p_b):
-                                collision = True; break
-                    if not collision:
-                        best_pos, found = (cx, cy), True
-                        if radius > 50:
-                            print(f"   🔧 Expert Nudging {ov['id']} -> ({int(cx)}, {int(cy)})")
-                            if not ov.get('animation') or ov.get('animation') not in self.SEMANTIC_ANIMS:
-                                ov['animation'] = self.SEMANTIC_ANIMS[scene_idx % len(self.SEMANTIC_ANIMS)]
-                        if scale < 1.0:
-                            print(f"   🔧 Scaling down {ov['id']} to {int(scale*100)}%")
-                            if o_type == 'text': ov['fontSize'] = f"{int(curr_fs)}px"
-                            else: ov['width'], ov['height'] = int(w), int(h)
-                        final_w, final_h = (w if o_type != 'text' else min(1600, len(ov['content']) * int(curr_fs) * 0.7)), (h if o_type != 'text' else int(curr_fs) * 1.5)
-                        break
+                        collision = False
+                        for p_id, p_l, p_t, p_r, p_b, p_s, p_e, p_imp in placed_boxes:
+                            if max(ov['start'], p_s) < min(ov['start'] + ov.get('duration', 60), p_e):
+                                if not (r + self.MIN_SPACING < p_l or l - self.MIN_SPACING > p_r or b + self.MIN_SPACING < p_t or t - self.MIN_SPACING > p_b):
+                                    collision = True; break
+                        if not collision:
+                            best_pos, found = (cx, cy), True
+                            if radius > 50:
+                                print(f"   🔧 Expert Nudging {ov['id']} -> ({int(cx)}, {int(cy)})")
+                                if not ov.get('animation') or ov.get('animation') not in self.SEMANTIC_ANIMS:
+                                    ov['animation'] = self.SEMANTIC_ANIMS[scene_idx % len(self.SEMANTIC_ANIMS)]
+                            if scale < 1.0:
+                                print(f"   🔧 Scaling down {ov['id']} to {int(scale*100)}%")
+                                if o_type == 'text': ov['fontSize'] = f"{int(curr_fs)}px"
+                                else: ov['width'], ov['height'] = int(w), int(h)
+                            final_w, final_h = (w if o_type != 'text' else min(1600, len(ov['content']) * int(curr_fs) * 0.7)), (h if o_type != 'text' else int(curr_fs) * 1.5)
+                            break
                     if found: break
                 if found: break
 
