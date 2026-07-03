@@ -19,6 +19,7 @@ class KnowledgeItem:
     last_seen: str
     is_anti_pattern: bool = True
     success_rate_after_fix: float = 0.0
+    patch_template: Optional[str] = None
 
 class ProductionMemoryManager:
     """
@@ -84,6 +85,12 @@ class ProductionMemoryManager:
 
     def _process_error(self, err_msg: str, timestamp: str) -> Optional[str]:
         """Converts raw error into a structured KnowledgeItem."""
+        patch = None
+        if "REQUIRED PATCH:" in err_msg:
+            parts = err_msg.split("REQUIRED PATCH:")
+            err_msg = parts[0].strip()
+            patch = parts[1].strip()
+
         # Normalize: Remove specific IDs/Names to find recurring patterns
         normalized = re.sub(r'\[SCENE_\d+\]', '', err_msg)
         normalized = re.sub(r"Overlay '.*?'", 'An overlay', normalized)
@@ -108,6 +115,7 @@ class ProductionMemoryManager:
             item = self.knowledge_base[k_id]
             item.frequency += 1
             item.last_seen = timestamp
+            if patch: item.patch_template = patch
             # Anti-pattern becomes MORE important the more it happens
             item.importance = min(1.0, 0.4 + (item.frequency * 0.15))
             # But success counter-acts importance
@@ -118,7 +126,7 @@ class ProductionMemoryManager:
                 id=k_id, content=normalized, category=category,
                 tags=self._extract_tags(normalized), importance=0.45,
                 frequency=1, first_seen=timestamp, last_seen=timestamp,
-                is_anti_pattern=True
+                is_anti_pattern=True, patch_template=patch
             )
             return k_id
 
@@ -185,7 +193,10 @@ class ProductionMemoryManager:
         if anti_patterns:
             injection += "⚠️ CRITICAL ERRORS TO AVOID (HIGH FREQUENCY):\n"
             for it in anti_patterns:
-                injection += f"- {it.content}\n"
+                line = f"- {it.content}"
+                if it.patch_template:
+                    line += f" -> [FIX TEMPLATE]: {it.patch_template}"
+                injection += line + "\n"
 
         success_patterns = [it for it in top_items if not it.is_anti_pattern]
         if success_patterns:

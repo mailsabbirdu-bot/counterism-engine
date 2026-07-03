@@ -22,6 +22,7 @@ class PerceptionFinding:
     fix_suggestion: str
     expected_quality_gain: float
     category: str = "general" # layout, motion, cognitive, composition, readability, narrative
+    patch: Optional[Dict[str, Any]] = None
 
 @dataclass
 class PerceptionObservation:
@@ -476,16 +477,22 @@ class TemporalHierarchyEngine(HumanVisionModule):
                 # V7.1: Include high-weight SVGs and indicators in reveal detection
                 focal_elements = [e.get('id') for e in elements if supervisor.ELEMENT_WEIGHTS.get(str(e.get('type','')).lower().replace('shadcn_', ''), 1.0) >= 0.8]
                 if len(focal_elements) > 1:
-                    obs.findings.append(PerceptionFinding(
-                        severity="error", confidence=0.9, frame_range=(start_frame, start_frame+15),
-                        affected_elements=focal_elements,
-                        human_explanation="Simultaneous focal reveals.",
-                        technical_explanation=f"Multiple elements with high weight reveal on frame {start_frame}.",
-                        viewer_impact="Attention saturation; the eye doesn't know where to lock first.",
-                        fix_suggestion="Stagger focal reveals by at least 12-15 frames.",
-                        expected_quality_gain=0.6,
-                        category="cognitive"
-                    ))
+                    # v3.0: Specific staggering patch
+                    suggested_start = start_frame
+                    for i, eid in enumerate(focal_elements):
+                        if i == 0: continue
+                        suggested_start += 15
+                        obs.findings.append(PerceptionFinding(
+                            severity="error", confidence=0.9, frame_range=(start_frame, start_frame+15),
+                            affected_elements=[eid],
+                            human_explanation=f"Simultaneous focal reveal: '{eid}' overlaps with others.",
+                            technical_explanation=f"Multiple elements with high weight reveal on frame {start_frame}.",
+                            viewer_impact="Attention saturation; the eye doesn't know where to lock first.",
+                            fix_suggestion=f"Reveal '{eid}' at frame {suggested_start} instead of {start_frame}.",
+                            expected_quality_gain=0.6,
+                            category="cognitive",
+                            patch={"start": suggested_start}
+                        ))
         return obs
 
 class MotionContinuityEngine(HumanVisionModule):
@@ -1098,11 +1105,18 @@ class SceneSupervisor:
                     "viewer_impact": finding.viewer_impact,
                     "fix_suggestion": finding.fix_suggestion,
                     "expected_quality_gain": finding.expected_quality_gain,
-                    "category": finding.category
+                    "category": finding.category,
+                    "patch": finding.patch
                 })
 
         # Derived legacy reporting from V7 structured findings
-        all_issues = [f['human_explanation'] for f in all_findings if f['severity'] in ['error', 'critical']]
+        all_issues = []
+        for f in all_findings:
+            if f['severity'] in ['error', 'critical']:
+                msg = f['human_explanation']
+                if f.get('patch'): msg += f" -> REQUIRED PATCH: {json.dumps(f['patch'])}"
+                all_issues.append(msg)
+
         all_notes = [f['viewer_impact'] for f in all_findings]
         all_fixes = [f['fix_suggestion'] for f in all_findings if f['fix_suggestion']]
         all_m_issues = [f['human_explanation'] for f in all_findings if f['category'] == 'motion']
