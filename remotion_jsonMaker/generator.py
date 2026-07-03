@@ -13,9 +13,11 @@ import playwright_stealth
 try:
     from .supervisor import supervise_manifest
     from .intelligence import SceneIntelligenceEngine
+    from .memory_manager import ProductionMemoryManager
 except (ImportError, ValueError):
     from supervisor import supervise_manifest
     from intelligence import SceneIntelligenceEngine
+    from memory_manager import ProductionMemoryManager
 
 class RemotionJsonMaker:
     # --- PRODUCTION-GRADE CONSTANTS ---
@@ -86,10 +88,11 @@ class RemotionJsonMaker:
     MIN_SPACING = 30
     MIN_FONT_SIZE = 40
 
-    def __init__(self, user_data_dir: str = None, headless: bool = True, manual: bool = False):
+    def __init__(self, user_data_dir: str = None, headless: bool = True, manual: bool = False, memory_path: str = "production_knowledge.json"):
         self.user_data_dir = user_data_dir
         self.headless = headless
         self.manual = manual
+        self.memory = ProductionMemoryManager(memory_path)
         self.playwright = None
         self.browser = None
         self.context = None
@@ -784,6 +787,7 @@ class RemotionJsonMaker:
 
     def generate(self, story: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None, drive_prompt_path: str = None,
                  previous_json: str = None, feedback_errors: List[str] = None, current_score: int = 0, interaction_log_path: str = None) -> Tuple[Dict[str, Any], bool]:
+        memory_context = self.memory.get_prompt_injection()
         pattern = r'(?:Scene|দৃশ্য)\s+[0-9০-৯]+[:\s]*'
         story_parts = [p.strip().lstrip(':').strip() for p in re.split(pattern, story, flags=re.IGNORECASE) if p.strip()]
         for i, n in enumerate(story_parts, 1): self.story_scenes[f"SCENE_{i:02d}"] = n
@@ -870,6 +874,7 @@ class RemotionJsonMaker:
             f"✓ Hero word exists in text content.\n"
             f"✓ Only approved component variants used.\n\n"
             f"{drive_guideline}\n"
+            f"{memory_context}\n"
             f"OUTPUT RAW JSON BLOCK ONLY. NO PREAMBLE. NO CHATTER."
         )
         if prompt_output_path:
@@ -923,7 +928,9 @@ def main():
     parser.add_argument("--manual", action="store_true")
     args = parser.parse_args()
 
-    maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, manual=args.manual)
+    manifest_dir = os.path.dirname(args.output)
+    memory_file = os.path.join(manifest_dir, "production_knowledge.json")
+    maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, manual=args.manual, memory_path=memory_file)
     if args.fps_update_file: maker.load_fps_update(args.fps_update_file)
     maker.scan_assets(args.public_dir)
 
@@ -969,6 +976,9 @@ def main():
         # --- STAGE 4: ELEMENT SUPERVISOR (DIRECTOR REVIEW) ---
         supervisor_feedback = maker.supervise(render_json)
         feedback = qa_feedback + supervisor_feedback
+
+        # Record finding for future memory
+        maker.memory.record_finding(success, score, feedback, manifest=render_json)
 
         # If supervisor found issues but QA passed, we still might want to iterate
         if supervisor_feedback and score == 100:
