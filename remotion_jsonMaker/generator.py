@@ -787,7 +787,14 @@ class RemotionJsonMaker:
 
     def generate(self, story: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None, drive_prompt_path: str = None,
                  previous_json: str = None, feedback_errors: List[str] = None, current_score: int = 0, interaction_log_path: str = None) -> Tuple[Dict[str, Any], bool]:
-        memory_context = self.memory.get_prompt_injection()
+        # Context-Aware Memory Retrieval: Extract tags from the story/durations to find relevant past mistakes
+        context_tags = []
+        if 'bangla' in story.lower() or any('\u0980' <= c <= '\u09FF' for c in story): context_tags.append('bangla')
+        if 'chart' in story.lower(): context_tags.append('chart')
+        if 'indicator' in story.lower(): context_tags.append('indicator')
+        if 'connector' in story.lower(): context_tags.append('connector')
+
+        memory_context = self.memory.get_prompt_injection(context_tags=context_tags)
         pattern = r'(?:Scene|দৃশ্য)\s+[0-9০-৯]+[:\s]*'
         story_parts = [p.strip().lstrip(':').strip() for p in re.split(pattern, story, flags=re.IGNORECASE) if p.strip()]
         for i, n in enumerate(story_parts, 1): self.story_scenes[f"SCENE_{i:02d}"] = n
