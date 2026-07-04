@@ -18,7 +18,9 @@ export const Connector: React.FC<ConnectorProps & { start?: number; duration?: n
   targetAnchor = 'center',
   start = 0,
   duration: userDuration = 120,
-  id = 'connector'
+  id = 'connector',
+  label,
+  pulse = false
 }) => {
   const frame = useCurrentFrame();
   const { fps, width: videoWidth, height: videoHeight } = useVideoConfig();
@@ -65,6 +67,10 @@ export const Connector: React.FC<ConnectorProps & { start?: number; duration?: n
   const finalStyle = { ...config.style, ...userStyle };
   const finalAnimation = { ...config.animation, ...userAnimation };
 
+  // Pulse effect
+  const pulseScale = pulse ? 1 + Math.sin(frame / 5) * 0.1 : 1;
+  const pulseOpacity = pulse ? 0.7 + Math.sin(frame / 5) * 0.3 : 1;
+
   return (
     <AbsoluteFill className="pointer-events-none">
       <svg width={videoWidth} height={videoHeight} viewBox={`0 0 ${videoWidth} ${videoHeight}`} style={{ opacity }}>
@@ -96,12 +102,40 @@ export const Connector: React.FC<ConnectorProps & { start?: number; duration?: n
           d={path}
           fill="none"
           stroke={finalStyle.color}
-          strokeWidth={finalStyle.width}
+          strokeWidth={finalStyle.width * pulseScale}
           strokeDasharray={finalStyle.dashArray || pathLength}
           strokeDashoffset={pathLength * (1 - drawProgress)}
           strokeLinecap="round"
           strokeLinejoin="round"
+          opacity={pulseOpacity}
         />
+
+        {/* Label along the path */}
+        {label && drawProgress > 0.5 && (
+           <text
+             dy="-10"
+             style={{
+               fontSize: '24px',
+               fontWeight: 'bold',
+               fill: finalStyle.color,
+               fontFamily: 'Inter, sans-serif',
+               textTransform: 'uppercase',
+               letterSpacing: '2px',
+               opacity: interpolate(drawProgress, [0.5, 0.8], [0, 1]),
+               paintOrder: 'stroke',
+               stroke: 'black',
+               strokeWidth: 4
+             }}
+           >
+             <textPath
+               href={`#${id}`}
+               startOffset="50%"
+               textAnchor="middle"
+             >
+               {label}
+             </textPath>
+           </text>
+        )}
 
         {/* Arrow Head at the end */}
         {drawProgress > 0.95 && (
