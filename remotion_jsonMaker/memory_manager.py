@@ -3,8 +3,8 @@ import os
 import time
 import re
 import math
+import hashlib
 from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, asdict, field
 
 @dataclass
 class KnowledgeItem:
@@ -108,8 +108,8 @@ class ProductionMemoryManager:
         elif any(x in normalized.lower() for x in ['animation', 'motion', 'reveal', 'pacing']): category = 'motion'
         elif any(x in normalized.lower() for x in ['variant', 'type', 'config', 'data']): category = 'variant'
 
-        # Generate unique ID for the pattern
-        k_id = f"err_{hash(normalized) & 0xFFFFFFFF:08x}"
+        # Generate unique stable ID for the pattern
+        k_id = f"err_{hashlib.sha256(normalized.encode('utf-8')).hexdigest()[:12]}"
 
         if k_id in self.knowledge_base:
             item = self.knowledge_base[k_id]

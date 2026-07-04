@@ -22,9 +22,6 @@ except (ImportError, ValueError):
     from perception_logic import VisionConstants
 
 class RemotionJsonMaker:
-    def _is_bangla(self, text: str) -> bool:
-        return any('\u0980' <= c <= '\u09FF' for c in str(text))
-
     # --- PRODUCTION-GRADE CONSTANTS ---
     TYPE_SIZES = {
         'text': (800, 200), 'chart': (1000, 562), 'shadcn_chart': (1000, 562),
@@ -364,7 +361,7 @@ class RemotionJsonMaker:
 
         # Font Decision Logic (Hardened)
         content = str(ov.get('content', '')).strip()
-        is_content_bangla = self._is_bangla(content)
+        is_content_bangla = VisionConstants.is_bangla(content)
         ai_font = ov.get('font')
 
         if is_content_bangla:
@@ -869,7 +866,7 @@ class RemotionJsonMaker:
                  previous_json: str = None, feedback_errors: List[str] = None, current_score: int = 0, interaction_log_path: str = None, surgical_mode: bool = False) -> Tuple[Dict[str, Any], bool]:
         # Context-Aware Memory Retrieval: Extract tags from the story/durations to find relevant past mistakes
         context_tags = []
-        if 'bangla' in story.lower() or any('\u0980' <= c <= '\u09FF' for c in story): context_tags.append('bangla')
+        if 'bangla' in story.lower() or VisionConstants.is_bangla(story): context_tags.append('bangla')
         if 'chart' in story.lower(): context_tags.append('chart')
         if 'indicator' in story.lower(): context_tags.append('indicator')
         if 'connector' in story.lower(): context_tags.append('connector')

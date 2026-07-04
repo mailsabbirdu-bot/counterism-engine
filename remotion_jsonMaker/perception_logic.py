@@ -26,6 +26,11 @@ class VisionConstants:
     DEFAULT_BANGLA_FONTS = ["Sohid_bangla", "Kalpurush", "Hind_Siliguri"]
 
     @staticmethod
+    def is_bangla(text: str) -> bool:
+        """Detects if a string contains Bangla characters."""
+        return any('\u0980' <= c <= '\u09FF' for c in str(text))
+
+    @staticmethod
     def to_str(val: Any) -> str:
         """Safely flattens potentially hallucinated dictionary values into strings."""
         if not val: return ""
