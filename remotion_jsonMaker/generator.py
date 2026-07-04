@@ -294,26 +294,29 @@ class RemotionJsonMaker:
         # UNIFICATION: Standardize content keys before promotion
         o_type = str(ov.get('type', 'text')).lower()
         ov['type'] = o_type # Ensure key exists for priority checks
-        if 'text' in ov and 'content' not in ov: ov['content'] = ov['text']
-        if 'label' in ov and 'content' not in ov: ov['content'] = ov['label']
-        if 'title' in ov and 'content' not in ov and o_type == 'text': ov['content'] = ov['title']
+
+        # Helper to unify keys within an object
+        def unify_obj(obj):
+            if 'text' in obj and 'content' not in obj: obj['content'] = obj['text']
+            if 'label' in obj and 'content' not in obj: obj['content'] = obj['label']
+            if 'title' in obj and 'content' not in obj and o_type == 'text': obj['content'] = obj['title']
+            if 'size' in obj:
+                if 'fontSize' not in obj: obj['fontSize'] = f"{obj['size']}px" if isinstance(obj['size'], (int, float)) else str(obj['size'])
+                del obj['size']
+            if 'z_index' in obj:
+                if 'zIndex' not in obj: obj['zIndex'] = obj['z_index']
+                del obj['z_index']
+
+        unify_obj(ov)
 
         # Move fields from 'properties', 'data', 'styling', 'style' or 'config' to root
         for nest_key in ['properties', 'data', 'styling', 'style', 'config']:
             if nest_key in ov and isinstance(ov[nest_key], dict):
                 nested = ov[nest_key]
-                # Unify nested too
-                if 'text' in nested and 'content' not in nested: nested['content'] = nested['text']
-                if 'label' in nested and 'content' not in nested: nested['content'] = nested['label']
-                if 'size' in nested:
-                     if 'fontSize' not in nested: nested['fontSize'] = f"{nested['size']}px" if isinstance(nested['size'], (int, float)) else str(nested['size'])
-                     del nested['size']
-                if 'z_index' in nested:
-                     if 'zIndex' not in nested: nested['zIndex'] = nested['z_index']
-                     del nested['z_index']
+                unify_obj(nested)
 
                 for sub_key, sub_val in nested.items():
-                    if sub_key in self.LOCKED_FIELDS: continue
+                    # v3.1: Force promote locked fields IF they were nested (solves AI nesting habit)
                     ov[sub_key] = sub_val
                 del ov[nest_key]
 
@@ -657,6 +660,37 @@ class RemotionJsonMaker:
             print(f"   ✅ Applied {patch_count} deterministic repairs.")
         return data
 
+    def extract_problematic_segments(self, data: Dict[str, Any], feedback: List[str]) -> Dict[str, Any]:
+        """v3.0: Extracts only the scenes/overlays that have remaining issues after auto-repair."""
+        problematic_scenes = []
+        # Find scenes mentioned in feedback
+        scene_ids = set(re.findall(r'\[(SCENE_\d+)\]', "\n".join(feedback)))
+
+        for scene in data.get('scenes', []):
+            if scene.get('scene_id') in scene_ids:
+                # v3.0: Provide full scene context for correction
+                problematic_scenes.append(scene)
+
+        return {"scenes": problematic_scenes}
+
+    def merge_surgical_corrections(self, master: Dict[str, Any], corrections: Dict[str, Any]) -> Dict[str, Any]:
+        """v3.0: Merges surgical Gemini corrections back into the master manifest."""
+        if not corrections or 'scenes' not in corrections: return master
+
+        for corr_scene in corrections['scenes']:
+            s_id = corr_scene.get('scene_id')
+            found = False
+            for i, master_scene in enumerate(master.get('scenes', [])):
+                if master_scene.get('scene_id') == s_id:
+                    master['scenes'][i] = corr_scene
+                    found = True; break
+            if not found:
+                master['scenes'].append(corr_scene)
+
+        # Re-sort scenes to maintain timeline order
+        master['scenes'].sort(key=lambda x: int(re.search(r'\d+', x.get('scene_id', '0')).group()))
+        return master
+
     def supervise(self, data: Dict[str, Any]) -> List[str]:
         """Runs the Element Supervisor and Intelligence Engine on the manifest."""
         print(f"🧠 INTELLIGENCE: Predicting human perception and attention flow...")
@@ -752,7 +786,11 @@ class RemotionJsonMaker:
                         for se in scene_errs:
                             error_list_text += f"  - {se.replace(f'[{scene}] ', '')}\n"
 
+                    mode_desc = "SURGICAL REPAIR (Partial JSON allowed)" if surgical_mode else "FULL MANIFEST REPAIR"
+                    json_header = "--- PROBLEMATIC SCENES ONLY (REPAIRED BY ENGINE) ---" if surgical_mode else "--- PREVIOUS JSON (REPAIRED BY ENGINE) ---"
+
                     copy_payload = (
+                        f"MODE: {mode_desc}\n"
                         f"{error_summary}"
                         f"--- ERROR LIST ---\n{error_list_text}\n\n"
                         f"--- [REQUIRED] REPAIR RULES ---\n"
@@ -760,8 +798,9 @@ class RemotionJsonMaker:
                         f"2. [FONTS] Use ONLY local production fonts (e.g., Sohid_bangla, Audiowide-Regular_english).\n"
                         f"3. [PATCH] If the error list contains a 'REQUIRED PATCH', you MUST apply it.\n"
                         f"4. [ANCHORS] Use canonical positions: L_MID(550,540), R_MID(1370,540), C_TOP(960,320), C_BOT(960,760).\n"
-                        f"5. [VALIDATION] Every scene MUST have a valid camera 'shot' sequence targeting overlay IDs.\n\n"
-                        f"--- PREVIOUS JSON (REPAIRED BY ENGINE) ---\n{previous_json}\n\n"
+                        f"5. [VALIDATION] Every scene MUST have a valid camera 'shot' sequence targeting overlay IDs.\n"
+                        f"6. [SCOPE] RETURN ONLY THE CORRECTED SCENES inside a {{\"scenes\": []}} object. Do not include global settings or correct scenes.\n\n"
+                        f"{json_header}\n{previous_json}\n\n"
                         f"--- STORY CONTEXT ---\n"
                         f"{re.search(r'STORY:.*?(?=TIMESTAMPS:)', prompt, re.DOTALL).group() if 'STORY:' in prompt else prompt[:500]}"
                     )
@@ -825,11 +864,9 @@ class RemotionJsonMaker:
         matches = re.findall(r'(SCENE_\d+):.*?\[30fps:\s*(\d+)f\s*-\s*\d+f\]\s*"(.*?)"', ts_content)
         return " | ".join([f"{m[0]}:{m[1]}f \"{m[2]}\"" for m in matches])
 
-    def _is_bangla(self, text: str) -> bool:
-        return any('\u0980' <= c <= '\u09FF' for c in str(text))
 
     def generate(self, story: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None, drive_prompt_path: str = None,
-                 previous_json: str = None, feedback_errors: List[str] = None, current_score: int = 0, interaction_log_path: str = None) -> Tuple[Dict[str, Any], bool]:
+                 previous_json: str = None, feedback_errors: List[str] = None, current_score: int = 0, interaction_log_path: str = None, surgical_mode: bool = False) -> Tuple[Dict[str, Any], bool]:
         # Context-Aware Memory Retrieval: Extract tags from the story/durations to find relevant past mistakes
         context_tags = []
         if 'bangla' in story.lower() or any('\u0980' <= c <= '\u09FF' for c in story): context_tags.append('bangla')
@@ -999,37 +1036,49 @@ def main():
     manifest_dir = os.path.dirname(args.output)
     interaction_log = os.path.join(manifest_dir, "interaction_log.txt")
 
+    master_json = {}
+
     while iteration <= 10: # Increased attempts for production perfection
-        print(f"\n🚀 ITERATION {iteration}: AI Generation & Hardening...")
+        print(f"\n🚀 ITERATION {iteration}: {'AI Generation' if iteration == 1 else 'Surgical Refinement'} & Hardening...")
+
+        # v3.0: If iteration > 1, use surgical mode with extracted problematic segments
+        current_surgical_mode = (iteration > 1)
+
         render_json, force_stop = maker.generate(story, args.prompt_output, ts_content, scene_durations, args.drive_prompt,
-                                     previous_json, feedback_errors, current_score, interaction_log_path=interaction_log)
+                                     previous_json, feedback_errors, current_score, interaction_log_path=interaction_log,
+                                     surgical_mode=current_surgical_mode)
 
         if not render_json and not force_stop:
             print("⚠️ Failed to parse AI output. Retrying...")
             iteration += 1
             continue
 
+        # v3.0: Merge surgical corrections back into master
+        if current_surgical_mode:
+            master_json = maker.merge_surgical_corrections(master_json, render_json)
+        else:
+            master_json = render_json
+
         # --- ENGINE-SIDE DETERMINISTIC FIXES (STAGE 2: HARDENING) ---
-        # All deep promotion and internal fixes are now consolidated in finalize_json_durations
-        render_json = maker.finalize_json_durations(render_json, public_dir=args.public_dir)
+        master_json = maker.finalize_json_durations(master_json, public_dir=args.public_dir)
 
         # Save temporarily for QA
         with open(args.output, 'w', encoding='utf-8') as f:
-            json.dump(render_json, f, indent=2, ensure_ascii=False)
+            json.dump(master_json, f, indent=2, ensure_ascii=False)
 
         print(f"🧪 STAGE 3: Production QA (Iteration {iteration})...")
         success, score, qa_feedback = test_manifest_quality(args.output, args.public_dir)
         current_score = score
 
         # --- STAGE 4: ELEMENT SUPERVISOR (DIRECTOR REVIEW) ---
-        supervisor_feedback = maker.supervise(render_json)
+        supervisor_feedback = maker.supervise(master_json)
         feedback = qa_feedback + supervisor_feedback
 
-        # v3.0: Apply deterministic QA repairs before re-prompting
-        render_json = maker.apply_qa_patches(render_json, feedback)
+        # v3.0: Apply deterministic QA repairs locally on master_json
+        master_json = maker.apply_qa_patches(master_json, feedback)
 
         # Record finding for future memory
-        maker.memory.record_finding(success, score, feedback, manifest=render_json)
+        maker.memory.record_finding(success, score, feedback, manifest=master_json)
 
         # If supervisor found issues but QA passed, we still might want to iterate
         if supervisor_feedback and score == 100:
@@ -1048,19 +1097,51 @@ def main():
         if success or force_stop:
             if force_stop:
                 print(f"\n🛑 PROCESS ENDED MANUALLY. Restoring Best Result ({best_score}%)...")
-                render_json = best_json
+                master_json = best_json
             else:
                 print(f"\n✨ PRODUCTION READY! Final Rating: {score}%")
             break
+        elif iteration == 10:
+            print(f"\n⌛ MAX ITERATIONS REACHED. Restoring Best Result ({best_score}%)...")
+            master_json = best_json
+            break
         else:
             print(f"\n⚠️ QA FAILED ({score}%). Re-prompting for correction...")
-            previous_json = json.dumps(render_json, indent=2, ensure_ascii=False)
+            # v3.0: Extract only problematic parts for next iteration prompt
+            surgical_data = maker.extract_problematic_segments(master_json, feedback)
+            previous_json = json.dumps(surgical_data, indent=2, ensure_ascii=False)
             feedback_errors = feedback
             iteration += 1
 
     # Ensure final best result is saved
     with open(args.output, 'w', encoding='utf-8') as f:
-        json.dump(render_json, f, indent=2, ensure_ascii=False)
-    print(f"✅ Final Manifest saved to: {args.output}")
+        json.dump(master_json, f, indent=2, ensure_ascii=False)
+
+    print(f"\n✅ Final Manifest saved to: {args.output}")
+
+    # --- FINAL PRODUCTION AUDIT ---
+    print("\n" + "="*80)
+    print("🏆 FINAL PRODUCTION AUDIT REPORT")
+    print("="*80)
+
+    final_reports = supervise_manifest(master_json)
+    avg_cinematic = 0
+
+    for r in final_reports:
+        s_id = r['scene_id']
+        s_score = r['scores'].get('overall_cinematic_score', 0)
+        avg_cinematic += s_score
+        print(f"\n🎬 {s_id}: Cinematic Score {s_score}/10")
+        print(f"   - Clarity: {r['scores'].get('attention_clarity', 0)}")
+        print(f"   - Motion: {r['scores'].get('motion_discipline', 0)}")
+        print(f"   - Readability: {r['scores'].get('readability_score', 0)}")
+        print(f"   - Verdict: {r['professional_verdict']}")
+
+    if final_reports:
+        avg_cinematic /= len(final_reports)
+        print("\n" + "-"*40)
+        print(f"📈 COMPOSITE PROJECT SCORE: {round(avg_cinematic * 10, 1)}%")
+        print(f"✨ Production status: {'READY FOR BROADCAST' if avg_cinematic >= 8.5 else 'REFINEMENT RECOMMENDED'}")
+        print("-"*40)
 
 if __name__ == "__main__": main()
