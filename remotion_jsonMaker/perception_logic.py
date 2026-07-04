@@ -21,6 +21,10 @@ class VisionConstants:
         "L_BOT": (550, 760), "C_BOT": (960, 760), "R_BOT": (1370, 760)
     }
 
+    # Production Fonts
+    DEFAULT_ENGLISH_FONTS = ["Audiowide-Regular_english", "Inter", "Arial"]
+    DEFAULT_BANGLA_FONTS = ["Sohid_bangla", "Kalpurush", "Hind_Siliguri"]
+
     @staticmethod
     def to_str(val: Any) -> str:
         """Safely flattens potentially hallucinated dictionary values into strings."""

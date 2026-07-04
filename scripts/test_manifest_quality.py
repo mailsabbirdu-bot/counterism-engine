@@ -328,10 +328,22 @@ def test_manifest_quality(filepath, public_dir=None):
                     scores["typography"] -= 10
                 elif font not in available_fonts:
                     if font not in ['Inter', 'Arial', 'sans-serif', 'serif', 'monospace']:
-                        all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Font '{font}' is NOT in /public/fonts. Valid local fonts: {available_fonts}", "category": "typography"})
+                        suggested = bangla_fonts[0] if is_bangla and bangla_fonts else (english_fonts[0] if english_fonts else "Arial")
+                        all_feedback.append({
+                            "scene": scene_id, "id": ov_id, "severity": S_ERROR,
+                            "msg": f"Font '{font}' is NOT in /public/fonts.",
+                            "patch": {"font": suggested},
+                            "category": "typography"
+                        })
                         scores["typography"] -= 15
                     else:
-                        all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_WARNING, "msg": f"Uses generic font '{font}'. Use production fonts like {available_fonts[:3]} instead.", "category": "typography"})
+                        suggested = bangla_fonts[0] if is_bangla and bangla_fonts else (english_fonts[0] if english_fonts else "Arial")
+                        all_feedback.append({
+                            "scene": scene_id, "id": ov_id, "severity": S_WARNING,
+                            "msg": f"Uses generic font '{font}'.",
+                            "patch": {"font": suggested},
+                            "category": "typography"
+                        })
                         scores["typography"] -= 5
 
                 # Language consistency
