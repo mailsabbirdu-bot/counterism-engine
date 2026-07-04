@@ -503,7 +503,9 @@ def test_manifest_quality(filepath, public_dir=None):
     # Includes machine-actionable patches if available
     str_feedback = []
     for f in all_feedback:
-        fb = f"[{f.get('scene','GLOBAL')}] {f['severity']}: {f['msg']}"
+        scene = f.get('scene','GLOBAL')
+        target = f" ({f['id']})" if f.get('id') else ""
+        fb = f"[{scene}] {f['severity']}:{target} {f['msg']}"
         if f.get('patch'):
             fb += f" -> REQUIRED PATCH: {json.dumps(f['patch'])}"
         str_feedback.append(fb)
