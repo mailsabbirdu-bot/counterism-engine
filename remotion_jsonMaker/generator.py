@@ -79,10 +79,10 @@ class RemotionJsonMaker:
     ]
 
     PRIORITY = {
-        'hero': 1000, 'text': 100, 'hub_network': 90, 'flow_diagram': 90, 'process': 90,
-        'chart': 80, 'shadcn_chart': 80, 'kpi_card': 80, 'timeline': 75, 'ui_panel': 60,
-        'compositions': 55, 'groups': 55, 'data_indicator': 50, 'shadcn_indicator': 50,
-        'label': 45, 'callout': 45, 'svg': 40, 'kpi': 40, 'connector': 35, 'graph': 30,
+        'hero': 1000, 'text': 60, 'hub_network': 90, 'flow_diagram': 90, 'process': 90,
+        'chart': 40, 'shadcn_chart': 40, 'graph': 50, 'kpi_card': 40, 'timeline': 75, 'ui_panel': 60,
+        'compositions': 55, 'groups': 55, 'data_indicator': 40, 'shadcn_indicator': 40,
+        'label': 45, 'callout': 45, 'svg': 40, 'kpi': 40, 'connector': 30,
         'shape': 10, 'ambient_graphic': 5, 'background': 0
     }
 
@@ -379,6 +379,17 @@ class RemotionJsonMaker:
             ov['items'] = [{"label": "Process A", "value": 75, "color": "#00F5FF"}]
         if var in ['stepIndicator', 'step_indicator_glass'] and 'steps' not in ov:
             ov['steps'] = ["Initiate", "Process", "Complete"]
+
+        if o_type == 'graph':
+            if 'nodes' not in ov:
+                ov['nodes'] = [{"id": "node_1", "label": "Concept", "importance": 1.0}]
+            if 'links' not in ov:
+                ov['links'] = []
+            # Ensure every node has an ID and label
+            for i, n in enumerate(ov['nodes']):
+                if 'id' not in n: n['id'] = f"n_{i}"
+                if 'label' not in n: n['label'] = f"Entity {i}"
+                if 'importance' not in n: n['importance'] = 1.0
 
         # Font Decision Logic (Hardened)
         content = str(ov.get('content', '')).strip()
@@ -1003,7 +1014,7 @@ class RemotionJsonMaker:
                 visual_context += f"- {s_id}: {v_desc}{track_info} (Style: Brightness={v_style.get('brightness', 0):.2f}, Contrast={v_style.get('contrast', 0):.2f})\n"
 
         full_prompt = (
-            f"TASK: GENERATE A PRODUCTION-READY CINEMATIC MOTION GRAPHICS MANIFEST.\n\n"
+            f"TASK: GENERATE A PRODUCTION-READY CINEMATIC KNOWLEDGE GRAPH MANIFEST.\n\n"
             f"--- SOURCE CONTENT ---\n"
             f"STORY:\n{story}\n"
             f"TIMESTAMPS: {compact_ts}\n"
@@ -1017,22 +1028,30 @@ class RemotionJsonMaker:
             f"SAFE_MARGIN: 150px from all edges\n"
             f"GRID: Rule of Thirds (X: 640, 1280 | Y: 360, 720)\n"
             f"HEADER_SIZE: 120px | BODY_SIZE: 64px\n"
-            f"Z_INDEX_HIERARCHY: Shapes (10), Charts/Indicators (40), Text (60), Hero (100)\n"
+            f"Z_INDEX_HIERARCHY: Shapes (10), Connectors (30), Charts/Indicators (40), Graphs (50), Text (60), Hero (100)\n"
             f"COLORS: PRIMARY: #00F5FF, ACCENT: #FF3E6C, WARN: #FFD700, SUCCESS: #00FFAB\n\n"
             f"--- SYSTEM ROLE & CORE RULES ---\n"
-            f"ROLE: WORLD-CLASS CINEMATIC MOTION DESIGNER (Vox/Polymatter Style).\n"
-            f"1. [REQUIRED] TYPOGRAPHY: Bangla text MUST use a font from the BANGLA list. English uses ENGLISH list. Use concise 2-3 word headers.\n"
-            f"2. [REQUIRED] COMPOSITION: Use Rule of Thirds. STOP CENTERING. NEVER use generic (960, 700) or (960, 540) coordinates for focal elements. Use negative space from VISUAL PERCEPTION DATA.\n"
-            f"3. [REQUIRED] SYNC: Match 'start' and 'duration' strictly to TIMESTAMPS. Sort overlays by entry time.\n"
-            f"4. [REQUIRED] BACKGROUND: Always 'background_type': 'video'. video_path: 'renders/scene_SC_XX.mp4'. Set 'audio_enabled': false.\n"
-            f"5. [REQUIRED] CAMERA: Every scene MUST have a camera 'shot' sequence targeting valid overlay IDs. Every shot MUST have a 'targetId'.\n"
-            f"6. [REQUIRED] SCHEMA: Use the 'variant' key for subtypes. NEVER invent a variant; use ONLY those listed below.\n"
-            f"7. [REQUIRED] RELATIONSHIPS: Use 'type': 'connector' to link components by their 'id'. Specify 'source' and 'target' IDs. Also populate the scene-level 'connections' array with [{{'from': 'ID', 'to': 'ID'}}] objects.\n"
-            f"8. [REQUIRED] UI_PANELS: Use 'type': 'ui_panel' with 'variant': 'glass' to frame important data or create technical overlays.\n"
-            f"9. [RECOMMENDED] CHOREOGRAPHY: Sequence reveals (Wave 1: Text, Wave 2: Visuals, Wave 3: Connectors/Details).\n"
-            f"10. [OPTIONAL] PARALLAX: Add slight 'parallax' values (-20 to 50) to create technical depth.\n"
-            f"11. [DIRECTOR RULE] COGNITIVE LOAD: Max 1 focal point per moment. Ensure 12-20 frames of 'RESTING TIME' after any major animation before the next event. Avoid simultaneous animations of more than 2 elements.\n"
-            f"12. [DIRECTOR RULE] READABILITY: Hold text on screen for at least (words * 0.3) seconds.\n\n"
+            f"ROLE: SEMANTIC NARRATIVE ARCHITECT & CINEMATIC DIRECTOR.\n"
+            f"OBJECTIVE: Use fewer words combined with sleek animation. Decompose narration into a Knowledge Graph.\n"
+            f"1. [REQUIRED] KNOWLEDGE GRAPH: Every sentence must be converted into Nodes (entities) and Edges (relationships). Use 'type': 'graph' to visualize these connections.\n"
+            f"2. [REQUIRED] TYPOGRAPHY: Use minimal text. Let the graph structure tell the story. Bangla text MUST use a font from the BANGLA list.\n"
+            f"3. [REQUIRED] COMPOSITION: Use Rule of Thirds. Place the Knowledge Graph as the central focal system.\n"
+            f"4. [REQUIRED] SYNC: Match 'start' and 'duration' strictly to TIMESTAMPS. Sort overlays by entry time.\n"
+            f"5. [REQUIRED] BACKGROUND: Always 'background_type': 'video'. video_path: 'renders/scene_SC_XX.mp4'. Set 'audio_enabled': false.\n"
+            f"6. [REQUIRED] CAMERA: Use camera 'shots' to focus on specific nodes/relationships as they are mentioned in narration.\n"
+            f"7. [REQUIRED] RELATIONSHIPS: Use 'type': 'connector' with a 'label' to show the semantic meaning of an edge (e.g., 'causes', 'influences').\n"
+            f"8. [REQUIRED] UI_PANELS: Use 'type': 'ui_panel' with 'variant': 'glass' to show metadata for a selected node.\n"
+            f"9. [RECOMMENDED] CHOREOGRAPHY: Reveal nodes first, then draw edges (connectors) as the relationship is explained.\n"
+            f"10. [OPTIONAL] PARALLAX: Add slight 'parallax' values to create technical depth between the graph and background.\n"
+            f"11. [DIRECTOR RULE] COGNITIVE LOAD: Keep the graph readable. Avoid more than 5 nodes on screen at once unless it's a 'hub' moment.\n"
+            f"12. [DIRECTOR RULE] READABILITY: Hold relationship labels long enough to be read.\n\n"
+            f"--- [REQUIRED] KNOWLEDGE GRAPH AUTHORITY ---\n"
+            f"GRAPH TYPE: 'type': 'graph'\n"
+            f"- nodes: [ {{ 'id': 'node1', 'label': 'Entity Name', 'importance': 1.2, 'type': 'concept' }} ]\n"
+            f"- links: [ {{ 'source': 'node1', 'target': 'node2', 'label': 'Relationship' }} ]\n"
+            f"CONNECTOR: 'type': 'connector'\n"
+            f"- label: 'Relationship text' (Renders along the line)\n"
+            f"- pulse: true (To highlight active relationship)\n\n"
             f"--- [REQUIRED] VARIANT AUTHORITY (USE ONLY THESE) ---\n"
             f"CHARTS: glass_area, neon_bar, stacked_line, radial_score, radar_web, pie_donut_glass, step_area, multi_bar_stack, bar_race_top, thick_line_glow, area, bar, line.\n"
             f"INDICATORS: metric_tile, tech_badge, activity_ring, crypto_card, server_status, data_ticker, notification_stack, kpiNumber, deltaIndicator, semiGauge, milestoneTimeline, statGrid, batteryLevel, statusBadge, stepIndicator, pulseRadar, multiProgress.\n"
@@ -1041,11 +1060,10 @@ class RemotionJsonMaker:
             f"HERO ANIMATIONS: glow_pulse, isolate_zoom, bounce_pop, neon_flicker, shake_alert, rainbow_flow, glitch_pop, wave_float, blur_reveal, glass_shimmer, heartbeat, fire_glow.\n\n"
             f"--- [REQUIRED] MANDATORY SCHEMA FIELDS ---\n"
             f"- ROOT: requires 'project_id', 'global_settings': {{ 'width': 1920, 'height': 1080, 'fps': 30 }}.\n"
+            f"- 'graph': requires 'nodes' and 'links' arrays.\n"
             f"- 'chart': requires 'chart_type', 'title', and 'data' array.\n"
-            f"- 'indicator': requires 'indicator_type', 'title', and 'value' (PURE NUMBER for animation, e.g., 20 NOT '20M').\n"
-            f"- 'milestoneTimeline': requires 'events': [ {{ 'title': '...', 'date': '...', 'description': '...' }} ].\n"
-            f"- 'statGrid': requires 'stats': [ {{ 'label': '...', 'value': 80, 'suffix': '%' }} ].\n"
-            f"- 'connector': requires 'source' (ID), 'target' (ID), and 'variant'.\n\n"
+            f"- 'indicator': requires 'indicator_type', 'title', and 'value' (PURE NUMBER).\n"
+            f"- 'connector': requires 'source' (ID), 'target' (ID), 'variant', and 'label'.\n\n"
             f"--- OPTIMIZATION OBJECTIVES ---\n"
             f"- Eliminate redundant coordinates: use root 'position': {{x,y}} OR properties.x/y, never both.\n"
             f"- Minimize nesting: prefer root-level fields where possible.\n"

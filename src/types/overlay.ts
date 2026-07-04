@@ -20,5 +20,9 @@ export interface Overlay {
     width?: number;
     height?: number;
     cameraFocus?: CameraFocus;
+    nodes?: any[];
+    links?: any[];
+    label?: string;
+    pulse?: boolean;
     [key: string]: any;
 }

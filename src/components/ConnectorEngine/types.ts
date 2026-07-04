@@ -19,6 +19,8 @@ export interface ConnectorProps {
     glow?: boolean;
     dashArray?: string;
   };
+  label?: string;
+  pulse?: boolean;
   sourceAnchor?: 'top' | 'bottom' | 'left' | 'right' | 'center';
   targetAnchor?: 'top' | 'bottom' | 'left' | 'right' | 'center';
 }
