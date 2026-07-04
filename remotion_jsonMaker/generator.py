@@ -7,6 +7,7 @@ import time
 import subprocess
 import shutil
 import math
+import copy
 from typing import Dict, Any, List, Optional, Tuple
 try:
     from .supervisor import supervise_manifest, SceneSupervisor
@@ -1089,25 +1090,30 @@ def main():
     issue_tracker = ConsecutiveIssueTracker(threshold=2)
 
     while iteration <= 10: # Increased attempts for production perfection
-        print(f"\n🚀 ITERATION {iteration}: {'AI Generation' if iteration == 1 else 'Surgical Refinement'} & Hardening...")
+        if iteration <= 5:
+            print(f"\n🚀 ITERATION {iteration}: {'AI Generation' if iteration == 1 else 'Surgical Refinement'}...")
 
-        # v3.0: If iteration > 1, use surgical mode with extracted problematic segments
-        current_surgical_mode = (iteration > 1)
+            # v3.0: If iteration > 1, use surgical mode with extracted problematic segments
+            current_surgical_mode = (iteration > 1)
 
-        render_json, force_stop = maker.generate(story, args.prompt_output, ts_content, scene_durations, args.drive_prompt,
-                                     previous_json, feedback_errors, current_score, interaction_log_path=interaction_log,
-                                     surgical_mode=current_surgical_mode, stubborn_issues=stubborn_issues)
+            render_json, force_stop = maker.generate(story, args.prompt_output, ts_content, scene_durations, args.drive_prompt,
+                                         previous_json, feedback_errors, current_score, interaction_log_path=interaction_log,
+                                         surgical_mode=current_surgical_mode, stubborn_issues=stubborn_issues)
 
-        if not render_json and not force_stop:
-            print("⚠️ Failed to parse AI output. Retrying...")
-            iteration += 1
-            continue
+            if not render_json and not force_stop:
+                print("⚠️ Failed to parse AI output. Retrying...")
+                iteration += 1
+                continue
 
-        # v3.0: Merge surgical corrections back into master
-        if current_surgical_mode:
-            master_json = maker.merge_surgical_corrections(master_json, render_json)
+            # v3.0: Merge surgical corrections back into master
+            if current_surgical_mode:
+                master_json = maker.merge_surgical_corrections(master_json, render_json)
+            else:
+                master_json = render_json
         else:
-            master_json = render_json
+            print(f"\n⚙️ ITERATION {iteration}: AUTONOMOUS ENGINE REPAIR (Targeting 100% Accuracy)...")
+            force_stop = False
+            # Logic: Use previous master_json and apply fixes/hardening recursively
 
         # --- ENGINE-SIDE DETERMINISTIC FIXES (STAGE 2: HARDENING) ---
         master_json = maker.finalize_json_durations(master_json, public_dir=args.public_dir)
@@ -1155,18 +1161,19 @@ def main():
         # RE-EVALUATE AFTER ENGINE FIXES: If engine hardening fixed everything, success=True
         if score == 100: success = True
 
-        # Track best result
+        # Track best result (Always store the fully hardened master_json)
         if score > best_score or best_json is None:
             best_score = score
-            best_json = render_json
+            best_json = copy.deepcopy(master_json)
             print(f"   🏆 New Best Score: {best_score}%")
 
-        if success or force_stop:
+        # ENDING LOGIC: Autonomous perfection required after Iteration 5
+        if (score == 100) or force_stop:
             if force_stop:
                 print(f"\n🛑 PROCESS ENDED MANUALLY. Restoring Best Result ({best_score}%)...")
                 master_json = best_json
-            else:
-                print(f"\n✨ PRODUCTION READY! Final Rating: {score}%")
+            elif score == 100:
+                print(f"\n✨ PRODUCTION READY! 100% Accuracy reached (Iter: {iteration})")
             break
         elif iteration == 10:
             print(f"\n⌛ MAX ITERATIONS REACHED. Restoring Best Result ({best_score}%)...")
