@@ -1,10 +1,10 @@
-# 🤖 Counterism Studio V4 JSON Maker (Playwright Gemini Edition)
+# 🤖 Counterism Studio V4 JSON Maker (Manual Gemini Edition)
 
-Run this cell in Google Colab to generate your `remotion_render.json` using **Gemini** via browser automation.
+Run this cell in Google Colab to generate your `remotion_render.json` using **Gemini** manually with guided prompts and feedback.
 
 ```python
 # ==============================================================================
-# COUNTERISM STUDIO V4 — GEMINI BROWSER JSON MASTER GENERATOR
+# COUNTERISM STUDIO V4 — GEMINI MANUAL JSON MASTER GENERATOR
 # ==============================================================================
 
 import os
@@ -87,8 +87,6 @@ print("\n✨ All Drive assets successfully linked to local public folder.")
 print_banner("🛠️ INSTALLING PROJECT DEPENDENCIES")
 !apt-get update -y -qq && apt-get install -y -qq ffmpeg build-essential
 !pip install -q -r remotion_jsonMaker/requirements.txt
-!playwright install chromium
-!playwright install-deps chromium
 
 # 👁️ VISUAL EYE STAGE
 print_banner("👁️ VISUAL EYE: PERCEPTION STAGE")
@@ -111,7 +109,7 @@ else:
 %cd remotion_jsonMaker
 
 # 4. Generate Master JSON
-print_banner("🧠 GEMINI BROWSER AUTOMATION")
+print_banner("🧠 GEMINI MANUAL INTERACTION")
 FPS_UPDATE_FILE = f"{DRIVE_BASE_PATH}/manifests/fps_update.txt"
 
 %run generator.py \
@@ -121,7 +119,6 @@ FPS_UPDATE_FILE = f"{DRIVE_BASE_PATH}/manifests/fps_update.txt"
     --fps-update-file="{FPS_UPDATE_FILE}" \
     --prompt-output="{PROMPT_FILE}" \
     --drive-prompt="{PROJECT_PATH}/guideline_prompt.txt" \
-    --user-data-dir="{USER_DATA_DIR}" \
     --public-dir="{PROJECT_PATH}/public" \
     --manual
 

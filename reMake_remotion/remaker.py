@@ -22,7 +22,7 @@ class RemotionRemaker:
         self.story_path = story_path
         self.story_scenes = {}
         self.data = self.load_manifest()
-        self.maker = RemotionJsonMaker(headless=True)
+        self.maker = RemotionJsonMaker()
         self.maker.scan_assets(self.public_dir)
         if timestamp_file and os.path.exists(timestamp_file):
             print(f"📂 Loading timestamps for audio sync: {timestamp_file}")
@@ -341,7 +341,6 @@ class RemotionRemaker:
         target_fonts = self.maker.bangla_fonts if lang == "BANGLA" else self.maker.english_fonts
 
         # Get context from original generator (reusing logic)
-        self.maker.start_browser()
 
         hero_anim_list = [
             "glow_pulse", "isolate_zoom", "bounce_pop", "neon_flicker", "shake_alert",
@@ -507,7 +506,6 @@ class RemotionRemaker:
                 print(f"     - [{ov.get('type', '???')}] Content: \"{content}\" | Font: {ov.get('font')}")
             print("-" * 50)
 
-        self.maker.stop_browser()
 
     def render_scene(self, scene_input: Any):
         scene = self.get_scene(scene_input)
