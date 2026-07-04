@@ -9,15 +9,43 @@ import shutil
 import math
 from typing import Dict, Any, List, Optional, Tuple
 try:
-    from .supervisor import supervise_manifest
+    from .supervisor import supervise_manifest, SceneSupervisor
     from .intelligence import SceneIntelligenceEngine
     from .memory_manager import ProductionMemoryManager
     from .perception_logic import VisionConstants
 except (ImportError, ValueError):
-    from supervisor import supervise_manifest
+    from supervisor import supervise_manifest, SceneSupervisor
     from intelligence import SceneIntelligenceEngine
     from memory_manager import ProductionMemoryManager
     from perception_logic import VisionConstants
+
+class ConsecutiveIssueTracker:
+    """Tracks how many times an issue has appeared across iterations."""
+    def __init__(self, threshold: int = 2):
+        self.issue_counts = {} # pattern -> count
+        self.threshold = threshold
+
+    def update_and_get_stubborn(self, feedback: List[str]) -> List[str]:
+        stubborn = []
+        current_patterns = set()
+
+        for fb in feedback:
+            # Strip IDs/timestamps to find recurring patterns
+            # Matches (ov_1_1) or (overlay_0)
+            pattern = re.sub(r'\(\w+\)', '(element)', fb)
+            pattern = re.sub(r'\[SCENE_\d+\]', '[SCENE]', pattern)
+            pattern = re.sub(r'at \d+f', 'at (time)', pattern)
+            current_patterns.add(pattern)
+
+            self.issue_counts[pattern] = self.issue_counts.get(pattern, 0) + 1
+            if self.issue_counts[pattern] >= self.threshold:
+                stubborn.append(fb)
+
+        # Prune resolved issues
+        resolved = [p for p in self.issue_counts if p not in current_patterns]
+        for p in resolved: del self.issue_counts[p]
+
+        return stubborn
 
 class RemotionJsonMaker:
     # --- PRODUCTION-GRADE CONSTANTS ---
@@ -621,8 +649,21 @@ class RemotionJsonMaker:
                                     target_ov_id = overlay_id_match.group(1)
                                     for ov in scene.get('overlays', []):
                                         if ov.get('id') == target_ov_id:
+                                            # Support for special deletion key
+                                            if "_delete" in patch_data:
+                                                for k in patch_data["_delete"]:
+                                                    if k in ov: del ov[k]
+                                                del patch_data["_delete"]
                                             ov.update(patch_data)
                                             patch_count += 1
+                                else:
+                                    # Scene-level patch (not overlay specific)
+                                    if "_delete" in patch_data:
+                                        for k in patch_data["_delete"]:
+                                            if k in scene: del scene[k]
+                                        del patch_data["_delete"]
+                                    scene.update(patch_data)
+                                    patch_count += 1
                     else:
                         # Global patch (less common)
                         data.update(patch_data)
@@ -743,7 +784,7 @@ class RemotionJsonMaker:
         words = re.sub(r'[.।]', '', str(overlay_content)).split()
         return {"word": max(words, key=len), "start": 45} if words else None
 
-    def _interact_with_gemini(self, prompt: str, previous_json: str = None, errors: List[str] = None, score: int = 0, surgical_mode: bool = False) -> str:
+    def _interact_with_gemini(self, prompt: str, previous_json: str = None, errors: List[str] = None, score: int = 0, surgical_mode: bool = False, stubborn_issues: List[str] = None) -> str:
         if self.manual:
             try:
                 from google.colab import output
@@ -752,9 +793,17 @@ class RemotionJsonMaker:
                 feedback_html = ""
                 header_color = "#4CAF50" if score >= 100 else "#FF9800" if score >= 80 else "#FF3E6C"
 
+                if stubborn_issues:
+                    stubborn_list = "".join([f"<li>{e}</li>" for e in stubborn_issues])
+                    feedback_html += f"""<div style='color: #FFD700; margin-bottom: 15px; border-left: 4px solid #FFD700; padding-left: 15px; background: #1a1a00; padding: 10px;'>
+                        <strong style='font-size: 16px;'>⚠️ STUBBORN ISSUES (FAILED TWICE)</strong>
+                        <p style='font-size: 13px;'>The engine will force-apply these patches if you fail again.</p>
+                        <ul style='margin-top: 8px; font-size: 13px; color: #ffeb3b;'>{stubborn_list}</ul>
+                    </div>"""
+
                 if errors:
                     err_list = "".join([f"<li>{e}</li>" for e in errors])
-                    feedback_html = f"""<div style='color: #FF3E6C; margin-bottom: 15px; border-left: 4px solid #FF3E6C; padding-left: 15px; background: #1a0a0d; padding: 10px;'>
+                    feedback_html += f"""<div style='color: #FF3E6C; margin-bottom: 15px; border-left: 4px solid #FF3E6C; padding-left: 15px; background: #1a0a0d; padding: 10px;'>
                         <strong style='font-size: 16px;'>🚨 QA FEEDBACK (CURRENT SCORE: {score}%)</strong>
                         <ul style='margin-top: 8px; font-size: 13px; color: #ff85a1;'>{err_list}</ul>
                     </div>"""
@@ -781,9 +830,16 @@ class RemotionJsonMaker:
                     mode_desc = "SURGICAL REPAIR (Partial JSON allowed)" if surgical_mode else "FULL MANIFEST REPAIR"
                     json_header = "--- PROBLEMATIC SCENES ONLY (REPAIRED BY ENGINE) ---" if surgical_mode else "--- PREVIOUS JSON (REPAIRED BY ENGINE) ---"
 
+                    stubborn_text = ""
+                    if stubborn_issues:
+                        stubborn_text = "⚠️ WARNING: You have failed to fix the following issues twice. FIX THEM NOW or the engine will override your output.\n"
+                        for si in stubborn_issues: stubborn_text += f"  - {si}\n"
+                        stubborn_text += "\n"
+
                     copy_payload = (
                         f"MODE: {mode_desc}\n"
                         f"{error_summary}"
+                        f"{stubborn_text}"
                         f"--- ERROR LIST ---\n{error_list_text}\n\n"
                         f"--- [REQUIRED] REPAIR RULES ---\n"
                         f"1. [FLATTEN] Use ROOT KEYS only. Never nest in 'style', 'data', or 'config'.\n"
@@ -858,7 +914,8 @@ class RemotionJsonMaker:
 
 
     def generate(self, story: str, prompt_output_path: str = None, timestamp_context: str = None, scene_durations: List[int] = None, drive_prompt_path: str = None,
-                 previous_json: str = None, feedback_errors: List[str] = None, current_score: int = 0, interaction_log_path: str = None, surgical_mode: bool = False) -> Tuple[Dict[str, Any], bool]:
+                 previous_json: str = None, feedback_errors: List[str] = None, current_score: int = 0, interaction_log_path: str = None, surgical_mode: bool = False,
+                 stubborn_issues: List[str] = None) -> Tuple[Dict[str, Any], bool]:
         # Context-Aware Memory Retrieval: Extract tags from the story/durations to find relevant past mistakes
         context_tags = []
         if 'bangla' in story.lower() or VisionConstants.is_bangla(story): context_tags.append('bangla')
@@ -957,7 +1014,7 @@ class RemotionJsonMaker:
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
 
-        raw_output = self._interact_with_gemini(full_prompt, previous_json, feedback_errors, current_score, surgical_mode=surgical_mode)
+        raw_output = self._interact_with_gemini(full_prompt, previous_json, feedback_errors, current_score, surgical_mode=surgical_mode, stubborn_issues=stubborn_issues)
         force_stop = False
         if raw_output.startswith("FORCE_QUIT_SIGNAL:"):
             force_stop = True
@@ -1023,11 +1080,13 @@ def main():
     current_score = 0
     best_score = -1
     best_json = None
+    stubborn_issues = None
 
     manifest_dir = os.path.dirname(args.output)
     interaction_log = os.path.join(manifest_dir, "interaction_log.txt")
 
     master_json = {}
+    issue_tracker = ConsecutiveIssueTracker(threshold=2)
 
     while iteration <= 10: # Increased attempts for production perfection
         print(f"\n🚀 ITERATION {iteration}: {'AI Generation' if iteration == 1 else 'Surgical Refinement'} & Hardening...")
@@ -1037,7 +1096,7 @@ def main():
 
         render_json, force_stop = maker.generate(story, args.prompt_output, ts_content, scene_durations, args.drive_prompt,
                                      previous_json, feedback_errors, current_score, interaction_log_path=interaction_log,
-                                     surgical_mode=current_surgical_mode)
+                                     surgical_mode=current_surgical_mode, stubborn_issues=stubborn_issues)
 
         if not render_json and not force_stop:
             print("⚠️ Failed to parse AI output. Retrying...")
@@ -1067,6 +1126,23 @@ def main():
 
         # v3.0: Apply deterministic QA repairs locally on master_json
         master_json = maker.apply_qa_patches(master_json, feedback)
+
+        # Detect stubborn issues (failed to correct twice)
+        stubborn_issues = issue_tracker.update_and_get_stubborn(feedback)
+        if stubborn_issues:
+            print(f"   🚨 STUBBORN ISSUES DETECTED ({len(stubborn_issues)}): Gemini failed to correct these twice.")
+            print(f"   🔧 Engine will now force-override these corrections.")
+            # If stubborn issues exist and they were fixable by patches,
+            # they are already corrected in master_json by apply_qa_patches.
+            # We can re-check quality to see if we can finish.
+            with open(args.output, 'w', encoding='utf-8') as f:
+                json.dump(master_json, f, indent=2, ensure_ascii=False)
+            success, score, qa_feedback = test_manifest_quality(args.output, args.public_dir)
+            current_score = score
+            print(f"   📈 Post-Override Score: {score}%")
+            # Re-evaluate supervisor feedback after engine intervention
+            supervisor_feedback = maker.supervise(master_json)
+            feedback = qa_feedback + supervisor_feedback
 
         # Record finding for future memory
         maker.memory.record_finding(success, score, feedback, manifest=master_json)
