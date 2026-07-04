@@ -217,7 +217,12 @@ def test_manifest_quality(filepath, public_dir=None):
 
         duration = scene.get('duration_in_frames', 180)
         if 'duration' in scene:
-            all_feedback.append({"scene": scene_id, "severity": S_ERROR, "msg": "Redundant 'duration' key found. Use 'duration_in_frames'.", "category": "schema"})
+            all_feedback.append({
+                "scene": scene_id, "severity": S_ERROR,
+                "msg": "Redundant 'duration' key found. Use 'duration_in_frames'.",
+                "patch": {"_delete": ["duration"]},
+                "category": "schema"
+            })
             scores["timing"] -= 5
 
         overlays = scene.get('overlays', [])
@@ -266,13 +271,28 @@ def test_manifest_quality(filepath, public_dir=None):
 
             # Redundant Typography/Z-index check
             if 'size' in ov:
-                all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": "Redundant 'size' key found. Use 'fontSize'.", "category": "schema"})
+                all_feedback.append({
+                    "scene": scene_id, "id": ov_id, "severity": S_ERROR,
+                    "msg": "Redundant 'size' key found. Use 'fontSize'.",
+                    "patch": {"_delete": ["size"]},
+                    "category": "schema"
+                })
                 scores["typography"] -= 5
             if 'z_index' in ov:
-                all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": "Redundant 'z_index' key found. Use 'zIndex'.", "category": "schema"})
+                all_feedback.append({
+                    "scene": scene_id, "id": ov_id, "severity": S_ERROR,
+                    "msg": "Redundant 'z_index' key found. Use 'zIndex'.",
+                    "patch": {"_delete": ["z_index"]},
+                    "category": "composition"
+                })
                 scores["composition"] -= 5
             if 'variant' in ov:
-                all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": "Redundant 'variant' key found. Use specific variant keys (e.g. 'chart_type').", "category": "schema"})
+                all_feedback.append({
+                    "scene": scene_id, "id": ov_id, "severity": S_ERROR,
+                    "msg": "Redundant 'variant' key found. Use specific variant keys (e.g. 'chart_type').",
+                    "patch": {"_delete": ["variant"]},
+                    "category": "schema"
+                })
                 scores["assets"] -= 5
 
             # Media Asset Verification
@@ -294,27 +314,69 @@ def test_manifest_quality(filepath, public_dir=None):
                 if variant_key:
                     variant = ov.get(variant_key)
                     if not variant:
-                        all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Missing '{variant_key}'.", "category": "schema"})
+                        # Patch: Assign default variant
+                        default_v = ENGINE_VARIANTS[o_type][0]
+                        all_feedback.append({
+                            "scene": scene_id, "id": ov_id, "severity": S_ERROR,
+                            "msg": f"Missing '{variant_key}'.",
+                            "patch": {variant_key: default_v},
+                            "category": "schema"
+                        })
                         scores["assets"] -= 25
                     elif variant not in ENGINE_VARIANTS[o_type]:
-                        all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Invalid variant '{variant}' for type '{o_type}'. Valid: {ENGINE_VARIANTS[o_type]}", "category": "schema"})
+                        # Patch: Map to nearest or first valid variant
+                        suggested_v = ENGINE_VARIANTS[o_type][0]
+                        for v in ENGINE_VARIANTS[o_type]:
+                            if v in variant or variant in v: suggested_v = v; break
+
+                        all_feedback.append({
+                            "scene": scene_id, "id": ov_id, "severity": S_ERROR,
+                            "msg": f"Invalid variant '{variant}' for type '{o_type}'. Valid: {ENGINE_VARIANTS[o_type]}",
+                            "patch": {variant_key: suggested_v},
+                            "category": "schema"
+                        })
                         scores["assets"] -= 20
                     else:
-                        # Deep Validation
+                        # Deep Validation with Patches
                         if variant == 'milestoneTracker' and 'milestones' not in ov:
-                            all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Variant '{variant}' requires 'milestones' array.", "category": "data"})
+                            all_feedback.append({
+                                "scene": scene_id, "id": ov_id, "severity": S_ERROR,
+                                "msg": f"Variant '{variant}' requires 'milestones' array.",
+                                "patch": {"milestones": [{"label": "Initiated", "date": "Start"}]},
+                                "category": "data"
+                            })
                             scores["assets"] -= 20
                         elif variant in ['timeline', 'milestoneTimeline'] and 'events' not in ov and 'milestones' not in ov:
-                            all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Variant '{variant}' requires 'events' array.", "category": "data"})
+                            all_feedback.append({
+                                "scene": scene_id, "id": ov_id, "severity": S_ERROR,
+                                "msg": f"Variant '{variant}' requires 'events' array.",
+                                "patch": {"events": [{"title": "Initial Event", "date": "T-0", "description": "Sequence started"}]},
+                                "category": "data"
+                            })
                             scores["assets"] -= 20
                         elif variant == 'statGrid' and 'stats' not in ov:
-                            all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Variant '{variant}' requires 'stats' array.", "category": "data"})
+                            all_feedback.append({
+                                "scene": scene_id, "id": ov_id, "severity": S_ERROR,
+                                "msg": f"Variant '{variant}' requires 'stats' array.",
+                                "patch": {"stats": [{"label": "Metric", "value": 100, "suffix": "%"}]},
+                                "category": "data"
+                            })
                             scores["assets"] -= 20
                         elif variant in ['multiProgress', 'ringChart'] and 'items' not in ov and 'rings' not in ov:
-                            all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Variant '{variant}' requires 'items' array.", "category": "data"})
+                            all_feedback.append({
+                                "scene": scene_id, "id": ov_id, "severity": S_ERROR,
+                                "msg": f"Variant '{variant}' requires 'items' array.",
+                                "patch": {"items": [{"label": "Primary", "value": 85, "color": "#00F5FF"}]},
+                                "category": "data"
+                            })
                             scores["assets"] -= 20
                         elif variant in ['stepIndicator', 'step_indicator_glass'] and 'steps' not in ov:
-                            all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": f"Variant '{variant}' requires 'steps' array.", "category": "data"})
+                            all_feedback.append({
+                                "scene": scene_id, "id": ov_id, "severity": S_ERROR,
+                                "msg": f"Variant '{variant}' requires 'steps' array.",
+                                "patch": {"steps": ["Step 1", "Step 2", "Step 3"]},
+                                "category": "data"
+                            })
                             scores["assets"] -= 20
 
             # Typography & Font Validation
@@ -523,5 +585,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python3 scripts/test_manifest_quality.py <manifest_path> [public_dir]")
         sys.exit(1)
+    # Add project root to path for internal imports
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     success, score, feedback = test_manifest_quality(sys.argv[1])
     sys.exit(0 if success else 1)
