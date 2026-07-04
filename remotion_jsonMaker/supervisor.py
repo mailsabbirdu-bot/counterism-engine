@@ -256,15 +256,19 @@ class GestaltAnalyzer(HumanVisionModule):
                                 p1, p2 = o1.get('position', {'x':0,'y':0}), o2.get('position', {'x':999,'y':999})
                                 dist = math.sqrt((p1['x']-p2['x'])**2 + (p1['y']-p2['y'])**2)
                                 if dist < 120:
+                                    # Deterministic move for o2
+                                    p2_x = p2.get('x', 960)
+                                    target_x = p2_x + 150 if p2_x > p1.get('x', 960) else p2_x - 150
                                     obs.findings.append(PerceptionFinding(
                         severity="warning", confidence=0.8, frame_range=(max(o1.get('start', 0), o2.get('start', 0)), state.duration),
-                        affected_elements=[o1.get('id'), o2.get('id')],
+                        affected_elements=[o2.get('id')],
                         human_explanation=f"Accidental Grouping: '{o1.get('id')}' and '{o2.get('id')}' are too close.",
                         technical_explanation=f"Spatial distance ({int(dist)}px) between elements triggers unintentional Gestalt proximity grouping.",
                         viewer_impact="Cognitive load; viewer perceives elements as a single unit when they should be distinct.",
                         fix_suggestion=f"Add breathing space (at least 150px) between '{o1.get('id')}' and '{o2.get('id')}'.",
                         expected_quality_gain=0.3,
-                        category="layout"
+                        category="layout",
+                        patch={"position": {"x": int(target_x), "y": int(p2.get('y', 540))}}
                     ))
         return obs
 
@@ -691,15 +695,18 @@ class CompositionConstraintEngine(DirectorPsychologyModule):
             if str(ov.get('importance', '')).lower() == 'hero':
                 pos = ov.get('position', {'x': 960, 'y': 540})
                 if abs(pos['x'] - 960) < 50:
+                    # Deterministic anchor selection
+                    target_x = 1370 if "right" in supervisor.bg_intel.get('text_region', {}).get('preferred', '') else 550
                     obs.findings.append(PerceptionFinding(
                         severity="warning", confidence=0.8, frame_range=(ov.get('start', 0), state.duration),
                         affected_elements=[ov.get('id')],
                         human_explanation="Hero element is centered.",
                         technical_explanation="Hero element X-coordinate is too close to center (960).",
                         viewer_impact="Layout feels 'standard' and lacks cinematic asymmetry.",
-                        fix_suggestion="Move hero to a Rule of Thirds vertical anchor (640 or 1280).",
+                        fix_suggestion=f"Move hero to ({target_x}, 540).",
                         expected_quality_gain=0.3,
-                        category="composition"
+                        category="composition",
+                        patch={"position": {"x": target_x, "y": 540}}
                     ))
 
         return obs
@@ -840,11 +847,11 @@ class ScoringSynthesisEngine(AnalysisModule):
             # V7.1 Recovery Mechanism: Positive signals reward the score
             if finding.severity == "info" and "utilize" in finding.human_explanation.lower():
                 reward = 0.05 * finding.confidence
-                category_quality[mapped_cat] = min(1.0, category_quality.get(mapped_cat, 0.5) + reward)
+                category_quality[mapped_cat] = min(1.0, category_quality.get(mapped_cat, 1.0) + reward)
                 continue
 
             # Impact factor based on severity (Penalties)
-            impact = 0.05 # info
+            impact = 0.01 # info (Aesthetic refinement)
             if finding.severity == "critical": impact = 0.35
             elif finding.severity == "error": impact = 0.20
             elif finding.severity == "warning": impact = 0.10
@@ -853,10 +860,18 @@ class ScoringSynthesisEngine(AnalysisModule):
             deduction = impact * finding.confidence
             category_quality[mapped_cat] = max(0, category_quality[mapped_cat] - deduction)
 
-        # Convert quality probabilities to 10-point scores
+        # conversion to scores and Mastery Bonus
         for cat in categories:
+            # Add Mastery Bonus: +0.5 reward for categories with zero non-info issues
+            cat_findings = [f for f in all_findings if cat_map.get(f.category) == cat]
+            severe_issues = [f for f in cat_findings if f.severity in ["warning", "error", "critical"]]
+
+            final_prob = category_quality[cat]
+            if not severe_issues and final_prob > 0.8:
+                final_prob = min(1.0, final_prob + 0.05) # +0.5 score bonus
+
             if cat in supervisor.scores:
-                supervisor.scores[cat] = round(category_quality[cat] * 10.0, 1)
+                supervisor.scores[cat] = round(final_prob * 10.0, 1)
 
         # Calculate Cinematic Score as weighted average of primary buckets
         prio_weights = {
@@ -1131,8 +1146,11 @@ class SceneSupervisor:
         status = "CLEAN"
         # v5 status rules (Stricter for production grade)
         total_errors = len([f for f in all_findings if f['severity'] in ['error', 'critical']])
-        if total_errors > 1 or self.scores['overall_cinematic_score'] < 6.0: status = "OVERLOADED"
-        elif total_errors > 0 or self.scores['overall_cinematic_score'] < 8.0: status = "ACCEPTABLE"
+        total_warnings = len([f for f in all_findings if f['severity'] == 'warning'])
+
+        # Thresholds for Broadcast Readiness
+        if total_errors > 0 or self.scores['overall_cinematic_score'] < 8.0: status = "OVERLOADED"
+        elif total_warnings > 1 or self.scores['overall_cinematic_score'] < 9.5: status = "ACCEPTABLE"
 
         # Integrate Jules Intelligence into scores
         if self.intelligence:

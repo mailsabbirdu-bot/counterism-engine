@@ -700,20 +700,40 @@ class RemotionJsonMaker:
         raw_scene_ids = set(re.findall(r'\[SCENE_(\d+)\]', "\n".join(feedback)))
         scene_ids = {f"SCENE_{int(id_str)}" for id_str in raw_scene_ids}
 
-        for scene in data.get('scenes', []):
+        for idx, scene in enumerate(data.get('scenes', [])):
             s_id = scene.get('scene_id')
             if s_id in scene_ids:
-                # v3.0: Provide full scene context for correction
-                problematic_scenes.append(scene)
+                # v3.1: Inject _temp_idx to track position during surgical merge
+                scene_copy = copy.deepcopy(scene)
+                scene_copy['_temp_idx'] = idx
+                problematic_scenes.append(scene_copy)
 
         return {"scenes": problematic_scenes}
 
     def merge_surgical_corrections(self, master: Dict[str, Any], corrections: Dict[str, Any]) -> Dict[str, Any]:
-        """v3.0: Merges surgical Gemini corrections back into the master manifest."""
+        """v3.1: Merges surgical Gemini corrections back into the master manifest using _temp_idx."""
         if not corrections or 'scenes' not in corrections: return master
 
+        # Ensure master has scenes
+        if 'scenes' not in master: master['scenes'] = []
+
         for corr_scene in corrections['scenes']:
-            # Use int-based ID comparison to be robust against leading zeros
+            # 1. Preferred Match: _temp_idx (Deterministic)
+            target_idx = corr_scene.get('_temp_idx')
+            if target_idx is not None and isinstance(target_idx, int) and target_idx < len(master['scenes']):
+                # Verify it's the same scene by checking relative ID
+                m_scene = master['scenes'][target_idx]
+                m_num = int(re.search(r'(\d+)', str(m_scene.get('scene_id', ''))).group(1))
+                c_num = int(re.search(r'(\d+)', str(corr_scene.get('scene_id', ''))).group(1))
+
+                if m_num == c_num:
+                    canonical_id = m_scene.get('scene_id')
+                    master['scenes'][target_idx] = corr_scene
+                    master['scenes'][target_idx]['scene_id'] = canonical_id
+                    if '_temp_idx' in master['scenes'][target_idx]: del master['scenes'][target_idx]['_temp_idx']
+                    continue
+
+            # 2. Fallback Match: Scene ID Comparison
             s_id_match = re.search(r'(\d+)', str(corr_scene.get('scene_id', '')))
             if not s_id_match: continue
 
@@ -722,19 +742,18 @@ class RemotionJsonMaker:
             for i, master_scene in enumerate(master.get('scenes', [])):
                 m_id_match = re.search(r'(\d+)', str(master_scene.get('scene_id', '')))
                 if m_id_match and int(m_id_match.group(1)) == s_num:
-                    # Preserve canonical scene_id from master if it exists
                     canonical_id = master_scene.get('scene_id')
                     master['scenes'][i] = corr_scene
                     master['scenes'][i]['scene_id'] = canonical_id
+                    if '_temp_idx' in master['scenes'][i]: del master['scenes'][i]['_temp_idx']
                     found = True; break
 
-            # If not found, it might be a new scene hallucinated by AI or we are in a clean state
             if not found:
-                # Don't append if it's clearly out of bounds
                 if s_num <= len(master.get('scenes', [])) + 2:
+                    if '_temp_idx' in corr_scene: del corr_scene['_temp_idx']
                     master['scenes'].append(corr_scene)
 
-        # Re-sort scenes to maintain timeline order
+        # Re-sort to be safe, though index-based merge should preserve order
         master['scenes'].sort(key=lambda x: int(re.search(r'\d+', x.get('scene_id', '0')).group()))
         return master
 
@@ -1159,8 +1178,13 @@ def main():
         current_score = score
 
         # --- STAGE 4: ELEMENT SUPERVISOR (DIRECTOR REVIEW) ---
+        reports = supervise_manifest(master_json)
         supervisor_feedback = maker.supervise(master_json)
         feedback = qa_feedback + supervisor_feedback
+
+        # Calculate Cinematic Aggregate
+        avg_cinematic = sum(r['scores'].get('overall_cinematic_score', 0) for r in reports) / len(reports) if reports else 0
+        cinematic_score = avg_cinematic * 10.0 # scale to 100
 
         # v3.0: Apply deterministic QA repairs locally on master_json
         master_json = maker.apply_qa_patches(master_json, feedback)
@@ -1193,22 +1217,26 @@ def main():
         # RE-EVALUATE AFTER ENGINE FIXES: If engine hardening fixed everything, success=True
         if score == 100: success = True
 
+        # Weighted Composite Score (Technical QA 60%, Cinematic 40%)
+        weighted_score = (score * 0.6) + (cinematic_score * 0.4)
+
         # Track best result (Always store the fully hardened master_json)
-        if score > best_score or best_json is None:
-            best_score = score
+        if weighted_score > best_score or best_json is None:
+            best_score = weighted_score
             best_json = copy.deepcopy(master_json)
-            print(f"   🏆 New Best Score: {best_score}%")
+            print(f"   🏆 New Best Composite Score: {round(best_score, 1)}% (QA: {score}%, Cinematic: {round(cinematic_score, 1)}%)")
 
         # ENDING LOGIC: Autonomous perfection required after Iteration 5
-        if (score == 100) or force_stop:
+        # Require 100% QA AND >= 98% Cinematic to finish early, or manual stop
+        if (score == 100 and cinematic_score >= 98.0) or force_stop:
             if force_stop:
-                print(f"\n🛑 PROCESS ENDED MANUALLY. Restoring Best Result ({best_score}%)...")
+                print(f"\n🛑 PROCESS ENDED MANUALLY. Restoring Best Result ({round(best_score, 1)}%)...")
                 master_json = best_json
             elif score == 100:
-                print(f"\n✨ PRODUCTION READY! 100% Accuracy reached (Iter: {iteration})")
+                print(f"\n✨ PRODUCTION READY! 100% Accuracy and high-fidelity aesthetics reached (Iter: {iteration})")
             break
         elif iteration == 10:
-            print(f"\n⌛ MAX ITERATIONS REACHED. Restoring Best Result ({best_score}%)...")
+            print(f"\n⌛ MAX ITERATIONS REACHED. Restoring Best Result ({round(best_score, 1)}%)...")
             master_json = best_json
             break
         else:
