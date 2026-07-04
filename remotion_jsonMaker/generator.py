@@ -8,8 +8,6 @@ import subprocess
 import shutil
 import math
 from typing import Dict, Any, List, Optional, Tuple
-from playwright.sync_api import sync_playwright
-import playwright_stealth
 try:
     from .supervisor import supervise_manifest
     from .intelligence import SceneIntelligenceEngine
@@ -55,7 +53,8 @@ class RemotionJsonMaker:
         'hero': 1000, 'text': 100, 'hub_network': 90, 'flow_diagram': 90, 'process': 90,
         'chart': 80, 'shadcn_chart': 80, 'kpi_card': 80, 'timeline': 75, 'ui_panel': 60,
         'compositions': 55, 'groups': 55, 'data_indicator': 50, 'shadcn_indicator': 50,
-        'label': 45, 'callout': 45, 'svg': 40, 'kpi': 40, 'graph': 30, 'shape': 10, 'background': 0
+        'label': 45, 'callout': 45, 'svg': 40, 'kpi': 40, 'connector': 35, 'graph': 30,
+        'shape': 10, 'ambient_graphic': 5, 'background': 0
     }
 
     # Rule of Thirds Anchors (Synced from VisionConstants)
@@ -72,15 +71,9 @@ class RemotionJsonMaker:
     MIN_SPACING = 30
     MIN_FONT_SIZE = 40
 
-    def __init__(self, user_data_dir: str = None, headless: bool = True, manual: bool = False, memory_path: str = "production_knowledge.json"):
-        self.user_data_dir = user_data_dir
-        self.headless = headless
+    def __init__(self, manual: bool = False, memory_path: str = "production_knowledge.json"):
         self.manual = manual
         self.memory = ProductionMemoryManager(memory_path)
-        self.playwright = None
-        self.browser = None
-        self.context = None
-        self.page = None
         self.fps_cache = {}
         self.visual_analysis = {}
         self.bangla_fonts = []
@@ -126,29 +119,6 @@ class RemotionJsonMaker:
                     with open(os.path.join(analysis_dir, f), 'r') as jf:
                         self.visual_analysis[v_name] = json.load(jf)
                 except: pass
-
-    def start_browser(self):
-        if self.page: return
-        self.playwright = sync_playwright().start()
-        print("🚀 Launching persistent browser...")
-        args = ["--disable-blink-features=AutomationControlled", "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
-        if self.user_data_dir:
-            self.context = self.playwright.chromium.launch_persistent_context(self.user_data_dir, headless=self.headless, args=args)
-        else:
-            self.browser = self.playwright.chromium.launch(headless=self.headless, args=args)
-            self.context = self.browser.new_context()
-        self.page = self.context.new_page()
-        playwright_stealth.Stealth().apply_stealth_sync(self.page)
-        try:
-            self.page.goto("https://gemini.google.com/app", wait_until="domcontentloaded", timeout=60000)
-        except Exception as e:
-            print(f"⚠️ Gemini loading warning: {e}")
-
-    def stop_browser(self):
-        if self.context: self.context.close()
-        if self.browser: self.browser.close()
-        if self.playwright: self.playwright.stop()
-        self.page = None
 
     def scan_assets(self, public_dir: str = "../public"):
         abs_public = os.path.abspath(public_dir)
@@ -273,6 +243,13 @@ class RemotionJsonMaker:
         if o_type == 'hero_animation':
              ov['type'] = 'text' # Usually AI means a text reveal
              o_type = 'text'
+        elif o_type == 'kpi':
+            ov['type'] = 'indicator'
+            o_type = 'indicator'
+        elif o_type == 'kpi_card':
+            ov['type'] = 'shadcn_indicator'
+            o_type = 'shadcn_indicator'
+            if 'indicator_type' not in ov: ov['indicator_type'] = 'mini_stat_card'
 
         if ov.get('type') == 'text' and 'hero_config' in ov:
             self._repair_hero_animations(ov['hero_config'])
@@ -744,11 +721,29 @@ class RemotionJsonMaker:
         hero['start'] = max(30, min(hero['start'], scene_duration - 60))
         return hero
 
+    def repair_json(self, json_str: str) -> Dict[str, Any]:
+        """v2.0: Robust JSON repair for common LLM hallucinations."""
+        try:
+            # 1. Clean characters and trailing commas
+            json_str = re.sub(r',(\s*[\]\}])', r'\1', json_str)
+            # 2. Fix missing brackets if simple enough
+            if json_str.count('{') > json_str.count('}'): json_str += '}' * (json_str.count('{') - json_str.count('}'))
+            if json_str.count('[') > json_str.count(']'): json_str += ']' * (json_str.count('[') - json_str.count(']'))
+
+            # 3. Use regex to extract the largest object if it's wrapped in text
+            match = re.search(r'(\{.*\})', json_str, re.DOTALL)
+            if match:
+                return json.loads(match.group(1), strict=False)
+            return json.loads(json_str, strict=False)
+        except:
+            print("   ⚠️ JSON repair failed. Returning empty dict.")
+            return {}
+
     def _get_fallback_hero(self, overlay_content: str):
         words = re.sub(r'[.।]', '', str(overlay_content)).split()
         return {"word": max(words, key=len), "start": 45} if words else None
 
-    def _interact_with_gemini(self, prompt: str, previous_json: str = None, errors: List[str] = None, score: int = 0) -> str:
+    def _interact_with_gemini(self, prompt: str, previous_json: str = None, errors: List[str] = None, score: int = 0, surgical_mode: bool = False) -> str:
         if self.manual:
             try:
                 from google.colab import output
@@ -962,7 +957,7 @@ class RemotionJsonMaker:
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
 
-        raw_output = self._interact_with_gemini(full_prompt, previous_json, feedback_errors, current_score)
+        raw_output = self._interact_with_gemini(full_prompt, previous_json, feedback_errors, current_score, surgical_mode=surgical_mode)
         force_stop = False
         if raw_output.startswith("FORCE_QUIT_SIGNAL:"):
             force_stop = True
@@ -1005,14 +1000,13 @@ def main():
     parser.add_argument("--fps-update-file")
     parser.add_argument("--prompt-output")
     parser.add_argument("--drive-prompt")
-    parser.add_argument("--user-data-dir")
     parser.add_argument("--public-dir", default="../public")
     parser.add_argument("--manual", action="store_true")
     args = parser.parse_args()
 
     manifest_dir = os.path.dirname(args.output)
     memory_file = os.path.join(manifest_dir, "production_knowledge.json")
-    maker = RemotionJsonMaker(user_data_dir=args.user_data_dir, manual=args.manual, memory_path=memory_file)
+    maker = RemotionJsonMaker(manual=args.manual, memory_path=memory_file)
     if args.fps_update_file: maker.load_fps_update(args.fps_update_file)
     maker.scan_assets(args.public_dir)
 

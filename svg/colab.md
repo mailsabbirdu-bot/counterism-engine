@@ -20,9 +20,6 @@ if not os.path.exists(ENGINE_DIR):
 
 # --- 2. INSTALL DEPS ---
 print("🛠️ Installing dependencies...")
-!pip install playwright playwright-stealth
-!playwright install chromium
-!playwright install-deps
 !npm install
 
 # --- 3. LOAD POWERFUL MANIFEST ---

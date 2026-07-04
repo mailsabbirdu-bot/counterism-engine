@@ -319,9 +319,16 @@ def test_manifest_quality(filepath, public_dir=None):
 
             # Typography & Font Validation
             if o_type in ['text', 'shadcn_chart', 'shadcn_indicator', 'chart', 'indicator', 'data_indicator', 'ui_panel']:
+                # Import here to avoid dependency issues for standalone script
+                try:
+                    from remotion_jsonMaker.perception_logic import VisionConstants
+                    is_bangla_func = VisionConstants.is_bangla
+                except:
+                    is_bangla_func = lambda t: any('\u0980' <= c <= '\u09FF' for c in str(t))
+
                 font = ov.get('font')
                 content = str(ov.get('content', ov.get('text', ov.get('label', ov.get('title', '')))))
-                is_bangla = any('\u0980' <= c <= '\u09FF' for c in content)
+                is_bangla = is_bangla_func(content)
 
                 if not font:
                     all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_ERROR, "msg": "Missing 'font' field.", "category": "typography"})

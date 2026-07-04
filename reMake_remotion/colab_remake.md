@@ -38,13 +38,6 @@ print("📡 Syncing Assets from Drive...")
 !cp -f /content/drive/MyDrive/Counterism_Studio_V4/*.ttf public/fonts/ 2>/dev/null || true
 !cp -f /content/drive/MyDrive/Counterism_Studio_V4/fonts/*.ttf public/fonts/ 2>/dev/null || true
 
-# Install Playwright for Gemini Refinement
-if shutil.which("playwright") is None:
-    print("🛠️ Installing Automation Tools...")
-    !pip install playwright playwright-stealth
-    !playwright install chromium
-    !playwright install-deps
-
 # Install Project Deps
 if not os.path.exists("node_modules"):
     print("🛠️ Installing Project Dependencies...")

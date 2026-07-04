@@ -361,7 +361,7 @@ class ReadabilityEngine(HumanVisionModule):
                 # PRODUCTION: Robust Multi-language detection
                 lang = 'english'
                 speed = VisionConstants.READING_SPEED_EN
-                if any('\u0980' <= c <= '\u09FF' for c in content):
+                if VisionConstants.is_bangla(content):
                     lang = 'bangla'
                     speed = VisionConstants.READING_SPEED_BN
                 elif any('\u0600' <= c <= '\u06FF' for c in content):
