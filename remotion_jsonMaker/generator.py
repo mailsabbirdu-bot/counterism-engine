@@ -298,8 +298,8 @@ class RemotionJsonMaker:
         if 'label' in ov and 'content' not in ov: ov['content'] = ov['label']
         if 'title' in ov and 'content' not in ov and o_type == 'text': ov['content'] = ov['title']
 
-        # Move fields from 'properties', 'data', 'styling', or 'config' to root
-        for nest_key in ['properties', 'data', 'styling', 'config']:
+        # Move fields from 'properties', 'data', 'styling', 'style' or 'config' to root
+        for nest_key in ['properties', 'data', 'styling', 'style', 'config']:
             if nest_key in ov and isinstance(ov[nest_key], dict):
                 nested = ov[nest_key]
                 # Unify nested too
@@ -617,6 +617,46 @@ class RemotionJsonMaker:
             if ov.get('hero_config'): ov['hero_config']['start'] = max(ov['start'] + 10, ov['hero_config'].get('start', 0))
             placed_boxes.append((ov['id'], best_pos[0]-final_w/2, best_pos[1]-final_h/2, best_pos[0]+final_w/2, best_pos[1]+final_h/2, ov['start'], ov['start']+ov['duration'], imp))
 
+    def apply_qa_patches(self, data: Dict[str, Any], feedback: List[str]) -> Dict[str, Any]:
+        """v2.0: Automatically applies deterministic JSON patches from QA feedback."""
+        print(f"🛠️ AUTO-REPAIR: Applying deterministic patches from QA...")
+        patch_count = 0
+
+        for fb in feedback:
+            if "REQUIRED PATCH:" in fb:
+                try:
+                    # Extract scene ID and patch block
+                    scene_match = re.search(r'\[(SCENE_\d+)\]', fb)
+                    patch_match = re.search(r'REQUIRED PATCH: (\{.*\})', fb)
+
+                    if not patch_match: continue
+                    scene_id = scene_match.group(1) if scene_match else None
+                    patch_data = json.loads(patch_match.group(1))
+
+                    # If scene_id is present, apply to specific overlays in that scene
+                    if scene_id:
+                        for scene in data.get('scenes', []):
+                            if scene.get('scene_id') == scene_id:
+                                # If patch contains 'id' and 'patch', it's overlay specific
+                                # In v3.0 QA, the string is [SCENE_01] ERROR: (ov_id) msg -> PATCH
+                                overlay_id_match = re.search(r'\((\w+)\)', fb)
+                                if overlay_id_match:
+                                    target_ov_id = overlay_id_match.group(1)
+                                    for ov in scene.get('overlays', []):
+                                        if ov.get('id') == target_ov_id:
+                                            ov.update(patch_data)
+                                            patch_count += 1
+                    else:
+                        # Global patch (less common)
+                        data.update(patch_data)
+                        patch_count += 1
+                except Exception as e:
+                    print(f"   ⚠️ Failed to apply patch: {e}")
+
+        if patch_count > 0:
+            print(f"   ✅ Applied {patch_count} deterministic repairs.")
+        return data
+
     def supervise(self, data: Dict[str, Any]) -> List[str]:
         """Runs the Element Supervisor and Intelligence Engine on the manifest."""
         print(f"🧠 INTELLIGENCE: Predicting human perception and attention flow...")
@@ -695,17 +735,33 @@ class RemotionJsonMaker:
 
                 copy_payload = prompt
                 if previous_json:
-                    # ULTRA-SLIM RE-PROMPT (To save word count/tokens)
+                    # v3.0 RE-PROMPT Strategy
+                    error_summary = ""
+                    scenes_with_errs = set()
+                    for e in errors:
+                        m = re.search(r'\[(SCENE_\d+)\]', e)
+                        if m: scenes_with_errs.add(m.group(1))
+
+                    error_summary = f"🚨 REPAIR REQ ({score}%): {len(errors)} issues across {len(scenes_with_errs)} scenes.\n\n"
+
+                    # Group errors for better readability
+                    error_list_text = ""
+                    for scene in sorted(list(scenes_with_errs)):
+                        scene_errs = [e for e in errors if f"[{scene}]" in e]
+                        error_list_text += f"\n[{scene}]:\n"
+                        for se in scene_errs:
+                            error_list_text += f"  - {se.replace(f'[{scene}] ', '')}\n"
+
                     copy_payload = (
-                        f"🚨 REPAIR REQ ({score}%): {len(errors)} ERRORS.\n\n"
-                        f"--- ERROR LIST ---\n{chr(10).join(errors)}\n\n"
+                        f"{error_summary}"
+                        f"--- ERROR LIST ---\n{error_list_text}\n\n"
                         f"--- [REQUIRED] REPAIR RULES ---\n"
-                        f"1. [REQUIRED] FIX: Root key only for data. NO 'data: {{}}' or 'styling: {{}}' nesting.\n"
-                        f"2. [REQUIRED] POS: L_MID(550,540), R_MID(1370,540), C_TOP(960,320), C_BOT(960,760). STOP CENTERING at (960, 700).\n"
-                        f"3. [REQUIRED] VAR: Use ONLY approved variants. Never invent names.\n"
-                        f"4. [REQUIRED] DATA: Every chart/indicator must have a 'title' and 'data'/'value'.\n"
-                        f"5. [REQUIRED] VALIDATION: Run the FINAL VALIDATION CHECKLIST before outputting.\n\n"
-                        f"--- PREVIOUS JSON ---\n{previous_json}\n\n"
+                        f"1. [FLATTEN] Use ROOT KEYS only. Never nest in 'style', 'data', or 'config'.\n"
+                        f"2. [FONTS] Use ONLY local production fonts (e.g., Sohid_bangla, Audiowide-Regular_english).\n"
+                        f"3. [PATCH] If the error list contains a 'REQUIRED PATCH', you MUST apply it.\n"
+                        f"4. [ANCHORS] Use canonical positions: L_MID(550,540), R_MID(1370,540), C_TOP(960,320), C_BOT(960,760).\n"
+                        f"5. [VALIDATION] Every scene MUST have a valid camera 'shot' sequence targeting overlay IDs.\n\n"
+                        f"--- PREVIOUS JSON (REPAIRED BY ENGINE) ---\n{previous_json}\n\n"
                         f"--- STORY CONTEXT ---\n"
                         f"{re.search(r'STORY:.*?(?=TIMESTAMPS:)', prompt, re.DOTALL).group() if 'STORY:' in prompt else prompt[:500]}"
                     )
@@ -968,6 +1024,9 @@ def main():
         # --- STAGE 4: ELEMENT SUPERVISOR (DIRECTOR REVIEW) ---
         supervisor_feedback = maker.supervise(render_json)
         feedback = qa_feedback + supervisor_feedback
+
+        # v3.0: Apply deterministic QA repairs before re-prompting
+        render_json = maker.apply_qa_patches(render_json, feedback)
 
         # Record finding for future memory
         maker.memory.record_finding(success, score, feedback, manifest=render_json)
