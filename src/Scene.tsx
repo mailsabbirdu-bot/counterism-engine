@@ -15,39 +15,45 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
   const [analysis, setAnalysis] = useState<any>(null);
 
   useEffect(() => {
-    if (sceneData.video_path) {
-      loadAnalysis(sceneData.video_path).then(setAnalysis);
+    const videoPath = sceneData.background?.video_path || sceneData.video_path;
+    if (videoPath) {
+      loadAnalysis(videoPath).then(setAnalysis);
     }
-  }, [sceneData.video_path, sceneData.background_type]);
+  }, [sceneData.background?.video_path, sceneData.video_path, sceneData.background?.background_type, sceneData.background_type]);
 
   if (!sceneData) {
     return <AbsoluteFill className="bg-black" />;
   }
 
   const renderBackground = () => {
-    switch (sceneData.config?.background?.type || sceneData.background_type) {
+    const bgType = sceneData.background?.background_type || sceneData.background_type || 'video';
+    const videoPath = sceneData.background?.video_path || sceneData.video_path;
+    const audioEnabled = sceneData.background?.audio_enabled ?? sceneData.audio_enabled;
+    const procConfig = sceneData.background?.procedural_config || sceneData.procedural_config || {};
+
+    switch (bgType) {
       case 'video':
-        if (!sceneData.video_path) return null;
-        const bgUrl = resolveAsset(sceneData.video_path);
+        if (!videoPath) return null;
+        const bgUrl = resolveAsset(videoPath);
         return (
           <OffthreadVideo
             src={bgUrl}
             className="w-full h-full object-cover"
-            muted={sceneData.audio_enabled !== true}
+            muted={audioEnabled !== true}
           />
         );
       case 'procedural':
-        return <ProceduralBackground config={sceneData.config?.background?.config || sceneData.procedural_config || {}} />;
+        return <ProceduralBackground config={procConfig} />;
       case 'none':
         return null;
       default:
-        if (sceneData.video_path) {
-          const fallbackUrl = resolveAsset(sceneData.video_path);
+        if (videoPath) {
+          const fallbackUrl = resolveAsset(videoPath);
           return (
             <OffthreadVideo
               src={fallbackUrl}
               className="w-full h-full object-cover"
-              muted={sceneData.audio_enabled !== true}
+              muted={audioEnabled !== true}
             />
           );
         }
