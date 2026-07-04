@@ -328,7 +328,11 @@ def test_manifest_quality(filepath, public_dir=None):
                     scores["typography"] -= 10
                 elif font not in available_fonts:
                     if font not in ['Inter', 'Arial', 'sans-serif', 'serif', 'monospace']:
-                        suggested = bangla_fonts[0] if is_bangla and bangla_fonts else (english_fonts[0] if english_fonts else "Arial")
+                        # PRODUCTION: Fallback to logic defaults if fonts are missing in public/fonts
+                        suggested = bangla_fonts[0] if (is_bangla and bangla_fonts) else (english_fonts[0] if (not is_bangla and english_fonts) else None)
+                        if not suggested:
+                            suggested = "Sohid_bangla" if is_bangla else "Audiowide-Regular_english"
+
                         all_feedback.append({
                             "scene": scene_id, "id": ov_id, "severity": S_ERROR,
                             "msg": f"Font '{font}' is NOT in /public/fonts.",
@@ -337,7 +341,10 @@ def test_manifest_quality(filepath, public_dir=None):
                         })
                         scores["typography"] -= 15
                     else:
-                        suggested = bangla_fonts[0] if is_bangla and bangla_fonts else (english_fonts[0] if english_fonts else "Arial")
+                        suggested = bangla_fonts[0] if (is_bangla and bangla_fonts) else (english_fonts[0] if (not is_bangla and english_fonts) else None)
+                        if not suggested:
+                            suggested = "Sohid_bangla" if is_bangla else "Audiowide-Regular_english"
+
                         all_feedback.append({
                             "scene": scene_id, "id": ov_id, "severity": S_WARNING,
                             "msg": f"Uses generic font '{font}'.",
