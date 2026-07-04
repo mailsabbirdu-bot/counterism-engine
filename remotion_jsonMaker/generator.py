@@ -55,7 +55,8 @@ class RemotionJsonMaker:
         'hero': 1000, 'text': 100, 'hub_network': 90, 'flow_diagram': 90, 'process': 90,
         'chart': 80, 'shadcn_chart': 80, 'kpi_card': 80, 'timeline': 75, 'ui_panel': 60,
         'compositions': 55, 'groups': 55, 'data_indicator': 50, 'shadcn_indicator': 50,
-        'label': 45, 'callout': 45, 'svg': 40, 'kpi': 40, 'graph': 30, 'shape': 10, 'background': 0
+        'label': 45, 'callout': 45, 'svg': 40, 'kpi': 40, 'connector': 35, 'graph': 30,
+        'shape': 10, 'ambient_graphic': 5, 'background': 0
     }
 
     # Rule of Thirds Anchors (Synced from VisionConstants)
@@ -273,6 +274,13 @@ class RemotionJsonMaker:
         if o_type == 'hero_animation':
              ov['type'] = 'text' # Usually AI means a text reveal
              o_type = 'text'
+        elif o_type == 'kpi':
+            ov['type'] = 'indicator'
+            o_type = 'indicator'
+        elif o_type == 'kpi_card':
+            ov['type'] = 'shadcn_indicator'
+            o_type = 'shadcn_indicator'
+            if 'indicator_type' not in ov: ov['indicator_type'] = 'mini_stat_card'
 
         if ov.get('type') == 'text' and 'hero_config' in ov:
             self._repair_hero_animations(ov['hero_config'])
@@ -748,7 +756,7 @@ class RemotionJsonMaker:
         words = re.sub(r'[.।]', '', str(overlay_content)).split()
         return {"word": max(words, key=len), "start": 45} if words else None
 
-    def _interact_with_gemini(self, prompt: str, previous_json: str = None, errors: List[str] = None, score: int = 0) -> str:
+    def _interact_with_gemini(self, prompt: str, previous_json: str = None, errors: List[str] = None, score: int = 0, surgical_mode: bool = False) -> str:
         if self.manual:
             try:
                 from google.colab import output
@@ -962,7 +970,7 @@ class RemotionJsonMaker:
         if prompt_output_path:
             with open(prompt_output_path, 'w', encoding='utf-8') as f: f.write(full_prompt)
 
-        raw_output = self._interact_with_gemini(full_prompt, previous_json, feedback_errors, current_score)
+        raw_output = self._interact_with_gemini(full_prompt, previous_json, feedback_errors, current_score, surgical_mode=surgical_mode)
         force_stop = False
         if raw_output.startswith("FORCE_QUIT_SIGNAL:"):
             force_stop = True

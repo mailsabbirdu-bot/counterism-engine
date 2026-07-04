@@ -5,6 +5,7 @@ import re
 import math
 import hashlib
 from typing import Dict, Any, List, Optional
+from dataclasses import dataclass, asdict, field
 
 @dataclass
 class KnowledgeItem:
