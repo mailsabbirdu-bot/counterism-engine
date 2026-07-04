@@ -488,7 +488,16 @@ def test_manifest_quality(filepath, public_dir=None):
                 all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_CRITICAL, "msg": f"Offscreen! Box: [L:{int(l)}, T:{int(t)}, R:{int(r)}, B:{int(b)}]. Move to Rule of Thirds anchor.", "patch": {"position": {"x": 960, "y": 540}}, "category": "layout"})
                 scores["layout"] -= 25
             elif o_type not in ['ambient_graphic', 'background'] and (l < 150 or r > 1770 or t < 150 or b > 930):
-                all_feedback.append({"scene": scene_id, "id": ov_id, "severity": S_WARNING, "msg": f"Safety margin violation. Box: [L:{int(l)}, T:{int(t)}, R:{int(r)}, B:{int(b)}]. Move to (550, 540) or (1370, 540).", "category": "composition"})
+                # Deterministic patch for safety margin: move to nearest Rule of Thirds anchor
+                target_x = 550 if x < 960 else 1370
+                target_y = 540 if abs(y-540) < abs(y-320) and abs(y-540) < abs(y-760) else (320 if y < 540 else 760)
+
+                all_feedback.append({
+                    "scene": scene_id, "id": ov_id, "severity": S_WARNING,
+                    "msg": f"Safety margin violation. Box: [L:{int(l)}, T:{int(t)}, R:{int(r)}, B:{int(b)}]. Move to ({target_x}, {target_y}).",
+                    "patch": {"position": {"x": target_x, "y": target_y}},
+                    "category": "composition"
+                })
                 scores["composition"] -= 5
 
             for p_id, p_l, p_t, p_r, p_b, p_s, p_e, p_imp in placed_geometries:

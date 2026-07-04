@@ -1,10 +1,7 @@
 {
   "scenes": [
     {
-      "scene_id": "SCENE_01",
-      "duration": 160,
-      "background_type": "video",
-      "video_path": "renders/scene_SC_01.mp4",
+      "scene_id": "SCENE_1",
       "overlays": [
         {
           "id": "txt_dhaka",
@@ -19,7 +16,7 @@
           },
           "hero_config": {
             "word": "মেগাসিটি",
-            "animation": "zoom_blur_reveal",
+            "animation": "blur_reveal",
             "color": "#FF3B30",
             "start": 45
           },
@@ -54,15 +51,14 @@
           "start": 45,
           "duration": 85,
           "position": {
-            "x": 1221,
-            "y": 688
+            "x": 1285,
+            "y": 687
           },
-          "font": "Sohid_bangla",
+          "font": "Audiowide-Regular_english",
           "color": "#FF3E6C",
           "colors": {
             "scheme": "nivo"
           },
-          "content": "Population Density Comparison",
           "exitAnimation": "fade_out",
           "depth": 30,
           "parallax": 0.8,
@@ -128,7 +124,11 @@
         "enabled": true
       },
       "duration_in_frames": 160,
-      "audio_enabled": false,
+      "background": {
+        "background_type": "video",
+        "video_path": "renders/scene_SC_01.mp4",
+        "audio_enabled": false
+      },
       "transition": {
         "type": "cinematicMatchCut",
         "duration": 15

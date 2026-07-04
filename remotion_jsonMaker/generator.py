@@ -207,37 +207,52 @@ class RemotionJsonMaker:
 
     def _harden_scene_metadata(self, scene: Dict[str, Any], scene_idx: int):
         """Stage 1: Scene-level metadata and duration hardening."""
-        s_id = scene.get('scene_id', f"SCENE_{scene_idx+1}")
+        # Unify Scene ID to canonical format
+        s_id = f"SCENE_{scene_idx+1}"
+        scene['scene_id'] = s_id
 
         if 'duration' in scene and 'duration_in_frames' not in scene:
             scene['duration_in_frames'] = scene['duration']
-        if 'duration' in scene:
-            del scene['duration']
 
         raw_dur = scene.get('duration_in_frames', 180)
         scene_duration = int(raw_dur * 30) if (isinstance(raw_dur, (float, int)) and raw_dur < 60) else int(raw_dur)
 
-        id_num_match = re.search(r'(\d+)', s_id)
-        id_num = int(id_num_match.group(1)) if id_num_match else (scene_idx + 1)
+        id_num = scene_idx + 1
 
-        if not scene.get('background_type'): scene['background_type'] = 'video'
-        if scene['background_type'] == 'video':
-            if not scene.get('video_path'):
+        if 'background' not in scene: scene['background'] = {}
+        bg = scene['background']
+
+        # Promote background fields from root if they exist
+        for k in ['background_type', 'video_path', 'audio_enabled', 'procedural_config']:
+            if k in scene:
+                if k not in bg: bg[k] = scene[k]
+                del scene[k]
+
+        if not bg.get('background_type'): bg['background_type'] = 'video'
+        if bg['background_type'] == 'video':
+            if not bg.get('video_path'):
                 vname = f"scene_SC_{id_num:02d}.mp4"
-                if vname in self.video_files: scene['video_path'] = f"renders/{vname}"
-                else: scene['background_type'] = 'procedural'
-            elif not str(scene['video_path']).startswith('renders/'):
-                scene['video_path'] = f"renders/{os.path.basename(scene['video_path'])}"
+                if vname in self.video_files: bg['video_path'] = f"renders/{vname}"
+                else: bg['background_type'] = 'procedural'
+            elif not str(bg['video_path']).startswith('renders/'):
+                bg['video_path'] = f"renders/{os.path.basename(bg['video_path'])}"
 
-        if scene['background_type'] == 'procedural':
-            if not scene.get('procedural_config') or not isinstance(scene.get('procedural_config'), dict):
-                scene['procedural_config'] = {"variant": "neon_grid"}
-            scene['video_path'] = None
+        if bg.get('background_type') == 'procedural':
+            if not bg.get('procedural_config') or not isinstance(bg.get('procedural_config'), dict):
+                bg['procedural_config'] = {"variant": "neon_grid"}
+            bg['video_path'] = None
 
-        filename = os.path.basename(str(scene.get('video_path', '')))
+        filename = os.path.basename(str(bg.get('video_path', '')))
+        scene_duration = int(raw_dur * 30) if (isinstance(raw_dur, (float, int)) and raw_dur < 60) else int(raw_dur)
         if filename in self.fps_cache: scene_duration = self.fps_cache[filename]
+
         scene['duration_in_frames'] = scene_duration
-        scene['audio_enabled'] = False # PRODUCTION OVERRIDE
+        bg['audio_enabled'] = False # PRODUCTION OVERRIDE
+
+        # Cleanup root of redundant keys
+        for k in ['duration', 'video_path', 'background_type', 'audio_enabled', 'id']:
+            if k in scene: del scene[k]
+
         return scene_duration, id_num
 
     def _repair_hero_animations(self, hero_config: Dict[str, Any]):
@@ -402,7 +417,7 @@ class RemotionJsonMaker:
 
         for scene_idx, scene in enumerate(data['scenes']):
             scene_duration, id_num = self._harden_scene_metadata(scene, scene_idx)
-            s_id = scene.get('scene_id', f"SCENE_{scene_idx+1}")
+            s_id = scene['scene_id'] # Use canonical ID from hardening
             print(f"   🎬 Processing: {s_id}")
 
             pattern = f"SC_{id_num:02d}".lower()
@@ -511,7 +526,8 @@ class RemotionJsonMaker:
                 for shot in scene['camera']['shots']: shot['ease'] = shot.get('ease', "cubicOut")
 
             for i, ov in enumerate(valid_overlays):
-                if self.in_files: sfx_manifest.append({"scene_id": s_id, "file": self.in_files[(in_ptr+i)%len(self.in_files)], "start": ov['start'], "end": ov['start']+30, "volume": 0.05})
+                # Ensure SFX uses unified s_id
+                if self.in_files: sfx_manifest.append({"scene_id": s_id, "file": self.in_files[(in_ptr+i)%len(self.in_files)], "start": int(ov.get('start', 0)), "end": int(ov.get('start', 0))+30, "volume": 0.05})
             in_ptr += len(valid_overlays)
 
         data['audio_sfx_manifest'] = sfx_manifest
@@ -588,8 +604,8 @@ class RemotionJsonMaker:
                         cx, cy = ax + radius * math.cos(rad), ay + radius * math.sin(rad)
                         l, t, r, b = cx-w/2, cy-h/2, cx+w/2, cy+h/2
 
-                        # Use 150px safety margin for first 30 radius steps, then relax
-                        margin = 150 if step < 30 else 50
+                        # Strict 150px safety margin enforcement for production broadcast
+                        margin = 150
                         if l < margin or r > (1920 - margin) or t < margin or b > (1080 - margin): continue
 
                         collision = False
@@ -680,10 +696,13 @@ class RemotionJsonMaker:
         """v3.0: Extracts only the scenes/overlays that have remaining issues after auto-repair."""
         problematic_scenes = []
         # Find scenes mentioned in feedback
-        scene_ids = set(re.findall(r'\[(SCENE_\d+)\]', "\n".join(feedback)))
+        # Supports [SCENE_01] and [SCENE_1]
+        raw_scene_ids = set(re.findall(r'\[SCENE_(\d+)\]', "\n".join(feedback)))
+        scene_ids = {f"SCENE_{int(id_str)}" for id_str in raw_scene_ids}
 
         for scene in data.get('scenes', []):
-            if scene.get('scene_id') in scene_ids:
+            s_id = scene.get('scene_id')
+            if s_id in scene_ids:
                 # v3.0: Provide full scene context for correction
                 problematic_scenes.append(scene)
 
@@ -694,14 +713,26 @@ class RemotionJsonMaker:
         if not corrections or 'scenes' not in corrections: return master
 
         for corr_scene in corrections['scenes']:
-            s_id = corr_scene.get('scene_id')
+            # Use int-based ID comparison to be robust against leading zeros
+            s_id_match = re.search(r'(\d+)', str(corr_scene.get('scene_id', '')))
+            if not s_id_match: continue
+
+            s_num = int(s_id_match.group(1))
             found = False
             for i, master_scene in enumerate(master.get('scenes', [])):
-                if master_scene.get('scene_id') == s_id:
+                m_id_match = re.search(r'(\d+)', str(master_scene.get('scene_id', '')))
+                if m_id_match and int(m_id_match.group(1)) == s_num:
+                    # Preserve canonical scene_id from master if it exists
+                    canonical_id = master_scene.get('scene_id')
                     master['scenes'][i] = corr_scene
+                    master['scenes'][i]['scene_id'] = canonical_id
                     found = True; break
+
+            # If not found, it might be a new scene hallucinated by AI or we are in a clean state
             if not found:
-                master['scenes'].append(corr_scene)
+                # Don't append if it's clearly out of bounds
+                if s_num <= len(master.get('scenes', [])) + 2:
+                    master['scenes'].append(corr_scene)
 
         # Re-sort scenes to maintain timeline order
         master['scenes'].sort(key=lambda x: int(re.search(r'\d+', x.get('scene_id', '0')).group()))
@@ -1113,7 +1144,8 @@ def main():
         else:
             print(f"\n⚙️ ITERATION {iteration}: AUTONOMOUS ENGINE REPAIR (Targeting 100% Accuracy)...")
             force_stop = False
-            # Logic: Use previous master_json and apply fixes/hardening recursively
+            # Autonomous mode: In iterations 6-10, we bypass Gemini and recursively apply
+            # all available hardening and deterministic patches until perfection.
 
         # --- ENGINE-SIDE DETERMINISTIC FIXES (STAGE 2: HARDENING) ---
         master_json = maker.finalize_json_durations(master_json, public_dir=args.public_dir)
