@@ -4,6 +4,44 @@
       "scene_id": "SCENE_1",
       "overlays": [
         {
+          "id": "chart_density",
+          "type": "shadcn_chart",
+          "chart_type": "glass_area",
+          "title": "Population Density Comparison",
+          "data": [
+            {
+              "label": "Dhaka",
+              "value": 44500
+            },
+            {
+              "label": "Mumbai",
+              "value": 31700
+            },
+            {
+              "label": "Tokyo",
+              "value": 6200
+            }
+          ],
+          "start": 5,
+          "duration": 125,
+          "position": {
+            "x": 1285,
+            "y": 687
+          },
+          "font": "Audiowide-Regular_english",
+          "color": "#FF3E6C",
+          "colors": {
+            "scheme": "nivo"
+          },
+          "exitAnimation": "fade_out",
+          "depth": -10,
+          "parallax": 0.4,
+          "animation": "wordReveal",
+          "width": 850,
+          "height": 477,
+          "visual_anchor": true
+        },
+        {
           "id": "txt_dhaka",
           "type": "text",
           "content": "ঢাকা: মেগাসিটি",
@@ -25,46 +63,8 @@
           "style": "text-#00F5FF",
           "maxWidth": 800,
           "exitAnimation": "slide_down",
-          "depth": 50,
-          "parallax": 1.0,
-          "visual_anchor": true
-        },
-        {
-          "id": "chart_density",
-          "type": "shadcn_chart",
-          "chart_type": "glass_area",
-          "title": "Population Density Comparison",
-          "data": [
-            {
-              "label": "Dhaka",
-              "value": 44500
-            },
-            {
-              "label": "Mumbai",
-              "value": 31700
-            },
-            {
-              "label": "Tokyo",
-              "value": 6200
-            }
-          ],
-          "start": 45,
-          "duration": 85,
-          "position": {
-            "x": 1285,
-            "y": 687
-          },
-          "font": "Audiowide-Regular_english",
-          "color": "#FF3E6C",
-          "colors": {
-            "scheme": "nivo"
-          },
-          "exitAnimation": "fade_out",
-          "depth": 30,
-          "parallax": 0.8,
-          "animation": "wordReveal",
-          "width": 850,
-          "height": 477,
+          "depth": 10,
+          "parallax": 0.6,
           "visual_anchor": true
         }
       ],
@@ -137,10 +137,6 @@
         {
           "frame": 15,
           "event": "txt_dhaka_reveal"
-        },
-        {
-          "frame": 45,
-          "event": "chart_density_reveal"
         }
       ],
       "connections": []

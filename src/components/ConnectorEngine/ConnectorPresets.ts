@@ -88,5 +88,60 @@ export const ConnectorPresets = {
     pathType: 'smoothCurve',
     style: { width: 3, color: '#10b981', glow: true },
     animation: { draw: true, particle: false, organic: true }
+  },
+  when: {
+    pathType: 'straight',
+    style: { width: 2, color: '#fbbf24', glow: true },
+    animation: { draw: true, particle: true }
+  },
+  how: {
+    pathType: 'smoothCurve',
+    style: { width: 3, color: '#8b5cf6', glow: true },
+    animation: { draw: true, particle: true }
+  },
+  why: {
+    pathType: 'arc',
+    style: { width: 3, color: '#f43f5e', glow: true },
+    animation: { draw: true, particle: true }
+  },
+  how_many: {
+    pathType: 'straight',
+    style: { width: 4, color: '#10b981', glow: true },
+    animation: { draw: true, particle: true }
+  },
+  reason: {
+    pathType: 'sCurve',
+    style: { width: 3, color: '#f97316', glow: true },
+    animation: { draw: true, particle: true }
+  },
+  input: {
+    pathType: 'straight',
+    style: { width: 2, color: '#3b82f6', glow: true },
+    animation: { draw: true, particle: true }
+  },
+  output: {
+    pathType: 'straight',
+    style: { width: 2, color: '#06b6d4', glow: true },
+    animation: { draw: true, particle: true }
+  },
+  result: {
+    pathType: 'smoothCurve',
+    style: { width: 4, color: '#ec4899', glow: true },
+    animation: { draw: true, particle: true }
+  },
+  dependency: {
+    pathType: 'zigzag',
+    style: { width: 2, color: '#a855f7', glow: true },
+    animation: { draw: true, particle: false }
+  },
+  what: {
+    pathType: 'smoothCurve',
+    style: { width: 3, color: '#00F5FF', glow: true },
+    animation: { draw: true, particle: true }
+  },
+  where: {
+    pathType: 'arc',
+    style: { width: 2, color: '#FFD700', glow: true },
+    animation: { draw: true, particle: true }
   }
 } as const;

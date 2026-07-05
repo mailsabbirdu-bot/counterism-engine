@@ -109,7 +109,7 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
                   strokeDasharray="8 4"
                   opacity={0.4}
                 />
-                {link.label && revealProgress > 0.7 && (
+              {(link.label || link.display_label) && revealProgress > 0.7 && (
                    <text
                      x={(s.x + t.x) / 2}
                      y={(s.y + t.y) / 2}
@@ -119,7 +119,7 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
                      textAnchor="middle"
                      style={{ paintOrder: 'stroke', stroke: 'black', strokeWidth: 3, opacity: revealProgress }}
                    >
-                     {link.label}
+                     {link.label || link.display_label}
                    </text>
                 )}
               </g>
@@ -136,22 +136,43 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
             );
 
             const imp = node.importance || 1.0;
-            const radius = 15 * imp * nodeReveal;
-            const color = node.type === 'concept' ? "#FF3E6C" : "#00F5FF";
+            const radius = (node.category === 'result' ? 25 : 15) * imp * nodeReveal;
+
+            // Map category to color
+            const categoryColors: Record<string, string> = {
+                'when': '#fbbf24', 'how': '#8b5cf6', 'why': '#f43f5e',
+                'how_many': '#10b981', 'reason': '#f97316', 'input': '#3b82f6',
+                'output': '#06b6d4', 'result': '#ec4899', 'dependency': '#a855f7',
+                'what': '#00F5FF', 'where': '#FFD700'
+            };
+
+            // Emotion-based glow intensity
+            const emotionGlow: Record<string, number> = {
+                'intense': 30, 'stable': 10, 'alert': 40, 'calm': 5, 'growing': 20
+            };
+            const glowSize = (emotionGlow[node.emotion || ''] || 15) * nodeReveal;
+
+            const color = categoryColors[node.category || ''] || (node.type === 'concept' ? "#FF3E6C" : "#00F5FF");
 
             if (!node.x || !node.y) return null;
 
             return (
               <g key={`node-group-${node.id}`} opacity={nodeReveal}>
+                {/* Dynamic Aura */}
+                <circle
+                  cx={node.x}
+                  cy={node.y}
+                  r={radius + glowSize}
+                  fill={color}
+                  opacity={0.15 * nodeReveal}
+                  style={{ filter: 'blur(20px)' }}
+                />
                 <circle
                   cx={node.x}
                   cy={node.y}
                   r={radius}
                   fill={color}
                   filter="url(#nodeGlow)"
-                  style={{
-                    boxShadow: `0 0 20px ${color}`
-                  }}
                 />
                 <circle
                   cx={node.x}
