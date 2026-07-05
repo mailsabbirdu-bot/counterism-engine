@@ -92,56 +92,56 @@ export const ConnectorPresets = {
   when: {
     pathType: 'straight',
     style: { width: 2, color: '#fbbf24', glow: true },
-    animation: { draw: true, particle: true }
+    animation: { draw: true, particle: true, particleCount: 3 }
   },
   how: {
     pathType: 'smoothCurve',
     style: { width: 3, color: '#8b5cf6', glow: true },
-    animation: { draw: true, particle: true }
+    animation: { draw: true, particle: true, particleCount: 5 }
   },
   why: {
     pathType: 'arc',
     style: { width: 3, color: '#f43f5e', glow: true },
-    animation: { draw: true, particle: true }
+    animation: { draw: true, particle: true, particleCount: 4 }
   },
   how_many: {
     pathType: 'straight',
     style: { width: 4, color: '#10b981', glow: true },
-    animation: { draw: true, particle: true }
+    animation: { draw: true, particle: true, particleCount: 6 }
   },
   reason: {
     pathType: 'sCurve',
     style: { width: 3, color: '#f97316', glow: true },
-    animation: { draw: true, particle: true }
+    animation: { draw: true, particle: true, particleCount: 2 }
   },
   input: {
     pathType: 'straight',
     style: { width: 2, color: '#3b82f6', glow: true },
-    animation: { draw: true, particle: true }
+    animation: { draw: true, particle: true, particleCount: 8 }
   },
   output: {
     pathType: 'straight',
     style: { width: 2, color: '#06b6d4', glow: true },
-    animation: { draw: true, particle: true }
+    animation: { draw: true, particle: true, particleCount: 8 }
   },
   result: {
     pathType: 'smoothCurve',
     style: { width: 4, color: '#ec4899', glow: true },
-    animation: { draw: true, particle: true }
+    animation: { draw: true, particle: true, particleCount: 10 }
   },
   dependency: {
     pathType: 'zigzag',
     style: { width: 2, color: '#a855f7', glow: true },
-    animation: { draw: true, particle: false }
+    animation: { draw: true, particle: true, particleCount: 1 }
   },
   what: {
     pathType: 'smoothCurve',
     style: { width: 3, color: '#00F5FF', glow: true },
-    animation: { draw: true, particle: true }
+    animation: { draw: true, particle: true, particleCount: 3 }
   },
   where: {
     pathType: 'arc',
     style: { width: 2, color: '#FFD700', glow: true },
-    animation: { draw: true, particle: true }
+    animation: { draw: true, particle: true, particleCount: 3 }
   }
 } as const;
