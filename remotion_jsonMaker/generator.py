@@ -198,6 +198,19 @@ class RemotionJsonMaker:
                 data['scenes'] = data['timeline']
             del data['timeline']
 
+        # PRODUCTION: Detect if AI outputted overlays at root instead of inside scenes
+        if 'overlays' in data and not data.get('scenes'):
+            print("   🔧 TITAN FIX: Found root-level overlays. Wrapping into canonical SCENE_1.")
+            data['scenes'] = [{
+                "scene_id": "SCENE_1",
+                "duration_in_frames": data.get('duration', 300),
+                "overlays": data['overlays'],
+                "camera": data.get('camera', {"enabled": True, "shots": []}),
+                "background": {"background_type": "procedural"}
+            }]
+            del data['overlays']
+            if 'camera' in data: del data['camera']
+
         if 'global_settings' not in data:
             data['global_settings'] = {"width": 1920, "height": 1080, "fps": 30}
 
@@ -1246,8 +1259,8 @@ class RemotionJsonMaker:
             f"--- SYSTEM ROLE & CORE RULES ---\n"
             f"ROLE: SEMANTIC NARRATIVE ARCHITECT & CINEMATIC DIRECTOR.\n"
             f"OBJECTIVE: Use fewer words combined with sleek animation. Decompose narration into a Knowledge Graph.\n"
-            f"1. [REQUIRED] KNOWLEDGE GRAPH: Every sentence must be converted into Nodes (entities) and Edges (relationships). Use 'type': 'graph' to visualize these connections.\n"
-            f"2. [REQUIRED] TYPOGRAPHY: Use minimal text. Let the graph structure tell the story. Bangla text MUST use a font from the BANGLA list.\n"
+            f"1. [REQUIRED] KNOWLEDGE GRAPH: Decompose the FULL narration into a rich network. Every sentence must yield 2-3 nodes. Aim for 6-10 interconnected nodes per scene.\n"
+            f"2. [REQUIRED] TYPOGRAPHY: Use minimal separate text layers. The message should be conveyed ALMOST EXCLUSIVELY THROUGH node labels and connector relationships. Only use 'text' overlays for 1-2 word high-impact anchors.\n"
             f"3. [REQUIRED] COMPOSITION: Use Rule of Thirds. Place the Knowledge Graph as the central focal system.\n"
             f"4. [REQUIRED] SYNC: Match 'start' and 'duration' strictly to TIMESTAMPS. Sort overlays by entry time.\n"
             f"5. [REQUIRED] BACKGROUND: Always 'background_type': 'video'. video_path: 'renders/scene_SC_XX.mp4'. Set 'audio_enabled': false.\n"
@@ -1260,10 +1273,10 @@ class RemotionJsonMaker:
             f"12. [DIRECTOR RULE] READABILITY: Hold relationship labels long enough to be read.\n\n"
             f"--- [REQUIRED] KNOWLEDGE GRAPH AUTHORITY ---\n"
             f"GRAPH TYPE: 'type': 'graph'\n"
-            f"- nodes: [ {{ 'id': 'n1', 'label': 'Entity', 'importance': 1.5, 'emotion': 'intense', 'category': 'how' }} ]\n"
+            f"- nodes: [ {{ 'id': 'n1', 'label': 'Entity', 'importance': 1.5, 'emotion': 'intense|calm|alert|growing', 'category': 'when|how|why|how_many|reason|input|output|result|dependency|what|where' }} ]\n"
             f"- links: [ {{ 'source': 'n1', 'target': 'n2', 'relationship': 'causes', 'display_label': 'leads to' }} ]\n"
             f"CONNECTOR: 'type': 'connector'\n"
-            f"- source/target: ALWAYS reference node IDs (e.g., 'n1') instead of coordinates.\n"
+            f"- source/target: ALWAYS reference node IDs (e.g., 'n1') from the 'graph' overlay instead of fixed coordinates.\n"
             f"- label: 'Display text' (Renders along the line)\n"
             f"- relationship: select from [when, how, why, how_many, reason, input, output, result, dependency, what, where]\n"
             f"- pulse: true (To highlight active relationship)\n\n"
@@ -1274,11 +1287,11 @@ class RemotionJsonMaker:
             f"CONNECTORS: smooth_curve, soft_arc, straight_flow, energy_flow, signal_beam, data_stream, s_curve, zigzag_soft, multi_branch, network_web, callout_line, camera_focus, timeline_path, route_path, curved_route, neon_connector, blueprint_connector, organic_connector.\n"
             f"HERO ANIMATIONS: glow_pulse, isolate_zoom, bounce_pop, neon_flicker, shake_alert, rainbow_flow, glitch_pop, wave_float, blur_reveal, glass_shimmer, heartbeat, fire_glow.\n\n"
             f"--- [REQUIRED] MANDATORY SCHEMA FIELDS ---\n"
-            f"- ROOT: requires 'project_id', 'global_settings': {{ 'width': 1920, 'height': 1080, 'fps': 30 }}.\n"
-            f"- 'graph': requires 'nodes' (min 4-6 for depth) and 'links' arrays. Use 'category' for nodes.\n"
+            f"- ROOT: requires 'project_id', 'global_settings': {{ 'width': 1920, 'height': 1080, 'fps': 30 }}, and 'scenes' array.\n"
+            f"- 'graph': requires 'nodes' (min 6-8 per scene for richness), 'links' array, 'emotion', and 'category' for every node.\n"
             f"- 'chart': requires 'chart_type', 'title', and 'data' array.\n"
             f"- 'indicator': requires 'indicator_type', 'title', and 'value' (PURE NUMBER).\n"
-            f"- 'connector': requires 'source' (NODE_ID), 'target' (NODE_ID), 'variant', 'relationship', and 'label'.\n\n"
+            f"- 'connector': requires 'source' (ID), 'target' (ID), 'variant', 'relationship', and 'label'.\n\n"
             f"--- OPTIMIZATION OBJECTIVES ---\n"
             f"- Eliminate redundant coordinates: use root 'position': {{x,y}} OR properties.x/y, never both.\n"
             f"- Minimize nesting: prefer root-level fields where possible.\n"

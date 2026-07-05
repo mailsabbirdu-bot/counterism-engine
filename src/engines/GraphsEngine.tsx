@@ -148,7 +148,7 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
 
             // Emotion-based glow intensity
             const emotionGlow: Record<string, number> = {
-                'intense': 30, 'stable': 10, 'alert': 40, 'calm': 5, 'growing': 20
+                'intense': 45, 'stable': 10, 'alert': 60, 'calm': 5, 'growing': 30
             };
             const glowSize = (emotionGlow[node.emotion || ''] || 15) * nodeReveal;
 
