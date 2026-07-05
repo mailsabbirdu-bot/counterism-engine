@@ -11,7 +11,7 @@ export const ParallaxLayer: React.FC<{
 
   // Cinematic Depth Logic
   // Objects further away (negative depth) get automatic blur
-  const zBlur = blur ?? (depth < 0 ? Math.abs(depth) / 10 : 0);
+  const zBlur = blur ?? (depth < 0 ? Math.abs(depth) / 20 : 0);
   const scale = 1 + (depth / 1000);
 
   return (
@@ -19,7 +19,7 @@ export const ParallaxLayer: React.FC<{
       style={{
         transformStyle: 'preserve-3d',
         transform: `translate3d(0, 0, ${depth}px) scale(${scale})`,
-        filter: zBlur > 0 ? `blur(${zBlur}px)` : undefined,
+        filter: zBlur > 0.5 ? `blur(${zBlur}px)` : undefined,
         zIndex,
         width,
         height,
