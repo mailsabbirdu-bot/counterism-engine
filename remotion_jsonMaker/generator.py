@@ -192,6 +192,12 @@ class RemotionJsonMaker:
 
     def _harden_root_settings(self, data: Dict[str, Any]):
         """Stage 0: Root Level Hardening."""
+        # Unify Architecture: Remove redundant 'timeline' and use 'scenes' as canonical
+        if 'timeline' in data:
+            if not data.get('scenes'):
+                data['scenes'] = data['timeline']
+            del data['timeline']
+
         if 'global_settings' not in data:
             data['global_settings'] = {"width": 1920, "height": 1080, "fps": 30}
 
@@ -1022,7 +1028,8 @@ class RemotionJsonMaker:
                 'smooth_curve', 'soft_arc', 'straight_flow', 'energy_flow', 'signal_beam',
                 'data_stream', 's_curve', 'zigzag_soft', 'multi_branch', 'network_web',
                 'callout_line', 'camera_focus', 'timeline_path', 'route_path', 'curved_route',
-                'neon_connector', 'blueprint_connector', 'organic_connector'
+                'neon_connector', 'blueprint_connector', 'organic_connector',
+                'when', 'how', 'why', 'how_many', 'reason', 'input', 'output', 'result', 'dependency', 'what', 'where'
             ]
         }
 
@@ -1070,6 +1077,16 @@ class RemotionJsonMaker:
                 v_key = 'chart_type' if 'chart' in o_type else 'indicator_type' if 'indicator' in o_type else 'preset' if o_type == 'connector' else None
                 if v_key and o_type in REGISTRY:
                     val = ov.get(v_key)
+
+                    # Logic: If connector has 'relationship' but no 'preset', map it
+                    if o_type == 'connector' and not val and ov.get('relationship'):
+                        rel = ov.get('relationship')
+                        if rel in REGISTRY['connector']:
+                            ov['preset'] = rel
+                            val = rel
+                            scene_initiatives.append(f"MAPPING: '{ov_id}' relationship '{rel}' mapped to visual preset.")
+                            corrections_made += 1
+
                     if not val or val not in REGISTRY[o_type]:
                         ov[v_key] = REGISTRY[o_type][0]
                         scene_initiatives.append(f"VARIANT: '{ov_id}' ({o_type}) variant '{val}' invalid -> reset to '{ov[v_key]}'")
@@ -1243,10 +1260,12 @@ class RemotionJsonMaker:
             f"12. [DIRECTOR RULE] READABILITY: Hold relationship labels long enough to be read.\n\n"
             f"--- [REQUIRED] KNOWLEDGE GRAPH AUTHORITY ---\n"
             f"GRAPH TYPE: 'type': 'graph'\n"
-            f"- nodes: [ {{ 'id': 'node1', 'label': 'Entity Name', 'importance': 1.2, 'type': 'concept' }} ]\n"
-            f"- links: [ {{ 'source': 'node1', 'target': 'node2', 'label': 'Relationship' }} ]\n"
+            f"- nodes: [ {{ 'id': 'n1', 'label': 'Entity', 'importance': 1.5, 'emotion': 'intense', 'category': 'how' }} ]\n"
+            f"- links: [ {{ 'source': 'n1', 'target': 'n2', 'relationship': 'causes', 'display_label': 'leads to' }} ]\n"
             f"CONNECTOR: 'type': 'connector'\n"
-            f"- label: 'Relationship text' (Renders along the line)\n"
+            f"- source/target: ALWAYS reference node IDs (e.g., 'n1') instead of coordinates.\n"
+            f"- label: 'Display text' (Renders along the line)\n"
+            f"- relationship: select from [when, how, why, how_many, reason, input, output, result, dependency, what, where]\n"
             f"- pulse: true (To highlight active relationship)\n\n"
             f"--- [REQUIRED] VARIANT AUTHORITY (USE ONLY THESE) ---\n"
             f"CHARTS: glass_area, neon_bar, stacked_line, radial_score, radar_web, pie_donut_glass, step_area, multi_bar_stack, bar_race_top, thick_line_glow, area, bar, line.\n"
@@ -1256,10 +1275,10 @@ class RemotionJsonMaker:
             f"HERO ANIMATIONS: glow_pulse, isolate_zoom, bounce_pop, neon_flicker, shake_alert, rainbow_flow, glitch_pop, wave_float, blur_reveal, glass_shimmer, heartbeat, fire_glow.\n\n"
             f"--- [REQUIRED] MANDATORY SCHEMA FIELDS ---\n"
             f"- ROOT: requires 'project_id', 'global_settings': {{ 'width': 1920, 'height': 1080, 'fps': 30 }}.\n"
-            f"- 'graph': requires 'nodes' and 'links' arrays.\n"
+            f"- 'graph': requires 'nodes' (min 4-6 for depth) and 'links' arrays. Use 'category' for nodes.\n"
             f"- 'chart': requires 'chart_type', 'title', and 'data' array.\n"
             f"- 'indicator': requires 'indicator_type', 'title', and 'value' (PURE NUMBER).\n"
-            f"- 'connector': requires 'source' (ID), 'target' (ID), 'variant', and 'label'.\n\n"
+            f"- 'connector': requires 'source' (NODE_ID), 'target' (NODE_ID), 'variant', 'relationship', and 'label'.\n\n"
             f"--- OPTIMIZATION OBJECTIVES ---\n"
             f"- Eliminate redundant coordinates: use root 'position': {{x,y}} OR properties.x/y, never both.\n"
             f"- Minimize nesting: prefer root-level fields where possible.\n"
