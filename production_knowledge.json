@@ -1,0 +1,19 @@
+{
+  "version": "2.0",
+  "last_updated": "2026-07-05 22:27:12",
+  "items": {
+    "err_dc049c2a2307": {
+      "id": "err_dc049c2a2307",
+      "content": "No scenes found in manifest.",
+      "category": "logic",
+      "tags": [],
+      "importance": 1.0,
+      "frequency": 5,
+      "first_seen": "2026-07-05 22:27:12",
+      "last_seen": "2026-07-05 22:27:12",
+      "is_anti_pattern": true,
+      "success_rate_after_fix": 0.0,
+      "patch_template": null
+    }
+  }
+}
