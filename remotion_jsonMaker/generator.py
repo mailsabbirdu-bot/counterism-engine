@@ -996,7 +996,7 @@ class RemotionJsonMaker:
 
     def final_production_guard(self, manifest_path: str, public_dir: str = "../public") -> str:
         """
-        v2.0 TITAN GUARD: Deep Semantic Auditor & Auto-Correction Initiative.
+        v3.0 TITAN GUARD: Deep Semantic Auditor & Auto-Correction Initiative.
         Reads the final JSON file, validates every line of logic, and guarantees 98%+ accuracy.
         """
         report = []
@@ -1012,6 +1012,9 @@ class RemotionJsonMaker:
         except Exception as e:
             return f"❌ TITAN GUARD ERROR: Failed to parse JSON: {e}"
 
+        # TITAN RECOVERY: Ensure structure before deep audit
+        self._harden_root_settings(data)
+
         # Production Registry (Authoritative source for renderability)
         REGISTRY = {
             'types': [
@@ -1020,6 +1023,7 @@ class RemotionJsonMaker:
                 'hub_network', 'flow_diagram', 'process', 'kpi_card', 'timeline', 'compositions', 'groups',
                 'ambient_graphic', 'callout', 'label'
             ],
+            'node_types': ['hero', 'data', 'concept', 'relationship', 'image', 'statistic'],
             'shadcn_chart': [
                 'glass_area', 'neon_bar', 'stacked_line', 'radial_score', 'radar_web', 'composed_tech',
                 'pie_donut_glass', 'scatter_bubble', 'horizontal_pill_bar', 'step_area', 'multi_bar_stack',
@@ -1125,17 +1129,28 @@ class RemotionJsonMaker:
                 # D. Dependency Validation (Connectors)
                 if o_type == 'connector':
                     src, tgt = ov.get('source'), ov.get('target')
-                    if src not in overlay_ids or tgt not in overlay_ids:
+                    # Logic: Connectors can target graph nodes! Check nodes in all graph overlays in the scene.
+                    all_node_ids = []
+                    for other_ov in scene.get('overlays', []):
+                        if other_ov.get('type') == 'graph':
+                            all_node_ids.extend([n.get('id') for n in other_ov.get('nodes', [])])
+                    valid_targets = overlay_ids + all_node_ids
+
+                    if src not in valid_targets or tgt not in valid_targets:
                         # Coerce to center if targets are hallucinated
-                        if src not in overlay_ids: ov['source'] = {"x": 960, "y": 540}
-                        if tgt not in overlay_ids: ov['target'] = {"x": 960, "y": 540}
+                        if src not in valid_targets: ov['source'] = {"x": 960, "y": 540}
+                        if tgt not in valid_targets: ov['target'] = {"x": 960, "y": 540}
                         scene_initiatives.append(f"DEPENDENCY: Connector '{ov_id}' targeted missing IDs -> anchored to center")
                         corrections_made += 1
 
-                # E. Knowledge Graph Integrity
+                # E. Knowledge Graph Integrity (Audit for Depth)
                 if o_type == 'graph':
-                    if not ov.get('nodes'):
-                        ov['nodes'] = [{"id": "n1", "label": "Concept", "importance": 1.0}]
+                    nodes = ov.get('nodes', [])
+                    if len(nodes) < 4:
+                        scene_initiatives.append(f"QUALITY: Graph '{ov_id}' is too sparse ({len(nodes)} nodes). Depth improvement suggested.")
+
+                    if not nodes:
+                        ov['nodes'] = [{"id": "n1", "label": "Concept", "importance": 1.0, "type": "concept", "category": "what", "emotion": "stable"}]
                         scene_initiatives.append(f"DATA: Graph '{ov_id}' missing nodes -> injected fallback")
                         corrections_made += 1
                     else:
@@ -1143,6 +1158,10 @@ class RemotionJsonMaker:
                         for i, n in enumerate(ov['nodes']):
                             if 'id' not in n: n['id'] = f"n_{i}"; corrections_made += 1
                             if 'label' not in n: n['label'] = f"Entity {i}"; corrections_made += 1
+                            if n.get('type') not in REGISTRY['node_types']:
+                                n['type'] = 'concept'; corrections_made += 1
+                            if 'category' not in n: n['category'] = 'what'; corrections_made += 1
+                            if 'emotion' not in n: n['emotion'] = 'stable'; corrections_made += 1
                             node_ids.append(n['id'])
 
                         # Validate Links
@@ -1257,28 +1276,22 @@ class RemotionJsonMaker:
             f"Z_INDEX_HIERARCHY: Shapes (10), Connectors (30), Charts/Indicators (40), Graphs (50), Text (60), Hero (100)\n"
             f"COLORS: PRIMARY: #00F5FF, ACCENT: #FF3E6C, WARN: #FFD700, SUCCESS: #00FFAB\n\n"
             f"--- SYSTEM ROLE & CORE RULES ---\n"
-            f"ROLE: SEMANTIC NARRATIVE ARCHITECT & CINEMATIC DIRECTOR.\n"
-            f"OBJECTIVE: Use fewer words combined with sleek animation. Decompose narration into a Knowledge Graph.\n"
-            f"1. [REQUIRED] KNOWLEDGE GRAPH: Decompose the FULL narration into a rich network. Every sentence must yield 2-3 nodes. Aim for 6-10 interconnected nodes per scene.\n"
-            f"2. [REQUIRED] TYPOGRAPHY: Use minimal separate text layers. The message should be conveyed ALMOST EXCLUSIVELY THROUGH node labels and connector relationships. Only use 'text' overlays for 1-2 word high-impact anchors.\n"
-            f"3. [REQUIRED] COMPOSITION: Use Rule of Thirds. Place the Knowledge Graph as the central focal system.\n"
-            f"4. [REQUIRED] SYNC: Match 'start' and 'duration' strictly to TIMESTAMPS. Sort overlays by entry time.\n"
-            f"5. [REQUIRED] BACKGROUND: Always 'background_type': 'video'. video_path: 'renders/scene_SC_XX.mp4'. Set 'audio_enabled': false.\n"
-            f"6. [REQUIRED] CAMERA: Use camera 'shots' to focus on specific nodes/relationships as they are mentioned in narration.\n"
-            f"7. [REQUIRED] RELATIONSHIPS: Use 'type': 'connector' with a 'label' to show the semantic meaning of an edge (e.g., 'causes', 'influences').\n"
-            f"8. [REQUIRED] UI_PANELS: Use 'type': 'ui_panel' with 'variant': 'glass' to show metadata for a selected node.\n"
-            f"9. [RECOMMENDED] CHOREOGRAPHY: Reveal nodes first, then draw edges (connectors) as the relationship is explained.\n"
-            f"10. [OPTIONAL] PARALLAX: Add slight 'parallax' values to create technical depth between the graph and background.\n"
-            f"11. [DIRECTOR RULE] COGNITIVE LOAD: Keep the graph readable. Avoid more than 5 nodes on screen at once unless it's a 'hub' moment.\n"
-            f"12. [DIRECTOR RULE] READABILITY: Hold relationship labels long enough to be read.\n\n"
+            f"ROLE: CINEMATIC NARRATIVE ARCHITECT (Vox/Neo Style).\n"
+            f"OBJECTIVE: Do not visualize language; visualize UNDERSTANDING. Decompose narration into conceptual systems.\n"
+            f"1. [REQUIRED] CONCEPTUAL STRUCTURE: Identify systems, causes, effects, and hierarchies behind the narration. Every sentence must contribute to a rich conceptual network.\n"
+            f"2. [REQUIRED] VISUAL HIERARCHY: Exactly one focal point at a time. Hierarchy: Hero (100) -> Supporting (50) -> Context UI (40) -> Ambient (10).\n"
+            f"3. [REQUIRED] KNOWLEDGE GRAPH: Use 'type': 'graph' as the structural backbone. Nodes represent Concepts, Systems, or Objects. Aim for 6-10 interconnected nodes per scene.\n"
+            f"4. [REQUIRED] TYPOGRAPHY: Text is graphic design, not subtitles. Use minimal 'text' overlays for 1-2 word high-impact headers only.\n"
+            f"5. [REQUIRED] MOTION IS INFORMATION: Animation must match meaning (Cause=Energy Flow, Warning=Pulse, Danger=Vibration).\n"
+            f"6. [REQUIRED] SEQUENTIAL REVEAL: Background -> Hero -> Graph grows -> Connections animate -> Camera pushes.\n\n"
             f"--- [REQUIRED] KNOWLEDGE GRAPH AUTHORITY ---\n"
             f"GRAPH TYPE: 'type': 'graph'\n"
-            f"- nodes: [ {{ 'id': 'n1', 'label': 'Entity', 'importance': 1.5, 'emotion': 'intense|calm|alert|growing', 'category': 'when|how|why|how_many|reason|input|output|result|dependency|what|where' }} ]\n"
-            f"- links: [ {{ 'source': 'n1', 'target': 'n2', 'relationship': 'causes', 'display_label': 'leads to' }} ]\n"
+            f"- nodes: [ {{ 'id': 'n1', 'label': 'Entity', 'type': 'hero|data|concept|relationship|image|statistic', 'importance': 1.5, 'emotion': 'intense|calm|alert|growing', 'category': 'why|how|result|causes|leads_to|depends_on' }} ]\n"
+            f"- links: [ {{ 'source': 'n1', 'target': 'n2', 'relationship': 'causes|leads_to|depends_on|triggers|increases|decreases', 'display_label': 'leads to' }} ]\n"
             f"CONNECTOR: 'type': 'connector'\n"
-            f"- source/target: ALWAYS reference node IDs (e.g., 'n1') from the 'graph' overlay instead of fixed coordinates.\n"
+            f"- source/target: ALWAYS reference node IDs from the 'graph' overlay.\n"
             f"- label: 'Display text' (Renders along the line)\n"
-            f"- relationship: select from [when, how, why, how_many, reason, input, output, result, dependency, what, where]\n"
+            f"- relationship: select from [causes, leads_to, depends_on, located_in, transforms_into, increases, decreases, supports, threatens, flows_to, triggers, influences]\n"
             f"- pulse: true (To highlight active relationship)\n\n"
             f"--- [REQUIRED] VARIANT AUTHORITY (USE ONLY THESE) ---\n"
             f"CHARTS: glass_area, neon_bar, stacked_line, radial_score, radar_web, pie_donut_glass, step_area, multi_bar_stack, bar_race_top, thick_line_glow, area, bar, line.\n"

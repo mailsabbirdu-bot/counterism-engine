@@ -1,19 +1,39 @@
 import React, { useMemo } from 'react';
-import { useCurrentFrame, useVideoConfig, spring, interpolate, Easing } from 'remotion';
+import { useCurrentFrame, useVideoConfig, spring, interpolate, Easing, AbsoluteFill } from 'remotion';
 import * as d3 from 'd3';
+import { LucideIcon, Zap, Activity, Brain, Target, ShieldAlert, BarChart3, Image as ImageIcon, MapPin, Clock, Database, ArrowRightLeft } from 'lucide-react';
 
 interface Node extends d3.SimulationNodeDatum {
-  id: string | number;
-  label?: string;
+  id: string;
+  label: string;
+  type?: 'hero' | 'data' | 'concept' | 'relationship' | 'image' | 'statistic';
   importance?: number;
-  type?: string;
+  emotion?: 'intense' | 'calm' | 'alert' | 'growing';
+  category?: string;
 }
 
 interface Link extends d3.SimulationLinkDatum<Node> {
-  source: string | number | Node;
-  target: string | number | Node;
-  label?: string;
+  source: string | Node;
+  target: string | Node;
+  relationship?: string;
+  display_label?: string;
 }
+
+const CATEGORY_COLORS: Record<string, string> = {
+  'why': '#f43f5e', 'how': '#8b5cf6', 'when': '#fbbf24',
+  'how_many': '#10b981', 'reason': '#f97316', 'input': '#3b82f6',
+  'output': '#06b6d4', 'result': '#ec4899', 'dependency': '#a855f7',
+  'what': '#00F5FF', 'where': '#FFD700', 'causes': '#ef4444'
+};
+
+const EMOTION_GLOW: Record<string, number> = {
+  'intense': 60, 'stable': 15, 'alert': 80, 'calm': 8, 'growing': 40
+};
+
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  'hero': Target, 'data': Database, 'concept': Brain,
+  'relationship': ArrowRightLeft, 'image': ImageIcon, 'statistic': BarChart3
+};
 
 export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
@@ -26,185 +46,142 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     const rawNodes: Node[] = overlay.nodes || [];
     const rawLinks: Link[] = overlay.links || [];
 
-    // Deep copy to avoid mutating props
     const nodes = rawNodes.map(n => ({ ...n }));
     const links = rawLinks.map(l => ({ ...l }));
 
     const simulation = d3.forceSimulation<Node>(nodes)
-      .force("link", d3.forceLink<Node, Link>(links).id(d => d.id).distance(250))
-      .force("charge", d3.forceManyBody().strength(-800))
+      .force("link", d3.forceLink<Node, Link>(links).id(d => d.id).distance(300))
+      .force("charge", d3.forceManyBody().strength(-1500))
       .force("center", d3.forceCenter(centerX, centerY))
-      .force("collision", d3.forceCollide().radius(80))
+      .force("collision", d3.forceCollide().radius(120))
       .stop();
 
-    for (let i = 0; i < 200; ++i) simulation.tick();
+    for (let i = 0; i < 250; ++i) simulation.tick();
 
-    return {
-      processedNodes: nodes,
-      processedLinks: links
-    };
+    return { processedNodes: nodes, processedLinks: links };
   }, [overlay.nodes, overlay.links, centerX, centerY]);
 
-  if (frame < overlay.start || frame > overlay.start + overlay.duration) {
-    return null;
-  }
+  if (frame < overlay.start || frame > overlay.start + overlay.duration) return null;
 
   const relativeFrame = frame - overlay.start;
-  const entrance = spring({
-    frame: relativeFrame,
-    fps,
-    config: { damping: 20 },
+  const revealProgress = interpolate(relativeFrame, [0, 60], [0, 1], {
+    extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.33, 1, 0.68, 1)
   });
 
-  const revealProgress = interpolate(
-    relativeFrame,
-    [0, 60],
-    [0, 1],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.25, 0.1, 0.25, 1) }
-  );
-
-  const rotation = frame * (overlay.speed || 0.02);
-  const scale = 0.9 + entrance * 0.1 + Math.sin(frame / 120) * 0.02;
-
   return (
-    <div
-      className="absolute inset-0 pointer-events-none overflow-hidden"
-      style={{ opacity: entrance, zIndex: overlay.zIndex ?? 50 }}
-    >
+    <AbsoluteFill className="pointer-events-none overflow-hidden" style={{ zIndex: overlay.zIndex ?? 50 }}>
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`}>
         <defs>
-          <filter id="nodeGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="15" result="blur" />
+          <filter id="cinematicGlow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="20" result="blur" />
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
-          <linearGradient id="edgeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#00F5FF" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#FF3E6C" stopOpacity="0.8" />
-          </linearGradient>
         </defs>
 
-        <g transform={`translate(${centerX}, ${centerY}) scale(${scale}) rotate(${rotation}) translate(${-centerX}, ${-centerY})`}>
-          {/* Links */}
-          {processedLinks.map((link, i) => {
-            const s = link.source as Node;
-            const t = link.target as Node;
-            const linkReveal = interpolate(
-              revealProgress,
-              [0.2, 0.8],
-              [0, 1],
-              { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
-            );
-
-            if (!s.x || !s.y || !t.x || !t.y) return null;
-
-            return (
-              <g key={`link-group-${i}`} opacity={linkReveal}>
-                <line
-                  x1={s.x}
-                  y1={s.y}
-                  x2={t.x}
-                  y2={t.y}
-                  stroke="url(#edgeGradient)"
-                  strokeWidth="2"
-                  strokeDasharray="8 4"
-                  opacity={0.4}
-                />
-              {(link.label || link.display_label) && revealProgress > 0.7 && (
-                   <text
-                     x={(s.x + t.x) / 2}
-                     y={(s.y + t.y) / 2}
-                     fill="white"
-                     fontSize="14"
-                     fontWeight="bold"
-                     textAnchor="middle"
-                     style={{ paintOrder: 'stroke', stroke: 'black', strokeWidth: 3, opacity: revealProgress }}
-                   >
-                     {link.label || link.display_label}
-                   </text>
-                )}
-              </g>
-            );
-          })}
+        <g transform={`translate(${centerX}, ${centerY}) rotate(${frame * 0.01}) translate(${-centerX}, ${-centerY})`}>
+          {/* Edges */}
+          {processedLinks.map((link, i) => (
+            <LivingEdge key={`link-${i}`} link={link} revealProgress={revealProgress} />
+          ))}
 
           {/* Nodes */}
-          {processedNodes.map((node, i) => {
-            const nodeReveal = interpolate(
-              revealProgress,
-              [i / (processedNodes.length + 1), (i + 1) / (processedNodes.length + 1)],
-              [0, 1],
-              { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
-            );
-
-            const imp = node.importance || 1.0;
-            const radius = (node.category === 'result' ? 25 : 15) * imp * nodeReveal;
-
-            // Map category to color
-            const categoryColors: Record<string, string> = {
-                'when': '#fbbf24', 'how': '#8b5cf6', 'why': '#f43f5e',
-                'how_many': '#10b981', 'reason': '#f97316', 'input': '#3b82f6',
-                'output': '#06b6d4', 'result': '#ec4899', 'dependency': '#a855f7',
-                'what': '#00F5FF', 'where': '#FFD700'
-            };
-
-            // Emotion-based glow intensity
-            const emotionGlow: Record<string, number> = {
-                'intense': 45, 'stable': 10, 'alert': 60, 'calm': 5, 'growing': 30
-            };
-            const glowSize = (emotionGlow[node.emotion || ''] || 15) * nodeReveal;
-
-            const color = categoryColors[node.category || ''] || (node.type === 'concept' ? "#FF3E6C" : "#00F5FF");
-
-            if (!node.x || !node.y) return null;
-
-            return (
-              <g key={`node-group-${node.id}`} opacity={nodeReveal}>
-                {/* Dynamic Aura */}
-                <circle
-                  cx={node.x}
-                  cy={node.y}
-                  r={radius + glowSize}
-                  fill={color}
-                  opacity={0.15 * nodeReveal}
-                  style={{ filter: 'blur(20px)' }}
-                />
-                <circle
-                  cx={node.x}
-                  cy={node.y}
-                  r={radius}
-                  fill={color}
-                  filter="url(#nodeGlow)"
-                />
-                <circle
-                  cx={node.x}
-                  cy={node.y}
-                  r={radius + 5}
-                  fill="none"
-                  stroke={color}
-                  strokeWidth="1"
-                  strokeOpacity={0.3}
-                />
-                {node.label && (
-                   <text
-                     x={node.x}
-                     y={node.y + radius + 25}
-                     fill="white"
-                     fontSize={20 * imp}
-                     fontWeight="black"
-                     textAnchor="middle"
-                     className="uppercase tracking-tighter"
-                     style={{
-                        fontFamily: overlay.font || 'Audiowide-Regular_english',
-                        textShadow: '0 4px 10px rgba(0,0,0,0.8)'
-                     }}
-                   >
-                     {node.label}
-                   </text>
-                )}
-              </g>
-            );
-          })}
+          {processedNodes.map((node, i) => (
+            <CinematicNode key={node.id} node={node} i={i} total={processedNodes.length} revealProgress={revealProgress} font={overlay.font} />
+          ))}
         </g>
       </svg>
-    </div>
+    </AbsoluteFill>
+  );
+};
+
+const LivingEdge: React.FC<{ link: Link, revealProgress: number }> = ({ link, revealProgress }) => {
+  const s = link.source as Node;
+  const t = link.target as Node;
+  const frame = useCurrentFrame();
+
+  if (!s.x || !s.y || !t.x || !t.y) return null;
+
+  const edgeReveal = interpolate(revealProgress, [0.1, 0.9], [0, 1], { extrapolateRight: 'clamp' });
+  const relColor = CATEGORY_COLORS[link.relationship || ''] || '#00F5FF';
+
+  const length = Math.sqrt((t.x - s.x) ** 2 + (t.y - s.y) ** 2);
+  const dashOffset = -frame * 2;
+
+  return (
+    <g opacity={edgeReveal}>
+      <path
+        d={`M ${s.x} ${s.y} Q ${(s.x + t.x) / 2 + 50} ${(s.y + t.y) / 2 - 50} ${t.x} ${t.y}`}
+        fill="none"
+        stroke={relColor}
+        strokeWidth="2"
+        strokeDasharray="10 5"
+        strokeDashoffset={dashOffset}
+        opacity={0.3}
+      />
+      {link.display_label && edgeReveal > 0.8 && (
+        <text
+          x={(s.x + t.x) / 2}
+          y={(s.y + t.y) / 2 - 20}
+          fill={relColor}
+          fontSize="16"
+          fontWeight="900"
+          textAnchor="middle"
+          className="uppercase tracking-[0.2em]"
+          style={{ paintOrder: 'stroke', stroke: 'black', strokeWidth: 4 }}
+        >
+          {link.display_label}
+        </text>
+      )}
+    </g>
+  );
+};
+
+const CinematicNode: React.FC<{ node: Node, i: number, total: number, revealProgress: number, font?: string }> = ({ node, i, total, revealProgress, font }) => {
+  const frame = useCurrentFrame();
+  const nodeReveal = interpolate(revealProgress, [i / (total + 1), (i + 1) / (total + 1)], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+
+  if (!node.x || !node.y) return null;
+
+  const imp = node.importance || 1.0;
+  const color = CATEGORY_COLORS[node.category || ''] || '#FFFFFF';
+  const glowIntensity = EMOTION_GLOW[node.emotion || ''] || 20;
+
+  // Breathe micro-animation
+  const breathe = Math.sin(frame / 20 + i) * 0.05 + 1;
+  const floatY = Math.sin(frame / 30 + i) * 10;
+
+  const Icon = TYPE_ICONS[node.type || 'concept'] || Brain;
+
+  return (
+    <g transform={`translate(${node.x}, ${node.y + floatY}) scale(${nodeReveal * breathe * imp})`}>
+      {/* Dynamic Aura */}
+      <circle r={40 + glowIntensity} fill={color} opacity={0.1 * nodeReveal} style={{ filter: 'blur(30px)' }} />
+
+      {/* Glassmorphism Card */}
+      <rect x="-80" y="-40" width="160" height="80" rx="20" fill="rgba(10, 10, 10, 0.8)" stroke={color} strokeWidth="2" style={{ filter: 'url(#cinematicGlow)' }} />
+
+      <g transform="translate(-60, 0)">
+        <Icon size={24} color={color} />
+      </g>
+
+      <text
+        x="10"
+        y="5"
+        fill="white"
+        fontSize="18"
+        fontWeight="900"
+        textAnchor="middle"
+        className="uppercase"
+        style={{ fontFamily: font || 'Inter', letterSpacing: '1px' }}
+      >
+        {node.label}
+      </text>
+
+      {node.type === 'hero' && (
+        <circle r={90} fill="none" stroke={color} strokeWidth="1" strokeDasharray="4 4" opacity={0.5}>
+          <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="10s" repeatCount="indefinite" />
+        </circle>
+      )}
+    </g>
   );
 };
