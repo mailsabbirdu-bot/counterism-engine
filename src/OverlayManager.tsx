@@ -90,7 +90,12 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays, analys
         if (!content) return null;
 
         return (
-          <ParallaxLayer key={overlay.id} depth={overlay.depth} zIndex={overlay.zIndex}>
+          <ParallaxLayer
+            key={overlay.id}
+            depth={overlay.depth ?? (overlay.parallax ? overlay.parallax * 10 : 0)}
+            zIndex={overlay.zIndex}
+            blur={overlay.blur}
+          >
             {content}
           </ParallaxLayer>
         );

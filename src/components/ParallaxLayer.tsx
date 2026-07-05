@@ -5,17 +5,25 @@ export const ParallaxLayer: React.FC<{
   depth?: number;
   zIndex?: number;
   children: React.ReactNode;
-}> = ({ depth = 0, zIndex, children }) => {
+  blur?: number;
+}> = ({ depth = 0, zIndex, children, blur }) => {
   const { width, height } = useVideoConfig();
+
+  // Cinematic Depth Logic
+  // Objects further away (negative depth) get automatic blur
+  const zBlur = blur ?? (depth < 0 ? Math.abs(depth) / 10 : 0);
+  const scale = 1 + (depth / 1000);
 
   return (
     <AbsoluteFill
       style={{
         transformStyle: 'preserve-3d',
-        transform: depth !== 0 ? `translate3d(0, 0, ${depth}px)` : undefined,
+        transform: `translate3d(0, 0, ${depth}px) scale(${scale})`,
+        filter: zBlur > 0 ? `blur(${zBlur}px)` : undefined,
         zIndex,
         width,
         height,
+        pointerEvents: 'none'
       }}
     >
       {children}

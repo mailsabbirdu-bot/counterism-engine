@@ -53,13 +53,18 @@ export const Connector: React.FC<ConnectorProps & { start?: number; duration?: n
   const relativeFrame = frame - start;
   if (frame < start || frame > start + userDuration) return null;
 
+  // Cinematic "Meaning-Driven" Motion
   const drawProgress = spring({
     frame: relativeFrame,
     fps,
-    config: { damping: 12, stiffness: 100 },
+    config: {
+        damping: preset === 'why' || preset === 'reason' ? 8 : 12,
+        stiffness: preset === 'result' ? 150 : 100,
+        mass: preset === 'dependency' ? 2 : 1
+    },
   });
 
-  const opacity = interpolate(relativeFrame, [0, 15, userDuration - 15, userDuration], [0, 1, 1, 0], {
+  const opacity = interpolate(relativeFrame, [0, 20, userDuration - 20, userDuration], [0, 1, 1, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp'
   });
