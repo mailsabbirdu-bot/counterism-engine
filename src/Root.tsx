@@ -28,7 +28,7 @@ export const RemotionRoot: React.FC = () => {
     const fontsToLoad = new Set<string>();
     template.scenes.forEach((scene: any) => {
       (scene.overlays || []).forEach((overlay: any) => {
-        if (overlay.type === 'text' && overlay.font) {
+        if (overlay.font) {
           fontsToLoad.add(overlay.font);
         }
       });
