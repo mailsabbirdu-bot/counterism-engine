@@ -151,6 +151,7 @@ const CinematicNode: React.FC<{ node: Node, i: number, total: number, revealProg
   const floatY = Math.sin(frame / 30 + i) * 10;
 
   const Icon = TYPE_ICONS[node.type || 'concept'] || Brain;
+  const isBangla = /[\u0980-\u09FF]/.test(node.label);
 
   return (
     <g transform={`translate(${node.x}, ${node.y + floatY}) scale(${nodeReveal * breathe * imp})`}>
@@ -171,8 +172,11 @@ const CinematicNode: React.FC<{ node: Node, i: number, total: number, revealProg
         fontSize="18"
         fontWeight="900"
         textAnchor="middle"
-        className="uppercase"
-        style={{ fontFamily: font || 'Inter', letterSpacing: '1px' }}
+        style={{
+            fontFamily: font ? `${font}, Inter, "Segoe UI", sans-serif` : 'Inter, "Segoe UI", sans-serif',
+            letterSpacing: isBangla ? '0px' : '1px',
+            textTransform: isBangla ? 'none' : 'uppercase'
+        }}
       >
         {node.label}
       </text>

@@ -194,9 +194,35 @@ class RemotionJsonMaker:
         """Stage 0: Root Level Hardening."""
         # Unify Architecture: Remove redundant 'timeline' and use 'scenes' as canonical
         if 'timeline' in data:
+            timeline = data['timeline']
             if not data.get('scenes'):
-                data['scenes'] = data['timeline']
-            del data['timeline']
+                if isinstance(timeline, list):
+                    data['scenes'] = timeline
+                elif isinstance(timeline, dict) and 'scenes' in timeline:
+                    data['scenes'] = timeline['scenes']
+                else:
+                    data['scenes'] = [timeline]
+            if 'timeline' in data: del data['timeline']
+
+        if 'scenes' in data:
+            if isinstance(data['scenes'], dict) and 'scenes' in data['scenes']:
+                data['scenes'] = data['scenes']['scenes']
+
+            if not isinstance(data['scenes'], list):
+                data['scenes'] = [data['scenes']]
+
+            # Ensure every scene is a dictionary. Filter out or repair malformed AI artifacts.
+            cleaned_scenes = []
+            for s in data['scenes']:
+                if isinstance(s, dict):
+                    cleaned_scenes.append(s)
+                elif isinstance(s, str):
+                    # Attempt to rescue if it looks like JSON string
+                    try:
+                        parsed = json.loads(s)
+                        if isinstance(parsed, dict): cleaned_scenes.append(parsed)
+                    except: pass
+            data['scenes'] = cleaned_scenes
 
         # PRODUCTION: Detect if AI outputted overlays at root instead of inside scenes
         if 'overlays' in data and not data.get('scenes'):
@@ -332,6 +358,7 @@ class RemotionJsonMaker:
 
         # UNIFICATION: Standardize content keys before promotion
         o_type = str(ov.get('type', 'text')).lower()
+        if 'text' in ov and 'content' not in ov: ov['content'] = ov['text']
         ov['type'] = o_type # Ensure key exists for priority checks
 
         # Helper to unify keys within an object
@@ -414,6 +441,9 @@ class RemotionJsonMaker:
 
         # Font Decision Logic (Hardened)
         content = str(ov.get('content', '')).strip()
+        if o_type == 'graph' and not content:
+            content = " ".join([str(n.get('label', '')) for n in ov.get('nodes', [])])
+
         is_content_bangla = VisionConstants.is_bangla(content)
         ai_font = ov.get('font')
 
@@ -421,6 +451,8 @@ class RemotionJsonMaker:
             # Content is Bangla: MUST use a Bangla font.
             if ai_font not in self.bangla_fonts:
                 ov['font'] = "Sohid_bangla" if "Sohid_bangla" in self.bangla_fonts else (self.bangla_fonts[0] if self.bangla_fonts else "Arial")
+            if o_type == 'text':
+                ov['splitMode'] = 'word'
         else:
             # Content is NOT Bangla: English/Mixed content should use English font for clarity.
             if ai_font not in self.english_fonts:
@@ -463,6 +495,7 @@ class RemotionJsonMaker:
             # Harvest hallucinated semantic keys into canonical overlays
             harvest_map = {
                 'text_overlays': 'text',
+                'text_elements': 'text',
                 'indicators': 'shadcn_indicator',
                 'charts': 'shadcn_chart',
                 'elements': None,
@@ -478,7 +511,7 @@ class RemotionJsonMaker:
                         scene['overlays'].append(item)
                     del scene[key]
 
-            # Special Handling for 'graph_evolution' hallucination
+            # Special Handling for 'graph_evolution' and 'graph' hallucination
             if 'graph_evolution' in scene and isinstance(scene['graph_evolution'], dict):
                 graph_data = scene['graph_evolution']
                 graph_overlay = {
@@ -492,6 +525,19 @@ class RemotionJsonMaker:
                 }
                 scene['overlays'].append(graph_overlay)
                 del scene['graph_evolution']
+
+            if 'graph' in scene:
+                g = scene['graph']
+                if isinstance(g, dict):
+                    g['type'] = 'graph'
+                    if 'id' not in g: g['id'] = f"graph_{id_num}"
+                    scene['overlays'].append(g)
+                elif isinstance(g, list):
+                    for item in g:
+                        if isinstance(item, dict):
+                            item['type'] = 'graph'
+                            scene['overlays'].append(item)
+                del scene['graph']
 
             valid_overlays = []
             text_count, focal_count, svg_count = 0, 0, 0
@@ -1092,18 +1138,31 @@ class RemotionJsonMaker:
             return "\n".join(report)
 
         for scene_idx, scene in enumerate(data.get('scenes', [])):
-            s_id = scene.get('scene_id', f"SCENE_{scene_idx+1}")
+            if 'scene_id' not in scene:
+                scene['scene_id'] = f"SCENE_{scene_idx+1}"
+
+            s_id = scene['scene_id']
             scene_initiatives = []
 
             # 0. Structural Recovery (Hallucination Harvesting)
-            harvest_map = {'text_overlays': 'text', 'indicators': 'shadcn_indicator', 'charts': 'shadcn_chart', 'elements': None, 'layers': None, 'visuals': None}
+            harvest_map = {
+                'text_overlays': 'text',
+                'text_elements': 'text',
+                'text_layers': 'text',
+                'indicators': 'shadcn_indicator',
+                'charts': 'shadcn_chart',
+                'elements': None,
+                'layers': None,
+                'visuals': None
+            }
             if 'overlays' not in scene: scene['overlays'] = []
 
             for key, default_type in harvest_map.items():
                 if scene.get(key) and isinstance(scene[key], list):
                     for item in scene[key]:
-                        if default_type and 'type' not in item: item['type'] = default_type
-                        scene['overlays'].append(item)
+                        if isinstance(item, dict):
+                            if default_type and 'type' not in item: item['type'] = default_type
+                            scene['overlays'].append(item)
                     del scene[key]
                     scene_initiatives.append(f"RECOVERY: Harvested semantic key '{key}' into canonical overlays.")
                     corrections_made += 1
@@ -1117,6 +1176,20 @@ class RemotionJsonMaker:
                 })
                 del scene['graph_evolution']
                 scene_initiatives.append("RECOVERY: Converted 'graph_evolution' to 'graph' overlay.")
+                corrections_made += 1
+
+            if 'graph' in scene:
+                g = scene['graph']
+                if isinstance(g, dict):
+                    g['type'] = 'graph'
+                    scene['overlays'].append(g)
+                elif isinstance(g, list):
+                    for item in g:
+                        if isinstance(item, dict):
+                            item['type'] = 'graph'
+                            scene['overlays'].append(item)
+                del scene['graph']
+                scene_initiatives.append("RECOVERY: Converted 'graph' key to overlays.")
                 corrections_made += 1
 
             if 'duration_frames' in scene and 'duration_in_frames' not in scene:
@@ -1264,13 +1337,21 @@ class RemotionJsonMaker:
                     corrections_made += 1
 
                 # G. Font Enforcements
-                content = str(ov.get('content', ''))
+                content = str(ov.get('content', ov.get('text', '')))
+                if o_type == 'graph' and not content:
+                    content = " ".join([str(n.get('label', '')) for n in ov.get('nodes', [])])
+
                 is_bn = VisionConstants.is_bangla(content)
                 current_font = ov.get('font')
-                if is_bn and current_font not in self.bangla_fonts:
-                    ov['font'] = self.bangla_fonts[0] if self.bangla_fonts else "Sohid_bangla"
-                    scene_initiatives.append(f"TYPOGRAPHY: Enforced Bangla font on '{ov_id}'")
-                    corrections_made += 1
+                if is_bn:
+                    if current_font not in self.bangla_fonts:
+                        ov['font'] = self.bangla_fonts[0] if self.bangla_fonts else "Sohid_bangla"
+                        scene_initiatives.append(f"TYPOGRAPHY: Enforced Bangla font on '{ov_id}'")
+                        corrections_made += 1
+                    if o_type == 'text' and ov.get('splitMode') != 'word':
+                        ov['splitMode'] = 'word'
+                        scene_initiatives.append(f"TYPOGRAPHY: Enforced word-split on Bangla text '{ov_id}'")
+                        corrections_made += 1
                 elif not is_bn and current_font not in self.english_fonts:
                     ov['font'] = self.english_fonts[0] if self.english_fonts else "Audiowide-Regular_english"
                     scene_initiatives.append(f"TYPOGRAPHY: Enforced English font on '{ov_id}'")
