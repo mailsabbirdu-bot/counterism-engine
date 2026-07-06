@@ -232,6 +232,8 @@ class RemotionJsonMaker:
 
         if 'duration' in scene and 'duration_in_frames' not in scene:
             scene['duration_in_frames'] = scene['duration']
+        if 'duration_frames' in scene and 'duration_in_frames' not in scene:
+            scene['duration_in_frames'] = scene['duration_frames']
 
         raw_dur = scene.get('duration_in_frames', 180)
         scene_duration = int(raw_dur * 30) if (isinstance(raw_dur, (float, int)) and raw_dur < 60) else int(raw_dur)
@@ -456,9 +458,40 @@ class RemotionJsonMaker:
                 sfx_manifest.append({"scene_id": s_id, "file": narration_file, "start": 0, "end": scene_duration, "volume": 1.0})
 
             if not scene.get('overlays'):
-                for k in ['elements', 'layers', 'visuals']:
-                    if scene.get(k) and isinstance(scene[k], list): scene['overlays'] = scene[k]; break
-            if not scene.get('overlays'): scene['overlays'] = []
+                scene['overlays'] = []
+
+            # Harvest hallucinated semantic keys into canonical overlays
+            harvest_map = {
+                'text_overlays': 'text',
+                'indicators': 'shadcn_indicator',
+                'charts': 'shadcn_chart',
+                'elements': None,
+                'layers': None,
+                'visuals': None
+            }
+
+            for key, default_type in harvest_map.items():
+                if scene.get(key) and isinstance(scene[key], list):
+                    for item in scene[key]:
+                        if default_type and 'type' not in item:
+                            item['type'] = default_type
+                        scene['overlays'].append(item)
+                    del scene[key]
+
+            # Special Handling for 'graph_evolution' hallucination
+            if 'graph_evolution' in scene and isinstance(scene['graph_evolution'], dict):
+                graph_data = scene['graph_evolution']
+                graph_overlay = {
+                    "id": f"graph_{id_num}",
+                    "type": "graph",
+                    "nodes": graph_data.get('nodes', []),
+                    "links": graph_data.get('links', []),
+                    "importance": "hero" if graph_data.get('hero_node') else "secondary",
+                    "start": 0,
+                    "duration": scene_duration
+                }
+                scene['overlays'].append(graph_overlay)
+                del scene['graph_evolution']
 
             valid_overlays = []
             text_count, focal_count, svg_count = 0, 0, 0
@@ -1061,6 +1094,35 @@ class RemotionJsonMaker:
         for scene_idx, scene in enumerate(data.get('scenes', [])):
             s_id = scene.get('scene_id', f"SCENE_{scene_idx+1}")
             scene_initiatives = []
+
+            # 0. Structural Recovery (Hallucination Harvesting)
+            harvest_map = {'text_overlays': 'text', 'indicators': 'shadcn_indicator', 'charts': 'shadcn_chart', 'elements': None, 'layers': None, 'visuals': None}
+            if 'overlays' not in scene: scene['overlays'] = []
+
+            for key, default_type in harvest_map.items():
+                if scene.get(key) and isinstance(scene[key], list):
+                    for item in scene[key]:
+                        if default_type and 'type' not in item: item['type'] = default_type
+                        scene['overlays'].append(item)
+                    del scene[key]
+                    scene_initiatives.append(f"RECOVERY: Harvested semantic key '{key}' into canonical overlays.")
+                    corrections_made += 1
+
+            if 'graph_evolution' in scene and isinstance(scene['graph_evolution'], dict):
+                graph_data = scene['graph_evolution']
+                scene['overlays'].append({
+                    "id": f"graph_{scene_idx+1}", "type": "graph",
+                    "nodes": graph_data.get('nodes', []), "links": graph_data.get('links', []),
+                    "importance": "hero", "start": 0, "duration": scene.get('duration_in_frames', 300)
+                })
+                del scene['graph_evolution']
+                scene_initiatives.append("RECOVERY: Converted 'graph_evolution' to 'graph' overlay.")
+                corrections_made += 1
+
+            if 'duration_frames' in scene and 'duration_in_frames' not in scene:
+                scene['duration_in_frames'] = scene['duration_frames']
+                corrections_made += 1
+
             scene_dur = scene.get('duration_in_frames', 180)
 
             # 1. Background Integrity
