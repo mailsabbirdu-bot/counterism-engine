@@ -49,6 +49,42 @@ const ViolinPlot: React.FC<{ overlay: any; dataProgress: number; commonProps: an
   );
 };
 
+// --- SEMANTIC REGISTRY ---
+const SEMANTIC_ROLES: Record<string, string[]> = {
+  trend: ['area', 'line', 'forecast', 'stream'],
+  comparison: ['bar', 'horizontalBar', 'waffle', 'marimekko'],
+  proportion: ['pie', 'donut', 'sunburst', 'treemap'],
+  hierarchy: ['circlePacking', 'sunburst', 'treemap'],
+  flow: ['sankey', 'chord', 'network'],
+  distribution: ['boxplot', 'violinPlot', 'swarmplot', 'heatmap'],
+  relationship: ['scatter', 'bubble', 'voronoi', 'radar']
+};
+
+const CHART_PERSONALITIES: Record<string, any> = {
+  scientific: { grid: true, scheme: 'cyan_blue', opacity: 0.8, border: 'rgba(34,211,238,0.3)', glow: '#22d3ee' },
+  financial: { grid: true, scheme: 'greens', opacity: 0.9, border: 'rgba(16,185,129,0.3)', glow: '#10b981' },
+  historical: { grid: false, scheme: 'red_grey', opacity: 0.7, border: 'rgba(245,158,11,0.2)', glow: '#f59e0b' },
+  futuristic: { grid: true, scheme: 'nivo', opacity: 0.6, border: 'rgba(255,255,255,0.1)', glow: '#fff' }
+};
+
+const ChartAnnotationLayer: React.FC<{ overlay: any; activeHighlight: any; relativeFrame: number }> = ({ overlay, activeHighlight, relativeFrame }) => {
+    if (!activeHighlight) return null;
+
+    const reveal = interpolate(relativeFrame - activeHighlight.start, [0, 15], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+    const color = activeHighlight.color || '#fff';
+
+    return (
+        <div className="absolute inset-0 pointer-events-none z-30" style={{ opacity: reveal }}>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                <div className="px-6 py-2 bg-black/80 border-2 rounded-lg text-white font-black uppercase tracking-widest text-lg" style={{ borderColor: color }}>
+                    {activeHighlight.label}
+                </div>
+                <div className="w-1 h-20 mx-auto mt-2" style={{ background: `linear-gradient(to bottom, ${color}, transparent)` }} />
+            </div>
+        </div>
+    );
+};
+
 export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { fps, width: videoWidth, height: videoHeight } = useVideoConfig();
@@ -56,86 +92,118 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const duration = safeNumber(overlay.duration, 120);
   const relativeFrame = frame - start;
 
-  if (frame % 30 === 0) {
-    console.log(`[ChartsEngine] Scene: ${overlay.scene_id} Overlay: ${overlay.id} Type: ${overlay.chart_type} Visible: ${frame >= start && frame <= start + duration} Pos: (${overlay.position?.x}, ${overlay.position?.y})`);
-  }
+  if (frame < start || frame > start + duration) return null;
 
-  if (frame < start || frame > start + duration) {
-    return null;
-  }
+  // Cinematic HUD Animation
+  const entrance = interpolate(relativeFrame, [0, 40], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.25, 0.1, 0.25, 1) });
+  const exitFrame = duration - 15;
+  const exit = interpolate(relativeFrame, [exitFrame, exitFrame + 15], [1, 0], { extrapolateLeft: 'clamp' });
+  const masterProgress = entrance * exit;
 
-  const entrance = interpolate(isNaN(relativeFrame) ? 0 : relativeFrame, [0, 30], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.2, 0, 0.2, 1) });
-  const exitFrame = duration - 20;
-  const exit = interpolate(isNaN(relativeFrame) ? 0 : relativeFrame, [exitFrame, exitFrame + 20], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.4, 0, 1, 1) });
-  const progress = entrance * exit;
+  const personality = CHART_PERSONALITIES[overlay.personality || 'futuristic'];
+  const role = overlay.semantic_role || 'trend';
+  const type = overlay.chart_type || SEMANTIC_ROLES[role][0];
 
   const renderChart = () => {
     const font = overlay.font || 'Inter, sans-serif';
     const commonProps = {
       theme: {
         axis: {
-          ticks: { text: { fill: '#ffffffb0', fontSize: 20, fontFamily: font, fontWeight: 'bold' } },
-          legend: { text: { fill: '#ffffffe0', fontSize: 24, fontFamily: font, fontWeight: '900' } }
+          ticks: { text: { fill: '#ffffff80', fontSize: 16, fontFamily: font, fontWeight: 'bold' } },
+          legend: { text: { fill: '#ffffffe0', fontSize: 20, fontFamily: font, fontWeight: '900' } }
         },
-        grid: { line: { stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 } },
-        tooltip: { container: { background: '#09090b', color: '#fff', fontSize: 20, fontFamily: font, borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' } },
-        labels: { text: { fontSize: 18, fontWeight: 'bold', fill: '#fff', fontFamily: font } },
-        dots: { text: { fontSize: 14, fontFamily: font } },
-        legends: { text: { fontSize: 16, fontFamily: font } },
-        annotations: { text: { fontFamily: font, fontSize: 18, fontWeight: 'bold', fill: '#fff' } },
-        arcLabels: { text: { fontFamily: font, fontSize: 20, fontWeight: 'bold', fill: '#fff' } },
-        arcLinkLabels: { text: { fontFamily: font, fontSize: 16, fill: '#fff' } }
+        grid: { line: { stroke: 'rgba(255,255,255,0.05)', strokeWidth: personality.grid ? 1 : 0 } },
+        tooltip: { container: { background: '#09090b', color: '#fff', fontSize: 18, fontFamily: font, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' } },
+        labels: { text: { fontSize: 14, fontWeight: 'bold', fill: '#fff', fontFamily: font } },
       },
-      colors: overlay.colors || { scheme: 'nivo' },
-      margin: { top: 60, right: 60, bottom: 80, left: 100 },
+      colors: overlay.colors || { scheme: personality.scheme },
+      margin: { top: 40, right: 40, bottom: 60, left: 80 },
       animate: false,
     };
 
-    const animationStart = 45;
-    const animationEnd = Math.min(duration - 30, 180);
-    const dataProgress = interpolate(isNaN(relativeFrame) ? 0 : relativeFrame, [animationStart, animationEnd], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.33, 1, 0.68, 1) });
+    // Staged Animation State
+    const stage1 = interpolate(relativeFrame, [20, 60], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }); // Grid/Axes
+    const stage2 = interpolate(relativeFrame, [50, 120], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.33, 1, 0.68, 1) }); // Data
+    const dataProgress = stage2;
 
-  if (!overlay?.data || (typeof overlay.data !== 'object')) {
-      overlay.data = [{ id: "A", value: 10 }, { id: "B", value: 20 }];
-  }
+    const highlights = overlay.highlights || [];
+    const activeHighlight = highlights.find((h: any) => frame >= h.start && frame <= h.start + h.duration);
 
-    const type = overlay.chart_type;
-
-    if (['line', 'area', 'forecast', 'multiLine', 'stackedArea'].includes(type)) {
-      const isFlat = Array.isArray(overlay.data) && overlay.data.length > 0 && !overlay.data[0].data;
-      const seriesArray = isFlat ? [{ id: overlay.title || 'Data', data: overlay.data }] : (Array.isArray(overlay.data) ? overlay.data : []);
-
-      const animatedData = seriesArray.map((series: any) => {
-        if (!series || !Array.isArray(series.data)) return { id: 'Empty', data: [] };
-        return {
-          ...series,
-          data: series.data.map((p: any, i: number) => {
-            const reveal = interpolate(dataProgress * series.data.length, [i, i + 0.8], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-            const y = typeof p.y === 'number' ? p.y : (p[overlay.keys?.[0] || 'value'] || 0);
-            return { ...p, x: p.x || p.year || p.label || i, y: y * reveal };
-          })
-        };
-      });
-
-      return (
-        <ResponsiveLine
-          {...commonProps}
-          data={animatedData}
-          xScale={{ type: 'point' }}
-          yScale={{ type: 'linear', min: overlay.minY ?? 0, max: overlay.maxY ?? 'auto', stacked: type === 'stackedArea' }}
-          curve={overlay.curve || "monotoneX"}
-          enableArea={['area', 'forecast', 'stackedArea'].includes(type)}
-          areaOpacity={0.25}
-          pointSize={type === 'forecast' ? 0 : 8}
-          pointColor="#09090b"
-          pointBorderWidth={2}
-          pointBorderColor={{ from: 'serieColor' }}
-          enableGridX={false}
-          lineWidth={4}
-          enableSlices="x"
-        />
-      );
+    if (!overlay?.data || (typeof overlay.data !== 'object')) {
+        overlay.data = [{ id: "A", value: 10 }, { id: "B", value: 20 }];
     }
+
+    // --- CHART DISPATCHER ---
+    const renderDispatch = () => {
+        if (['line', 'area', 'forecast', 'multiLine', 'stackedArea'].includes(type)) {
+            const isFlat = Array.isArray(overlay.data) && overlay.data.length > 0 && !overlay.data[0].data;
+            const seriesArray = isFlat ? [{ id: overlay.title || 'Data', data: overlay.data }] : (Array.isArray(overlay.data) ? overlay.data : []);
+
+            const animatedData = seriesArray.map((series: any) => {
+                if (!series || !Array.isArray(series.data)) return { id: 'Empty', data: [] };
+                const isSeriesHighlighted = activeHighlight && series.id === activeHighlight.seriesId;
+                const seriesOpacity = activeHighlight ? (isSeriesHighlighted ? 1 : 0.2) : 1;
+
+                return {
+                    ...series,
+                    color: isSeriesHighlighted ? activeHighlight.color : series.color,
+                    data: series.data.map((p: any, i: number) => {
+                        const reveal = interpolate(dataProgress * series.data.length, [i, i + 0.8], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+                        const y = typeof p.y === 'number' ? p.y : (p[overlay.keys?.[0] || 'value'] || 0);
+                        return { ...p, x: p.x || p.year || p.label || i, y: y * reveal, opacity: seriesOpacity };
+                    })
+                };
+            });
+
+            return (
+                <ResponsiveLine
+                    {...commonProps}
+                    data={animatedData}
+                    xScale={{ type: 'point' }}
+                    yScale={{ type: 'linear', min: overlay.minY ?? 0, max: overlay.maxY ?? 'auto', stacked: type === 'stackedArea' }}
+                    curve={overlay.curve || "monotoneX"}
+                    enableArea={['area', 'forecast', 'stackedArea'].includes(type)}
+                    areaOpacity={0.25}
+                    pointSize={type === 'forecast' ? 0 : 8}
+                    pointColor="#09090b"
+                    pointBorderWidth={2}
+                    pointBorderColor={{ from: 'serieColor' }}
+                    enableGridX={false}
+                    lineWidth={4}
+                    enableSlices="x"
+                />
+            );
+        }
+        return null;
+    };
+
+    return (
+        <div className="w-full h-full relative">
+            <div style={{ opacity: stage1 }}>{renderDispatch()}</div>
+            <ChartAnnotationLayer overlay={overlay} activeHighlight={activeHighlight} relativeFrame={relativeFrame} />
+        </div>
+    );
+  };
+
+  const renderLegacyChart = () => {
+    const font = overlay.font || 'Inter, sans-serif';
+    const commonProps = {
+      theme: {
+        axis: {
+          ticks: { text: { fill: '#ffffff80', fontSize: 16, fontFamily: font, fontWeight: 'bold' } },
+          legend: { text: { fill: '#ffffffe0', fontSize: 20, fontFamily: font, fontWeight: '900' } }
+        },
+        grid: { line: { stroke: 'rgba(255,255,255,0.05)', strokeWidth: personality.grid ? 1 : 0 } },
+        tooltip: { container: { background: '#09090b', color: '#fff', fontSize: 18, fontFamily: font, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' } },
+        labels: { text: { fontSize: 14, fontWeight: 'bold', fill: '#fff', fontFamily: font } },
+      },
+      colors: overlay.colors || { scheme: personality.scheme },
+      margin: { top: 40, right: 40, bottom: 60, left: 80 },
+      animate: false,
+    };
+
+    const stage2 = interpolate(relativeFrame, [50, 120], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.33, 1, 0.68, 1) });
+    const dataProgress = stage2;
 
     if (['bar', 'horizontalBar', 'verticalBar', 'groupedBar', 'stackedBar', 'barRace'].includes(type)) {
        if (!Array.isArray(overlay.data)) return null;
@@ -315,29 +383,64 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     return null;
   };
 
+  const renderContent = () => {
+    if (['line', 'area', 'forecast', 'multiLine', 'stackedArea'].includes(type)) return renderChart();
+    return renderLegacyChart();
+  };
+
   return (
     <div
-      className="absolute bg-zinc-950/80 backdrop-blur-3xl rounded-[3rem] border-2 border-white/20 shadow-[0_40px_80px_rgba(0,0,0,0.7)] overflow-hidden p-12"
+      className="absolute overflow-hidden p-12 rounded-[2rem]"
       style={{
-        fontFamily: overlay.font || 'Inter, sans-serif',
-        width: safeNumber(overlay.width, 1000),
-        height: safeNumber(overlay.height, 650),
+        width: safeNumber(overlay.width, 1100),
+        height: safeNumber(overlay.height, 700),
         left: `${safeNumber(overlay.position?.x, videoWidth / 2)}px`,
         top: `${safeNumber(overlay.position?.y, videoHeight / 2)}px`,
-        opacity: progress,
+        opacity: masterProgress,
         zIndex: safeNumber(overlay.zIndex, 30),
-        transform: `translate(-50%, -50%) scale(${0.98 + progress * 0.02})`,
-        filter: progress < 1 ? `blur(${(1 - progress) * 10}px)` : 'none'
+        transform: `translate(-50%, -50%) scale(${0.9 + masterProgress * 0.1})`,
+        background: 'rgba(5, 5, 5, 0.8)',
+        backdropFilter: 'blur(20px)',
+        border: `1px solid ${personality.border}`,
+        boxShadow: `0 0 40px ${personality.glow}22`
       }}
     >
-      <div className="flex justify-between items-center mb-10 text-left">
-        <div>
-          <h3 className="text-white font-black text-3xl tracking-tighter leading-tight uppercase">{overlay.title || 'Data Analysis'}</h3>
-          <p className="text-white/60 text-sm font-mono uppercase tracking-[0.4em] mt-2 font-bold">{overlay.subtitle || 'System Telemetry'}</p>
+      {/* Background HUD Grid */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
+          backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
+          backgroundSize: '40px 40px'
+      }} />
+
+      <div className="relative flex justify-between items-start mb-12 text-left">
+        <div style={{ opacity: interpolate(relativeFrame, [10, 30], [0, 1], { extrapolateLeft: 'clamp' }) }}>
+          <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-[2px]" style={{ background: personality.glow }} />
+              <span className="text-[10px] font-black uppercase tracking-[0.4em]" style={{ color: personality.glow }}>{overlay.personality || 'System'} Telemetry</span>
+          </div>
+          <h3 className="text-white font-black text-4xl tracking-tighter leading-tight uppercase">{overlay.title || 'Data Analysis'}</h3>
         </div>
-        <div className="px-6 py-3 bg-blue-500/10 rounded-2xl border-2 border-blue-500/20 text-sm text-blue-400 font-mono font-black shadow-xl uppercase tracking-widest">Telemetry Active</div>
+
+        {/* Technical Status Badge */}
+        <div
+            className="flex items-center gap-4 px-6 py-3 rounded-lg border bg-black/40"
+            style={{
+                borderColor: personality.border,
+                opacity: interpolate(relativeFrame, [20, 40], [0, 1], { extrapolateLeft: 'clamp' })
+            }}
+        >
+            <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: personality.glow }} />
+            <span className="text-[10px] text-white/60 font-mono font-bold uppercase tracking-widest">Semantic: {role}</span>
+        </div>
       </div>
-      <div className="h-[calc(100%-120px)] w-full">{renderChart()}</div>
+
+      <div className="h-[calc(100%-140px)] w-full relative">
+          {/* Subtle Scanning Line */}
+          <div className="absolute left-0 right-0 h-[1px] bg-white/10 z-20 pointer-events-none" style={{
+              top: `${interpolate(frame % 120, [0, 120], [0, 100])}%`,
+              boxShadow: `0 0 10px white`
+          }} />
+          {renderContent()}
+      </div>
     </div>
   );
 };
