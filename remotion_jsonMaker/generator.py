@@ -482,6 +482,30 @@ class RemotionJsonMaker:
         for scene_idx, scene in enumerate(data['scenes']):
             scene_duration, id_num = self._harden_scene_metadata(scene, scene_idx)
             s_id = scene['scene_id'] # Use canonical ID from hardening
+
+            # --- KNOWLEDGE GRAPH DE-CLUTTERING (v4.5) ---
+            # If a graph is present, standard text overlays often repeat the same words.
+            # This logic strips redundant text overlays to prevent visual mess.
+            has_graph = any(ov.get('type') == 'graph' for ov in scene.get('overlays', []))
+            if has_graph:
+                graph_words = set()
+                for ov in scene.get('overlays', []):
+                    if ov.get('type') == 'graph':
+                        for node in ov.get('nodes', []):
+                            graph_words.update(re.sub(r'[.।]', '', str(node.get('label', ''))).lower().split())
+
+                # Filter overlays: Remove text layers that are >70% redundant with graph labels
+                cleaned_overlays = []
+                for ov in scene.get('overlays', []):
+                    if ov.get('type') == 'text':
+                        text_words = re.sub(r'[.।]', '', str(ov.get('content', ''))).lower().split()
+                        if not text_words: continue
+                        redundant_count = sum(1 for w in text_words if w in graph_words)
+                        if redundant_count / len(text_words) > 0.7:
+                            print(f"   🧹 DE-CLUTTER: Stripped redundant text layer '{ov.get('id')}' (Redundancy: {int(redundant_count/len(text_words)*100)}%)")
+                            continue
+                    cleaned_overlays.append(ov)
+                scene['overlays'] = cleaned_overlays
             print(f"   🎬 Processing: {s_id}")
 
             pattern = f"SC_{id_num:02d}".lower()
@@ -1445,23 +1469,22 @@ class RemotionJsonMaker:
             f"REASONING PIPELINE (MANDATORY):\n"
             f"1. EXTRACT CONCEPTS: Identify objects, causes, effects, processes. Filter out grammar words.\n"
             f"2. DISCOVER RELATIONSHIPS: How do concepts interact? (causes, triggers, leads_to, threatens).\n"
-            f"3. RANK IMPORTANCE: The 'Hero' node represents the primary narrative idea of the current scene, not necessarily the most visually prominent object.\n"
-            f"4. EVOLVE GRAPH: Accumulate knowledge across scenes. Scene N builds upon Scene N-1 to create a cohesive knowledge system.\n"
-            f"5. DESIGN LAYOUT: Hero center, Causes left, Effects right, Context top, Risk bottom. Cluster related nodes. Preserve whitespace around Hero.\n\n"
+            f"3. RANK IMPORTANCE: Identify the 'Hero' node (primary concept). Map other nodes to categories: threat, mechanism, data, context.\n"
+            f"4. EVOLVE GRAPH: Accumulate knowledge across scenes. Scene N builds upon Scene N-1.\n"
+            f"5. DESIGN LAYOUT: Hero center (960, 540), Threat bottom (960, 850), Context top (960, 200). Cluster related nodes.\n\n"
             f"--- 3. CONCEPT QUALITY RULES ---\n"
-            f"- Nodes represent ideas, systems, entities, or measurable quantities. NEVER use single grammatical words.\n"
-            f"- Merge synonyms into one node. Avoid duplicates. Prefer abstract concepts over repeated nouns.\n"
-            f"- Every non-hero node must connect to at least one other node. Every graph must tell one coherent story.\n"
-            f"- Visual perception data informs spatial placement only. It MUST NOT determine semantic importance.\n\n"
+            f"- Nodes represent ideas, systems, entities. NEVER use single grammatical words.\n"
+            f"- Merge synonyms. Avoid duplicates. Prefer abstract concepts over repeated nouns.\n"
+            f"- Every non-hero node must connect to at least one other node.\n\n"
             f"--- 4. PRODUCTION DESIGN PROTOCOL ---\n"
-            f"- VISUAL HIERARCHY: Exactly 1 dominant focal point at any moment. Depth: Hero(100) -> Graph(50) -> UI(40) -> Shapes(10).\n"
-            f"- COGNITIVE LOAD: Max 7 nodes visible. Max 4 simultaneous animations. Max 2 label changes at once.\n"
-            f"- MOTION IS DATA: Animation must match meaning (Cause=Energy Flow, Connection=Beam, Warning=Pulse, Danger=Vibration).\n"
-            f"- LAYOUT: Minimize edge crossings. Cluster strongly related nodes. Avoid connector overlap. Safety margins >= 150px.\n\n"
+            f"- VISUAL HIERARCHY: Knowledge Graphs are the PRIMARY visual layer. MINIMIZE standard 'text' overlays. If text is necessary, use a single header.\n"
+            f"- COGNITIVE LOAD: Max 6 nodes visible. Stagger reveals (start at 0f, 15f, 30f...).\n"
+            f"- CINEMATIC SLEEK: Knowledge Graphs are technical HUD discs. Text for narration should be labels in the graph nodes.\n"
+            f"- SPATIAL DISCIPLINE: Use position: {{x, y}} for nodes. Force distance > 300px between nodes. Safety margins >= 200px.\n\n"
             f"--- 5. SCHEMA AUTHORITY ---\n"
-            f"- 'graph': requires 'nodes' (6-10 per scene) and 'links'.\n"
-            f"  - nodes: {{ id, label, type(hero|data|concept|image), importance(0.5-2.0), emotion(intense|calm|alert|growing), category(semantic) }}\n"
-            f"  - links: {{ source, target, relationship(semantic), display_label }}\n"
+            f"- 'graph': requires 'nodes' (5-8 per scene) and 'links'.\n"
+            f"  - nodes: {{ id, label, type(hero|data|concept|image), importance(0.5-2.0), emotion(intense|calm|alert|growing), category(threat|mechanism|context|data), position: {{x, y}} }}\n"
+            f"  - links: {{ id, source, target, relationship(semantic), display_label }}\n"
             f"- 'connector': source/target MUST be node IDs from the graph. Preset: relationship type.\n\n"
             f"--- 6. VARIANT REGISTRY (STRICT) ---\n"
             f"CHARTS: glass_area, neon_bar, stacked_line, radial_score, radar_web, composed_tech, pie_donut_glass, scatter_bubble, horizontal_pill_bar, step_area, multi_bar_stack, curved_edge_line, double_radar, funnel_glass, vertical_stepper, micro_sparkline, grid_dots, smooth_area_dual, bar_race_top, thick_line_glow, layered_pies, range_area, pixel_bars, curved_scatter, staircase_line, floating_bars, hollow_pie, dual_axis_tech, jagged_peak, dot_matrix_chart, area, bar, line.\n"
