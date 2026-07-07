@@ -1353,6 +1353,12 @@ class RemotionJsonMaker:
                                     scene_initiatives.append(f"DATA: Fixed invalid link in graph '{ov_id}'")
                                     corrections_made += 1
 
+                        # Narration Sync: Ensure active_at exists
+                        for node in ov['nodes']:
+                            if 'active_at' not in node:
+                                node['active_at'] = int(ov.get('start', 0)) + 30
+                                corrections_made += 1
+
                 # F. Hierarchy Enforcement
                 prio = self.PRIORITY.get(o_type, 20)
                 if ov.get('zIndex') != prio:
@@ -1467,23 +1473,23 @@ class RemotionJsonMaker:
             f"--- 2. ROLE: CINEMATIC NARRATIVE ARCHITECT ---\n"
             f"OBJECTIVE: Visualize UNDERSTANDING, not language. Reveal the hidden system behind the narration.\n"
             f"REASONING PIPELINE (MANDATORY):\n"
-            f"1. EXTRACT CONCEPTS: Identify objects, causes, effects, processes. Filter out grammar words.\n"
-            f"2. DISCOVER RELATIONSHIPS: How do concepts interact? (causes, triggers, leads_to, threatens).\n"
-            f"3. RANK IMPORTANCE: Identify the 'Hero' node (primary concept). Map other nodes to categories: threat, mechanism, data, context.\n"
-            f"4. EVOLVE GRAPH: Accumulate knowledge across scenes. Scene N builds upon Scene N-1.\n"
-            f"5. DESIGN LAYOUT: Hero center (960, 540), Threat bottom (960, 850), Context top (960, 200). Cluster related nodes.\n\n"
+            f"1. EXTRACT CONCEPTS: Identify objects, causes, effects. Filter grammar words.\n"
+            f"2. NARRATIVE SYNC: For every node, identify the EXACT frame (from TIMESTAMPS) when it is first mentioned. Use this for `active_at`.\n"
+            f"3. DISCOVER RELATIONSHIPS: How do concepts interact? (causes, triggers, leads_to, threatens).\n"
+            f"4. RANK IMPORTANCE: The 'Hero' node is the central theme. Categories: threat, mechanism, data, context.\n"
+            f"5. DESIGN LAYOUT: Use position: {{x, y}} to place nodes. Cluster related nodes. Hero center.\n\n"
             f"--- 3. CONCEPT QUALITY RULES ---\n"
-            f"- Nodes represent ideas, systems, entities. NEVER use single grammatical words.\n"
-            f"- Merge synonyms. Avoid duplicates. Prefer abstract concepts over repeated nouns.\n"
-            f"- Every non-hero node must connect to at least one other node.\n\n"
+            f"- Nodes represent ideas/entities. NEVER use single grammatical words.\n"
+            f"- Every node MUST have an `active_at` integer frame value matched to the narration.\n"
+            f"- Every node MUST have `importance` (1.0 to 5.0). Importance 5 = Large Hero node.\n\n"
             f"--- 4. PRODUCTION DESIGN PROTOCOL ---\n"
-            f"- VISUAL HIERARCHY: Knowledge Graphs are the PRIMARY visual layer. MINIMIZE standard 'text' overlays. If text is necessary, use a single header.\n"
-            f"- COGNITIVE LOAD: Max 6 nodes visible. Stagger reveals (start at 0f, 15f, 30f...).\n"
-            f"- CINEMATIC SLEEK: Knowledge Graphs are technical HUD discs. Text for narration should be labels in the graph nodes.\n"
-            f"- SPATIAL DISCIPLINE: Use position: {{x, y}} for nodes. Force distance > 300px between nodes. Safety margins >= 200px.\n\n"
+            f"- VISUAL HIERARCHY: Knowledge Graphs are the PRIMARY visual layer. Minimize 'text' overlays. \n"
+            f"- NARRATION AWARE: The graph will dim past nodes and fade future nodes. Ensure `active_at` is accurate.\n"
+            f"- SPATIAL DISCIPLINE: Max 8 nodes per scene. Use safe zones (200px margin).\n"
+            f"- CAMERA SYNC: In the `camera` shots, use `lookAt` targeting node IDs as they become active.\n\n"
             f"--- 5. SCHEMA AUTHORITY ---\n"
-            f"- 'graph': requires 'nodes' (5-8 per scene) and 'links'.\n"
-            f"  - nodes: {{ id, label, type(hero|data|concept|image), importance(0.5-2.0), emotion(intense|calm|alert|growing), category(threat|mechanism|context|data), position: {{x, y}} }}\n"
+            f"- 'graph': requires 'nodes' and 'links'.\n"
+            f"  - nodes: {{ id, label, type(hero|data|concept|image|statistic|warning), importance(1.0-5.0), active_at(frame), category(threat|mechanism|context|data), position: {{x, y}} }}\n"
             f"  - links: {{ id, source, target, relationship(semantic), display_label }}\n"
             f"- 'connector': source/target MUST be node IDs from the graph. Preset: relationship type.\n\n"
             f"--- 6. VARIANT REGISTRY (STRICT) ---\n"
