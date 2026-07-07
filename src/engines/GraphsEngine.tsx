@@ -39,24 +39,31 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { width, height, fps } = useVideoConfig();
 
-  // STABLE SIMULATION: Keyed by overlay ID to ensure stability
+  // STABLE SIMULATION: Adaptive spacing and simulation bounds
   const { processedNodes, processedLinks } = useMemo(() => {
     const rawNodes: Node[] = overlay.nodes || [];
     const rawLinks: Link[] = overlay.links || [];
+    const nodeCount = rawNodes.length;
 
     const nodes = rawNodes.map((n, i) => ({ ...n, id: n.id || `node-${i}` }));
     const links = rawLinks.map((l, i) => ({ ...l, id: l.id || `link-${i}` }));
 
-    // ULTIMATE SPACING: Enforce extreme collision radius to completely eliminate overlap
+    // Adaptive Simulation Parameters based on node count
+    const distance = interpolate(nodeCount, [3, 15], [400, 250], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+    const charge = interpolate(nodeCount, [3, 15], [-6000, -3000], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+    const collisionRadius = interpolate(nodeCount, [3, 15], [300, 180], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+
     const simulation = d3.forceSimulation<Node>(nodes)
-      .force("link", d3.forceLink<Node, Link>(links).id(d => d.id).distance(450))
-      .force("charge", d3.forceManyBody().strength(-6000))
+      .force("link", d3.forceLink<Node, Link>(links).id(d => d.id).distance(distance))
+      .force("charge", d3.forceManyBody().strength(charge))
       .force("center", d3.forceCenter(0, 0))
-      .force("collision", d3.forceCollide().radius(320))
+      .force("collision", d3.forceCollide().radius(collisionRadius))
+      // Force viewport boundaries (approximate)
+      .force("x", d3.forceX().strength(0.08))
+      .force("y", d3.forceY().strength(0.08))
       .stop();
 
-    // Deeper stabilization
-    for (let i = 0; i < 500; ++i) simulation.tick();
+    for (let i = 0; i < 400; ++i) simulation.tick();
 
     return { processedNodes: nodes, processedLinks: links };
   }, [overlay.id]);
@@ -67,7 +74,6 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const centerX = overlay.position?.x ?? width / 2;
   const centerY = overlay.position?.y ?? height / 2;
 
-  // ULTRA-SLEEK ENTRANCE: High damping, no overshoot
   const masterEntrance = spring({
     frame: relativeFrame,
     fps,
@@ -92,10 +98,8 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
           </pattern>
         </defs>
 
-        {/* HUD Grid Background */}
         <rect width="100%" height="100%" fill="url(#ultraGrid)" opacity={masterProgress * 0.6} />
 
-        {/* Global Cinematic Orbit - Now a very subtle wavering instead of constant rotation */}
         <g transform={`
             translate(${centerX}, ${centerY})
             rotate(${Math.sin(frame * 0.01) * 2})
@@ -103,7 +107,13 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
         `}>
           {/* Living Semantic Edges */}
           {processedLinks.map((link, i) => (
-            <LivingEdge key={`link-${i}`} link={link} progress={masterProgress} relativeFrame={relativeFrame} />
+            <LivingEdge
+                key={`link-${i}`}
+                link={link}
+                progress={masterProgress}
+                relativeFrame={relativeFrame}
+                globalFrame={frame}
+            />
           ))}
 
           {/* Floating Conceptual Discs */}
@@ -115,6 +125,7 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
               total={processedNodes.length}
               progress={masterProgress}
               relativeFrame={relativeFrame}
+              globalFrame={frame}
               font={overlay.font}
             />
           ))}
@@ -124,14 +135,24 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   );
 };
 
-const LivingEdge: React.FC<{ link: Link, progress: number, relativeFrame: number }> = ({ link, progress, relativeFrame }) => {
+const LivingEdge: React.FC<{
+    link: Link,
+    progress: number,
+    relativeFrame: number,
+    globalFrame: number
+}> = ({ link, progress, relativeFrame, globalFrame }) => {
   const s = link.source as Node;
   const t = link.target as Node;
 
   if (!s.x || !s.y || !t.x || !t.y) return null;
 
+  // Narration Awareness: Active if both nodes are active or past
+  const sActiveAt = (s as any).active_at || 0;
+  const tActiveAt = (t as any).active_at || 0;
+  const isEdgeActive = globalFrame >= sActiveAt && globalFrame >= tActiveAt;
+
   const relColor = CATEGORY_COLORS[link.relationship || ''] || '#00F5FF';
-  const edgeAlpha = interpolate(progress, [0.6, 1.0], [0, 0.25], { extrapolateLeft: 'clamp' });
+  const edgeAlpha = interpolate(progress, [0.6, 1.0], [0, isEdgeActive ? 0.4 : 0.15], { extrapolateLeft: 'clamp' });
 
   const dx = t.x - s.x;
   const dy = t.y - s.y;
@@ -149,22 +170,24 @@ const LivingEdge: React.FC<{ link: Link, progress: number, relativeFrame: number
         d={path}
         fill="none"
         stroke={relColor}
-        strokeWidth="0.5"
+        strokeWidth={isEdgeActive ? 1.5 : 0.5}
         strokeDasharray={dist}
         strokeDashoffset={dist * (1 - progress)}
       />
-      {/* Cinematic Data Stream */}
-      <path
-        d={path}
-        fill="none"
-        stroke="white"
-        strokeWidth="1"
-        strokeDasharray={`8, ${dist / 2}`}
-        strokeDashoffset={-relativeFrame * 6}
-        style={{ filter: 'blur(3px)', mixBlendMode: 'screen' }}
-        opacity={0.8}
-      />
-      {link.display_label && progress > 0.95 && (
+      {/* Cinematic Data Stream - Active Links only */}
+      {isEdgeActive && (
+        <path
+            d={path}
+            fill="none"
+            stroke="white"
+            strokeWidth="1.2"
+            strokeDasharray={`10, ${dist / 2}`}
+            strokeDashoffset={-globalFrame * 5}
+            style={{ filter: 'blur(3px)', mixBlendMode: 'screen' }}
+            opacity={0.8}
+        />
+      )}
+      {link.display_label && isEdgeActive && progress > 0.95 && (
         <text
           dy="-15"
           textAnchor="middle"
@@ -187,88 +210,101 @@ const LivingEdge: React.FC<{ link: Link, progress: number, relativeFrame: number
   );
 };
 
-const CinematicNode: React.FC<{ node: Node, i: number, total: number, progress: number, relativeFrame: number, font?: string }> = ({ node, i, total, progress, relativeFrame, font }) => {
+const CinematicNode: React.FC<{
+    node: Node,
+    i: number,
+    total: number,
+    progress: number,
+    relativeFrame: number,
+    globalFrame: number,
+    font?: string
+}> = ({ node, i, total, progress, relativeFrame, globalFrame, font }) => {
   const nodeReveal = spring({
-      frame: relativeFrame - (i * 4), // Staggered reveal
+      frame: relativeFrame - (i * 3),
       fps: 30,
       config: { damping: 25, stiffness: 60 }
   });
 
-  const scale = nodeReveal * progress;
-  if (!node.x || !node.y || scale <= 0) return null;
+  const scaleProgress = nodeReveal * progress;
+  if (!node.x || !node.y || scaleProgress <= 0) return null;
 
+  // Narration Awareness
+  const activeAt = (node as any).active_at || 0;
+  const isPast = globalFrame > activeAt + 60;
+  const isActive = globalFrame >= activeAt && globalFrame <= activeAt + 60;
+  const isFuture = globalFrame < activeAt;
+
+  const nodeOpacity = isActive ? 1.0 : isPast ? 0.45 : 0.1;
   const importance = node.importance || 1.0;
   const color = CATEGORY_COLORS[node.category || ''] || '#FFFFFF';
 
-  // Sleek organic drift - Now even more subtle to prevent "jumping"
-  const driftX = Math.sin(relativeFrame / 80 + i) * 8;
-  const driftY = Math.cos(relativeFrame / 75 + i) * 8;
+  // Adaptive Geometry
+  const baseRadius = interpolate(importance, [1.0, 5.0], [50, 100], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
 
-  // Semantic animations
+  const driftX = Math.sin(globalFrame / 80 + i) * 8;
+  const driftY = Math.cos(globalFrame / 75 + i) * 8;
+
+  // Semantic animations derived from relativeFrame
   let pulse = 1;
-  if (node.category === 'threat' || node.emotion === 'alert' || node.emotion === 'intense') {
-      pulse = 1 + Math.pow(Math.sin(relativeFrame * 0.1 + i), 4) * 0.05; // Heartbeat pulse
-  } else {
-      pulse = 1 + Math.sin(relativeFrame * 0.05 + i) * 0.02; // Calm breathing
+  if (isActive || node.category === 'threat') {
+      pulse = 1 + Math.pow(Math.sin(globalFrame * 0.12 + i), 4) * (isActive ? 0.08 : 0.03);
   }
 
   const Icon = TYPE_ICONS[node.type || 'concept'] || Brain;
+  const showIcon = node.type === 'hero' || node.type === 'statistic' || node.type === 'warning' || isActive;
   const isBangla = /[\u0980-\u09FF]/.test(node.label);
 
+  // Dynamic Label Width
+  const labelWidth = Math.max(180, node.label.length * (isBangla ? 22 : 14));
+
   return (
-    <g transform={`translate(${node.x + driftX}, ${node.y + driftY}) scale(${scale * pulse * (0.9 + importance * 0.1)})`}>
-      {/* Ghost Aura - Large, subtle glow */}
-      <circle r={100} fill={color} opacity={0.015} style={{ filter: 'url(#cinematicGlow)' }} />
+    <g opacity={nodeOpacity} transform={`translate(${node.x + driftX}, ${node.y + driftY}) scale(${scaleProgress * pulse})`}>
+      {/* Ghost Aura */}
+      <circle r={baseRadius + 30} fill={color} opacity={isActive ? 0.03 : 0.01} style={{ filter: 'url(#cinematicGlow)' }} />
 
-      {/* Glass HUD Disc - Multi-layered & Refined */}
-      <circle r="60" fill="rgba(5, 5, 5, 0.75)" style={{ backdropFilter: 'blur(15px)' }} />
-      <circle r="60" fill="none" stroke={color} strokeWidth="1" strokeOpacity={0.4} />
+      {/* HUD Disc */}
+      <circle r={baseRadius} fill="rgba(2, 2, 2, 0.88)" style={{ backdropFilter: 'blur(12px)' }} />
+      <circle r={baseRadius} fill="none" stroke={color} strokeWidth={isActive ? 2 : 1} strokeOpacity={0.5} />
 
-      {/* Category Specific Technical Details */}
-      {node.category === 'threat' && (
-          <g>
-              <circle r="68" fill="none" stroke="#f43f5e" strokeWidth="2" strokeDasharray="4,16" opacity={0.6}>
-                  <animate attributeName="stroke-opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite" />
-              </circle>
-          </g>
-      )}
-
+      {/* Category Details */}
       {node.category === 'mechanism' && (
-          <g transform={`rotate(${relativeFrame * 2})`}>
-              <path d="M 72 0 A 72 72 0 0 1 0 72" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" opacity={0.5} />
-              <path d="M -72 0 A 72 72 0 0 1 0 -72" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" opacity={0.5} />
+          <g transform={`rotate(${globalFrame * 1.5})`}>
+              <path d={`M ${baseRadius + 12} 0 A ${baseRadius + 12} ${baseRadius + 12} 0 0 1 0 ${baseRadius + 12}`} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" opacity={0.6} />
+              <circle cx={baseRadius + 12} cy="0" r="3" fill={color} />
           </g>
       )}
 
-      {/* Rotating Data Rings */}
-      <g transform={`rotate(${relativeFrame * 0.4 * (i % 2 === 0 ? 1 : -1)})`}>
-          <path d="M 68 0 A 68 68 0 0 1 0 68" fill="none" stroke={color} strokeWidth="1" strokeLinecap="round" opacity={0.3} />
-          <circle cx="68" cy="0" r="2" fill={color} />
-      </g>
+      {node.category === 'threat' && isActive && (
+          <g>
+              <circle r={baseRadius + 10} fill="none" stroke="#f43f5e" strokeWidth="2" strokeDasharray="4,12" opacity={0.6} />
+              <circle r={baseRadius + 5} fill="none" stroke="#f43f5e" strokeWidth="0.5" opacity={0.3} />
+          </g>
+      )}
 
-      {/* Primary Icon - Elevated */}
-      <g transform="translate(0, -12)">
-        <Icon size={34} color={color} strokeWidth={1.5} style={{ filter: 'drop-shadow(0 0 12px ' + color + '66)' }} />
-      </g>
+      {/* Primary Icon - Selective Visibility */}
+      {showIcon && (
+        <g transform={`translate(0, -12)`}>
+            <Icon size={baseRadius * 0.6} color={color} strokeWidth={isActive ? 2 : 1.5} style={{ filter: isActive ? 'drop-shadow(0 0 10px ' + color + ')' : 'none' }} />
+        </g>
+      )}
 
       {/* DETACHED Modern Label - Technical HUD Plate */}
-      <g transform="translate(0, 95)">
-          {/* Transparent plate with glow border */}
-          <rect x="-100" y="-18" width="200" height="36" rx="2" fill="rgba(0,0,0,0.8)" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
-          <rect x="-100" y="-18" width="2" height="36" fill={color} /> {/* Technical Side-bar */}
+      <g transform={`translate(0, ${baseRadius + 40})`}>
+          <rect x={-labelWidth/2} y="-20" width={labelWidth} height="40" rx="4" fill="rgba(0,0,0,0.9)" stroke={color} strokeWidth="0.5" strokeOpacity={isActive ? 0.4 : 0.15} />
+          <rect x={-labelWidth/2} y="-20" width="3" height="40" fill={color} opacity={isActive ? 1 : 0.4} />
           <text
             fill="white"
-            fontSize="16"
+            fontSize={isActive ? "20" : "17"}
             fontWeight="900"
             textAnchor="middle"
-            dy="6"
+            dy="8"
             style={{
                 fontFamily: font ? `${font}, Inter, sans-serif` : 'Inter, "Segoe UI", sans-serif',
                 letterSpacing: isBangla ? '0px' : '4px',
                 textTransform: isBangla ? 'none' : 'uppercase',
                 paintOrder: 'stroke',
                 stroke: 'black',
-                strokeWidth: 4
+                strokeWidth: 5
             }}
           >
             {node.label}
@@ -276,11 +312,8 @@ const CinematicNode: React.FC<{ node: Node, i: number, total: number, progress: 
       </g>
 
       {node.type === 'hero' && (
-        <g>
-            <circle r={85} fill="none" stroke={color} strokeWidth="2" strokeDasharray="20,60" opacity={0.4}>
-              <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="12s" repeatCount="indefinite" />
-            </circle>
-            <circle r={92} fill="none" stroke={color} strokeWidth="0.5" opacity={0.2} />
+        <g transform={`rotate(${globalFrame * -0.5})`}>
+            <circle r={baseRadius + 25} fill="none" stroke={color} strokeWidth="1.5" strokeDasharray="20,40" opacity={0.3} />
         </g>
       )}
     </g>
