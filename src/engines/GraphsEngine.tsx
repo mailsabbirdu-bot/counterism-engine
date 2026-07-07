@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect } from 'react';
 import { useCurrentFrame, useVideoConfig, spring, interpolate, Easing, AbsoluteFill } from 'remotion';
 import * as d3 from 'd3';
-import { LucideIcon, Zap, Activity, Brain, Target, ShieldAlert, BarChart3, Image as ImageIcon, MapPin, Clock, Database, ArrowRightLeft } from 'lucide-react';
+import { LucideIcon, Zap, Activity, Brain, Target, ShieldAlert, BarChart3, Image as ImageIcon, MapPin, Clock, Database, ArrowRightLeft, TrendingUp, TrendingDown, AlertTriangle, HelpCircle } from 'lucide-react';
 import { useFocus } from '../context/FocusContext';
 
 interface Node extends d3.SimulationNodeDatum {
@@ -46,7 +46,8 @@ const EMOTION_GLOW: Record<string, number> = {
 
 const TYPE_ICONS: Record<string, LucideIcon> = {
   'hero': Target, 'data': Database, 'concept': Brain,
-  'relationship': ArrowRightLeft, 'image': ImageIcon, 'statistic': BarChart3
+  'relationship': ArrowRightLeft, 'image': ImageIcon, 'statistic': BarChart3,
+  'warning': AlertTriangle, 'growth': TrendingUp, 'decline': TrendingDown, 'unknown': HelpCircle
 };
 
 export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
@@ -55,7 +56,11 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
 
   // STABLE SIMULATION: Adaptive spacing and simulation bounds
   const { processedNodes, processedLinks } = useMemo(() => {
-    const rawNodes: Node[] = overlay.nodes || [];
+    const rawNodes: Node[] = (overlay.nodes || []).map((n: any) => ({
+        ...n,
+        importance: n.importance ?? (n.type === 'hero' ? 5 : 2),
+        emotion: n.emotion ?? (n.type === 'warning' ? 'alert' : 'calm')
+    }));
     const rawLinks: Link[] = overlay.links || [];
     const nodeCount = rawNodes.length;
 
@@ -179,8 +184,9 @@ const LivingEdge: React.FC<{
     link: Link,
     progress: number,
     relativeFrame: number,
-    globalFrame: number
-}> = ({ link, progress, relativeFrame, globalFrame }) => {
+    globalFrame: number,
+    startFrame: number
+}> = ({ link, progress, relativeFrame, globalFrame, startFrame }) => {
   const s = link.source as Node;
   const t = link.target as Node;
 
@@ -199,8 +205,15 @@ const LivingEdge: React.FC<{
   // Narration Awareness: Edge becomes active when BOTH nodes have been introduced
   const isEdgeActive = isConceptActive(s) && isConceptActive(t);
 
+  // SEQUENTIAL KNOWLEDGE ARCS: Reveal animation for the edge
+  const edgeReveal = spring({
+      frame: globalFrame - Math.max(s.active_at ?? 0, t.active_at ?? 0),
+      fps: 30,
+      config: { damping: 20, stiffness: 40 }
+  });
+
   const relColor = CATEGORY_COLORS[link.relationship || ''] || '#00F5FF';
-  const edgeAlpha = interpolate(progress, [0.6, 1.0], [0, isEdgeActive ? 0.4 : 0.15], { extrapolateLeft: 'clamp' });
+  const edgeAlpha = interpolate(progress * edgeReveal, [0.6, 1.0], [0, isEdgeActive ? 0.4 : 0.15], { extrapolateLeft: 'clamp' });
 
   const dx = t.x - s.x;
   const dy = t.y - s.y;
