@@ -2,7 +2,9 @@ import React, { useMemo } from 'react';
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from 'remotion';
 import { safeNumber } from '../lib/safeNumber';
 import { getPresetKeyframes } from '../lib/cameraPresets';
+import { SHOT_PRESETS } from '../lib/shotPresets';
 import { CameraConfig, CameraKeyframe, CameraPreset } from '../types/camera';
+import { useFocus } from '../context/FocusContext';
 
 // Professional Ease-In-Out Quintic for cinematic feel
 const cinematicEase = Easing.bezier(0.65, 0, 0.35, 1);
@@ -24,6 +26,8 @@ const parseEasing = (easing: string | any) => {
       case 'narrative': return narrativeEase;
       case 'linear': return Easing.linear;
       case 'bezier': return Easing.bezier(0.25, 0.1, 0.25, 1);
+      case 'bounce': return Easing.bounce;
+      case 'elastic': return Easing.elastic(1);
       default: return cinematicEase;
     }
   }
@@ -39,12 +43,19 @@ const resolveTarget = (
   lookAt: string | { x: number, y: number } | undefined,
   overlays: any[],
   width: number,
-  height: number
+  height: number,
+  focalTargets: Record<string, any> = {}
 ) => {
   const cx = width / 2;
   const cy = height / 2;
 
   if (!lookAt) return { x: cx, y: cy, zoom: null, offset: { x: 0, y: 0 } };
+
+  // v4.0: First priority: Check FocusProvider for semantic targets
+  if (typeof lookAt === 'string' && focalTargets[lookAt]) {
+      const target = focalTargets[lookAt];
+      return { x: target.x, y: target.y, zoom: target.zoom || null, offset: { x: 0, y: 0 } };
+  }
 
   // EXTREME: Support "ACTIVE_NODE" and "ACTIVE_FOCUS" tracking
   if (lookAt === 'ACTIVE_NODE' || lookAt === 'ACTIVE_FOCUS') {
@@ -74,7 +85,7 @@ const resolveTarget = (
   return { x: lookAt.x, y: lookAt.y, zoom: null, offset: { x: 0, y: 0 } };
 };
 
-const getCameraState = (frame: number, keyframes: CameraKeyframe[], overlays: any[], width: number, height: number) => {
+const getCameraState = (frame: number, keyframes: CameraKeyframe[], overlays: any[], width: number, height: number, focalTargets: Record<string, any> = {}) => {
   const cx = width / 2;
   const cy = height / 2;
 
@@ -93,7 +104,7 @@ const getCameraState = (frame: number, keyframes: CameraKeyframe[], overlays: an
   const k2 = sorted[Math.min(i + 1, sorted.length - 1)];
 
   const getTarget = (k: CameraKeyframe) => {
-    if (k.lookAt) return resolveTarget(k.lookAt, overlays, width, height);
+    if (k.lookAt) return resolveTarget(k.lookAt, overlays, width, height, focalTargets);
     return {
       x: k.x !== undefined ? cx + k.x : cx,
       y: k.y !== undefined ? cy + k.y : cy,
@@ -146,6 +157,7 @@ export const CameraEngine: React.FC<{
 }> = ({ config, overlays, children, backgroundLayer }) => {
   const frame = useCurrentFrame();
   const { width, height, durationInFrames } = useVideoConfig();
+  const { targets: focalTargets } = useFocus();
 
   const start = Number((config as any)?.start) || 0;
   const duration = Number((config as any)?.duration) || durationInFrames;
@@ -164,128 +176,30 @@ export const CameraEngine: React.FC<{
     if (config?.shots && config.shots.length > 0) {
         config.shots.forEach(shot => {
             const inDur = shot.inDuration ?? 30;
-
-            // Resolve target's cameraFocus zoom if available
             const target = overlays.find(o => o.id === shot.targetId);
             const defaultZoom = target?.cameraFocus?.zoom || 1.5;
             const zoom = shot.zoom || defaultZoom;
 
-            // Movement start
-            keys.push({
-                frame: shot.startFrame,
-                easing: 'in-out'
-            });
+            const preset = shot.style ? SHOT_PRESETS[shot.style] : null;
 
-            // Shot Style Logic
-            let startZoom = 1.0;
-            let endZoom = zoom;
-            let currentEasing = shot.easing || 'in-out';
+            // Start zoom calculation
+            const startZoom = preset?.startZoom ? (preset.startZoom > 5 ? preset.startZoom : zoom * preset.startZoom) : zoom;
+            const endZoom = preset?.endZoomOffset ? zoom * preset.endZoomOffset : zoom;
+            const currentEasing = shot.easing || preset?.easing || 'in-out';
 
-            let rotationX = 0, rotationY = 0, rotationZ = 0, zOffset = 0;
+            keys.push({ frame: shot.startFrame, easing: 'in-out' });
 
-            if (shot.style === 'push_in' || shot.style === 'slow_push') {
-                startZoom = zoom * 0.85;
-                endZoom = zoom;
-            } else if (shot.style === 'pull_out' || shot.style === 'slow_pull') {
-                startZoom = zoom * 1.15;
-                endZoom = zoom;
-            } else if (shot.style === 'whip_pan') {
-                currentEasing = { type: 'bezier', bezier: [1, 0, 0, 1] } as any;
-            } else if (shot.style === 'dramatic_reveal') {
-                startZoom = zoom * 1.5;
-                endZoom = zoom;
-                currentEasing = { type: 'bezier', bezier: [0.16, 1, 0.3, 1] } as any;
-                rotationX = 25; rotationY = -15; zOffset = -200;
-            } else if (shot.style === 'cinematic_drift') {
-                rotationZ = 2; rotationX = 3;
-            } else if (shot.style === 'dynamic_orbit') {
-                rotationY = 15; rotationX = 5;
-            } else if (shot.style === 'vertical_sweep') {
-                rotationX = -20;
-            } else if (shot.style === 'spiral_vortex') {
-                rotationZ = 45; startZoom = zoom * 0.5;
-            } else if (shot.style === 'glitch_snap') {
-                currentEasing = { type: 'bezier', bezier: [0.1, 0.9, 0.2, 1] } as any;
-                rotationZ = -5;
-            } else if (shot.style === 'low_angle_hero') {
-                rotationX = -35; zOffset = 100;
-            } else if (shot.style === 'side_strafe_left') {
-                rotationY = -20;
-            } else if (shot.style === 'side_strafe_right') {
-                rotationY = 20;
-            } else if (shot.style === 'aerial_top_down') {
-                rotationX = 70; startZoom = zoom * 0.7;
-            } else if (shot.style === 'shaky_handheld') {
-                rotationZ = 3; rotationX = 2; rotationY = 2;
-            } else if (shot.style === 'zoom_blur_reveal') {
-                startZoom = 0.1; currentEasing = { type: 'bezier', bezier: [0.4, 0, 0.2, 1] } as any;
-            } else if (shot.style === 'tilt_shift_focus') {
-                rotationX = 15; rotationY = 15;
-            } else if (shot.style === 'power_zoom') {
-                startZoom = zoom * 0.4; currentEasing = { type: 'bezier', bezier: [0.85, 0, 0.15, 1] } as any;
-            } else if (shot.style === 'smooth_glide') {
-                rotationZ = -1; rotationY = -5;
-            } else if (shot.style === 'epic_scaling') {
-                startZoom = 0.5; endZoom = zoom * 1.2;
-            } else if (shot.style === 'warp_speed') {
-                zOffset = -1000; startZoom = 0.5;
-            } else if (shot.style === 'rolling_horizon') {
-                rotationZ = -90; currentEasing = { type: 'bezier', bezier: [0.6, -0.28, 0.735, 0.045] } as any;
-            } else if (shot.style === 'fisheye_distort') {
-                startZoom = 1.8; endZoom = zoom; rotationX = 10;
-            } else if (shot.style === 'dolly_zoom') {
-                startZoom = zoom * 2; endZoom = zoom; zOffset = 500;
-            } else if (shot.style === 'parallax_slide') {
-                rotationY = 40; zOffset = -300;
-            } else if (shot.style === 'staccato_jump') {
-                currentEasing = { type: 'bezier', bezier: [0, 1, 0, 1] } as any;
-            } else if (shot.style === 'oblique_view') {
-                rotationX = 20; rotationY = 20; rotationZ = 10;
-            } else if (shot.style === 'macro_focus') {
-                startZoom = zoom * 1.4; endZoom = zoom;
-            } else if (shot.style === 'uprising_reveal') {
-                rotationX = -60; zOffset = -500;
-            } else if (shot.style === 'descending_gaze') {
-                rotationX = 60; zOffset = 500;
-            } else if (shot.style === 'infinity_loop') {
-                rotationZ = 360; rotationY = 30;
-            } else if (shot.style === 'kaleidoscope') {
-                rotationZ = 180; rotationX = 20; rotationY = 20;
-            } else if (shot.style === 'cyber_scan') {
-                rotationY = -45; rotationX = 10;
-            } else if (shot.style === 'extreme_closeup') {
-                startZoom = zoom * 3; endZoom = zoom;
-            } else if (shot.style === 'wide_panorama') {
-                startZoom = zoom * 0.3; endZoom = zoom;
-            } else if (shot.style === 'pendulum_swing') {
-                rotationZ = -30; rotationY = 15;
-            } else if (shot.style === 'drunken_stumble') {
-                rotationZ = 10; rotationX = 10; rotationY = 10;
-            } else if (shot.style === 'floating_weightless') {
-                rotationX = 5; rotationY = 5; rotationZ = 5;
-            } else if (shot.style === 'rapid_fire') {
-                currentEasing = Easing.bounce as any;
-            } else if (shot.style === 'gentle_breeze') {
-                rotationZ = 0.5; rotationY = 1;
-            } else if (shot.style === 'the_matrix') {
-                rotationY = 90; startZoom = zoom * 0.5;
-            } else if (shot.style === 'heartbeat_zoom') {
-                currentEasing = Easing.elastic(1) as any;
-            }
-
-            // Reach target: start movement transition
             keys.push({
                 frame: shot.startFrame + inDur,
                 lookAt: shot.targetId,
                 zoom: startZoom,
-                rotationX,
-                rotationY,
-                rotationZ,
-                z: zOffset,
+                rotationX: preset?.rotationX || 0,
+                rotationY: preset?.rotationY || 0,
+                rotationZ: preset?.rotationZ || 0,
+                z: preset?.zOffset || 0,
                 easing: 'linear'
             });
 
-            // End hold: finish cinematic drift/animation within shot
             keys.push({
                 frame: shot.startFrame + shot.duration,
                 lookAt: shot.targetId,
@@ -308,8 +222,8 @@ export const CameraEngine: React.FC<{
     return Array.from(uniqueKeysMap.values()).sort((a, b) => a.frame - b.frame);
   }, [config, durationInFrames]);
 
-  const cameraState = useMemo(() => getCameraState(isNaN(frame) ? 0 : frame, mergedKeyframes, overlays, width, height), [frame, mergedKeyframes, overlays, width, height]);
-  const nextFrameState = useMemo(() => getCameraState(isNaN(frame) ? 0.5 : frame + 0.5, mergedKeyframes, overlays, width, height), [frame, mergedKeyframes, overlays, width, height]);
+  const cameraState = useMemo(() => getCameraState(isNaN(frame) ? 0 : frame, mergedKeyframes, overlays, width, height, focalTargets), [frame, mergedKeyframes, overlays, width, height, focalTargets]);
+  const nextFrameState = useMemo(() => getCameraState(isNaN(frame) ? 0.5 : frame + 0.5, mergedKeyframes, overlays, width, height, focalTargets), [frame, mergedKeyframes, overlays, width, height, focalTargets]);
 
   if (!config?.enabled) {
     return <div style={{ width, height, position: 'relative' }}>{backgroundLayer}{children}</div>;

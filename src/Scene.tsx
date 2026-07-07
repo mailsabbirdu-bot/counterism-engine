@@ -9,6 +9,8 @@ import { AnimationProvider } from '../svg/components/AnimationContext';
 import { InfographicComposer } from '../svg/components/InfographicComposer';
 import { loadAnalysis } from './services/AnalysisLoader';
 import { VisualEyeDebug } from './engines/VisualEyeDebug';
+import { FocusProvider } from './context/FocusContext';
+import { NarrativeDirector } from './engines/NarrativeDirector';
 
 export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
   const { durationInFrames } = useVideoConfig();
@@ -63,18 +65,22 @@ export const Scene: React.FC<{ sceneData: any }> = ({ sceneData }) => {
 
   return (
     <AbsoluteFill className="bg-black">
-      <AnimationProvider>
-        <AudioEngine sceneId={sceneData.scene_id} />
-        <CameraEngine
-          config={sceneData.camera}
-          overlays={sceneData.overlays || []}
-          backgroundLayer={renderBackground()}
-        >
-          <InfographicComposer sceneData={sceneData} />
-          <OverlayManager overlays={sceneData.overlays || []} analysis={analysis} />
-          {sceneData.visual_eye_debug && <VisualEyeDebug analysis={analysis} />}
-        </CameraEngine>
-      </AnimationProvider>
+      <FocusProvider>
+        <AnimationProvider>
+          <AudioEngine sceneId={sceneData.scene_id} />
+          <NarrativeDirector role={sceneData.semantic_role || 'trend'}>
+            <CameraEngine
+              config={sceneData.camera}
+              overlays={sceneData.overlays || []}
+              backgroundLayer={renderBackground()}
+            >
+              <InfographicComposer sceneData={sceneData} />
+              <OverlayManager overlays={sceneData.overlays || []} analysis={analysis} />
+              {sceneData.visual_eye_debug && <VisualEyeDebug analysis={analysis} />}
+            </CameraEngine>
+          </NarrativeDirector>
+        </AnimationProvider>
+      </FocusProvider>
     </AbsoluteFill>
   );
 };
