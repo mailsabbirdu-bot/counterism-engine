@@ -6,6 +6,7 @@ import { CameraConfig, CameraKeyframe, CameraPreset } from '../types/camera';
 
 // Professional Ease-In-Out Quintic for cinematic feel
 const cinematicEase = Easing.bezier(0.65, 0, 0.35, 1);
+const narrativeEase = Easing.bezier(0.33, 1, 0.68, 1); // Fast start, gentle finish
 
 // Improved noise for handheld shake
 const seedNoise = (f: number, seed: number) => {
@@ -20,6 +21,7 @@ const parseEasing = (easing: string | any) => {
       case 'in': return Easing.in(Easing.ease);
       case 'out': return Easing.out(Easing.ease);
       case 'in-out': return cinematicEase;
+      case 'narrative': return narrativeEase;
       case 'linear': return Easing.linear;
       case 'bezier': return Easing.bezier(0.25, 0.1, 0.25, 1);
       default: return cinematicEase;
@@ -342,6 +344,11 @@ export const CameraEngine: React.FC<{
   const speed = Math.sqrt(dx * dx + dy * dy);
   const blur = config.motionBlur?.enabled ? Math.min(speed * (config.motionBlur.intensity || 0.5), 10) : 0;
 
+  // Global Atmosphere System (NASA/Bloomberg/Cyberpunk styles)
+  const stylePreset = (config as any)?.style_preset || 'none';
+  const showVignette = stylePreset !== 'none';
+  const showHUD = ['nasa', 'bloomberg', 'cyberpunk'].includes(stylePreset);
+
   return (
     <div
       style={{
@@ -372,6 +379,24 @@ export const CameraEngine: React.FC<{
           zIndex: 5,
           pointerEvents: 'none'
       }} />
+
+      {/* Cinematic Atmosphere Layer (Vignette, Grain, Scanlines) */}
+      {showVignette && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, width, height, zIndex: 6,
+          background: 'radial-gradient(circle, transparent 40%, rgba(0,0,0,0.8) 120%)',
+          pointerEvents: 'none'
+        }} />
+      )}
+
+      {showHUD && (
+        <div style={{
+            position: 'absolute', top: 0, left: 0, width, height, zIndex: 7,
+            opacity: 0.1, pointerEvents: 'none',
+            background: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06))',
+            backgroundSize: '100% 2px, 3px 100%'
+        }} />
+      )}
 
       {/* Cinematic Camera Pivot System - Transforms Overlays only */}
       <div
