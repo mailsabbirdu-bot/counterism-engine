@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useCurrentFrame, useVideoConfig, spring, interpolate, Easing, AbsoluteFill } from 'remotion';
 import * as d3 from 'd3';
 import { LucideIcon, Zap, Activity, Brain, Target, ShieldAlert, BarChart3, Image as ImageIcon, MapPin, Clock, Database, ArrowRightLeft } from 'lucide-react';
+import { useFocus } from '../context/FocusContext';
 
 interface Node extends d3.SimulationNodeDatum {
   id: string;
@@ -164,6 +165,8 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
               relativeFrame={relativeFrame}
               globalFrame={frame}
               font={overlay.font}
+              centerX={centerX}
+              centerY={centerY}
             />
           ))}
         </g>
@@ -286,8 +289,12 @@ const CinematicNode: React.FC<{
     progress: number,
     relativeFrame: number,
     globalFrame: number,
-    font?: string
-}> = ({ node, i, total, progress, relativeFrame, globalFrame, font }) => {
+    font?: string,
+    centerX: number,
+    centerY: number
+}> = ({ node, i, total, progress, relativeFrame, globalFrame, font, centerX, centerY }) => {
+  const { registerTarget, unregisterTarget } = useFocus();
+
   const nodeReveal = spring({
       frame: relativeFrame - (i * 3),
       fps: 30,
@@ -295,7 +302,6 @@ const CinematicNode: React.FC<{
   });
 
   const scaleProgress = nodeReveal * progress;
-  if (!node.x || !node.y || scaleProgress <= 0) return null;
 
   // Multi-Window Narration Awareness Logic
   const getActivation = () => {
@@ -318,6 +324,25 @@ const CinematicNode: React.FC<{
   };
 
   const { isActive, isPast, isFuture } = getActivation();
+
+  useEffect(() => {
+    if (isActive && node.x && node.y) {
+        registerTarget({
+            id: node.id,
+            x: centerX + node.x,
+            y: centerY + node.y,
+            importance: node.importance || 1,
+            weight: (node.importance || 1) * 2,
+            category: node.category
+        });
+    } else {
+        unregisterTarget(node.id);
+    }
+    return () => unregisterTarget(node.id);
+  }, [isActive, node.id, node.x, node.y, centerX, centerY, registerTarget, unregisterTarget]);
+
+  if (!node.x || !node.y || scaleProgress <= 0) return null;
+
   const nodeOpacity = isActive ? 1.0 : isPast ? 0.45 : 0.1;
   const importance = node.importance || 1.0;
 
