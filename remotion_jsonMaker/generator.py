@@ -390,8 +390,12 @@ class RemotionJsonMaker:
         if 'variant' in ov:
             v_val = str(ov['variant'])
             if 'chart' in o_type:
+                if v_val.startswith('metaphor_'):
+                    ov['visual_metaphor'] = v_val.replace('metaphor_', '')
+                    ov['type'] = 'chart'
+                    o_type = 'chart'
                 # Map glass/neon/glow variants to shadcn_chart
-                if any(x in v_val for x in ['glass', 'neon', 'stacked', 'web', 'glow', 'composed', 'thick', 'pixel', 'grid']):
+                elif any(x in v_val for x in ['glass', 'neon', 'stacked', 'web', 'glow', 'composed', 'thick', 'pixel', 'grid']):
                     ov['type'] = 'shadcn_chart'
                     o_type = 'shadcn_chart'
                 ov['chart_type'] = v_val
@@ -1127,6 +1131,7 @@ class RemotionJsonMaker:
                 'ambient_graphic', 'callout', 'label'
             ],
             'node_types': ['hero', 'data', 'concept', 'relationship', 'image', 'statistic'],
+            'chart': ['bar', 'line', 'area', 'metaphor_mountain', 'metaphor_skyscraper'],
             'shadcn_chart': [
                 'glass_area', 'neon_bar', 'stacked_line', 'radial_score', 'radar_web', 'composed_tech',
                 'pie_donut_glass', 'scatter_bubble', 'horizontal_pill_bar', 'step_area', 'multi_bar_stack',
@@ -1485,11 +1490,12 @@ class RemotionJsonMaker:
             f"OBJECTIVE: Direct a high-end cinematic information film. Data is the lead actor.\n"
             f"REASONING PIPELINE (MANDATORY):\n"
             f"1. NARRATIVE SYNC: Identify ALL frame ranges where every concept/data series is discussed. Use `active_windows`.\n"
-            f"2. SEMANTIC VISUALIZATION: Choose 'graph' (concepts/logic) or 'shadcn_chart' (numbers/data).\n"
+            f"2. SEMANTIC VISUALIZATION: Choose 'graph' (concepts/logic), 'chart' (metaphorical/story), or 'shadcn_chart' (numbers/data).\n"
             f"3. DIRECTORIAL PRESET: nasa (sci-fi tech), bloomberg (financial/crisp), cyberpunk (intense/dark), minimal_apple (sleek), military (alert/tactical), archive (historical), nat_geo (organic).\n"
             f"4. STORY BEATS: Assign `story_beat`: introduction | growth | plateau | collapse | forecast.\n\n"
             f"--- 3. PRODUCTION QUALITY RULES ---\n"
-            f"- For `shadcn_chart`, use `semantic_role`: trend | comparison | proportion | hierarchy | flow | distribution.\n"
+            f"- For `chart` or `shadcn_chart`, use `semantic_role`: trend | comparison | proportion | hierarchy | flow | distribution.\n"
+            f"- STORY VISUAL METAPHORS: metaphor_mountain (for trends/growth), metaphor_skyscraper (for comparisons/scale).\n"
             f"- Nodes/Series MUST have `importance` (1.0-5.0) and `active_windows` (lists of [start, end]).\n"
             f"- Assign `emotion` to nodes/series: alert | intense | growing | scientific | historical | calm.\n\n"
             f"--- 4. CINEMATIC PROTOCOL ---\n"
@@ -1502,7 +1508,7 @@ class RemotionJsonMaker:
             f"  - links: {{ id, source, target, relationship, display_label }}\n"
             f"- 'connector': source/target MUST be node IDs from the graph. Preset: relationship type.\n\n"
             f"--- 6. VARIANT REGISTRY (STRICT) ---\n"
-            f"CHARTS: glass_area, neon_bar, stacked_line, radial_score, radar_web, composed_tech, pie_donut_glass, scatter_bubble, horizontal_pill_bar, step_area, multi_bar_stack, curved_edge_line, double_radar, funnel_glass, vertical_stepper, micro_sparkline, grid_dots, smooth_area_dual, bar_race_top, thick_line_glow, layered_pies, range_area, pixel_bars, curved_scatter, staircase_line, floating_bars, hollow_pie, dual_axis_tech, jagged_peak, dot_matrix_chart, area, bar, line.\n"
+            f"CHARTS: metaphor_mountain, metaphor_skyscraper, glass_area, neon_bar, stacked_line, radial_score, radar_web, composed_tech, pie_donut_glass, scatter_bubble, horizontal_pill_bar, step_area, multi_bar_stack, curved_edge_line, double_radar, funnel_glass, vertical_stepper, micro_sparkline, grid_dots, smooth_area_dual, bar_race_top, thick_line_glow, layered_pies, range_area, pixel_bars, curved_scatter, staircase_line, floating_bars, hollow_pie, dual_axis_tech, jagged_peak, dot_matrix_chart, area, bar, line.\n"
             f"INDICATORS: metric_tile, tech_badge, activity_ring, crypto_card, server_status, user_profile_stat, weather_glass, storage_pill, upload_cloud, score_board, notification_stack, data_ticker, network_ping, step_indicator_glass, battery_pack, media_controls, social_stats, tech_folder, system_cpu, location_tag, search_bar_glass, badge_collection, data_download, wifi_radar, system_lock, clock_modern, status_grid, floating_icon_text, mini_stat_card, activity_dots, kpiNumber, deltaIndicator, semiGauge, milestoneTimeline, statGrid, batteryLevel, statusBadge, stepIndicator, pulseRadar, multiProgress.\n"
             f"CONNECTORS: causes, leads_to, depends_on, located_in, transforms_into, increases, decreases, supports, threatens, flows_to, triggers, influences, smooth_curve, soft_arc, straight_flow, energy_flow, signal_beam, data_stream, s_curve, zigzag_soft, multi_branch, network_web, callout_line, camera_focus, timeline_path, route_path, curved_route, neon_connector, blueprint_connector, organic_connector.\n\n"
             f"--- 7. MANDATORY OUTPUT STRUCTURE ---\n"

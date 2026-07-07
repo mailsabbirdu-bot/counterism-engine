@@ -138,7 +138,87 @@ const SemanticVisualOverlays: React.FC<{ role: string; color: string; progress: 
     );
 };
 
-export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
+const MountainMetaphor: React.FC<{ data: any; progress: number; color: string; font: string; emotion: string }> = ({ data, progress, color, font, emotion }) => {
+    if (!Array.isArray(data) || data.length === 0) return null;
+    const series = data[0].data || [];
+    const width = 1000;
+    const height = 400;
+
+    const points = series.map((p: any, i: number) => {
+        const x = (i / (series.length - 1)) * width;
+        const y = height - (p.y * height / 100) * progress;
+        return `${x},${y}`;
+    }).join(' ');
+
+    const path = `M 0,${height} L ${points} L ${width},${height} Z`;
+
+    return (
+        <div className="relative w-full h-full flex items-end">
+            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
+                <defs>
+                    <linearGradient id="mountainFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={color} stopOpacity={0.6} />
+                        <stop offset="100%" stopColor={color} stopOpacity={0} />
+                    </linearGradient>
+                    <filter id="peakGlow">
+                        <feGaussianBlur stdDeviation="10" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                </defs>
+
+                {/* Mountain Silhouette */}
+                <path d={path} fill="url(#mountainFill)" stroke={color} strokeWidth="3" filter="url(#peakGlow)" />
+
+                {/* Data Labels at Peaks */}
+                {series.map((p: any, i: number) => {
+                    const x = (i / (series.length - 1)) * width;
+                    const y = height - (p.y * height / 100) * progress;
+                    if (i % 2 !== 0 || progress < 0.8) return null;
+                    return (
+                        <g key={i} transform={`translate(${x}, ${y - 20})`}>
+                            <text fill="white" fontSize="14" fontWeight="900" textAnchor="middle" style={{ fontFamily: font }}>{p.y}</text>
+                            <circle r="4" fill={color} />
+                        </g>
+                    );
+                })}
+            </svg>
+            {/* Cinematic Fog */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60" />
+        </div>
+    );
+};
+
+const SkyscraperMetaphor: React.FC<{ data: any; progress: number; color: string; font: string }> = ({ data, progress, color, font }) => {
+    if (!Array.isArray(data)) return null;
+    return (
+        <div className="flex items-end justify-around w-full h-full px-10 gap-4">
+            {data.map((item: any, i: number) => {
+                const h = (item.value || 0) * progress * 4;
+                return (
+                    <div key={i} className="relative flex flex-col items-center group" style={{ width: '80px' }}>
+                        {/* Skyscraper Body */}
+                        <div
+                            className="w-full bg-zinc-900 border-t-4 border-x-2 relative shadow-2xl"
+                            style={{ height: `${h}px`, borderColor: color, boxShadow: `0 0 30px ${color}33` }}
+                        >
+                            {/* Windows */}
+                            <div className="grid grid-cols-2 gap-1 p-2 opacity-20">
+                                {[...Array(Math.floor(h/20))].map((_, j) => <div key={j} className="h-1 bg-white/40" />)}
+                            </div>
+                            {/* Top Searchlight */}
+                            {progress > 0.9 && (
+                                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full w-[2px] h-40 bg-gradient-to-t from-white to-transparent opacity-40 blur-sm" />
+                            )}
+                        </div>
+                        <span className="text-white font-black uppercase text-[10px] mt-4 tracking-widest text-center" style={{ fontFamily: font }}>{item.label || item.id}</span>
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
+export const StoryVisualizationEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { fps, width: videoWidth, height: videoHeight } = useVideoConfig();
   const start = safeNumber(overlay.start, 0);
@@ -518,6 +598,13 @@ export const ChartsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   };
 
   const renderContent = () => {
+    const font = overlay.font || 'Inter, sans-serif';
+    const color = personality.glow;
+    const metaphor = overlay.visual_metaphor;
+
+    if (metaphor === 'mountain') return <MountainMetaphor data={overlay.data} progress={dataProgress} color={color} font={font} emotion={overlay.emotion} />;
+    if (metaphor === 'skyscraper') return <SkyscraperMetaphor data={overlay.data} progress={dataProgress} color={color} font={font} />;
+
     if (['line', 'area', 'forecast', 'multiLine', 'stackedArea'].includes(type)) return renderChart();
     return renderLegacyChart();
   };

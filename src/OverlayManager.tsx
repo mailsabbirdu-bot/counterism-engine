@@ -4,7 +4,7 @@ import { ParallaxLayer } from './components/ParallaxLayer';
 import { TextEngine } from './engines/TextEngine';
 import { UISystem } from './engines/UISystem';
 import { ShapesEngine } from './engines/ShapesEngine';
-import { ChartsEngine } from './engines/ChartsEngine';
+import { StoryVisualizationEngine } from './engines/StoryVisualizationEngine';
 import { GraphsEngine } from './engines/GraphsEngine';
 import { MediaEngine } from './engines/MediaEngine';
 import { DataIndicatorEngine } from './engines/DataIndicatorEngine';
@@ -47,7 +47,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays, analys
             case 'shape':
               return <ShapesEngine overlay={positionalOverlay} />;
             case 'chart':
-              return <ChartsEngine overlay={positionalOverlay} />;
+              return <StoryVisualizationEngine overlay={positionalOverlay} />;
             case 'indicator':
             case 'data_indicator':
               return <DataIndicatorEngine overlay={positionalOverlay} />;
