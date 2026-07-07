@@ -6,10 +6,13 @@ import { LucideIcon, Zap, Activity, Brain, Target, ShieldAlert, BarChart3, Image
 interface Node extends d3.SimulationNodeDatum {
   id: string;
   label: string;
-  type?: 'hero' | 'data' | 'concept' | 'relationship' | 'image' | 'statistic';
+  type?: 'hero' | 'data' | 'concept' | 'relationship' | 'image' | 'statistic' | 'warning';
   importance?: number;
-  emotion?: 'intense' | 'calm' | 'alert' | 'growing';
+  emotion?: 'intense' | 'calm' | 'alert' | 'growing' | 'scientific' | 'historical';
   category?: string;
+  active_at?: number;
+  active_windows?: [number, number][];
+  semantic_zone?: 'input' | 'process' | 'result' | 'threat' | 'context';
 }
 
 interface Link extends d3.SimulationLinkDatum<Node> {
@@ -23,11 +26,21 @@ const CATEGORY_COLORS: Record<string, string> = {
   'why': '#f43f5e', 'how': '#8b5cf6', 'when': '#fbbf24',
   'how_many': '#10b981', 'reason': '#f97316', 'input': '#3b82f6',
   'output': '#06b6d4', 'result': '#ec4899', 'dependency': '#a855f7',
-  'what': '#00F5FF', 'where': '#FFD700', 'causes': '#ef4444'
+  'what': '#00F5FF', 'where': '#FFD700', 'causes': '#ef4444',
+  'threat': '#f43f5e', 'mechanism': '#06b6d4', 'context': '#fbbf24', 'data': '#3b82f6'
+};
+
+const EMOTION_COLORS: Record<string, string> = {
+    'alert': '#ef4444',
+    'intense': '#f43f5e',
+    'growing': '#10b981',
+    'scientific': '#22d3ee',
+    'historical': '#f59e0b',
+    'calm': '#3b82f6'
 };
 
 const EMOTION_GLOW: Record<string, number> = {
-  'intense': 60, 'stable': 15, 'alert': 80, 'calm': 8, 'growing': 40
+  'intense': 60, 'stable': 15, 'alert': 80, 'calm': 8, 'growing': 40, 'scientific': 30, 'historical': 25
 };
 
 const TYPE_ICONS: Record<string, LucideIcon> = {
@@ -57,10 +70,31 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
       .force("link", d3.forceLink<Node, Link>(links).id(d => d.id).distance(distance))
       .force("charge", d3.forceManyBody().strength(charge))
       .force("center", d3.forceCenter(0, 0))
-      .force("collision", d3.forceCollide().radius(collisionRadius))
-      // Force viewport boundaries (approximate)
-      .force("x", d3.forceX().strength(0.08))
-      .force("y", d3.forceY().strength(0.08))
+      .force("collision", d3.forceCollide().radius(node => {
+          const imp = node.importance || 1.0;
+          const radius = interpolate(imp, [1.0, 5.0], [50, 100], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+          // COLLISION AWARENESS: Expand radius vertically to account for label plate
+          return radius + 60;
+      }))
+      // Force viewport boundaries
+      .force("x", d3.forceX().strength(0.1))
+      .force("y", d3.forceY().strength(0.1))
+      // SEMANTIC ZONING: Push nodes toward their assigned zones
+      .force("semantic", (alpha) => {
+          for (const node of nodes) {
+              if (!node.semantic_zone) continue;
+              const target = { x: 0, y: 0 };
+              switch (node.semantic_zone) {
+                  case 'context': target.x = -600; target.y = -350; break;
+                  case 'input':   target.x = -600; target.y = 0; break;
+                  case 'process': target.x = 0;    target.y = 0; break;
+                  case 'result':  target.x = 600;  target.y = 0; break;
+                  case 'threat':  target.x = 0;    target.y = 400; break;
+              }
+              node.vx! += (target.x - node.x!) * 0.05 * alpha;
+              node.vy! += (target.y - node.y!) * 0.05 * alpha;
+          }
+      })
       .stop();
 
     for (let i = 0; i < 400; ++i) simulation.tick();
@@ -116,6 +150,9 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
             />
           ))}
 
+          {/* Active Node Position Tracking (for CameraEngine) */}
+          <ActiveNodeTracker nodes={processedNodes} globalFrame={frame} centerX={centerX} centerY={centerY} />
+
           {/* Floating Conceptual Discs */}
           {processedNodes.map((node, i) => (
             <CinematicNode
@@ -146,10 +183,18 @@ const LivingEdge: React.FC<{
 
   if (!s.x || !s.y || !t.x || !t.y) return null;
 
-  // Narration Awareness: Active if both nodes are active or past
-  const sActiveAt = (s as any).active_at || 0;
-  const tActiveAt = (t as any).active_at || 0;
-  const isEdgeActive = globalFrame >= sActiveAt && globalFrame >= tActiveAt;
+  // Helper for multi-window activation check
+  const isConceptActive = (node: Node) => {
+      const activeAt = node.active_at ?? 0;
+      const windows = node.active_windows || [[activeAt, activeAt + 60]];
+      for (const [start] of windows) {
+          if (globalFrame >= start) return true;
+      }
+      return false;
+  };
+
+  // Narration Awareness: Edge becomes active when BOTH nodes have been introduced
+  const isEdgeActive = isConceptActive(s) && isConceptActive(t);
 
   const relColor = CATEGORY_COLORS[link.relationship || ''] || '#00F5FF';
   const edgeAlpha = interpolate(progress, [0.6, 1.0], [0, isEdgeActive ? 0.4 : 0.15], { extrapolateLeft: 'clamp' });
@@ -210,6 +255,30 @@ const LivingEdge: React.FC<{
   );
 };
 
+// Component to communicate current active node position to the DOM
+// This allows the CameraEngine to potentially find and track the element
+const ActiveNodeTracker: React.FC<{ nodes: Node[], globalFrame: number, centerX: number, centerY: number }> = ({ nodes, globalFrame, centerX, centerY }) => {
+    const activeNode = nodes.find(n => {
+        const activeAt = (n as any).active_at || 0;
+        const windows = (n as any).active_windows || [[activeAt, activeAt + 60]];
+        for (const [start, end] of windows) {
+            if (globalFrame >= start && globalFrame <= end) return true;
+        }
+        return false;
+    });
+
+    if (!activeNode || !activeNode.x || !activeNode.y) return null;
+
+    return (
+        <div
+            id="active-node-pos"
+            data-x={centerX + activeNode.x}
+            data-y={centerY + activeNode.y}
+            style={{ display: 'none' }}
+        />
+    );
+};
+
 const CinematicNode: React.FC<{
     node: Node,
     i: number,
@@ -228,15 +297,32 @@ const CinematicNode: React.FC<{
   const scaleProgress = nodeReveal * progress;
   if (!node.x || !node.y || scaleProgress <= 0) return null;
 
-  // Narration Awareness
-  const activeAt = (node as any).active_at || 0;
-  const isPast = globalFrame > activeAt + 60;
-  const isActive = globalFrame >= activeAt && globalFrame <= activeAt + 60;
-  const isFuture = globalFrame < activeAt;
+  // Multi-Window Narration Awareness Logic
+  const getActivation = () => {
+      const activeAt = node.active_at ?? 0;
+      const windows = node.active_windows || [[activeAt, activeAt + 60]];
 
+      let isActive = false;
+      let isPast = globalFrame > windows[windows.length - 1][1];
+      let isFuture = globalFrame < windows[0][0];
+
+      for (const [start, end] of windows) {
+          if (globalFrame >= start && globalFrame <= end) {
+              isActive = true;
+              isPast = false;
+              isFuture = false;
+              break;
+          }
+      }
+      return { isActive, isPast, isFuture };
+  };
+
+  const { isActive, isPast, isFuture } = getActivation();
   const nodeOpacity = isActive ? 1.0 : isPast ? 0.45 : 0.1;
   const importance = node.importance || 1.0;
-  const color = CATEGORY_COLORS[node.category || ''] || '#FFFFFF';
+
+  // Color is influenced by both Category and Emotion
+  const color = EMOTION_COLORS[node.emotion || ''] || CATEGORY_COLORS[node.category || ''] || '#FFFFFF';
 
   // Adaptive Geometry
   const baseRadius = interpolate(importance, [1.0, 5.0], [50, 100], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
@@ -266,18 +352,27 @@ const CinematicNode: React.FC<{
       <circle r={baseRadius} fill="rgba(2, 2, 2, 0.88)" style={{ backdropFilter: 'blur(12px)' }} />
       <circle r={baseRadius} fill="none" stroke={color} strokeWidth={isActive ? 2 : 1} strokeOpacity={0.5} />
 
-      {/* Category Details */}
-      {node.category === 'mechanism' && (
-          <g transform={`rotate(${globalFrame * 1.5})`}>
+      {/* Category & Emotion Visual Details */}
+      {(node.category === 'mechanism' || node.emotion === 'growing') && (
+          <g transform={`rotate(${globalFrame * (node.emotion === 'growing' ? 0.8 : 1.5)})`}>
               <path d={`M ${baseRadius + 12} 0 A ${baseRadius + 12} ${baseRadius + 12} 0 0 1 0 ${baseRadius + 12}`} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" opacity={0.6} />
               <circle cx={baseRadius + 12} cy="0" r="3" fill={color} />
           </g>
       )}
 
-      {node.category === 'threat' && isActive && (
+      {(node.category === 'threat' || node.emotion === 'alert' || node.emotion === 'intense') && isActive && (
           <g>
-              <circle r={baseRadius + 10} fill="none" stroke="#f43f5e" strokeWidth="2" strokeDasharray="4,12" opacity={0.6} />
-              <circle r={baseRadius + 5} fill="none" stroke="#f43f5e" strokeWidth="0.5" opacity={0.3} />
+              <circle r={baseRadius + 10} fill="none" stroke={color} strokeWidth="2" strokeDasharray="4,12" opacity={0.6} />
+              <circle r={baseRadius + 5} fill="none" stroke={color} strokeWidth="0.5" opacity={0.3} />
+              {/* Alert Scanline */}
+              <line x1={-baseRadius} y1={Math.sin(globalFrame * 0.2) * baseRadius} x2={baseRadius} y2={Math.sin(globalFrame * 0.2) * baseRadius} stroke={color} strokeWidth="1" opacity="0.2" />
+          </g>
+      )}
+
+      {(node.emotion === 'scientific' || node.type === 'statistic') && (
+          <g>
+              <rect x={-baseRadius} y={-baseRadius} width={baseRadius*2} height={baseRadius*2} fill="none" stroke={color} strokeWidth="0.5" strokeDasharray="2,10" opacity="0.3" />
+              <path d={`M ${-baseRadius} 0 L ${baseRadius} 0 M 0 ${-baseRadius} L 0 ${baseRadius}`} stroke={color} strokeWidth="0.5" opacity="0.2" />
           </g>
       )}
 

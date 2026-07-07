@@ -44,6 +44,16 @@ const resolveTarget = (
 
   if (!lookAt) return { x: cx, y: cy, zoom: null, offset: { x: 0, y: 0 } };
 
+  // EXTREME: Support "ACTIVE_NODE" tracking
+  if (lookAt === 'ACTIVE_NODE') {
+      const tracker = typeof document !== 'undefined' ? document.getElementById('active-node-pos') : null;
+      if (tracker) {
+          const x = Number(tracker.getAttribute('data-x'));
+          const y = Number(tracker.getAttribute('data-y'));
+          if (!isNaN(x) && !isNaN(y)) return { x, y, zoom: null, offset: { x: 0, y: 0 } };
+      }
+  }
+
   if (typeof lookAt === 'string') {
     const target = (overlays || []).find(o => o.id === lookAt);
     if (target && target.position) {

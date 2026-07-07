@@ -1353,10 +1353,11 @@ class RemotionJsonMaker:
                                     scene_initiatives.append(f"DATA: Fixed invalid link in graph '{ov_id}'")
                                     corrections_made += 1
 
-                        # Narration Sync: Ensure active_at exists
+                        # Narration Sync: Ensure active_at or active_windows exists
                         for node in ov['nodes']:
-                            if 'active_at' not in node:
-                                node['active_at'] = int(ov.get('start', 0)) + 30
+                            if 'active_windows' not in node:
+                                start = node.get('active_at', int(ov.get('start', 0)) + 30)
+                                node['active_windows'] = [[start, start + 60]]
                                 corrections_made += 1
 
                 # F. Hierarchy Enforcement
@@ -1390,6 +1391,8 @@ class RemotionJsonMaker:
             # 3. Camera Shot Security
             camera = scene.get('camera', {})
             for shot in camera.get('shots', []):
+                if shot.get('targetId') == 'ACTIVE_NODE':
+                    continue # Reserved keyword for dynamic tracking
                 if shot.get('targetId') not in overlay_ids:
                     if overlay_ids: shot['targetId'] = overlay_ids[0]
                     else: camera['enabled'] = False
@@ -1471,26 +1474,24 @@ class RemotionJsonMaker:
             f"ENV_FONTS: BANGLA: {self.bangla_fonts} | ENGLISH: {self.english_fonts}\n"
             f"ENV_VIDEOS: {self.video_files}\n\n"
             f"--- 2. ROLE: CINEMATIC NARRATIVE ARCHITECT ---\n"
-            f"OBJECTIVE: Visualize UNDERSTANDING, not language. Reveal the hidden system behind the narration.\n"
+            f"OBJECTIVE: Visualize UNDERSTANDING. Concepts should appear and REAPPEAR with the narration.\n"
             f"REASONING PIPELINE (MANDATORY):\n"
-            f"1. EXTRACT CONCEPTS: Identify objects, causes, effects. Filter grammar words.\n"
-            f"2. NARRATIVE SYNC: For every node, identify the EXACT frame (from TIMESTAMPS) when it is first mentioned. Use this for `active_at`.\n"
-            f"3. DISCOVER RELATIONSHIPS: How do concepts interact? (causes, triggers, leads_to, threatens).\n"
-            f"4. RANK IMPORTANCE: The 'Hero' node is the central theme. Categories: threat, mechanism, data, context.\n"
-            f"5. DESIGN LAYOUT: Use position: {{x, y}} to place nodes. Cluster related nodes. Hero center.\n\n"
+            f"1. EXTRACT CONCEPTS: Identify entities/processes. \n"
+            f"2. TEMPORAL MAPPING: For every concept, list ALL frame ranges (from TIMESTAMPS) where it is being discussed. Use this for `active_windows`.\n"
+            f"3. SEMANTIC ZONING: Assign nodes to zones: input (left), process (center), result (right), threat (bottom), context (top).\n"
+            f"4. EMOTIONAL TAGGING: Map narration tone to emotions: alert, intense, growing, scientific, historical, calm.\n\n"
             f"--- 3. CONCEPT QUALITY RULES ---\n"
-            f"- Nodes represent ideas/entities. NEVER use single grammatical words.\n"
-            f"- Every node MUST have an `active_at` integer frame value matched to the narration.\n"
-            f"- Every node MUST have `importance` (1.0 to 5.0). Importance 5 = Large Hero node.\n\n"
+            f"- Every node MUST have `active_windows`: [[start, end], [start, end]].\n"
+            f"- Importance (1.0-5.0) scales the HUD disc size.\n"
+            f"- Categories: threat, mechanism, data, context. Emotions: alert, intense, growing, scientific, historical.\n\n"
             f"--- 4. PRODUCTION DESIGN PROTOCOL ---\n"
-            f"- VISUAL HIERARCHY: Knowledge Graphs are the PRIMARY visual layer. Minimize 'text' overlays. \n"
-            f"- NARRATION AWARE: The graph will dim past nodes and fade future nodes. Ensure `active_at` is accurate.\n"
-            f"- SPATIAL DISCIPLINE: Max 8 nodes per scene. Use safe zones (200px margin).\n"
-            f"- CAMERA SYNC: In the `camera` shots, use `lookAt` targeting node IDs as they become active.\n\n"
+            f"- VISUAL HIERARCHY: Knowledge Graph is primary. Minimize text overlays. \n"
+            f"- CAMERA: Use a `shot` with `lookAt: \"ACTIVE_NODE\"` to automatically follow the narration.\n"
+            f"- SPATIAL: Force nodes into their `semantic_zone` using coordinates within safe bounds (200-1700x, 200-900y).\n\n"
             f"--- 5. SCHEMA AUTHORITY ---\n"
             f"- 'graph': requires 'nodes' and 'links'.\n"
-            f"  - nodes: {{ id, label, type(hero|data|concept|image|statistic|warning), importance(1.0-5.0), active_at(frame), category(threat|mechanism|context|data), position: {{x, y}} }}\n"
-            f"  - links: {{ id, source, target, relationship(semantic), display_label }}\n"
+            f"  - nodes: {{ id, label, type(hero|data|concept|statistic|warning), importance, active_windows, semantic_zone, emotion, category, position: {{x, y}} }}\n"
+            f"  - links: {{ id, source, target, relationship, display_label }}\n"
             f"- 'connector': source/target MUST be node IDs from the graph. Preset: relationship type.\n\n"
             f"--- 6. VARIANT REGISTRY (STRICT) ---\n"
             f"CHARTS: glass_area, neon_bar, stacked_line, radial_score, radar_web, composed_tech, pie_donut_glass, scatter_bubble, horizontal_pill_bar, step_area, multi_bar_stack, curved_edge_line, double_radar, funnel_glass, vertical_stepper, micro_sparkline, grid_dots, smooth_area_dual, bar_race_top, thick_line_glow, layered_pies, range_area, pixel_bars, curved_scatter, staircase_line, floating_bars, hollow_pie, dual_axis_tech, jagged_peak, dot_matrix_chart, area, bar, line.\n"
