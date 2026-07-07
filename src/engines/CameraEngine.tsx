@@ -44,9 +44,10 @@ const resolveTarget = (
 
   if (!lookAt) return { x: cx, y: cy, zoom: null, offset: { x: 0, y: 0 } };
 
-  // EXTREME: Support "ACTIVE_NODE" tracking
-  if (lookAt === 'ACTIVE_NODE') {
-      const tracker = typeof document !== 'undefined' ? document.getElementById('active-node-pos') : null;
+  // EXTREME: Support "ACTIVE_NODE" and "ACTIVE_FOCUS" tracking
+  if (lookAt === 'ACTIVE_NODE' || lookAt === 'ACTIVE_FOCUS') {
+      const trackerId = lookAt === 'ACTIVE_NODE' ? 'active-node-pos' : 'active-focus-pos';
+      const tracker = typeof document !== 'undefined' ? document.getElementById(trackerId) : null;
       if (tracker) {
           const x = Number(tracker.getAttribute('data-x'));
           const y = Number(tracker.getAttribute('data-y'));

@@ -1286,6 +1286,14 @@ class RemotionJsonMaker:
                 # B. Timing Stability
                 start = int(ov.get('start', 0))
                 duration = int(ov.get('duration', scene_dur - start))
+
+                # Injection: Active Windows for chart series if missing
+                if o_type == 'shadcn_chart' and 'data' in ov and isinstance(ov['data'], list):
+                    for series in ov['data']:
+                        if isinstance(series, dict) and 'active_windows' not in series:
+                            s_start = series.get('active_at', start + 60)
+                            series['active_windows'] = [[s_start, s_start + 120]]
+                            corrections_made += 1
                 if start >= scene_dur:
                     ov['start'] = max(0, scene_dur - 60)
                     scene_initiatives.append(f"TIMING: '{ov_id}' start ({start}) exceeded scene duration -> clamped")
@@ -1473,21 +1481,21 @@ class RemotionJsonMaker:
             f"{visual_context}\n"
             f"ENV_FONTS: BANGLA: {self.bangla_fonts} | ENGLISH: {self.english_fonts}\n"
             f"ENV_VIDEOS: {self.video_files}\n\n"
-            f"--- 2. ROLE: CINEMATIC NARRATIVE ARCHITECT ---\n"
-            f"OBJECTIVE: Visualize UNDERSTANDING. Reveal the system and the data behind the narration.\n"
+            f"--- 2. ROLE: DOCUMENTARY DIRECTOR PERSONA ---\n"
+            f"OBJECTIVE: Direct a high-end cinematic information film. Data is the lead actor.\n"
             f"REASONING PIPELINE (MANDATORY):\n"
-            f"1. NARRATIVE SYNC: For every concept or data point, identify the EXACT frame ranges (from TIMESTAMPS) where it is being discussed. Use for `active_windows` or `highlights`.\n"
-            f"2. SEMANTIC VISUALIZATION: Choose between 'graph' (for relationships) and 'shadcn_chart' (for data).\n"
-            f"3. CHART PERSONALITY: Match tone to personality: scientific (cyan), financial (green), historical (amber), futuristic (white).\n"
-            f"4. DATA HIGHLIGHTS: Identify 'Critical Data Moments' in the narration. Add them to the chart's `highlights` array.\n\n"
-            f"--- 3. DATA QUALITY RULES ---\n"
-            f"- For `shadcn_chart`, use `semantic_role`: trend (line/area), comparison (bar/waffle), proportion (pie/donut), flow (sankey), distribution (boxplot), relationship (scatter/radar).\n"
-            f"- `highlights`: [{{ \"seriesId\": string, \"start\": frame, \"duration\": 60, \"label\": \"Insight Text\", \"color\": hex }}]\n"
-            f"- `personality`: scientific | financial | historical | futuristic\n\n"
-            f"--- 4. PRODUCTION DESIGN PROTOCOL ---\n"
-            f"- VISUAL HIERARCHY: Knowledge Graph or Semantic Chart are primary. Strip standard 'text' overlays if the chart title covers it.\n"
-            f"- CAMERA: For charts, use `lookAt: \"ACTIVE_NODE\"` or target the chart ID. Use `zoom: 1.2` for highlights.\n"
-            f"- SPATIAL: Charts should be large (width: 1100, height: 700) and centered if they are the primary focus.\n\n"
+            f"1. NARRATIVE SYNC: Identify ALL frame ranges where every concept/data series is discussed. Use `active_windows`.\n"
+            f"2. SEMANTIC VISUALIZATION: Choose 'graph' (concepts/logic) or 'shadcn_chart' (numbers/data).\n"
+            f"3. DIRECTORIAL PRESET: nasa (sci-fi tech), bloomberg (financial/crisp), cyberpunk (intense/dark), minimal_apple (sleek), military (alert/tactical), archive (historical), nat_geo (organic).\n"
+            f"4. STORY BEATS: Assign `story_beat`: introduction | growth | plateau | collapse | forecast.\n\n"
+            f"--- 3. PRODUCTION QUALITY RULES ---\n"
+            f"- For `shadcn_chart`, use `semantic_role`: trend | comparison | proportion | hierarchy | flow | distribution.\n"
+            f"- Nodes/Series MUST have `importance` (1.0-5.0) and `active_windows` (lists of [start, end]).\n"
+            f"- Assign `emotion` to nodes/series: alert | intense | growing | scientific | historical | calm.\n\n"
+            f"--- 4. CINEMATIC PROTOCOL ---\n"
+            f"- VISUAL HIERARCHY: Strip redundant 'text' layers if the Chart/Graph title covers the narration.\n"
+            f"- CAMERA: Use `lookAt: \"ACTIVE_NODE\"` (for graphs) or `lookAt: \"ACTIVE_FOCUS\"` (for charts) for autonomous tracking.\n"
+            f"- SPATIAL: Force nodes into `semantic_zone`: input | process | result | threat | context.\n\n"
             f"--- 5. SCHEMA AUTHORITY ---\n"
             f"- 'graph': requires 'nodes' and 'links'.\n"
             f"  - nodes: {{ id, label, type(hero|data|concept|statistic|warning), importance, active_windows, semantic_zone, emotion, category, position: {{x, y}} }}\n"
