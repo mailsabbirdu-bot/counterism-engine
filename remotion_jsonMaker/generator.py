@@ -49,6 +49,24 @@ class ConsecutiveIssueTracker:
         return stubborn
 
 class RemotionJsonMaker:
+    # --- SEMANTIC MAPPING ENGINE ---
+    SEMANTIC_KEYWORDS = {
+        'conflict': ['threat', 'problem', 'danger', 'risk', 'warning', 'versus', 'crisis', 'battle', 'war', 'attack', 'failed'],
+        'trend': ['growth', 'increase', 'rise', 'data', 'percent', 'forecast', 'future', 'trend', 'evolution', 'history'],
+        'comparison': ['vs', 'compare', 'difference', 'better', 'higher', 'scale', 'ratio', 'rank'],
+        'historical': ['past', 'archive', 'ancient', 'was', 'used to', 'century', 'origin', 'legacy']
+    }
+
+    def _auto_assign_semantic_role(self, story_text: str) -> str:
+        story_lower = story_text.lower()
+        counts = {role: 0 for role in self.SEMANTIC_KEYWORDS}
+        for role, keywords in self.SEMANTIC_KEYWORDS.items():
+            for kw in keywords:
+                if kw in story_lower: counts[role] += 1
+
+        best_role = max(counts, key=counts.get)
+        return best_role if counts[best_role] > 0 else 'trend'
+
     # --- PRODUCTION-GRADE CONSTANTS ---
     TYPE_SIZES = {
         'text': (800, 200), 'chart': (1000, 562), 'shadcn_chart': (1000, 562),
@@ -486,6 +504,11 @@ class RemotionJsonMaker:
         for scene_idx, scene in enumerate(data['scenes']):
             scene_duration, id_num = self._harden_scene_metadata(scene, scene_idx)
             s_id = scene['scene_id'] # Use canonical ID from hardening
+
+            # v4.5: Semantic Orchestration
+            if 'semantic_role' not in scene:
+                story_context = self.story_scenes.get(s_id, "")
+                scene['semantic_role'] = self._auto_assign_semantic_role(story_context)
 
             # --- KNOWLEDGE GRAPH DE-CLUTTERING (v4.5) ---
             # If a graph is present, standard text overlays often repeat the same words.
@@ -1171,6 +1194,12 @@ class RemotionJsonMaker:
                 scene['scene_id'] = f"SCENE_{scene_idx+1}"
 
             s_id = scene['scene_id']
+
+            # v4.5: TITAN NARRATIVE SECURITY
+            if 'semantic_role' not in scene:
+                scene['semantic_role'] = self._auto_assign_semantic_role(str(scene))
+                scene_initiatives.append(f"NARRATIVE: Assigned automatic semantic_role '{scene['semantic_role']}'")
+                corrections_made += 1
             scene_initiatives = []
 
             # 0. Structural Recovery (Hallucination Harvesting)
@@ -1403,7 +1432,16 @@ class RemotionJsonMaker:
 
             # 3. Camera Shot Security
             camera = scene.get('camera', {})
+            role = scene.get('semantic_role', 'trend')
             for shot in camera.get('shots', []):
+                # Align shot style with semantic role if missing or inappropriate
+                if not shot.get('style'):
+                    if role == 'conflict': shot['style'] = 'shaky_handheld'
+                    elif role == 'trend': shot['style'] = 'slow_push'
+                    else: shot['style'] = 'cinematic_drift'
+                    scene_initiatives.append(f"CAMERA: Aligned shot style with semantic_role '{role}'")
+                    corrections_made += 1
+
                 if shot.get('targetId') == 'ACTIVE_NODE':
                     continue # Reserved keyword for dynamic tracking
                 if shot.get('targetId') not in overlay_ids:
@@ -1490,7 +1528,7 @@ class RemotionJsonMaker:
             f"OBJECTIVE: Direct a high-end cinematic information film. Data is the lead actor.\n"
             f"REASONING PIPELINE (MANDATORY):\n"
             f"1. NARRATIVE SYNC: Identify ALL frame ranges where every concept/data series is discussed. Use `active_windows`.\n"
-            f"2. STORY DIRECTOR: Assign a `semantic_role` (trend | conflict | comparison | historical) to the ENTIRE SCENE. This drives the global visual language.\n"
+            f"2. STORY DIRECTOR: Assign a `semantic_role` (trend | conflict | comparison | historical) to the ENTIRE SCENE. This drives the global visual language (lighting, particles, motion).\n"
             f"3. SEMANTIC VISUALIZATION: Choose 'graph' (concepts/logic), 'chart' (metaphorical/story), or 'shadcn_chart' (numbers/data).\n"
             f"4. DIRECTORIAL PRESET: nasa (sci-fi tech), bloomberg (financial/crisp), cyberpunk (intense/dark), minimal_apple (sleek), military (alert/tactical), archive (historical), nat_geo (organic).\n"
             f"5. STORY BEATS: Assign `story_beat`: introduction | growth | plateau | collapse | forecast.\n\n"
@@ -1500,6 +1538,7 @@ class RemotionJsonMaker:
             f"- Nodes/Series MUST have `importance` (1.0-5.0) and `active_windows` (lists of [start, end]).\n"
             f"- Assign `emotion` to nodes/series: alert | intense | growing | scientific | historical | calm.\n\n"
             f"--- 4. CINEMATIC PROTOCOL ---\n"
+            f"- VISUAL LANGUAGE: Role 'conflict' = Red mood, high jitter. Role 'trend' = Blue mood, ascending data particles. Role 'comparison' = Green mood.\n"
             f"- STORY DIRECTOR: Every scene MUST have a `semantic_role`. Use 'conflict' for threats/problems, 'trend' for growth/data, 'comparison' for scales.\n"
             f"- VISUAL HIERARCHY: Strip redundant 'text' layers if the Chart/Graph title covers the narration.\n"
             f"- CAMERA: Use `lookAt` targeting IDs of specific graph nodes or chart peaks for semantic tracking.\n"
