@@ -1,10 +1,10 @@
 # ☁️ Google Colab Setup (Counterism Studio V4)
 
-Run the following cell in Google Colab to automate the process: Semantic Analysis -> Manifest Hardening -> Remotion Rendering.
+Run the following cell in Google Colab to automate the process with dynamic duration adjustment and Drive-based manifests.
 
 ```python
 # ==============================================================================
-# COUNTERISM STUDIO V4 — ONE-CELL SEMANTIC PIPELINE
+# COUNTERISM STUDIO V4 — AUTOMATED CINEMATIC PIPELINE (DYNAMC DURATION)
 # ==============================================================================
 
 import os
@@ -18,96 +18,83 @@ def print_banner(text):
     print(f" {text}")
     print("="*80)
 
-# --- 1. MOUNT GOOGLE DRIVE ---
+# 1. Mount Google Drive
 print_banner("📂 MOUNTING GOOGLE DRIVE")
 from google.colab import drive
 drive.mount('/content/drive')
 
-# --- 2. SETUP ENVIRONMENT ---
+# 2. Setup Project Environment
 PROJECT_NAME = "counterism-engine"
 DRIVE_BASE_PATH = "/content/drive/MyDrive/Counterism_Studio_V4"
-STORY_FILE = f"{DRIVE_BASE_PATH}/audio/story.txt"
-TIMESTAMP_FILE = f"{DRIVE_BASE_PATH}/manifests/timestamp.txt"
-FPS_UPDATE_FILE = f"{DRIVE_BASE_PATH}/manifests/fps_update.txt"
-OUTPUT_JSON = "remotion_render.json"
-DRIVE_MANIFEST_DIR = f"{DRIVE_BASE_PATH}/manifests"
+REPO_URL = "https://github.com/mailsabbirdu-bot/counterism-engine"
 
 %cd /content
 if not os.path.exists(PROJECT_NAME):
-    !git clone https://github.com/mailsabbirdu-bot/counterism-engine
+    print(f"🚀 Cloning repository: {REPO_URL}")
+    !git clone {REPO_URL}
+else:
+    print(f"✅ Project folder '{PROJECT_NAME}' already exists.")
+
 %cd {PROJECT_NAME}
 
-# --- 3. INSTALL NLP & RENDERING DEPENDENCIES ---
+# 3. Handle External Assets (Renders, Audio, Fonts, SFX)
+print_banner("🔍 ASSET VERIFICATION & COPYING")
+
+# Crucial: Clean and create directories in the correct order
+!rm -rf public/renders
+!mkdir -p public/renders/audios
+!mkdir -p public/audio
+!mkdir -p public/fonts
+
+# Sync Background Videos
+drive_renders = f"{DRIVE_BASE_PATH}/renders"
+if os.path.exists(drive_renders):
+    print(f"📡 Syncing renders from: {drive_renders}")
+    import glob
+    for f in glob.glob(os.path.join(drive_renders, "*.mp4")):
+        shutil.copy(f, "public/renders/")
+else:
+    print(f"❌ FATAL: 'renders' folder NOT FOUND in Drive: {drive_renders}")
+
+# Sync Voiceovers
+drive_audio = f"{DRIVE_BASE_PATH}/audio"
+if os.path.exists(drive_audio):
+    !cp -r {drive_audio}/* public/audio/
+
+# Sync SFX & Narration (Recursive sync from multiple Drive locations)
+print("📡 Searching for SFX and narration assets...")
+import glob
+for sfx_path in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/renders/audio", f"{DRIVE_BASE_PATH}/audio"]:
+    if os.path.exists(sfx_path):
+        print(f"📦 Syncing audio from: {sfx_path}")
+        for ext in ["*.mp3", "*.wav", "*.m4a", "*.aac", "*.ogg"]:
+            for f in glob.glob(os.path.join(sfx_path, "**", ext), recursive=True):
+                shutil.copy(f, "public/renders/audios/")
+
+# Sync Fonts
+drive_fonts = f"{DRIVE_BASE_PATH}/fonts"
+if os.path.exists(drive_fonts):
+    !cp -r {drive_fonts}/* public/fonts/
+
+# 4. Manifest Verification
+print_banner("📜 MANIFEST VERIFICATION")
+DRIVE_JSON = f"{DRIVE_BASE_PATH}/manifests/remotion_render.json"
+if os.path.exists(DRIVE_JSON):
+    print(f"✅ Found Drive manifest: {DRIVE_JSON}")
+else:
+    print(f"❌ FATAL: Manifest NOT FOUND in Drive: {DRIVE_JSON}")
+
+# 5. Install Dependencies
 print_banner("🛠️ INSTALLING DEPENDENCIES")
-!pip install -q stanza networkx pydantic regex
+# Use -qq and --silent to ignore verbose node/apt messages
 !apt-get update -y -qq && apt-get install -y -qq ffmpeg build-essential
 !npm install --silent
 
-# Download Stanza models for English (required for Semantic Engine)
-import stanza
-stanza.download('en', verbose=False)
-
-# --- 4. SYNC ASSETS FROM DRIVE ---
-print_banner("🔍 SYNCING ASSETS")
-!mkdir -p public/renders/audios public/fonts public/audio
-
-# Background Videos
-if os.path.exists(f"{DRIVE_BASE_PATH}/renders"):
-    !cp {DRIVE_BASE_PATH}/renders/*.mp4 public/renders/ 2>/dev/null || true
-
-# Voiceovers & SFX
-for sfx_path in [f"{DRIVE_BASE_PATH}/renders/audios", f"{DRIVE_BASE_PATH}/audio"]:
-    if os.path.exists(sfx_path):
-        !cp -r {sfx_path}/* public/renders/audios/ 2>/dev/null || true
-
-# Fonts
-if os.path.exists(f"{DRIVE_BASE_PATH}/fonts"):
-    !cp -r {DRIVE_BASE_PATH}/fonts/* public/fonts/
-
-# --- 5. SEMANTIC ANALYSIS (RULE-BASED PROTOTYPE) ---
-print_banner("🧠 SEMANTIC UNDERSTANDING")
-if os.path.exists(STORY_FILE):
-    with open(STORY_FILE, 'r') as f:
-        story_content = f.read()
-
-    print("Running deterministic NLP analysis on script...")
-    # Import from the newly created semantic_engine package
-    import sys
-    sys.path.append(os.getcwd())
-    from semantic_engine.main import SemanticEngine
-
-    engine = SemanticEngine()
-    semantic_results = engine.process(story_content)
-
-    # Save semantic results for reference
-    os.makedirs("out/analysis", exist_ok=True)
-    with open("out/analysis/semantic_model.json", 'w') as f:
-        json.dump(semantic_results, f, indent=2)
-    print("✅ Semantic Model generated in out/analysis/semantic_model.json")
-else:
-    print("⚠️ Skipping semantic analysis: story.txt not found in Drive.")
-
-# --- 6. MANIFEST HARDENING & GENERATION (TITAN GUARD) ---
-print_banner("🛡️ MANIFEST HARDENING (TITAN GUARD)")
-# This runs the production generator which handles AI-hallucination repair and rhythmic staggering
-!python3 remotion_jsonMaker/generator.py \
-    --story-file {STORY_FILE} \
-    --output {OUTPUT_JSON} \
-    --timestamp-file {TIMESTAMP_FILE} \
-    --fps-update-file {FPS_UPDATE_FILE} \
-    --public-dir public/
-
-# Sync generated manifest back to Drive
-if os.path.exists(OUTPUT_JSON):
-    os.makedirs(DRIVE_MANIFEST_DIR, exist_ok=True)
-    shutil.copy(OUTPUT_JSON, f"{DRIVE_MANIFEST_DIR}/remotion_render.json")
-    print(f"✅ Hardened manifest synced to Drive: {DRIVE_MANIFEST_DIR}/remotion_render.json")
-
-# --- 7. START RENDERING ---
+# 6. Render Pipeline
 print_banner("🎬 STARTING RENDERING PIPELINE")
 !npm run render -- --concurrency=1
 
-# --- 8. SYNC RENDERS TO DRIVE ---
+# 7. Automatic Drive Upload
 print_banner("💾 SAVING RESULTS TO GOOGLE DRIVE")
 LOCAL_RENDER_DIR = "renders/overlays/remotion"
 DRIVE_RENDER_DIR = f"{DRIVE_BASE_PATH}/renders/overlays/remotion"
@@ -115,5 +102,5 @@ if os.path.exists(LOCAL_RENDER_DIR):
     os.makedirs(DRIVE_RENDER_DIR, exist_ok=True)
     !cp -rvu {LOCAL_RENDER_DIR}/* {DRIVE_RENDER_DIR}/
 
-print_banner("🏁 ALL TASKS COMPLETE")
+print_banner("🏁 PROCESS COMPLETE")
 ```
