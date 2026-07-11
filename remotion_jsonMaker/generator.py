@@ -1194,13 +1194,13 @@ class RemotionJsonMaker:
                 scene['scene_id'] = f"SCENE_{scene_idx+1}"
 
             s_id = scene['scene_id']
+            scene_initiatives = []
 
             # v4.5: TITAN NARRATIVE SECURITY
             if 'semantic_role' not in scene:
                 scene['semantic_role'] = self._auto_assign_semantic_role(str(scene))
                 scene_initiatives.append(f"NARRATIVE: Assigned automatic semantic_role '{scene['semantic_role']}'")
                 corrections_made += 1
-            scene_initiatives = []
 
             # 0. Structural Recovery (Hallucination Harvesting)
             harvest_map = {
