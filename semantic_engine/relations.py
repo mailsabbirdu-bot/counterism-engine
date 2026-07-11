@@ -9,7 +9,11 @@ class RelationExtractor:
             'due to': 'caused_by',
             'depends on': 'dependency',
             'part of': 'membership',
-            'inside': 'spatial_containment'
+            'inside': 'spatial_containment',
+            'কারণে': 'caused_by',
+            'ফলে': 'results_in',
+            'অংশ': 'membership',
+            'ভিতরে': 'spatial_containment'
         }
 
     def extract(self, text: str, entities: List[Any], actions: List[Any]) -> List[Relation]:

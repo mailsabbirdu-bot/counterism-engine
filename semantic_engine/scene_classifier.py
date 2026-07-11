@@ -3,17 +3,17 @@ from typing import Dict, Any
 class SceneClassifier:
     def __init__(self):
         self.type_keywords = {
-            'trend': ['increase', 'growth', 'rise', 'forecast', 'future', 'trend', 'evolution'],
-            'conflict': ['threat', 'danger', 'problem', 'risk', 'crisis', 'battle', 'war', 'attack'],
-            'comparison': ['vs', 'compare', 'difference', 'better', 'higher', 'scale', 'ratio'],
-            'historical': ['past', 'archive', 'ancient', 'was', 'used to', 'century', 'origin']
+            'trend': ['increase', 'growth', 'rise', 'forecast', 'future', 'trend', 'evolution', 'বৃদ্ধি', 'উন্নতি', 'ভবিষ্যৎ'],
+            'conflict': ['threat', 'danger', 'problem', 'risk', 'crisis', 'battle', 'war', 'attack', 'লড়াই', 'সংকট', 'বিপদ', 'টাইমবোম্ব'],
+            'comparison': ['vs', 'compare', 'difference', 'better', 'higher', 'scale', 'ratio', 'তুলনা', 'পার্থক্য'],
+            'historical': ['past', 'archive', 'ancient', 'was', 'used to', 'century', 'origin', 'অতীত', 'ইতিহাস', 'আগে']
         }
 
         self.emotion_keywords = {
-            'intense': ['crisis', 'emergency', 'urgent', 'disaster', 'incredible'],
-            'alert': ['warning', 'look out', 'watch', 'danger', 'unstable'],
-            'growing': ['expanding', 'more', 'rising', 'gaining'],
-            'calm': ['stable', 'peaceful', 'uniform', 'steady']
+            'intense': ['crisis', 'emergency', 'urgent', 'disaster', 'incredible', 'তীব্র', 'ভয়াবহ', 'জরুরী'],
+            'alert': ['warning', 'look out', 'watch', 'danger', 'unstable', 'সতর্ক', 'সাবধান'],
+            'growing': ['expanding', 'more', 'rising', 'gaining', 'ক্রমবর্ধমান', 'বাড়ছে'],
+            'calm': ['stable', 'peaceful', 'uniform', 'steady', 'শান্ত', 'স্থির']
         }
 
     def classify(self, text: str) -> Dict[str, str]:
