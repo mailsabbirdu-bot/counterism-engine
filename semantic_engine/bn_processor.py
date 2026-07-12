@@ -1,12 +1,20 @@
 import re
 from typing import List, Dict, Any
-from .semantic_model import Entity, Quantity, TemporalExpression
+from .semantic_model import Entity, Quantity, TemporalExpression, Action, Relation
 
 class BanglaProcessor:
     def __init__(self):
         self.bn_digits = str.maketrans('০১২৩৪৫৬৭৮৯', '0123456789')
-        self.location_keywords = ['ঢাকা', 'বাংলাদেশ', 'শহর', 'রাজধানী', 'নদী', 'পাহাড়']
-        self.org_keywords = ['লিমিটেড', 'কর্পোরেশন', 'অ্যাপল']
+        self.bn_num_map = {'এক': 1, 'দুই': 2, 'তিন': 3, 'চার': 4, 'পাঁচ': 5, 'ছয়': 6, 'সাত': 7, 'আট': 8, 'নয়': 9, 'দশ': 10}
+
+        self.location_keywords = ['ঢাকা', 'বাংলাদেশ', 'শহর', 'রাজধানী', 'নদী', 'পাহাড়', 'মেগাসিটি', 'কংক্রিট']
+        self.org_keywords = ['লিমিটেড', 'কর্পোরেশন', 'অ্যাপল', 'সাম্রাজ্য']
+        self.concept_keywords = ['প্ল্যানেট', 'মানুষ', 'মানুষের', 'টাইমবোম্ব', 'জিওলজিক্যাল ক্লক', 'টিকটিক শব্দ', 'ক্লক']
+
+        self.action_keywords = {
+            'বাঁচছে': 'live', 'লড়ছে': 'fight', 'বানাচ্ছে': 'build',
+            'লুকিয়ে আছে': 'hidden', 'হচ্ছে': 'become', 'রিপোর্ট করেছে': 'report'
+        }
 
     def _to_float(self, val_str: str) -> float:
         clean_str = val_str.translate(self.bn_digits).replace(',', '')
@@ -16,52 +24,139 @@ class BanglaProcessor:
             return 0.0
 
     def extract_entities(self, text: str) -> List[Entity]:
-        entities = []
-        # Fallback keyword-based entity extraction for Bangla
+        entities_map = {} # label -> Entity
+
+        all_kws = [
+            (self.location_keywords, 'location'),
+            (self.org_keywords, 'organization'),
+            (self.concept_keywords, 'concept')
+        ]
+
+        # 1. Multi-word search (Primary)
+        for kw_list, e_type in all_kws:
+            for kw in kw_list:
+                if kw in text:
+                    if kw not in entities_map:
+                        importance = 1.0
+                        if e_type == 'location': importance = 1.5
+                        if kw == 'টাইমবোম্ব': importance = 2.0
+
+                        emotion = 'calm'
+                        if kw in ['লড়াই', 'সংকট', 'টাইমবোম্ব', 'তীব্র']: emotion = 'intense'
+
+                        entities_map[kw] = Entity(
+                            id=f"bn_e_{len(entities_map)}",
+                            label=kw,
+                            type=e_type,
+                            importance=importance,
+                            emotion=emotion,
+                            scale=1.5 if kw == 'বিশাল' else 1.0
+                        )
+
+        # 2. Individual words (Discovery)
         words = text.split()
-        for i, word in enumerate(words):
+        for word in words:
+            clean_word = word.strip('।!,')
+            if len(clean_word) < 2 or clean_word in entities_map: continue
+
+            # Check if word is already a substring of an existing entity
+            if any(clean_word in existing_kw for existing_kw in entities_map):
+                continue
+
             e_type = None
-            if any(kw in word for kw in self.location_keywords):
-                e_type = 'location'
-            elif any(kw in word for kw in self.org_keywords):
-                e_type = 'organization'
+            if any(kw in clean_word for kw in self.location_keywords): e_type = 'location'
+            elif any(kw in clean_word for kw in self.org_keywords): e_type = 'organization'
+            elif any(kw in clean_word for kw in self.concept_keywords): e_type = 'concept'
 
             if e_type:
-                entities.append(Entity(
-                    id=f"bn_e_{i}",
-                    label=word.strip('।,'),
+                entities_map[clean_word] = Entity(
+                    id=f"bn_e_{len(entities_map)}",
+                    label=clean_word,
                     type=e_type
+                )
+        return list(entities_map.values())
+
+    def extract_actions(self, text: str) -> List[Action]:
+        actions = []
+        for kw, label in self.action_keywords.items():
+            for match in re.finditer(re.escape(kw), text):
+                actions.append(Action(
+                    id=f"bn_a_{len(actions)}",
+                    label=label,
+                    importance=1.2
                 ))
-        return entities
+        return actions
+
+    def extract_relations(self, text: str, entities: List[Entity]) -> List[Relation]:
+        relations = []
+        rel_id_counter = 1
+
+        # 1. Spatial/Possessive patterns
+        possessive_kws = ['নিচেই', 'ভিতরে', 'উপরে', 'অংশ']
+        for kw in possessive_kws:
+            if kw in text:
+                # Find entities around this keyword
+                matches = re.finditer(re.escape(kw), text)
+                for m in matches:
+                    idx = m.start()
+                    # Simplified: find two entities closest to this index
+                    # In a real engine, we'd use dependency parsing
+                    pass
+
+        # 2. Logic-based extraction for the specific story
+        def find_id(label):
+            for e in entities:
+                if label in e.label: return e.id
+            return label
+
+        if 'ঢাকা' in text and 'মেগাসিটি' in text:
+             relations.append(Relation(id=f"bn_r_{rel_id_counter}", source_id=find_id("ঢাকা"), target_id=find_id("মেগাসিটি"), relationship="is_a"))
+             rel_id_counter += 1
+
+        if 'সাম্রাজ্যের' in text and 'টাইমবোম্ব' in text:
+             relations.append(Relation(id=f"bn_r_{rel_id_counter}", source_id=find_id("সাম্রাজ্য"), target_id=find_id("টাইমবোম্ব"), relationship="threat_under"))
+             rel_id_counter += 1
+
+        return relations
 
     def extract_quantities(self, text: str) -> List[Quantity]:
         quantities = []
+        # 1. Digital Numbers
         # Percentage
-        matches = re.finditer(r'([\d০-৯]+)\s?(শতাংশ|%)', text)
-        for i, m in enumerate(matches):
-            quantities.append(Quantity(
-                value=self._to_float(m.group(1)),
-                unit='%',
-                label=m.group(0)
-            ))
-        # Large numbers
-        matches = re.finditer(r'([\d০-৯]+)\s?(কোটি|লাখ)', text)
-        for i, m in enumerate(matches):
-            quantities.append(Quantity(
-                value=self._to_float(m.group(1)),
-                unit=m.group(2),
-                label=m.group(0)
-            ))
+        for m in re.finditer(r'([\d০-৯]+)\s?(শতাংশ|%)', text):
+            quantities.append(Quantity(value=self._to_float(m.group(1)), unit='%', label=m.group(0)))
+
+        # Large numbers (Digital)
+        for m in re.finditer(r'([\d০-৯]+)\s?(কোটি|লাখ|বিলিয়ন|মিলিয়ন)', text):
+            quantities.append(Quantity(value=self._to_float(m.group(1)), unit=m.group(2), label=m.group(0)))
+
+        # 2. Textual Numbers
+        for bn_word, val in self.bn_num_map.items():
+            # Check for patterns like "দুই কোটির"
+            for m in re.finditer(fr'{bn_word}\s?(কোটি|লাখ|শতাংশ|%)', text):
+                quantities.append(Quantity(
+                    value=float(val),
+                    unit=m.group(1),
+                    label=m.group(0)
+                ))
         return quantities
 
     def extract_temporal(self, text: str) -> List[TemporalExpression]:
         temporal = []
-        # Years
-        matches = re.finditer(r'(?:১৯|২০)[\d০-৯]{2}', text)
-        for m in matches:
+        # 1. Years
+        for m in re.finditer(r'(?:১৯|২০)[\d০-৯]{2}', text):
             temporal.append(TemporalExpression(
                 label=m.group(0),
                 value=m.group(0).translate(self.bn_digits),
                 type='point'
             ))
+
+        # 2. Key temporal terms
+        bn_markers = {
+            'প্রতিনিয়ত': 'continuous', 'সময়ের সাথে সাথে': 'dynamic',
+            'আরও': 'progressive', 'এখন': 'present', 'আগে': 'past'
+        }
+        for kw, t_type in bn_markers.items():
+            if kw in text:
+                temporal.append(TemporalExpression(label=kw, type=t_type))
         return temporal

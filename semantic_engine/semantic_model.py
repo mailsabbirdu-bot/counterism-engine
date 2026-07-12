@@ -6,6 +6,9 @@ class Entity(BaseModel):
     label: str
     type: str = "concept" # hero, concept, organization, location, etc.
     importance: float = 1.0
+    emotion: Optional[str] = None
+    scale: float = 1.0
+    time: Optional[str] = None
     attributes: Dict[str, Any] = {}
 
 class Action(BaseModel):

@@ -51,8 +51,8 @@ class SemanticEngine:
             entities = bn_proc.extract_entities(text)
             quantities = bn_proc.extract_quantities(text)
             temporal = bn_proc.extract_temporal(text)
-            actions = [] # Simplified
-            relations = []
+            actions = bn_proc.extract_actions(text)
+            relations = bn_proc.extract_relations(text, entities)
         else:
             self.entity_extractor = EntityExtractor()
             entities = self.entity_extractor.extract(doc)
