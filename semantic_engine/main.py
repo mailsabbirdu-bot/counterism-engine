@@ -93,7 +93,7 @@ class SemanticEngine:
                 temporal = self.timeline_extractor.extract(scene_text)
 
                 self.action_extractor = ActionExtractor()
-                actions = self.action_extractor.extract(doc)
+                actions = self.action_extractor.extract(doc, entities=entities)
 
                 self.relation_extractor = RelationExtractor()
                 relations = self.relation_extractor.extract(scene_text, entities, actions)
