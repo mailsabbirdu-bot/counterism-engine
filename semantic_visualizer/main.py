@@ -116,17 +116,23 @@ class SemanticVisualizer:
             global_theme=global_analysis["main_structure"]["theme"]
         )
 
-def main():
-    visualizer = SemanticVisualizer()
-    plan = visualizer.process(
-        "semantic_visualizer/input/semantic_model.json",
-        "semantic_visualizer/input/knowledge_graph.json"
-    )
+import argparse
 
-    with open("semantic_visualizer/output/visualization_plan.json", "w", encoding="utf-8") as f:
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", default="semantic_visualizer/input/semantic_model.json")
+    parser.add_argument("--graph", default="semantic_visualizer/input/knowledge_graph.json")
+    parser.add_argument("--output", default="semantic_visualizer/output/visualization_plan.json")
+    args = parser.parse_args()
+
+    visualizer = SemanticVisualizer()
+    plan = visualizer.process(args.model, args.graph)
+
+    os.makedirs(os.path.dirname(args.output), exist_ok=True)
+    with open(args.output, "w", encoding="utf-8") as f:
         json.dump(plan.dict(), f, indent=2, ensure_ascii=False)
 
-    print("✅ Visualization plan generated: semantic_visualizer/output/visualization_plan.json")
+    print(f"✅ Visualization plan generated: {args.output}")
 
 if __name__ == "__main__":
     main()
