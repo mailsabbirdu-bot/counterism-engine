@@ -31,7 +31,9 @@ if not os.path.exists(PROJECT_NAME):
 print("🛠️ Installing NLP dependencies...")
 !pip install -q stanza networkx pydantic regex
 import stanza
+print("Downloading NLP models (English & Bangla)...")
 stanza.download('en', verbose=False)
+stanza.download('bn', verbose=False)
 
 # --- 4. PROCESS NARRATION ---
 print("🧠 Initializing Semantic Engine...")
