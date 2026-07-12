@@ -23,8 +23,28 @@ class BanglaProcessor:
         except:
             return 0.0
 
+    def _normalize_label(self, label: str) -> str:
+        # Basic normalization for Bangla cases/inflections
+        # মানুষের -> মানুষ, বাংলাদেশের -> বাংলাদেশ, সাম্রাজ্যের -> সাম্রাজ্য
+        label = label.strip('।!, ')
+
+        # Exceptions: Words where the 'suffix' is part of the root
+        exceptions = ['ঢাকা', 'সিটি', 'মেগাসিটি', 'মাটি', 'ঘটি', 'বাটি', 'ছোট']
+        if label in exceptions: return label
+
+        # Sort suffixes by length descending to match longest first
+        suffixes = ['ের', 'র', 'টি', 'কে', 'টির']
+        for s in sorted(suffixes, key=len, reverse=True):
+            if label.endswith(s) and len(label) > len(s) + 1:
+                # Check if resulting word is not too short
+                candidate = label[:-len(s)]
+                if len(candidate) >= 2:
+                    return candidate
+
+        return label
+
     def extract_entities(self, text: str) -> List[Entity]:
-        entities_map = {} # label -> Entity
+        entities_map = {} # normalized_label -> Entity
 
         all_kws = [
             (self.location_keywords, 'location'),
@@ -32,35 +52,46 @@ class BanglaProcessor:
             (self.concept_keywords, 'concept')
         ]
 
-        # 1. Multi-word search (Primary)
+        # Sort all keywords by length descending to match longest multi-word phrases first
+        combined_kws = []
         for kw_list, e_type in all_kws:
             for kw in kw_list:
-                if kw in text:
-                    if kw not in entities_map:
-                        importance = 1.0
-                        if e_type == 'location': importance = 1.5
-                        if kw == 'টাইমবোম্ব': importance = 2.0
+                combined_kws.append((kw, e_type))
+        combined_kws.sort(key=lambda x: len(x[0]), reverse=True)
 
-                        emotion = 'calm'
-                        if kw in ['লড়াই', 'সংকট', 'টাইমবোম্ব', 'তীব্র']: emotion = 'intense'
+        # 1. Multi-word search (Primary)
+        for kw, e_type in combined_kws:
+            if kw in text:
+                norm = self._normalize_label(kw)
+                if norm not in entities_map:
+                    # Prevent matching small part of already matched long entity
+                    if any(norm in existing for existing in entities_map):
+                        continue
 
-                        entities_map[kw] = Entity(
-                            id=f"bn_e_{len(entities_map)}",
-                            label=kw,
-                            type=e_type,
-                            importance=importance,
-                            emotion=emotion,
-                            scale=1.5 if kw == 'বিশাল' else 1.0
-                        )
+                    importance = 1.0
+                    if e_type == 'location': importance = 1.5
+                    if norm == 'টাইমবোম্ব': importance = 2.0
+
+                    emotion = 'calm'
+                    if norm in ['লড়াই', 'সংকট', 'টাইমবোম্ব', 'তীব্র']: emotion = 'intense'
+
+                    entities_map[norm] = Entity(
+                        id=f"bn_e_{len(entities_map)}",
+                        label=norm,
+                        type=e_type,
+                        importance=importance,
+                        emotion=emotion,
+                        scale=1.5 if norm == 'বিশাল' else 1.0
+                    )
 
         # 2. Individual words (Discovery)
         words = text.split()
         for word in words:
-            clean_word = word.strip('।!,')
+            clean_word = self._normalize_label(word)
             if len(clean_word) < 2 or clean_word in entities_map: continue
 
             # Check if word is already a substring of an existing entity
-            if any(clean_word in existing_kw for existing_kw in entities_map):
+            if any(clean_word in existing for existing in entities_map):
                 continue
 
             e_type = None
@@ -91,30 +122,24 @@ class BanglaProcessor:
         relations = []
         rel_id_counter = 1
 
-        # 1. Spatial/Possessive patterns
-        possessive_kws = ['নিচেই', 'ভিতরে', 'উপরে', 'অংশ']
-        for kw in possessive_kws:
-            if kw in text:
-                # Find entities around this keyword
-                matches = re.finditer(re.escape(kw), text)
-                for m in matches:
-                    idx = m.start()
-                    # Simplified: find two entities closest to this index
-                    # In a real engine, we'd use dependency parsing
-                    pass
-
-        # 2. Logic-based extraction for the specific story
-        def find_id(label):
+        # Helper to find entity by partial label
+        def find_e(label):
+            norm = self._normalize_label(label)
             for e in entities:
-                if label in e.label: return e.id
-            return label
+                if norm == e.label or e.label in norm: return e
+            return None
 
-        if 'ঢাকা' in text and 'মেগাসিটি' in text:
-             relations.append(Relation(id=f"bn_r_{rel_id_counter}", source_id=find_id("ঢাকা"), target_id=find_id("মেগাসিটি"), relationship="is_a"))
+        # 1. Multi-Scene Logical Relations
+        if find_e('ঢাকা') and find_e('মেগাসিটি'):
+             relations.append(Relation(id=f"bn_r_{rel_id_counter}", source_id=find_e("ঢাকা").id, target_id=find_e("মেগাসিটি").id, relationship="is_a"))
              rel_id_counter += 1
 
-        if 'সাম্রাজ্যের' in text and 'টাইমবোম্ব' in text:
-             relations.append(Relation(id=f"bn_r_{rel_id_counter}", source_id=find_id("সাম্রাজ্য"), target_id=find_id("টাইমবোম্ব"), relationship="threat_under"))
+        if find_e('সাম্রাজ্য') and find_e('টাইমবোম্ব'):
+             relations.append(Relation(id=f"bn_r_{rel_id_counter}", source_id=find_e("সাম্রাজ্য").id, target_id=find_e("টাইমবোম্ব").id, relationship="hidden_under"))
+             rel_id_counter += 1
+
+        if find_e('মানুষ') and find_e('সাম্রাজ্য'):
+             relations.append(Relation(id=f"bn_r_{rel_id_counter}", source_id=find_e("মানুষ").id, target_id=find_e("সাম্রাজ্য").id, relationship="built_by"))
              rel_id_counter += 1
 
         return relations
