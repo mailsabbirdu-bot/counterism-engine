@@ -35,6 +35,7 @@ class Relation(BaseModel):
     target_id: str
     relationship: str
     importance: float = 1.0
+    strength: float = 1.0
 
 class SemanticSceneModel(BaseModel):
     scene_id: str

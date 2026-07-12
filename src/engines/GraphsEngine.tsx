@@ -211,8 +211,12 @@ const LivingEdge: React.FC<{
       config: { damping: 20, stiffness: 40 }
   });
 
+  const strength = (link as any).strength ?? 1.0;
+  const importance = (link as any).importance ?? 1.0;
+  const visualPriority = strength * importance;
+
   const relColor = CATEGORY_COLORS[link.relationship || ''] || '#00F5FF';
-  const edgeAlpha = interpolate(progress * edgeReveal, [0.6, 1.0], [0, isEdgeActive ? 0.4 : 0.15], { extrapolateLeft: 'clamp' });
+  const edgeAlpha = interpolate(progress * edgeReveal, [0.6, 1.0], [0, isEdgeActive ? (0.4 * visualPriority) : 0.15], { extrapolateLeft: 'clamp' });
 
   const dx = t.x - s.x;
   const dy = t.y - s.y;
@@ -230,7 +234,7 @@ const LivingEdge: React.FC<{
         d={path}
         fill="none"
         stroke={relColor}
-        strokeWidth={isEdgeActive ? 1.5 : 0.5}
+        strokeWidth={isEdgeActive ? (1.5 * visualPriority) : 0.5}
         strokeDasharray={dist}
         strokeDashoffset={dist * (1 - progress)}
       />
