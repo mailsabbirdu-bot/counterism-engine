@@ -55,10 +55,10 @@ if os.path.exists(STORY_FILE):
     # --- 5. SAVE RESULTS TO DRIVE ---
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # Save Model
+    # Save Model (Sequential Scenes)
     model_path = f"{OUTPUT_DIR}/semantic_model.json"
     with open(model_path, 'w', encoding='utf-8') as f:
-        json.dump(result['model'], f, indent=2, ensure_ascii=False)
+        json.dump(result['scenes'], f, indent=2, ensure_ascii=False)
 
     # Save Knowledge Graph
     graph_path = f"{OUTPUT_DIR}/knowledge_graph.json"

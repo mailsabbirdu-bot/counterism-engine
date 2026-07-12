@@ -28,19 +28,23 @@ class BanglaProcessor:
         # মানুষের -> মানুষ, বাংলাদেশের -> বাংলাদেশ, সাম্রাজ্যের -> সাম্রাজ্য
         label = label.strip('।!, ')
 
-        # Exceptions: Words where the 'suffix' is part of the root
-        exceptions = ['ঢাকা', 'সিটি', 'মেগাসিটি', 'মাটি', 'ঘটি', 'বাটি', 'ছোট']
-        if label in exceptions: return label
+        # Suffix processing (with semantic safeguards)
+        suffixes = ['ের', 'র', 'টি', 'কে', 'টির', 'গুলো', 'গুলোে']
 
-        # Sort suffixes by length descending to match longest first
-        suffixes = ['ের', 'র', 'টি', 'কে', 'টির']
+        # Sort by length descending to match longest first
         for s in sorted(suffixes, key=len, reverse=True):
-            if label.endswith(s) and len(label) > len(s) + 1:
-                # Check if resulting word is not too short
-                candidate = label[:-len(s)]
-                if len(candidate) >= 2:
-                    return candidate
+            if label.endswith(s):
+                root = label[:-len(s)]
+                # Safeguard: Don't strip if it breaks a common word root
+                if root in ['ঢাকা', 'মেগাসি', 'বিশা', 'মা', 'পা']:
+                     continue
+                if len(root) >= 2:
+                    label = root
+                    break
 
+        # Specific overrides for multi-word
+        if label == 'মেগাসি': return 'মেগাসিটি'
+        if label == 'বিশা': return 'বিশাল'
         return label
 
     def extract_entities(self, text: str) -> List[Entity]:
@@ -52,25 +56,25 @@ class BanglaProcessor:
             (self.concept_keywords, 'concept')
         ]
 
-        # Sort all keywords by length descending to match longest multi-word phrases first
+        # 1. Multi-word search (Primary)
+        # We search raw text for keywords, then normalize the result
         combined_kws = []
         for kw_list, e_type in all_kws:
             for kw in kw_list:
                 combined_kws.append((kw, e_type))
         combined_kws.sort(key=lambda x: len(x[0]), reverse=True)
 
-        # 1. Multi-word search (Primary)
         for kw, e_type in combined_kws:
             if kw in text:
                 norm = self._normalize_label(kw)
                 if norm not in entities_map:
-                    # Prevent matching small part of already matched long entity
+                    # Prevent redundant substring matches
                     if any(norm in existing for existing in entities_map):
                         continue
 
                     importance = 1.0
                     if e_type == 'location': importance = 1.5
-                    if norm == 'টাইমবোম্ব': importance = 2.0
+                    if norm in ['ঢাকা', 'মেগাসিটি', 'টাইমবোম্ব']: importance = 2.0
 
                     emotion = 'calm'
                     if norm in ['লড়াই', 'সংকট', 'টাইমবোম্ব', 'তীব্র']: emotion = 'intense'
@@ -84,26 +88,26 @@ class BanglaProcessor:
                         scale=1.5 if norm == 'বিশাল' else 1.0
                     )
 
-        # 2. Individual words (Discovery)
+        # 2. Contextual word discovery (Fallback)
+        # Process every word in the text that wasn't caught by keywords
         words = text.split()
         for word in words:
-            clean_word = self._normalize_label(word)
-            if len(clean_word) < 2 or clean_word in entities_map: continue
+            clean = word.strip('।!, ')
+            if len(clean) < 2: continue
 
-            # Check if word is already a substring of an existing entity
-            if any(clean_word in existing for existing in entities_map):
-                continue
+            norm = self._normalize_label(clean)
+            if norm in entities_map: continue
 
-            e_type = None
-            if any(kw in clean_word for kw in self.location_keywords): e_type = 'location'
-            elif any(kw in clean_word for kw in self.org_keywords): e_type = 'organization'
-            elif any(kw in clean_word for kw in self.concept_keywords): e_type = 'concept'
+            # Check if this concept is meaningful
+            is_significant = any(norm in kw for kw in self.location_keywords + self.org_keywords + self.concept_keywords)
 
-            if e_type:
-                entities_map[clean_word] = Entity(
+            if is_significant:
+                if any(norm in existing for existing in entities_map): continue
+
+                entities_map[norm] = Entity(
                     id=f"bn_e_{len(entities_map)}",
-                    label=clean_word,
-                    type=e_type
+                    label=norm,
+                    type='concept'
                 )
         return list(entities_map.values())
 
