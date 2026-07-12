@@ -33,7 +33,10 @@ class SemanticVisualizer:
         previous_tone = "calm"
 
         # Process each scene
-        for scene in semantic_data["scenes"]:
+        # Handle both dictionary {"scenes": [...]} and raw list [...] formats
+        scene_list = semantic_data["scenes"] if isinstance(semantic_data, dict) and "scenes" in semantic_data else semantic_data
+
+        for scene in scene_list:
             scene_id = scene["scene_id"]
             scene_type = scene["scene_type"]
             tone = scene["emotional_tone"]
