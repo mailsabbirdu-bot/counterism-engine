@@ -1,14 +1,18 @@
 import json
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from semantic_visualizer.schemas.visualization_schema import (
-    VisualizationPlan, ScenePlan, VisualObject, VisualRelationship, Animation, CameraInstruction
+    VisualizationPlan, ScenePlan, VisualObject, VisualRelationship, MotionLanguage,
+    CameraInstruction, Composition, TransitionPlan, GeometryPath
 )
 from semantic_visualizer.core.graph_analyzer import GraphAnalyzer
 from semantic_visualizer.core.importance_engine import ImportanceEngine, EmotionEngine
 from semantic_visualizer.core.visual_mapper import RelationshipEngine, VisualMapper
 from semantic_visualizer.core.animation_selector import AnimationSelector, CameraPlanner
+from semantic_visualizer.core.composition_engine import CompositionEngine
+from semantic_visualizer.core.motion_grammar import MotionGrammarEngine
+from semantic_visualizer.core.transition_engine import TransitionEngine
 
 class SemanticVisualizer:
     def __init__(self):
@@ -19,6 +23,9 @@ class SemanticVisualizer:
         self.visual_mapper = VisualMapper()
         self.anim_selector = AnimationSelector()
         self.camera_planner = CameraPlanner()
+        self.composition_engine = CompositionEngine()
+        self.motion_grammar = MotionGrammarEngine()
+        self.transition_engine = TransitionEngine()
 
     def process(self, semantic_model_path: str, knowledge_graph_path: str) -> VisualizationPlan:
         with open(semantic_model_path, 'r') as f:
@@ -30,13 +37,12 @@ class SemanticVisualizer:
         global_analysis = self.graph_analyzer.analyze(graph_data)
 
         scenes = []
-        previous_tone = "calm"
 
-        # Process each scene
         # Handle both dictionary {"scenes": [...]} and raw list [...] formats
         scene_list = semantic_data["scenes"] if isinstance(semantic_data, dict) and "scenes" in semantic_data else semantic_data
 
-        for scene in scene_list:
+        # Process each scene
+        for i, scene in enumerate(scene_list):
             scene_id = scene["scene_id"]
             scene_type = scene["scene_type"]
             tone = scene["emotional_tone"]
@@ -44,36 +50,38 @@ class SemanticVisualizer:
             # Local node analysis for this scene
             scene_nodes = [n for n in graph_data["nodes"] if n.get("scene_id") == scene_id]
 
-            # Determine Scene Theme and Hero
-            scene_theme = f"{tone} {scene_type}"
-            if tone == "intense":
-                scene_theme = "hidden danger"
-
-            local_hero = global_analysis["main_structure"]["hero_node"]
-            if scene_nodes:
-                # Find node in this scene with highest importance or centrality
-                local_hero = max(scene_nodes, key=lambda x: x.get("importance", 1.0) + global_analysis["centrality"].get(x["id"], 0))["id"]
+            # 1. Composition Planning
+            comp = self.composition_engine.plan_composition(scene_nodes, global_analysis["main_structure"]["hero_node"])
+            local_hero = comp.hero_object
 
             visual_objects = []
             for node in scene_nodes:
+                is_hero = (node["id"] == local_hero)
                 centrality = global_analysis["centrality"].get(node["id"], 0)
                 v_weight = self.importance_engine.calculate_weight(node, centrality)
                 v_mapping = self.visual_mapper.map_entity(node["type"], node.get("emotion", "calm"))
+                layout = self.composition_engine.get_layout(node, is_hero)
+                grammar = self.motion_grammar.select_grammar(scene_type, node.get("emotion", "calm"), node["label"])
 
                 visual_objects.append(VisualObject(
                     id=node["id"],
                     label=node["label"],
                     type=v_mapping["type"],
                     style=v_mapping["style"],
-                    position="center" if node["id"] == local_hero else "top" if node.get("type") == "location" else "bottom",
+                    x=layout["x"],
+                    y=layout["y"],
+                    depth=layout["depth"],
+                    layer=layout["layer"],
+                    visual_priority=layout["visual_priority"],
                     scale=node.get("scale", 1.0),
                     pulse=node.get("emotion") == "intense",
                     importance=node.get("importance", 1.0),
                     visual_weight=v_weight,
-                    emotion=node.get("emotion", "calm")
+                    emotion=node.get("emotion", "calm"),
+                    motion_grammar=grammar
                 ))
 
-            # Filter edges for this scene
+            # 2. Relationship Mapping
             edges_key = "links" if "links" in graph_data else "edges"
             scene_edges = [e for e in graph_data[edges_key] if e.get("scene_id") == scene_id]
             visual_rels = []
@@ -83,38 +91,36 @@ class SemanticVisualizer:
                     source_id=edge["source"],
                     target_id=edge["target"],
                     type=rel_mapping["type"],
-                    visual=rel_mapping["visual"],
+                    renderer=rel_mapping["renderer"],
+                    path=rel_mapping["path"],
+                    speed=rel_mapping["speed"],
                     strength=edge.get("strength", 1.0)
                 ))
 
-            # Animations
-            anims = []
-            scene_anim = self.anim_selector.select(scene_type, tone)
-            for obj in visual_objects:
-                anims.append(Animation(
-                    target_id=obj.id,
-                    enter=scene_anim["enter"],
-                    motion=scene_anim["motion"],
-                    exit=scene_anim["exit"]
-                ))
+            # 3. Transition Planning
+            next_scene = scene_list[i+1] if i+1 < len(scene_list) else None
+            transition = self.transition_engine.plan_transition(scene, next_scene)
 
-            # Camera
-            cam = self.camera_planner.plan(scene_type, local_hero)
+            # 4. Camera Planning
+            cam_data = self.camera_planner.plan(scene_type, local_hero)
+            if tone == "intense":
+                cam_data["movement"] = "descend"
+
+            theme = f"{tone} {scene_type}" if tone != "intense" else "hidden danger"
 
             scenes.append(ScenePlan(
                 scene_id=scene_id,
-                duration=300, # Default duration
-                theme=scene_theme,
+                duration=300,
+                theme=theme,
+                composition=comp,
                 visual_objects=visual_objects,
                 relationships=visual_rels,
-                animations=anims,
-                camera=CameraInstruction(**cam)
+                transition=transition,
+                camera=CameraInstruction(**cam_data)
             ))
 
-            previous_tone = tone
-
         return VisualizationPlan(
-            project_id="megacity_documentary",
+            project_id="megacity_documentary_directorial",
             scenes=scenes,
             global_theme=global_analysis["main_structure"]["theme"]
         )
@@ -135,7 +141,7 @@ def main():
     with open(args.output, "w", encoding="utf-8") as f:
         json.dump(plan.dict(), f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Visualization plan generated: {args.output}")
+    print(f"✅ Advanced Directorial Visualization plan generated: {args.output}")
 
 if __name__ == "__main__":
     main()
