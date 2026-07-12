@@ -7,9 +7,12 @@ class BanglaProcessor:
         self.bn_digits = str.maketrans('০১২৩৪৫৬৭৮৯', '0123456789')
         self.bn_num_map = {'এক': 1, 'দুই': 2, 'তিন': 3, 'চার': 4, 'পাঁচ': 5, 'ছয়': 6, 'সাত': 7, 'আট': 8, 'নয়': 9, 'দশ': 10}
 
-        self.location_keywords = ['ঢাকা', 'বাংলাদেশ', 'শহর', 'রাজধানী', 'নদী', 'পাহাড়', 'মেগাসিটি', 'কংক্রিট']
+        self.location_keywords = ['ঢাকা', 'বাংলাদেশ', 'শহর', 'রাজধানী', 'নদী']
         self.org_keywords = ['লিমিটেড', 'কর্পোরেশন', 'অ্যাপল', 'সাম্রাজ্য']
-        self.concept_keywords = ['প্ল্যানেট', 'মানুষ', 'মানুষের', 'টাইমবোম্ব', 'জিওলজিক্যাল ক্লক', 'টিকটিক শব্দ', 'ক্লক']
+        self.concept_keywords = ['প্ল্যানেট', 'মানুষ', 'মানুষের', 'টাইমবোম্ব', 'জিওলজিক্যাল টাইমবোম্ব', 'জিওলজিক্যাল ক্লক', 'টিকটিক শব্দ', 'ক্লক']
+        self.urban_keywords = ['মেগাসিটি', 'মেগাসি']
+        self.material_keywords = ['কংক্রিট', 'কংক্রিটের']
+        self.metaphor_keywords = ['পাহাড়']
 
         self.action_keywords = {
             'বাঁচছে': 'live', 'লড়ছে': 'fight', 'বানাচ্ছে': 'build',
@@ -31,12 +34,14 @@ class BanglaProcessor:
         # Suffix processing (with semantic safeguards)
         suffixes = ['ের', 'র', 'টি', 'কে', 'টির', 'গুলো', 'গুলোে']
 
+        # Words that should NEVER have their suffix stripped
+        protected_roots = ['ঢাকা', 'মেগাসি', 'বিশা', 'মা', 'পা', 'শহ', 'নগ', 'শহর', 'নগর']
+
         # Sort by length descending to match longest first
         for s in sorted(suffixes, key=len, reverse=True):
             if label.endswith(s):
                 root = label[:-len(s)]
-                # Safeguard: Don't strip if it breaks a common word root
-                if root in ['ঢাকা', 'মেগাসি', 'বিশা', 'মা', 'পা']:
+                if root in protected_roots:
                      continue
                 if len(root) >= 2:
                     label = root
@@ -53,7 +58,10 @@ class BanglaProcessor:
         all_kws = [
             (self.location_keywords, 'location'),
             (self.org_keywords, 'organization'),
-            (self.concept_keywords, 'concept')
+            (self.concept_keywords, 'concept'),
+            (self.urban_keywords, 'urban_concept'),
+            (self.material_keywords, 'material'),
+            (self.metaphor_keywords, 'metaphor')
         ]
 
         # 1. Multi-word search (Primary)
@@ -74,10 +82,10 @@ class BanglaProcessor:
 
                     importance = 1.0
                     if e_type == 'location': importance = 1.5
-                    if norm in ['ঢাকা', 'মেগাসিটি', 'টাইমবোম্ব']: importance = 2.0
+                    if norm in ['ঢাকা', 'মেগাসিটি', 'টাইমবোম্ব', 'জিওলজিক্যাল টাইমবোম্ব']: importance = 2.0
 
                     emotion = 'calm'
-                    if norm in ['লড়াই', 'সংকট', 'টাইমবোম্ব', 'তীব্র']: emotion = 'intense'
+                    if norm in ['লড়াই', 'সংকট', 'টাইমবোম্ব', 'জিওলজিক্যাল টাইমবোম্ব', 'তীব্র']: emotion = 'intense'
 
                     entities_map[norm] = Entity(
                         id=f"bn_e_{len(entities_map)}",

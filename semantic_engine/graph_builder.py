@@ -31,7 +31,13 @@ class GraphBuilder:
                 # Deduplicate nodes by label in multi-scene graph
                 node_id = entity.label
                 if not G.has_node(node_id):
-                    G.add_node(node_id, label=entity.label, type=entity.type, importance=entity.importance)
+                    G.add_node(node_id,
+                               label=entity.label,
+                               type=entity.type,
+                               importance=entity.importance,
+                               emotion=entity.emotion,
+                               scale=entity.scale,
+                               scene_id=model.scene_id)
                 else:
                     # Update importance if higher
                     G.nodes[node_id]['importance'] = max(G.nodes[node_id]['importance'], entity.importance)
@@ -45,8 +51,20 @@ class GraphBuilder:
 
                 src = get_label(relation.source_id)
                 tgt = get_label(relation.target_id)
-                G.add_edge(src, tgt, relationship=relation.relationship)
+                if src and tgt:
+                    G.add_edge(src, tgt, relationship=relation.relationship, scene_id=model.scene_id)
         return G
 
     def to_json(self, G: nx.DiGraph) -> dict:
-        return nx.node_link_data(G)
+        data = nx.node_link_data(G)
+        # Flatten attributes for easier use in Remotion
+        for node in data['nodes']:
+            # Ensure type exists
+            if 'type' not in node:
+                node['type'] = 'concept'
+            # Add visual weight calculation
+            importance = node.get('importance', 1.0)
+            scale = node.get('scale', 1.0)
+            node['visual_weight'] = importance * scale
+
+        return data

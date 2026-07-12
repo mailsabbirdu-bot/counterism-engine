@@ -4,10 +4,15 @@ from .semantic_model import Entity
 
 class EntityExtractor:
     def __init__(self):
-        # Rule-based patterns for named entities (simple version)
-        # In a full version, we'd use POS tags (PROPN) from the parser
-        self.location_keywords = ['north', 'south', 'east', 'west', 'city', 'country', 'ocean', 'river', 'mountain', 'ঢাকা', 'বাংলাদেশ']
-        self.org_suffixes = ['inc', 'corp', 'limited', 'university', 'agency', 'foundation', 'লিমিটেড', 'কর্পোরেশন']
+        # Rule-based patterns for named entities
+        self.type_patterns = {
+            'location': ['north', 'south', 'east', 'west', 'city', 'country', 'ocean', 'river', 'mountain', 'ঢাকা', 'বাংলাদেশ', 'শহর', 'নগরী', 'গ্রাম', 'বিভাগ'],
+            'organization': ['inc', 'corp', 'limited', 'university', 'agency', 'foundation', 'লিমিটেড', 'কর্পোরেশন', 'দল', 'প্রতিষ্ঠান', 'সংস্থা'],
+            'metric': ['percent', 'million', 'billion', 'ratio', 'index', 'শতাংশ', 'কোটি', 'লক্ষ', 'হাজার', 'মিটার', 'কিমি', 'কেজি'],
+            'event': ['war', 'battle', 'anniversary', 'festival', 'summit', 'যুদ্ধ', 'উৎসব', 'আক্রমণ', 'বিস্ফোরণ', 'ঘটনা'],
+            'person': ['mr', 'ms', 'dr', 'prof', 'মন্ত্রী', 'প্রধানমন্ত্রী', 'শেখ', 'মোহাম্মদ'],
+            'object': ['tower', 'building', 'bridge', 'vehicle', 'phone', 'ঘড়ি', 'সেতু', 'দালান', 'গাড়ি']
+        }
 
     def extract(self, doc: Any) -> List[Entity]:
         entities = []
@@ -48,8 +53,7 @@ class EntityExtractor:
 
     def _determine_type(self, label: str) -> str:
         label_lower = label.lower()
-        if any(kw in label_lower for kw in self.location_keywords):
-            return "location"
-        if any(kw in label_lower for kw in self.org_suffixes):
-            return "organization"
+        for e_type, patterns in self.type_patterns.items():
+            if any(kw in label_lower for kw in patterns):
+                return e_type
         return "concept"
