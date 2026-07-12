@@ -1,18 +1,27 @@
 from typing import Dict, Any
 
+from ..schemas.visualization_schema import GeometryPath
+
 class RelationshipEngine:
     def __init__(self):
         self.rules = {
-            "is_a": {"type": "containment", "visual": "bound_box"},
-            "builds": {"type": "construction_flow", "visual": "particle_stream"},
-            "hidden_under": {"type": "reveal", "visual": "mask_reveal"},
-            "produces": {"type": "energy_transfer", "visual": "pulse_line"},
-            "forms": {"type": "aggregation", "visual": "merge_effect"},
-            "located_in": {"type": "containment", "visual": "map_overlay"}
+            "is_a": {"type": "containment", "renderer": "bound_box", "path": "straight"},
+            "builds": {"type": "construction_flow", "renderer": "particle_stream", "path": "curved"},
+            "hidden_under": {"type": "reveal", "renderer": "mask_reveal", "path": "vertical_depth"},
+            "produces": {"type": "energy_transfer", "renderer": "pulse_line", "path": "curved"},
+            "forms": {"type": "aggregation", "renderer": "merge_effect", "path": "straight"},
+            "located_in": {"type": "containment", "renderer": "map_overlay", "path": "straight"}
         }
 
-    def map_relation(self, relationship: str) -> Dict[str, str]:
-        return self.rules.get(relationship, {"type": "connector", "visual": "basic_line"})
+    def map_relation(self, relationship: str) -> Dict[str, Any]:
+        mapping = self.rules.get(relationship, {"type": "connector", "renderer": "particle_stream", "path": "curved"})
+
+        return {
+            "type": mapping["type"],
+            "renderer": mapping["renderer"],
+            "path": GeometryPath(type=mapping["path"], control_points=[]),
+            "speed": 0.8 if mapping["type"] == "construction_flow" else 1.0
+        }
 
 class VisualMapper:
     def __init__(self):
