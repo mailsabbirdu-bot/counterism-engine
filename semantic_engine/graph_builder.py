@@ -52,7 +52,11 @@ class GraphBuilder:
                 src = get_label(relation.source_id)
                 tgt = get_label(relation.target_id)
                 if src and tgt:
-                    G.add_edge(src, tgt, relationship=relation.relationship, scene_id=model.scene_id)
+                    G.add_edge(src, tgt,
+                               relationship=relation.relationship,
+                               scene_id=model.scene_id,
+                               strength=relation.strength,
+                               importance=relation.importance)
         return G
 
     def to_json(self, G: nx.DiGraph) -> dict:
