@@ -78,9 +78,9 @@ class SemanticEngine:
             if lang == 'bn':
                 bn_proc = BanglaProcessor()
                 entities = bn_proc.extract_entities(scene_text)
-                quantities = bn_proc.extract_quantities(scene_text)
+                quantities = bn_proc.extract_quantities(scene_text, entities=entities)
                 temporal = bn_proc.extract_temporal(scene_text)
-                actions = bn_proc.extract_actions(scene_text)
+                actions = bn_proc.extract_actions(scene_text, entities)
                 relations = bn_proc.extract_relations(scene_text, entities)
             else:
                 self.entity_extractor = EntityExtractor()

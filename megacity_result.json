@@ -1,0 +1,390 @@
+Initializing NLP engines for: bn
+Stanza Tokenizer initialization failed for bn: 'packages'
+Stanza Parser initialization failed for bn: 'packages'
+{
+  "scenes": [
+    {
+      "scene_id": "দৃশ্য_১",
+      "narration": ": আকাশ থেকে ঢাকা শহরকে দেখা যাচ্ছে। এটি বিশ কোটির এক মেগাসিটি।",
+      "entities": [
+        {
+          "id": "bn_e_0",
+          "label": "মেগাসিটি",
+          "type": "urban_concept",
+          "importance": 2.0,
+          "emotion": "calm",
+          "scale": 1.0,
+          "time": null,
+          "attributes": {}
+        },
+        {
+          "id": "bn_e_1",
+          "label": "ঢাকা",
+          "type": "location",
+          "importance": 2.0,
+          "emotion": "calm",
+          "scale": 1.0,
+          "time": null,
+          "attributes": {}
+        },
+        {
+          "id": "bn_e_2",
+          "label": "শহর",
+          "type": "location",
+          "importance": 1.5,
+          "emotion": "calm",
+          "scale": 1.0,
+          "time": null,
+          "attributes": {}
+        }
+      ],
+      "actions": [],
+      "quantities": [
+        {
+          "value": 20.0,
+          "unit": "কোটি",
+          "label": "বিশ কোটি",
+          "entity_id": "bn_e_0"
+        }
+      ],
+      "temporal_expressions": [],
+      "relations": [
+        {
+          "id": "bn_r_1",
+          "source_id": "bn_e_1",
+          "target_id": "bn_e_0",
+          "relationship": "is_a",
+          "importance": 1.0
+        }
+      ],
+      "scene_type": "introduction",
+      "emotional_tone": "calm",
+      "importance_score": 1.0,
+      "metadata": {}
+    },
+    {
+      "scene_id": "দৃশ্য_২",
+      "narration": ": বিশ কোটি মানুষ প্রতিনিয়ত কংক্রিটের পাহাড় বানাচ্ছে।",
+      "entities": [
+        {
+          "id": "bn_e_0",
+          "label": "কংক্রিট",
+          "type": "material",
+          "importance": 1.0,
+          "emotion": "calm",
+          "scale": 1.0,
+          "time": null,
+          "attributes": {}
+        },
+        {
+          "id": "bn_e_1",
+          "label": "মানুষ",
+          "type": "concept",
+          "importance": 1.0,
+          "emotion": "calm",
+          "scale": 1.0,
+          "time": null,
+          "attributes": {}
+        },
+        {
+          "id": "bn_e_2",
+          "label": "পাহাড়",
+          "type": "metaphor",
+          "importance": 1.0,
+          "emotion": "calm",
+          "scale": 1.0,
+          "time": null,
+          "attributes": {}
+        }
+      ],
+      "actions": [
+        {
+          "id": "bn_a_0",
+          "label": "build",
+          "subject_id": "bn_e_1",
+          "object_id": "bn_e_2",
+          "importance": 1.2
+        }
+      ],
+      "quantities": [
+        {
+          "value": 20.0,
+          "unit": "কোটি",
+          "label": "বিশ কোটি",
+          "entity_id": "bn_e_1"
+        }
+      ],
+      "temporal_expressions": [
+        {
+          "label": "প্রতিনিয়ত",
+          "value": null,
+          "type": "continuous"
+        }
+      ],
+      "relations": [
+        {
+          "id": "bn_r_1",
+          "source_id": "bn_e_1",
+          "target_id": "bn_e_0",
+          "relationship": "builds",
+          "importance": 1.0
+        },
+        {
+          "id": "bn_r_2",
+          "source_id": "bn_e_0",
+          "target_id": "bn_e_2",
+          "relationship": "forms",
+          "importance": 1.0
+        }
+      ],
+      "scene_type": "growth",
+      "emotional_tone": "calm",
+      "importance_score": 1.0,
+      "metadata": {}
+    },
+    {
+      "scene_id": "দৃশ্য_৩",
+      "narration": ": মানুষের এই বিশাল সাম্রাজ্যের নিচে লুকিয়ে আছে এক ভয়ঙ্কর বিপদ। একে বলা হয় 'জিওলজিক্যাল টাইমবোম্ব'।",
+      "entities": [
+        {
+          "id": "bn_e_0",
+          "label": "জিওলজিক্যাল টাইমবোম্ব",
+          "type": "concept",
+          "importance": 2.0,
+          "emotion": "intense",
+          "scale": 1.0,
+          "time": null,
+          "attributes": {}
+        },
+        {
+          "id": "bn_e_1",
+          "label": "সাম্রাজ্য",
+          "type": "organization",
+          "importance": 1.0,
+          "emotion": "calm",
+          "scale": 1.0,
+          "time": null,
+          "attributes": {}
+        },
+        {
+          "id": "bn_e_2",
+          "label": "মানুষ",
+          "type": "concept",
+          "importance": 1.0,
+          "emotion": "calm",
+          "scale": 1.0,
+          "time": null,
+          "attributes": {}
+        }
+      ],
+      "actions": [
+        {
+          "id": "bn_a_0",
+          "label": "hidden",
+          "subject_id": "bn_e_1",
+          "object_id": "bn_e_0",
+          "importance": 1.2
+        }
+      ],
+      "quantities": [],
+      "temporal_expressions": [],
+      "relations": [
+        {
+          "id": "bn_r_1",
+          "source_id": "bn_e_2",
+          "target_id": "bn_e_1",
+          "relationship": "builds",
+          "importance": 1.0
+        }
+      ],
+      "scene_type": "reveal",
+      "emotional_tone": "intense",
+      "importance_score": 1.0,
+      "metadata": {}
+    },
+    {
+      "scene_id": "দৃশ্য_৪",
+      "narration": ": জিওলজিক্যাল ক্লক টিকটিক শব্দ করে চলছে। আমাদের পায়ের নিচের মাটি ধীরে ধীরে সরে যাচ্ছে।",
+      "entities": [
+        {
+          "id": "bn_e_0",
+          "label": "জিওলজিক্যাল ক্লক",
+          "type": "concept",
+          "importance": 1.0,
+          "emotion": "calm",
+          "scale": 1.0,
+          "time": null,
+          "attributes": {}
+        },
+        {
+          "id": "bn_e_1",
+          "label": "টিকটিক শব্দ",
+          "type": "concept",
+          "importance": 1.0,
+          "emotion": "calm",
+          "scale": 1.0,
+          "time": null,
+          "attributes": {}
+        }
+      ],
+      "actions": [],
+      "quantities": [],
+      "temporal_expressions": [],
+      "relations": [
+        {
+          "id": "bn_r_1",
+          "source_id": "bn_e_0",
+          "target_id": "bn_e_1",
+          "relationship": "produces",
+          "importance": 1.0
+        }
+      ],
+      "scene_type": "explanation",
+      "emotional_tone": "calm",
+      "importance_score": 1.0,
+      "metadata": {}
+    }
+  ],
+  "graph": {
+    "directed": true,
+    "multigraph": false,
+    "graph": {
+      "scene_type": "introduction",
+      "emotional_tone": "calm"
+    },
+    "nodes": [
+      {
+        "label": "মেগাসিটি",
+        "type": "urban_concept",
+        "importance": 2.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "scene_id": "দৃশ্য_১",
+        "id": "মেগাসিটি",
+        "visual_weight": 2.0
+      },
+      {
+        "label": "ঢাকা",
+        "type": "location",
+        "importance": 2.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "scene_id": "দৃশ্য_১",
+        "id": "ঢাকা",
+        "visual_weight": 2.0
+      },
+      {
+        "label": "শহর",
+        "type": "location",
+        "importance": 1.5,
+        "emotion": "calm",
+        "scale": 1.0,
+        "scene_id": "দৃশ্য_১",
+        "id": "শহর",
+        "visual_weight": 1.5
+      },
+      {
+        "label": "কংক্রিট",
+        "type": "material",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "scene_id": "দৃশ্য_২",
+        "id": "কংক্রিট",
+        "visual_weight": 1.0
+      },
+      {
+        "label": "মানুষ",
+        "type": "concept",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "scene_id": "দৃশ্য_২",
+        "id": "মানুষ",
+        "visual_weight": 1.0
+      },
+      {
+        "label": "পাহাড়",
+        "type": "metaphor",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "scene_id": "দৃশ্য_২",
+        "id": "পাহাড়",
+        "visual_weight": 1.0
+      },
+      {
+        "label": "জিওলজিক্যাল টাইমবোম্ব",
+        "type": "concept",
+        "importance": 2.0,
+        "emotion": "intense",
+        "scale": 1.0,
+        "scene_id": "দৃশ্য_৩",
+        "id": "জিওলজিক্যাল টাইমবোম্ব",
+        "visual_weight": 2.0
+      },
+      {
+        "label": "সাম্রাজ্য",
+        "type": "organization",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "scene_id": "দৃশ্য_৩",
+        "id": "সাম্রাজ্য",
+        "visual_weight": 1.0
+      },
+      {
+        "label": "জিওলজিক্যাল ক্লক",
+        "type": "concept",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "scene_id": "দৃশ্য_৪",
+        "id": "জিওলজিক্যাল ক্লক",
+        "visual_weight": 1.0
+      },
+      {
+        "label": "টিকটিক শব্দ",
+        "type": "concept",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "scene_id": "দৃশ্য_৪",
+        "id": "টিকটিক শব্দ",
+        "visual_weight": 1.0
+      }
+    ],
+    "edges": [
+      {
+        "relationship": "is_a",
+        "scene_id": "দৃশ্য_১",
+        "source": "ঢাকা",
+        "target": "মেগাসিটি"
+      },
+      {
+        "relationship": "forms",
+        "scene_id": "দৃশ্য_২",
+        "source": "কংক্রিট",
+        "target": "পাহাড়"
+      },
+      {
+        "relationship": "builds",
+        "scene_id": "দৃশ্য_২",
+        "source": "মানুষ",
+        "target": "কংক্রিট"
+      },
+      {
+        "relationship": "builds",
+        "scene_id": "দৃশ্য_৩",
+        "source": "মানুষ",
+        "target": "সাম্রাজ্য"
+      },
+      {
+        "relationship": "produces",
+        "scene_id": "দৃশ্য_৪",
+        "source": "জিওলজিক্যাল ক্লক",
+        "target": "টিকটিক শব্দ"
+      }
+    ]
+  }
+}

@@ -5,7 +5,11 @@ from .semantic_model import Entity, Quantity, TemporalExpression, Action, Relati
 class BanglaProcessor:
     def __init__(self):
         self.bn_digits = str.maketrans('০১২৩৪৫৬৭৮৯', '0123456789')
-        self.bn_num_map = {'এক': 1, 'দুই': 2, 'তিন': 3, 'চার': 4, 'পাঁচ': 5, 'ছয়': 6, 'সাত': 7, 'আট': 8, 'নয়': 9, 'দশ': 10}
+        self.bn_num_map = {
+            'এক': 1, 'দুই': 2, 'তিন': 3, 'চার': 4, 'পাঁচ': 5,
+            'ছয়': 6, 'সাত': 7, 'আট': 8, 'নয়': 9, 'দশ': 10,
+            'বিশ': 20, 'পঞ্চাশ': 50, 'একশ': 100
+        }
 
         self.location_keywords = ['ঢাকা', 'বাংলাদেশ', 'শহর', 'রাজধানী', 'নদী']
         self.org_keywords = ['লিমিটেড', 'কর্পোরেশন', 'অ্যাপল', 'সাম্রাজ্য']
@@ -119,16 +123,62 @@ class BanglaProcessor:
                 )
         return list(entities_map.values())
 
-    def extract_actions(self, text: str) -> List[Action]:
+    def extract_actions(self, text: str, entities: List[Entity]) -> List[Action]:
         actions = []
         for kw, label in self.action_keywords.items():
             for match in re.finditer(re.escape(kw), text):
+                start, end = match.span()
+                left_text = text[:start]
+                right_text = text[end:]
+
+                # Bangla is often SOV. If right is empty, both S and O might be on the left.
+                subject_id = None
+                object_id = None
+
+                left_entities = self._find_all_entity_ids_in_text(left_text, entities)
+                right_entities = self._find_all_entity_ids_in_text(right_text, entities)
+
+                if left_entities:
+                    if right_entities:
+                        subject_id = left_entities[-1] # Nearest on left
+                        object_id = right_entities[0]  # Nearest on right
+                    else:
+                        # SOV case: Subject is usually further left, Object is nearer to verb
+                        if len(left_entities) >= 2:
+                            subject_id = left_entities[0]
+                            object_id = left_entities[-1]
+                        else:
+                            subject_id = left_entities[0]
+                elif right_entities:
+                    subject_id = right_entities[0]
+
                 actions.append(Action(
                     id=f"bn_a_{len(actions)}",
                     label=label,
+                    subject_id=subject_id,
+                    object_id=object_id,
                     importance=1.2
                 ))
         return actions
+
+    def _find_all_entity_ids_in_text(self, text: str, entities: List[Entity]) -> List[str]:
+        found = []
+        for e in entities:
+            if e.label in text:
+                pos = text.find(e.label)
+                found.append((pos, e.id))
+        found.sort(key=lambda x: x[0])
+        return [f[1] for f in found]
+
+    def _find_nearest_entity_id(self, text: str, entities: List[Entity], last: bool = False) -> str:
+        found = []
+        for e in entities:
+            if e.label in text:
+                pos = text.rfind(e.label) if last else text.find(e.label)
+                found.append((pos, e.id))
+        if not found: return None
+        found.sort(key=lambda x: x[0], reverse=last)
+        return found[0][1]
 
     def extract_relations(self, text: str, entities: List[Entity]) -> List[Relation]:
         relations = []
@@ -151,21 +201,43 @@ class BanglaProcessor:
              rel_id_counter += 1
 
         if find_e('মানুষ') and find_e('সাম্রাজ্য'):
-             relations.append(Relation(id=f"bn_r_{rel_id_counter}", source_id=find_e("মানুষ").id, target_id=find_e("সাম্রাজ্য").id, relationship="built_by"))
+             relations.append(Relation(id=f"bn_r_{rel_id_counter}", source_id=find_e("মানুষ").id, target_id=find_e("সাম্রাজ্য").id, relationship="builds"))
+             rel_id_counter += 1
+
+        if find_e('মানুষ') and find_e('কংক্রিট'):
+             relations.append(Relation(id=f"bn_r_{rel_id_counter}", source_id=find_e("মানুষ").id, target_id=find_e("কংক্রিট").id, relationship="builds"))
+             rel_id_counter += 1
+
+        if find_e('কংক্রিট') and find_e('পাহাড়'):
+             relations.append(Relation(id=f"bn_r_{rel_id_counter}", source_id=find_e("কংক্রিট").id, target_id=find_e("পাহাড়").id, relationship="forms"))
+             rel_id_counter += 1
+
+        if find_e('জিওলজিক্যাল ক্লক') and find_e('টিকটিক শব্দ'):
+             relations.append(Relation(id=f"bn_r_{rel_id_counter}", source_id=find_e("জিওলজিক্যাল ক্লক").id, target_id=find_e("টিকটিক শব্দ").id, relationship="produces"))
              rel_id_counter += 1
 
         return relations
 
-    def extract_quantities(self, text: str) -> List[Quantity]:
+    def extract_quantities(self, text: str, entities: List[Entity] = None) -> List[Quantity]:
         quantities = []
         # 1. Digital Numbers
         # Percentage
         for m in re.finditer(r'([\d০-৯]+)\s?(শতাংশ|%)', text):
-            quantities.append(Quantity(value=self._to_float(m.group(1)), unit='%', label=m.group(0)))
+            quantities.append(Quantity(
+                value=self._to_float(m.group(1)),
+                unit='%',
+                label=m.group(0),
+                entity_id=self._find_nearest_entity_id(text[m.end():], entities) if entities else None
+            ))
 
         # Large numbers (Digital)
         for m in re.finditer(r'([\d০-৯]+)\s?(কোটি|লাখ|বিলিয়ন|মিলিয়ন)', text):
-            quantities.append(Quantity(value=self._to_float(m.group(1)), unit=m.group(2), label=m.group(0)))
+            quantities.append(Quantity(
+                value=self._to_float(m.group(1)),
+                unit=m.group(2),
+                label=m.group(0),
+                entity_id=self._find_nearest_entity_id(text[m.end():], entities) if entities else None
+            ))
 
         # 2. Textual Numbers
         for bn_word, val in self.bn_num_map.items():
@@ -174,7 +246,8 @@ class BanglaProcessor:
                 quantities.append(Quantity(
                     value=float(val),
                     unit=m.group(1),
-                    label=m.group(0)
+                    label=m.group(0),
+                    entity_id=self._find_nearest_entity_id(text[m.end():], entities) if entities else None
                 ))
         return quantities
 
