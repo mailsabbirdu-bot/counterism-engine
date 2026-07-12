@@ -33,7 +33,11 @@ print("🛠️ Installing NLP dependencies...")
 import stanza
 print("Downloading NLP models (English & Bangla)...")
 stanza.download('en', verbose=False)
-stanza.download('bn', verbose=False)
+try:
+    stanza.download('bn', verbose=False)
+except Exception as e:
+    print(f"⚠️ Stanza Bangla model download skipped: {e}")
+    print("The engine will use the built-in BanglaProcessor fallback.")
 
 # --- 4. PROCESS NARRATION ---
 print("🧠 Initializing Semantic Engine...")
