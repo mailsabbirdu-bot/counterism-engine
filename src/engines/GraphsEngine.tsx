@@ -156,9 +156,6 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
             />
           ))}
 
-          {/* Active Node Position Tracking (for CameraEngine) */}
-          <ActiveNodeTracker nodes={processedNodes} globalFrame={frame} centerX={centerX} centerY={centerY} />
-
           {/* Floating Conceptual Discs */}
           {processedNodes.map((node, i) => (
             <CinematicNode
@@ -176,6 +173,8 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
           ))}
         </g>
       </svg>
+      {/* Active Node Position Tracking (for CameraEngine) - Moved outside SVG for DOM validity */}
+      <ActiveNodeTracker nodes={processedNodes} globalFrame={frame} centerX={centerX} centerY={centerY} />
     </AbsoluteFill>
   );
 };
