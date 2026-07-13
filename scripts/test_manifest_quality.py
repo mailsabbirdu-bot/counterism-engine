@@ -49,7 +49,7 @@ def test_manifest_quality(filepath, public_dir=None):
         'text', 'ui_panel', 'shape', 'chart', 'indicator', 'data_indicator',
         'graph', 'video', 'image', 'shadcn_chart', 'shadcn_indicator', 'svg', 'connector',
         'hub_network', 'flow_diagram', 'process', 'kpi_card', 'timeline', 'compositions', 'groups',
-        'ambient_graphic', 'callout', 'label'
+        'ambient_graphic', 'callout', 'label', 'crve'
     ]
 
     ENGINE_VARIANTS = {
