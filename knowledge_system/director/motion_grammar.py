@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-from ..schemas.visualization_schema import MotionLanguage
+from .visualization_schema import MotionLanguage
 
 class MotionGrammarEngine:
     def __init__(self):

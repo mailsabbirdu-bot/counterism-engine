@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any
-from ..schemas.visualization_schema import TransitionPlan
+from .visualization_schema import TransitionPlan
 
 class TransitionEngine:
     def __init__(self):

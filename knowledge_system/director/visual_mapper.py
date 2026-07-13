@@ -1,6 +1,6 @@
 from typing import Dict, Any
 
-from ..schemas.visualization_schema import GeometryPath
+from .visualization_schema import GeometryPath
 
 class RelationshipEngine:
     def __init__(self):
