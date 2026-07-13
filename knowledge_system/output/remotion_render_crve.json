@@ -1,0 +1,55 @@
+{
+  "project_id": "knowledge_system_unified",
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "scenes": [
+    {
+      "scene_id": "scene_1",
+      "duration_in_frames": 300,
+      "background": {
+        "background_type": "procedural",
+        "procedural_config": {
+          "variant": "neon_grid"
+        }
+      },
+      "overlays": [
+        {
+          "id": "crve_scene_1",
+          "type": "crve",
+          "start": 0,
+          "duration": 300,
+          "position": {
+            "x": 960,
+            "y": 540
+          },
+          "nodes": [
+            {
+              "id": "Dhaka",
+              "label": "Dhaka",
+              "type": "abstract_core",
+              "importance": 1.0,
+              "scale": 1.0,
+              "depth": 0.0
+            }
+          ],
+          "links": []
+        }
+      ],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "crve_scene_1",
+            "startFrame": 0,
+            "style": "cinematic_drift",
+            "zoom": 1.0,
+            "duration": 150
+          }
+        ]
+      }
+    }
+  ]
+}

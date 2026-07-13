@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from ..schemas.visualization_schema import Composition, VisualObject
+from .visualization_schema import Composition, VisualObject
 
 class CompositionEngine:
     def __init__(self):

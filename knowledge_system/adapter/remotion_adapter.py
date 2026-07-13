@@ -56,6 +56,7 @@ class RemotionAdapter:
                     "shots": [
                         {
                             "targetId": crve_overlay["id"],
+                            "startFrame": 0,
                             "style": p_scene["camera"]["movement"],
                             "zoom": p_scene["camera"]["zoom"],
                             "duration": p_scene["camera"]["duration"]

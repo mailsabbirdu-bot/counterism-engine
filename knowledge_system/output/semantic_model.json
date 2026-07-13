@@ -1,0 +1,26 @@
+[
+  {
+    "scene_id": "scene_1",
+    "narration": "Dhaka city.",
+    "entities": [
+      {
+        "id": "e_1",
+        "label": "Dhaka",
+        "type": "concept",
+        "importance": 1.0,
+        "emotion": null,
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      }
+    ],
+    "actions": [],
+    "quantities": [],
+    "temporal_expressions": [],
+    "relations": [],
+    "scene_type": "trend",
+    "emotional_tone": "calm",
+    "importance_score": 1.0,
+    "metadata": {}
+  }
+]
