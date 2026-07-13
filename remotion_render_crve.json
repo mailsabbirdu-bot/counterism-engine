@@ -1,0 +1,273 @@
+{
+  "project_id": "megacity_documentary_directorial",
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "scenes": [
+    {
+      "scene_id": "দৃশ্য_১",
+      "duration_in_frames": 300,
+      "background": {
+        "background_type": "procedural",
+        "procedural_config": {
+          "variant": "neon_grid"
+        }
+      },
+      "overlays": [
+        {
+          "id": "crve_দৃশ্য_১",
+          "type": "crve",
+          "start": 0,
+          "duration": 300,
+          "position": {
+            "x": 960,
+            "y": 540
+          },
+          "nodes": [
+            {
+              "id": "মেগাসিটি",
+              "label": "মেগাসিটি",
+              "type": "structures",
+              "importance": 2.0,
+              "scale": 1.0,
+              "depth": 0.0
+            },
+            {
+              "id": "ঢাকা",
+              "label": "ঢাকা",
+              "type": "map_marker",
+              "importance": 2.0,
+              "scale": 1.0,
+              "depth": -500.0
+            },
+            {
+              "id": "শহর",
+              "label": "শহর",
+              "type": "map_marker",
+              "importance": 1.5,
+              "scale": 1.0,
+              "depth": -500.0
+            }
+          ],
+          "links": [
+            {
+              "id": "ঢাকা_মেগাসিটি",
+              "source": "ঢাকা",
+              "target": "মেগাসিটি",
+              "relationship": "containment",
+              "strength": 1.0
+            }
+          ]
+        }
+      ],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "crve_দৃশ্য_১",
+            "style": "zoom_out",
+            "zoom": 1.0,
+            "duration": 150
+          }
+        ]
+      }
+    },
+    {
+      "scene_id": "দৃশ্য_২",
+      "duration_in_frames": 300,
+      "background": {
+        "background_type": "procedural",
+        "procedural_config": {
+          "variant": "neon_grid"
+        }
+      },
+      "overlays": [
+        {
+          "id": "crve_দৃশ্য_২",
+          "type": "crve",
+          "start": 0,
+          "duration": 300,
+          "position": {
+            "x": 960,
+            "y": 540
+          },
+          "nodes": [
+            {
+              "id": "কংক্রিট",
+              "label": "কংক্রিট",
+              "type": "particles",
+              "importance": 1.0,
+              "scale": 1.0,
+              "depth": 0.0
+            },
+            {
+              "id": "মানুষ",
+              "label": "মানুষ",
+              "type": "abstract_core",
+              "importance": 1.0,
+              "scale": 1.0,
+              "depth": 0.0
+            },
+            {
+              "id": "পাহাড়",
+              "label": "পাহাড়",
+              "type": "transformation_object",
+              "importance": 1.0,
+              "scale": 1.0,
+              "depth": 0.0
+            }
+          ],
+          "links": [
+            {
+              "id": "কংক্রিট_পাহাড়",
+              "source": "কংক্রিট",
+              "target": "পাহাড়",
+              "relationship": "aggregation",
+              "strength": 1.0
+            },
+            {
+              "id": "মানুষ_কংক্রিট",
+              "source": "মানুষ",
+              "target": "কংক্রিট",
+              "relationship": "construction_flow",
+              "strength": 1.0
+            }
+          ]
+        }
+      ],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "crve_দৃশ্য_২",
+            "style": "pan_up",
+            "zoom": 1.0,
+            "duration": 150
+          }
+        ]
+      }
+    },
+    {
+      "scene_id": "দৃশ্য_৩",
+      "duration_in_frames": 300,
+      "background": {
+        "background_type": "procedural",
+        "procedural_config": {
+          "variant": "neon_grid"
+        }
+      },
+      "overlays": [
+        {
+          "id": "crve_দৃশ্য_৩",
+          "type": "crve",
+          "start": 0,
+          "duration": 300,
+          "position": {
+            "x": 960,
+            "y": 540
+          },
+          "nodes": [
+            {
+              "id": "জিওলজিক্যাল টাইমবোম্ব",
+              "label": "জিওলজিক্যাল টাইমবোম্ব",
+              "type": "danger_core",
+              "importance": 2.0,
+              "scale": 1.0,
+              "depth": -200.0
+            },
+            {
+              "id": "সাম্রাজ্য",
+              "label": "সাম্রাজ্য",
+              "type": "structures",
+              "importance": 1.0,
+              "scale": 1.0,
+              "depth": 0.0
+            }
+          ],
+          "links": [
+            {
+              "id": "মানুষ_সাম্রাজ্য",
+              "source": "মানুষ",
+              "target": "সাম্রাজ্য",
+              "relationship": "construction_flow",
+              "strength": 1.0
+            }
+          ]
+        }
+      ],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "crve_দৃশ্য_৩",
+            "style": "descend",
+            "zoom": 1.5,
+            "duration": 150
+          }
+        ]
+      }
+    },
+    {
+      "scene_id": "দৃশ্য_৪",
+      "duration_in_frames": 300,
+      "background": {
+        "background_type": "procedural",
+        "procedural_config": {
+          "variant": "neon_grid"
+        }
+      },
+      "overlays": [
+        {
+          "id": "crve_দৃশ্য_৪",
+          "type": "crve",
+          "start": 0,
+          "duration": 300,
+          "position": {
+            "x": 960,
+            "y": 540
+          },
+          "nodes": [
+            {
+              "id": "জিওলজিক্যাল ক্লক",
+              "label": "জিওলজিক্যাল ক্লক",
+              "type": "danger_core",
+              "importance": 1.0,
+              "scale": 1.0,
+              "depth": 0.0
+            },
+            {
+              "id": "টিকটিক শব্দ",
+              "label": "টিকটিক শব্দ",
+              "type": "danger_core",
+              "importance": 1.0,
+              "scale": 1.0,
+              "depth": 0.0
+            }
+          ],
+          "links": [
+            {
+              "id": "জিওলজিক্যাল ক্লক_টিকটিক শব্দ",
+              "source": "জিওলজিক্যাল ক্লক",
+              "target": "টিকটিক শব্দ",
+              "relationship": "energy_transfer",
+              "strength": 1.0
+            }
+          ]
+        }
+      ],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "crve_দৃশ্য_৪",
+            "style": "focus_shift",
+            "zoom": 1.0,
+            "duration": 150
+          }
+        ]
+      }
+    }
+  ]
+}
