@@ -9,6 +9,7 @@ import { GraphsEngine } from './engines/GraphsEngine';
 import { MediaEngine } from './engines/MediaEngine';
 import { DataIndicatorEngine } from './engines/DataIndicatorEngine';
 import { ShadcnEngine } from './engines/ShadcnEngine';
+import { CRVEEngine } from './CRVE/engines/RelationshipEngine';
 import { AnimatedSvg } from '../svg/components/AnimatedSvg';
 import { Connector } from './components/ConnectorEngine/Connector';
 import { resolvePosition } from './services/SmartPositionResolver';
@@ -53,6 +54,17 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ overlays, analys
               return <DataIndicatorEngine overlay={positionalOverlay} />;
             case 'graph':
               return <GraphsEngine overlay={positionalOverlay} />;
+            case 'crve':
+              return (
+                <CRVEEngine
+                  nodes={overlay.nodes || []}
+                  links={overlay.links || []}
+                  start={overlay.start || 0}
+                  duration={overlay.duration || 300}
+                  position={positionalOverlay.position}
+                  font={overlay.font}
+                />
+              );
             case 'video':
             case 'image':
               return <MediaEngine overlay={positionalOverlay} />;
