@@ -87,10 +87,32 @@ export const RemotionRoot: React.FC = () => {
     <>
       {template.scenes.map((scene: any) => {
         const processedScene = processCameraAutomation(scene);
+
+        // Remotion Composition ID validation: a-z, A-Z, 0-9, CJK characters and -
+        // If scene_id contains non-supported characters (like Bangla), we must slugify it.
+        const compId = scene.scene_id
+            .replace(/_/g, '-')
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-zA-Z0-9-]/g, (char: string) => {
+                // Keep CJK characters as per Remotion rules
+                const code = char.charCodeAt(0);
+                if (
+                    (code >= 0x4e00 && code <= 0x9fff) || // CJK Unified Ideographs
+                    (code >= 0x3400 && code <= 0x4dbf) || // CJK Unified Ideographs Extension A
+                    (code >= 0x3040 && code <= 0x309f) || // Hiragana
+                    (code >= 0x30a0 && code <= 0x30ff) || // Katakana
+                    (code >= 0xac00 && code <= 0xd7af)    // Hangul Syllables
+                ) return char;
+                return '-';
+            })
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '');
+
         return (
           <Composition
             key={scene.scene_id}
-            id={scene.scene_id.replace(/_/g, '-')}
+            id={compId || `scene-${scene.scene_id}`}
             component={Scene}
             durationInFrames={scene.duration_in_frames}
             fps={template.global_settings?.fps || 30}

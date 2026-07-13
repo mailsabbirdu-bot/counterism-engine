@@ -66,7 +66,7 @@ class SemanticEngine:
         # 3. Process Each Scene
         all_scene_models = []
 
-        for scene_marker, scene_text in scene_segments:
+        for idx, (scene_marker, scene_text) in enumerate(scene_segments):
             # A. Language Detection
             lang = self._detect_lang(scene_text)
             engines = self._get_lang_engines(lang)
@@ -102,8 +102,11 @@ class SemanticEngine:
             classification = self.scene_classifier.classify(scene_text)
 
             # D. Build Scene Model
+            # Canonicalize Scene ID to valid Remotion identifier (ASCII slug)
+            s_id = f"scene_{idx + 1}"
+
             model = SemanticSceneModel(
-                scene_id=scene_marker.replace(" ", "_"),
+                scene_id=s_id,
                 narration=scene_text,
                 entities=entities,
                 actions=actions,
