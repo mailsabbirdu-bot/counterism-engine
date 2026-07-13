@@ -2,52 +2,128 @@
   "project_id": "knowledge_system_unified",
   "scenes": [
     {
-      "scene_id": "scene_1",
+      "scene_id": "SCENE_1",
       "duration": 300,
       "theme": "calm trend",
       "composition": {
-        "hero_object": "Dhaka",
+        "hero_object": "none",
         "support_objects": [],
         "attention_curve": [
           0.2,
-          0.6,
+          0.5,
           1.0
         ],
         "layers": [
-          "surface"
+          "background",
+          "surface",
+          "foreground"
         ]
       },
-      "visual_objects": [
-        {
-          "id": "Dhaka",
-          "label": "Dhaka",
-          "type": "abstract_core",
-          "style": "standard",
-          "x": "center",
-          "y": "center",
-          "depth": 0.0,
-          "layer": "surface",
-          "scale": 1.0,
-          "pulse": false,
-          "importance": 1.0,
-          "visual_weight": 2.0,
-          "visual_priority": 90,
-          "emotion": "calm",
-          "motion_grammar": {
-            "meaning": "stable_flow",
-            "grammar": [
-              "slow_drift",
-              "fade_reveal"
-            ],
-            "parameters": {}
-          }
-        }
-      ],
+      "visual_objects": [],
+      "relationships": [],
+      "transition": {
+        "type": "dissolve_to_detail",
+        "from_node": "SCENE_1",
+        "to_node": "SCENE_2",
+        "meaning": "context_shift"
+      },
+      "camera": {
+        "movement": "cinematic_drift",
+        "focus": "none",
+        "zoom": 1.0,
+        "duration": 150
+      }
+    },
+    {
+      "scene_id": "SCENE_2",
+      "duration": 300,
+      "theme": "calm trend",
+      "composition": {
+        "hero_object": "none",
+        "support_objects": [],
+        "attention_curve": [
+          0.2,
+          0.5,
+          1.0
+        ],
+        "layers": [
+          "background",
+          "surface",
+          "foreground"
+        ]
+      },
+      "visual_objects": [],
+      "relationships": [],
+      "transition": {
+        "type": "dissolve_to_detail",
+        "from_node": "SCENE_2",
+        "to_node": "SCENE_3",
+        "meaning": "context_shift"
+      },
+      "camera": {
+        "movement": "cinematic_drift",
+        "focus": "none",
+        "zoom": 1.0,
+        "duration": 150
+      }
+    },
+    {
+      "scene_id": "SCENE_3",
+      "duration": 300,
+      "theme": "calm trend",
+      "composition": {
+        "hero_object": "none",
+        "support_objects": [],
+        "attention_curve": [
+          0.2,
+          0.5,
+          1.0
+        ],
+        "layers": [
+          "background",
+          "surface",
+          "foreground"
+        ]
+      },
+      "visual_objects": [],
+      "relationships": [],
+      "transition": {
+        "type": "dissolve_to_detail",
+        "from_node": "SCENE_3",
+        "to_node": "SCENE_4",
+        "meaning": "context_shift"
+      },
+      "camera": {
+        "movement": "cinematic_drift",
+        "focus": "none",
+        "zoom": 1.0,
+        "duration": 150
+      }
+    },
+    {
+      "scene_id": "SCENE_4",
+      "duration": 300,
+      "theme": "calm trend",
+      "composition": {
+        "hero_object": "none",
+        "support_objects": [],
+        "attention_curve": [
+          0.2,
+          0.5,
+          1.0
+        ],
+        "layers": [
+          "background",
+          "surface",
+          "foreground"
+        ]
+      },
+      "visual_objects": [],
       "relationships": [],
       "transition": null,
       "camera": {
         "movement": "cinematic_drift",
-        "focus": "Dhaka",
+        "focus": "none",
         "zoom": 1.0,
         "duration": 150
       }

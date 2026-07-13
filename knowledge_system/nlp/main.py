@@ -38,7 +38,7 @@ class SemanticEngine:
 
     def _split_scenes(self, text: str) -> List[tuple]:
         # Regex for markers like 'দৃশ্য ১', 'Scene 1', 'দৃশ্য 1'
-        pattern = r'(?:দৃশ্য\s*[০-৯\d]+|Scene\s*\d+)'
+        pattern = r'(?:दृश्य\s*[০-৯\d]+|Scene\s*\d+|দৃশ্য\s*[০-৯\d]+:?|Scene\s*\d+:?)'
         markers = re.findall(pattern, text)
         segments = re.split(pattern, text)
 
@@ -103,7 +103,7 @@ class SemanticEngine:
 
             # D. Build Scene Model
             # Canonicalize Scene ID to valid Remotion identifier (ASCII slug)
-            s_id = f"scene_{idx + 1}"
+            s_id = f"SCENE_{idx + 1}"
 
             model = SemanticSceneModel(
                 scene_id=s_id,

@@ -28,7 +28,7 @@ export const getArrowData = (s: Point, t: Point) => {
     straights: false,
   });
 
-  const [sx, sy, cx, cy, ex, ey, ae, as, ec] = arrow;
+  const [sx, sy, cx, cy, ex, ey, ae, as, ec] = arrow as any;
 
   return {
     path: `M ${sx} ${sy} Q ${cx} ${cy} ${ex} ${ey}`,

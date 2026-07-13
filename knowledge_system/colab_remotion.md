@@ -62,23 +62,20 @@ print_banner("🎬 STARTING RENDERING PIPELINE")
 
 # --- 6. SAVE OUTPUT TO DRIVE ---
 print_banner("💾 SAVING FINAL VIDEO TO DRIVE")
-LOCAL_OUTPUT = "renders/overlays/remotion/SCENE_1.mp4" # Default Remotion output path
-FINAL_OUTPUT_NAME = "cinematic_knowledge_demo.mp4"
+# Standard naming for CRVE renders in Colab
+import glob
+renders = glob.glob("renders/**/*.mp4", recursive=True)
 
-if os.path.exists(LOCAL_OUTPUT):
-    dest_path = f"{OUTPUT_DIR}/{FINAL_OUTPUT_NAME}"
-    shutil.copy(LOCAL_OUTPUT, dest_path)
-    print(f"\n✨ SUCCESS! Video rendered and saved.")
-    print(f"📍 Final Video: {dest_path}")
+if renders:
+    print(f"📦 Found {len(renders)} render artifacts. Copying to Drive...")
+    for i, r_path in enumerate(sorted(renders)):
+        filename = os.path.basename(r_path)
+        dest = f"{OUTPUT_DIR}/final_{filename}"
+        shutil.copy(r_path, dest)
+        print(f"   ✅ Saved: {dest}")
+    print(f"\n✨ SUCCESS! All renders saved to: {OUTPUT_DIR}")
 else:
-    # Try to find any mp4 in the local render directory
-    import glob
-    renders = glob.glob("renders/**/*.mp4", recursive=True)
-    if renders:
-        shutil.copy(renders[0], f"{OUTPUT_DIR}/{FINAL_OUTPUT_NAME}")
-        print(f"✅ Found and saved render: {renders[0]}")
-    else:
-        print("❌ ERROR: Render output not found locally.")
+    print("❌ ERROR: No render output (.mp4) found in project directory.")
 
 print_banner("🏁 RENDER COMPLETE")
 ```
