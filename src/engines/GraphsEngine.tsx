@@ -73,10 +73,10 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     const collisionRadius = interpolate(nodeCount, [3, 15], [300, 180], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
 
     const simulation = d3.forceSimulation<Node>(nodes)
-      .force("link", d3.forceLink<Node, Link>(links).id(d => d.id).distance(distance))
+      .force("link", d3.forceLink<Node, Link>(links).id((d: any) => d.id).distance(distance))
       .force("charge", d3.forceManyBody().strength(charge))
       .force("center", d3.forceCenter(0, 0))
-      .force("collision", d3.forceCollide().radius(node => {
+      .force("collision", d3.forceCollide().radius((node: any) => {
           const imp = node.importance || 1.0;
           const radius = interpolate(imp, [1.0, 5.0], [50, 100], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
           // COLLISION AWARENESS: Expand radius vertically to account for label plate
@@ -149,10 +149,11 @@ export const GraphsEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
           {processedLinks.map((link, i) => (
             <LivingEdge
                 key={`link-${i}`}
-                link={link}
+                link={link as any}
                 progress={masterProgress}
                 relativeFrame={relativeFrame}
                 globalFrame={frame}
+                startFrame={overlay.start}
             />
           ))}
 
@@ -206,7 +207,7 @@ const LivingEdge: React.FC<{
 
   // SEQUENTIAL KNOWLEDGE ARCS: Reveal animation for the edge
   const edgeReveal = spring({
-      frame: globalFrame - Math.max(s.active_at ?? 0, t.active_at ?? 0),
+      frame: globalFrame - Math.max((s as any).active_at ?? 0, (t as any).active_at ?? 0),
       fps: 30,
       config: { damping: 20, stiffness: 40 }
   });

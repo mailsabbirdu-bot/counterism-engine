@@ -161,17 +161,36 @@ const start = async () => {
 
     const concurrency = concurrencyArg ? parseInt(concurrencyArg, 10) : 1;
 
-    for (const scene of template.scenes) {
-      const normalizedId = scene.scene_id.replace(/_/g, '-');
+    for (let sceneIdx = 0; sceneIdx < template.scenes.length; sceneIdx++) {
+      const scene = template.scenes[sceneIdx];
 
-      if (sceneIdArg && scene.scene_id !== sceneIdArg && normalizedId !== sceneIdArg) {
+      // Slugify logic must match src/Root.tsx
+      const compId = scene.scene_id
+          .replace(/_/g, '-')
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-zA-Z0-9-]/g, (char: string) => {
+              const code = char.charCodeAt(0);
+              if (
+                  (code >= 0x4e00 && code <= 0x9fff) ||
+                  (code >= 0x3400 && code <= 0x4dbf) ||
+                  (code >= 0x3040 && code <= 0x309f) ||
+                  (code >= 0x30a0 && code <= 0x30ff) ||
+                  (code >= 0xac00 && code <= 0xd7af)
+              ) return char;
+              return '-';
+          })
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '') || `scene-${sceneIdx + 1}`;
+
+      if (sceneIdArg && scene.scene_id !== sceneIdArg && compId !== sceneIdArg) {
           continue;
       }
-      console.log(`\n🎬 Processing Scene: ${scene.scene_id}`);
+      console.log(`\n🎬 Processing Scene: ${scene.scene_id} (ID: ${compId})`);
 
-      const composition = compositions.find((c) => c.id === normalizedId);
+      const composition = compositions.find((c) => c.id === compId);
       if (!composition) {
-        console.error(`❌ Composition ${normalizedId} not found (Scene ID: ${scene.scene_id})`);
+        console.error(`❌ Composition ${compId} not found (Scene ID: ${scene.scene_id})`);
         continue;
       }
 
