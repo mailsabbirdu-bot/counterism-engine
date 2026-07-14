@@ -12,7 +12,7 @@ class CompositionEngine:
 
     def plan_composition(self, scene_nodes: List[Dict[str, Any]], global_hero: str) -> Composition:
         if not scene_nodes:
-            return Composition(hero_object="none")
+            return Composition(hero_object="SCENE_TITLE")
 
         # Determine local hero based on importance and centrality
         local_hero = max(scene_nodes, key=lambda x: x.get("importance", 1.0))["id"]

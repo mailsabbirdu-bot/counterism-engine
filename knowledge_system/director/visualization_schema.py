@@ -44,7 +44,7 @@ class TransitionPlan(BaseModel):
     meaning: str
 
 class Composition(BaseModel):
-    hero_object: str
+    hero_object: Optional[str] = "SCENE_TITLE"
     support_objects: List[str] = []
     attention_curve: List[float] = [0.2, 0.5, 1.0]
     layers: List[str] = ["background", "surface", "foreground"]

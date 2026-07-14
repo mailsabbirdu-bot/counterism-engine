@@ -6,20 +6,43 @@
       "duration": 300,
       "theme": "calm trend",
       "composition": {
-        "hero_object": "none",
+        "hero_object": "Dhaka",
         "support_objects": [],
         "attention_curve": [
           0.2,
-          0.5,
+          0.6,
           1.0
         ],
         "layers": [
-          "background",
-          "surface",
-          "foreground"
+          "surface"
         ]
       },
-      "visual_objects": [],
+      "visual_objects": [
+        {
+          "id": "Dhaka",
+          "label": "Dhaka",
+          "type": "abstract_core",
+          "style": "standard",
+          "x": "center",
+          "y": "center",
+          "depth": 0.0,
+          "layer": "surface",
+          "scale": 1.0,
+          "pulse": false,
+          "importance": 1.0,
+          "visual_weight": 1.0,
+          "visual_priority": 90,
+          "emotion": "calm",
+          "motion_grammar": {
+            "meaning": "stable_flow",
+            "grammar": [
+              "slow_drift",
+              "fade_reveal"
+            ],
+            "parameters": {}
+          }
+        }
+      ],
       "relationships": [],
       "transition": {
         "type": "dissolve_to_detail",
@@ -29,7 +52,7 @@
       },
       "camera": {
         "movement": "cinematic_drift",
-        "focus": "none",
+        "focus": "Dhaka",
         "zoom": 1.0,
         "duration": 150
       }
@@ -37,94 +60,51 @@
     {
       "scene_id": "SCENE_2",
       "duration": 300,
-      "theme": "calm trend",
+      "theme": "calm reveal",
       "composition": {
-        "hero_object": "none",
+        "hero_object": "Empire",
         "support_objects": [],
         "attention_curve": [
           0.2,
-          0.5,
+          0.6,
           1.0
         ],
         "layers": [
-          "background",
-          "surface",
-          "foreground"
+          "surface"
         ]
       },
-      "visual_objects": [],
-      "relationships": [],
-      "transition": {
-        "type": "dissolve_to_detail",
-        "from_node": "SCENE_2",
-        "to_node": "SCENE_3",
-        "meaning": "context_shift"
-      },
-      "camera": {
-        "movement": "cinematic_drift",
-        "focus": "none",
-        "zoom": 1.0,
-        "duration": 150
-      }
-    },
-    {
-      "scene_id": "SCENE_3",
-      "duration": 300,
-      "theme": "calm trend",
-      "composition": {
-        "hero_object": "none",
-        "support_objects": [],
-        "attention_curve": [
-          0.2,
-          0.5,
-          1.0
-        ],
-        "layers": [
-          "background",
-          "surface",
-          "foreground"
-        ]
-      },
-      "visual_objects": [],
-      "relationships": [],
-      "transition": {
-        "type": "dissolve_to_detail",
-        "from_node": "SCENE_3",
-        "to_node": "SCENE_4",
-        "meaning": "context_shift"
-      },
-      "camera": {
-        "movement": "cinematic_drift",
-        "focus": "none",
-        "zoom": 1.0,
-        "duration": 150
-      }
-    },
-    {
-      "scene_id": "SCENE_4",
-      "duration": 300,
-      "theme": "calm trend",
-      "composition": {
-        "hero_object": "none",
-        "support_objects": [],
-        "attention_curve": [
-          0.2,
-          0.5,
-          1.0
-        ],
-        "layers": [
-          "background",
-          "surface",
-          "foreground"
-        ]
-      },
-      "visual_objects": [],
+      "visual_objects": [
+        {
+          "id": "Empire",
+          "label": "Empire",
+          "type": "abstract_core",
+          "style": "standard",
+          "x": "center",
+          "y": "center",
+          "depth": 0.0,
+          "layer": "surface",
+          "scale": 1.0,
+          "pulse": false,
+          "importance": 1.0,
+          "visual_weight": 1.0,
+          "visual_priority": 90,
+          "emotion": "calm",
+          "motion_grammar": {
+            "meaning": "stable_flow",
+            "grammar": [
+              "slow_drift",
+              "fade_reveal"
+            ],
+            "parameters": {}
+          }
+        }
+      ],
       "relationships": [],
       "transition": null,
       "camera": {
-        "movement": "cinematic_drift",
-        "focus": "none",
-        "zoom": 1.0,
+        "movement": "push_in",
+        "focus": "Empire",
+        "zoom": 1.5,
         "duration": 150
       }
     }

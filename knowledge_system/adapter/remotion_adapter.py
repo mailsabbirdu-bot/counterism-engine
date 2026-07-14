@@ -39,6 +39,7 @@ class RemotionAdapter:
             crve_overlay = {
                 "id": f"crve_{p_scene['scene_id']}",
                 "type": "crve",
+                "content": p_scene.get("theme", "Semantic Concept"),
                 "start": 0,
                 "duration": p_scene["duration"],
                 "position": {"x": 960, "y": 540}, # Adapter anchors to center for simulation

@@ -52,8 +52,17 @@ class KnowledgeSystemPipeline:
             scene_type = scene["scene_type"]
             tone = scene["emotional_tone"]
 
-            # Local node analysis
-            scene_nodes = [n for n in graph_data["nodes"] if n.get("scene_id") == scene_id]
+            # Local node analysis: Find all nodes relevant to this scene's relationships
+            edges_key = "links" if "links" in graph_data else "edges"
+            scene_edges_data = [e for e in graph_data[edges_key] if e.get("scene_id") == scene_id]
+
+            node_ids_in_edges = set()
+            for e in scene_edges_data:
+                node_ids_in_edges.add(e["source"])
+                node_ids_in_edges.add(e["target"])
+
+            scene_nodes = [n for n in graph_data["nodes"] if n.get("scene_id") == scene_id or n["id"] in node_ids_in_edges]
+
             comp = self.composition_engine.plan_composition(scene_nodes, global_analysis["main_structure"]["hero_node"])
             local_hero = comp.hero_object
 

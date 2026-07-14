@@ -5,6 +5,27 @@
     "scene_type": "trend",
     "emotional_tone": "calm"
   },
-  "nodes": [],
+  "nodes": [
+    {
+      "label": "Dhaka",
+      "type": "concept",
+      "importance": 1.0,
+      "emotion": null,
+      "scale": 1.0,
+      "scene_id": "SCENE_1",
+      "id": "Dhaka",
+      "visual_weight": 1.0
+    },
+    {
+      "label": "Empire",
+      "type": "concept",
+      "importance": 1.0,
+      "emotion": null,
+      "scale": 1.0,
+      "scene_id": "SCENE_2",
+      "id": "Empire",
+      "visual_weight": 1.0
+    }
+  ],
   "edges": []
 }
