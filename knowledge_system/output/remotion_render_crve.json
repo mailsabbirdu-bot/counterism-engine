@@ -19,13 +19,23 @@
         {
           "id": "crve_SCENE_1",
           "type": "crve",
+          "content": "calm trend",
           "start": 0,
           "duration": 300,
           "position": {
             "x": 960,
             "y": 540
           },
-          "nodes": [],
+          "nodes": [
+            {
+              "id": "Dhaka",
+              "label": "Dhaka",
+              "type": "abstract_core",
+              "importance": 1.0,
+              "scale": 1.0,
+              "depth": 0.0
+            }
+          ],
           "links": []
         }
       ],
@@ -55,13 +65,23 @@
         {
           "id": "crve_SCENE_2",
           "type": "crve",
+          "content": "calm reveal",
           "start": 0,
           "duration": 300,
           "position": {
             "x": 960,
             "y": 540
           },
-          "nodes": [],
+          "nodes": [
+            {
+              "id": "Empire",
+              "label": "Empire",
+              "type": "abstract_core",
+              "importance": 1.0,
+              "scale": 1.0,
+              "depth": 0.0
+            }
+          ],
           "links": []
         }
       ],
@@ -71,80 +91,8 @@
           {
             "targetId": "crve_SCENE_2",
             "startFrame": 0,
-            "style": "cinematic_drift",
-            "zoom": 1.0,
-            "duration": 150
-          }
-        ]
-      }
-    },
-    {
-      "scene_id": "SCENE_3",
-      "duration_in_frames": 300,
-      "background": {
-        "background_type": "procedural",
-        "procedural_config": {
-          "variant": "neon_grid"
-        }
-      },
-      "overlays": [
-        {
-          "id": "crve_SCENE_3",
-          "type": "crve",
-          "start": 0,
-          "duration": 300,
-          "position": {
-            "x": 960,
-            "y": 540
-          },
-          "nodes": [],
-          "links": []
-        }
-      ],
-      "camera": {
-        "enabled": true,
-        "shots": [
-          {
-            "targetId": "crve_SCENE_3",
-            "startFrame": 0,
-            "style": "cinematic_drift",
-            "zoom": 1.0,
-            "duration": 150
-          }
-        ]
-      }
-    },
-    {
-      "scene_id": "SCENE_4",
-      "duration_in_frames": 300,
-      "background": {
-        "background_type": "procedural",
-        "procedural_config": {
-          "variant": "neon_grid"
-        }
-      },
-      "overlays": [
-        {
-          "id": "crve_SCENE_4",
-          "type": "crve",
-          "start": 0,
-          "duration": 300,
-          "position": {
-            "x": 960,
-            "y": 540
-          },
-          "nodes": [],
-          "links": []
-        }
-      ],
-      "camera": {
-        "enabled": true,
-        "shots": [
-          {
-            "targetId": "crve_SCENE_4",
-            "startFrame": 0,
-            "style": "cinematic_drift",
-            "zoom": 1.0,
+            "style": "push_in",
+            "zoom": 1.5,
             "duration": 150
           }
         ]

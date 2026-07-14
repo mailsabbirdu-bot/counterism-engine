@@ -164,24 +164,15 @@ const start = async () => {
     for (let sceneIdx = 0; sceneIdx < template.scenes.length; sceneIdx++) {
       const scene = template.scenes[sceneIdx];
 
-      // Slugify logic must match src/Root.tsx
+      // Slugify logic must match src/Root.tsx and src/lib/slugify.ts
       const compId = scene.scene_id
-          .replace(/_/g, '-')
+          .toString()
+          .toLowerCase()
           .normalize("NFD")
           .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[^a-zA-Z0-9-]/g, (char: string) => {
-              const code = char.charCodeAt(0);
-              if (
-                  (code >= 0x4e00 && code <= 0x9fff) ||
-                  (code >= 0x3400 && code <= 0x4dbf) ||
-                  (code >= 0x3040 && code <= 0x309f) ||
-                  (code >= 0x30a0 && code <= 0x30ff) ||
-                  (code >= 0xac00 && code <= 0xd7af)
-              ) return char;
-              return '-';
-          })
+          .replace(/[^a-z0-9]/g, '-')
           .replace(/-+/g, '-')
-          .replace(/^-|-$/g, '') || `scene-${sceneIdx + 1}`;
+          .replace(/^-+|-+$/g, '') || `scene-${sceneIdx + 1}`;
 
       if (sceneIdArg && scene.scene_id !== sceneIdArg && compId !== sceneIdArg) {
           continue;

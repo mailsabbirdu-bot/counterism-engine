@@ -49,6 +49,8 @@ class SemanticEngine:
             idx = i + 1
             if idx < len(segments):
                 scene_text = segments[idx].strip()
+                # Clean narration from potential marker residues
+                scene_text = re.sub(r'^[:।\s]+', '', scene_text)
                 if scene_text:
                     scenes.append((marker, scene_text))
 
