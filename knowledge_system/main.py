@@ -63,6 +63,13 @@ class KnowledgeSystemPipeline:
 
             scene_nodes = [n for n in graph_data["nodes"] if n.get("scene_id") == scene_id or n["id"] in node_ids_in_edges]
 
+            # Ensure every node used in an edge is present in scene_nodes to prevent d3-force "node not found" errors
+            all_available_nodes = {n["id"]: n for n in graph_data["nodes"]}
+            for node_id in node_ids_in_edges:
+                if not any(n["id"] == node_id for n in scene_nodes):
+                    if node_id in all_available_nodes:
+                        scene_nodes.append(all_available_nodes[node_id])
+
             comp = self.composition_engine.plan_composition(scene_nodes, global_analysis["main_structure"]["hero_node"])
             local_hero = comp.hero_object
 

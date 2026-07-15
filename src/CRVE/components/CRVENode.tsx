@@ -59,11 +59,14 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active
         textAnchor="middle"
         dy={radius + 35}
         style={{
-            fontSize: active ? '18px' : '14px',
-            fontWeight: 800,
+            fontSize: active ? '28px' : '22px', // INCREASED SIZE
+            fontWeight: 900,
             fontFamily: font || 'Inter, sans-serif',
             letterSpacing: '2px',
-            textTransform: 'uppercase'
+            textTransform: 'uppercase',
+            paintOrder: 'stroke',
+            stroke: 'black',
+            strokeWidth: 4
         }}
       >
         {node.label}

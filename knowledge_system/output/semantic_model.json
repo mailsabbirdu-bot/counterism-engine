@@ -1,28 +1,9 @@
 [
   {
     "scene_id": "SCENE_1",
-    "narration": "Dhaka. People build empire.",
-    "entities": [
-      {
-        "id": "e_1",
-        "label": "Dhaka",
-        "type": "concept",
-        "importance": 1.0,
-        "emotion": null,
-        "scale": 1.0,
-        "time": null,
-        "attributes": {}
-      }
-    ],
-    "actions": [
-      {
-        "id": "a_1",
-        "label": "build",
-        "subject_id": "People",
-        "object_id": "empire",
-        "importance": 1.5
-      }
-    ],
+    "narration": "আকাশ।",
+    "entities": [],
+    "actions": [],
     "quantities": [],
     "temporal_expressions": [],
     "relations": [],
@@ -33,14 +14,27 @@
   },
   {
     "scene_id": "SCENE_2",
-    "narration": "Empire hidden under timebomb.",
+    "narration": "মাটি।",
+    "entities": [],
+    "actions": [],
+    "quantities": [],
+    "temporal_expressions": [],
+    "relations": [],
+    "scene_type": "trend",
+    "emotional_tone": "calm",
+    "importance_score": 1.0,
+    "metadata": {}
+  },
+  {
+    "scene_id": "SCENE_3",
+    "narration": "মানুষ গাছ বানাচ্ছে।",
     "entities": [
       {
-        "id": "e_1",
-        "label": "Empire",
+        "id": "bn_e_0",
+        "label": "মানুষ",
         "type": "concept",
         "importance": 1.0,
-        "emotion": null,
+        "emotion": "calm",
         "scale": 1.0,
         "time": null,
         "attributes": {}
@@ -48,17 +42,30 @@
     ],
     "actions": [
       {
-        "id": "a_1",
-        "label": "hide",
-        "subject_id": "e_1",
+        "id": "bn_a_0",
+        "label": "build",
+        "subject_id": "bn_e_0",
         "object_id": null,
-        "importance": 1.5
+        "importance": 1.2
       }
     ],
     "quantities": [],
     "temporal_expressions": [],
     "relations": [],
-    "scene_type": "reveal",
+    "scene_type": "growth",
+    "emotional_tone": "calm",
+    "importance_score": 1.0,
+    "metadata": {}
+  },
+  {
+    "scene_id": "SCENE_4",
+    "narration": "ঘড়ি।",
+    "entities": [],
+    "actions": [],
+    "quantities": [],
+    "temporal_expressions": [],
+    "relations": [],
+    "scene_type": "trend",
     "emotional_tone": "calm",
     "importance_score": 1.0,
     "metadata": {}

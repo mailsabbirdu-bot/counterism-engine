@@ -40,13 +40,19 @@ class CompositionEngine:
         layer = self._assign_layer(node)
         depth = self.layer_depths.get(layer, 0)
 
+        # Composition logic to avoid center-stacking
         x = "center"
         y = "center"
 
-        if layer == "background": y = "top"
-        if layer == "subsurface": y = "lower_third"
-        if not is_hero:
+        if layer == "background":
+            y = "top"
+            x = "right" if hash(node["id"]) % 2 == 0 else "left"
+        elif layer == "subsurface":
+            y = "lower_third"
+            x = "center" if is_hero else ("left" if hash(node["id"]) % 2 == 0 else "right")
+        elif not is_hero:
              x = "left" if hash(node["id"]) % 2 == 0 else "right"
+             y = "top" if hash(node["id"]) % 3 == 0 else "bottom"
 
         return {
             "x": x,
