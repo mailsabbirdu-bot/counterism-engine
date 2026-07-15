@@ -23,6 +23,7 @@ class MotionLanguage(BaseModel):
 class VisualObject(BaseModel):
     id: str
     label: str
+    style_preset: Optional[str] = "glass_disc"
     type: str # danger_core, abstract_core, map_marker, terrain, particles, structures
     style: str # warning, standard, highlight
     x: str = "center" # left, right, center

@@ -89,6 +89,7 @@ class KnowledgeSystemPipeline:
                 visual_objects.append(VisualObject(
                     id=node["id"],
                     label=node["label"],
+                    style_preset=layout["style_preset"],
                     type=v_mapping["type"],
                     style=v_mapping["style"],
                     x=layout["x"],

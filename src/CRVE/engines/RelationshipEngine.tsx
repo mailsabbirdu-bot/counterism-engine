@@ -72,8 +72,14 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({ nodes: rawNodes, links: 
             if (grammar.style === 'particle_stream') {
                 return <ParticleStream key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
             }
-            if (grammar.style === 'pulse_line') {
+            if (grammar.style === 'pulse_line' || grammar.style === 'laser_beam') {
                 return <EnergyBeam key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
+            }
+            if (grammar.style === 'electric_arc') {
+                return <ElectricArc key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
+            }
+            if (grammar.style === 'liquid_flow') {
+                return <LiquidFlow key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
             }
             return <HUDConnector key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
           })}

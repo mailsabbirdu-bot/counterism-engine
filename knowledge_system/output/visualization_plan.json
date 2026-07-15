@@ -4,32 +4,124 @@
     {
       "scene_id": "SCENE_1",
       "duration": 300,
-      "theme": "calm trend",
+      "theme": "calm introduction",
       "composition": {
-        "hero_object": "SCENE_TITLE",
-        "support_objects": [],
+        "hero_object": "মেগাসিটি",
+        "support_objects": [
+          "ঢাকা",
+          "শহর"
+        ],
         "attention_curve": [
           0.2,
-          0.5,
+          0.6,
           1.0
         ],
         "layers": [
           "background",
-          "surface",
-          "foreground"
+          "surface"
         ]
       },
-      "visual_objects": [],
-      "relationships": [],
+      "visual_objects": [
+        {
+          "id": "মেগাসিটি",
+          "label": "মেগাসিটি",
+          "style_preset": "circuit_chip",
+          "type": "structures",
+          "style": "high_tech",
+          "x": "center",
+          "y": "center",
+          "depth": 0.0,
+          "layer": "surface",
+          "scale": 1.0,
+          "pulse": false,
+          "importance": 2.0,
+          "visual_weight": 2.17,
+          "visual_priority": 90,
+          "emotion": "calm",
+          "motion_grammar": {
+            "meaning": "stable_flow",
+            "grammar": [
+              "slow_drift",
+              "fade_reveal"
+            ],
+            "parameters": {}
+          }
+        },
+        {
+          "id": "ঢাকা",
+          "label": "ঢাকা",
+          "style_preset": "orbital_rings",
+          "type": "map_marker",
+          "style": "terrain",
+          "x": "right",
+          "y": "top",
+          "depth": -500.0,
+          "layer": "background",
+          "scale": 1.0,
+          "pulse": false,
+          "importance": 2.0,
+          "visual_weight": 2.17,
+          "visual_priority": 50,
+          "emotion": "calm",
+          "motion_grammar": {
+            "meaning": "stable_flow",
+            "grammar": [
+              "slow_drift",
+              "fade_reveal"
+            ],
+            "parameters": {}
+          }
+        },
+        {
+          "id": "শহর",
+          "label": "শহর",
+          "style_preset": "circuit_chip",
+          "type": "map_marker",
+          "style": "terrain",
+          "x": "right",
+          "y": "top",
+          "depth": -500.0,
+          "layer": "background",
+          "scale": 1.0,
+          "pulse": false,
+          "importance": 1.5,
+          "visual_weight": 1.5,
+          "visual_priority": 50,
+          "emotion": "calm",
+          "motion_grammar": {
+            "meaning": "stable_flow",
+            "grammar": [
+              "slow_drift",
+              "fade_reveal"
+            ],
+            "parameters": {}
+          }
+        }
+      ],
+      "relationships": [
+        {
+          "source_id": "ঢাকা",
+          "target_id": "মেগাসিটি",
+          "type": "containment",
+          "renderer": "bound_box",
+          "path": {
+            "type": "straight",
+            "control_points": []
+          },
+          "direction": "source_to_target",
+          "speed": 1.0,
+          "strength": 1.0
+        }
+      ],
       "transition": {
-        "type": "dissolve_to_detail",
+        "type": "layer_shift",
         "from_node": "SCENE_1",
-        "to_node": "SCENE_2",
-        "meaning": "context_shift"
+        "to_node": "subsurface",
+        "meaning": "revealing_hidden"
       },
       "camera": {
-        "movement": "cinematic_drift",
-        "focus": "SCENE_TITLE",
+        "movement": "zoom_out",
+        "focus": "মেগাসিটি",
         "zoom": 1.0,
         "duration": 150
       }
@@ -37,23 +129,122 @@
     {
       "scene_id": "SCENE_2",
       "duration": 300,
-      "theme": "calm trend",
+      "theme": "hidden danger",
       "composition": {
-        "hero_object": "SCENE_TITLE",
-        "support_objects": [],
+        "hero_object": "জিওলজিক্যাল টাইমবোম্ব",
+        "support_objects": [
+          "কংক্রিট",
+          "পাহাড়"
+        ],
         "attention_curve": [
           0.2,
-          0.5,
+          0.6,
           1.0
         ],
         "layers": [
-          "background",
-          "surface",
-          "foreground"
+          "subsurface",
+          "surface"
         ]
       },
-      "visual_objects": [],
-      "relationships": [],
+      "visual_objects": [
+        {
+          "id": "জিওলজিক্যাল টাইমবোম্ব",
+          "label": "জিওলজিক্যাল টাইমবোম্ব",
+          "style_preset": "orbital_rings",
+          "type": "danger_core",
+          "style": "warning",
+          "x": "center",
+          "y": "lower_third",
+          "depth": -200.0,
+          "layer": "subsurface",
+          "scale": 1.0,
+          "pulse": true,
+          "importance": 2.0,
+          "visual_weight": 3.0,
+          "visual_priority": 90,
+          "emotion": "intense",
+          "motion_grammar": {
+            "meaning": "hidden_danger",
+            "grammar": [
+              "slow_reveal",
+              "depth_movement",
+              "focus_shift"
+            ],
+            "parameters": {
+              "layers": {
+                "surface": "stable",
+                "hidden": "emerging"
+              },
+              "camera": "descend"
+            }
+          }
+        },
+        {
+          "id": "কংক্রিট",
+          "label": "কংক্রিট",
+          "style_preset": "tactical_triangle",
+          "type": "particles",
+          "style": "structures",
+          "x": "right",
+          "y": "top",
+          "depth": 0.0,
+          "layer": "surface",
+          "scale": 1.0,
+          "pulse": false,
+          "importance": 1.0,
+          "visual_weight": 1.17,
+          "visual_priority": 50,
+          "emotion": "calm",
+          "motion_grammar": {
+            "meaning": "stable_flow",
+            "grammar": [
+              "slow_drift",
+              "fade_reveal"
+            ],
+            "parameters": {}
+          }
+        },
+        {
+          "id": "পাহাড়",
+          "label": "পাহাড়",
+          "style_preset": "glass_disc",
+          "type": "transformation_object",
+          "style": "abstract",
+          "x": "left",
+          "y": "top",
+          "depth": 0.0,
+          "layer": "surface",
+          "scale": 1.0,
+          "pulse": false,
+          "importance": 1.0,
+          "visual_weight": 1.17,
+          "visual_priority": 50,
+          "emotion": "calm",
+          "motion_grammar": {
+            "meaning": "stable_flow",
+            "grammar": [
+              "slow_drift",
+              "fade_reveal"
+            ],
+            "parameters": {}
+          }
+        }
+      ],
+      "relationships": [
+        {
+          "source_id": "কংক্রিট",
+          "target_id": "পাহাড়",
+          "type": "aggregation",
+          "renderer": "merge_effect",
+          "path": {
+            "type": "straight",
+            "control_points": []
+          },
+          "direction": "source_to_target",
+          "speed": 1.0,
+          "strength": 1.0
+        }
+      ],
       "transition": {
         "type": "dissolve_to_detail",
         "from_node": "SCENE_2",
@@ -61,18 +252,18 @@
         "meaning": "context_shift"
       },
       "camera": {
-        "movement": "cinematic_drift",
-        "focus": "SCENE_TITLE",
-        "zoom": 1.0,
+        "movement": "descend",
+        "focus": "জিওলজিক্যাল টাইমবোম্ব",
+        "zoom": 1.5,
         "duration": 150
       }
     },
     {
       "scene_id": "SCENE_3",
       "duration": 300,
-      "theme": "calm growth",
+      "theme": "calm explanation",
       "composition": {
-        "hero_object": "মানুষ",
+        "hero_object": "টিকটিক শব্দ",
         "support_objects": [],
         "attention_curve": [
           0.2,
@@ -85,9 +276,10 @@
       },
       "visual_objects": [
         {
-          "id": "মানুষ",
-          "label": "মানুষ",
-          "type": "abstract_core",
+          "id": "টিকটিক শব্দ",
+          "label": "টিকটিক শব্দ",
+          "style_preset": "neon_hexagon",
+          "type": "danger_core",
           "style": "standard",
           "x": "center",
           "y": "center",
@@ -96,65 +288,28 @@
           "scale": 1.0,
           "pulse": false,
           "importance": 1.0,
-          "visual_weight": 2.0,
+          "visual_weight": 1.0,
           "visual_priority": 90,
           "emotion": "calm",
           "motion_grammar": {
-            "meaning": "accumulation",
+            "meaning": "stable_flow",
             "grammar": [
-              "expand",
-              "float_up",
-              "particles"
+              "slow_drift",
+              "fade_reveal"
             ],
-            "parameters": {
-              "particles": true,
-              "direction": "upward"
-            }
+            "parameters": {}
           }
         }
       ],
       "relationships": [],
-      "transition": {
-        "type": "dissolve_to_detail",
-        "from_node": "SCENE_3",
-        "to_node": "SCENE_4",
-        "meaning": "context_shift"
-      },
-      "camera": {
-        "movement": "pan_up",
-        "focus": "মানুষ",
-        "zoom": 1.0,
-        "duration": 150
-      }
-    },
-    {
-      "scene_id": "SCENE_4",
-      "duration": 300,
-      "theme": "calm trend",
-      "composition": {
-        "hero_object": "SCENE_TITLE",
-        "support_objects": [],
-        "attention_curve": [
-          0.2,
-          0.5,
-          1.0
-        ],
-        "layers": [
-          "background",
-          "surface",
-          "foreground"
-        ]
-      },
-      "visual_objects": [],
-      "relationships": [],
       "transition": null,
       "camera": {
-        "movement": "cinematic_drift",
-        "focus": "SCENE_TITLE",
+        "movement": "focus_shift",
+        "focus": "টিকটিক শব্দ",
         "zoom": 1.0,
         "duration": 150
       }
     }
   ],
-  "global_theme": "calm trend"
+  "global_theme": "calm introduction"
 }
