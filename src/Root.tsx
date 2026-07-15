@@ -26,11 +26,17 @@ export const RemotionRoot: React.FC = () => {
     const assetsPromises: Promise<any>[] = [];
 
     // 1. Font Loading
-    const fontsToLoad = new Set<string>();
+    const fontsToLoad = new Set<string>(["Sohid_bangla", "Audiowide-Regular_english"]);
     template.scenes.forEach((scene: any) => {
       (scene.overlays || []).forEach((overlay: any) => {
         if (overlay.font) {
           fontsToLoad.add(overlay.font);
+        }
+        // Also check nodes inside crve overlays
+        if (overlay.type === 'crve' && overlay.nodes) {
+            overlay.nodes.forEach((n: any) => {
+                if (n.font) fontsToLoad.add(n.font);
+            });
         }
       });
     });

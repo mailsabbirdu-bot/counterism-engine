@@ -1,39 +1,33 @@
 [
   {
     "scene_id": "SCENE_1",
-    "narration": "আকাশ।",
-    "entities": [],
-    "actions": [],
-    "quantities": [],
-    "temporal_expressions": [],
-    "relations": [],
-    "scene_type": "trend",
-    "emotional_tone": "calm",
-    "importance_score": 1.0,
-    "metadata": {}
-  },
-  {
-    "scene_id": "SCENE_2",
-    "narration": "মাটি।",
-    "entities": [],
-    "actions": [],
-    "quantities": [],
-    "temporal_expressions": [],
-    "relations": [],
-    "scene_type": "trend",
-    "emotional_tone": "calm",
-    "importance_score": 1.0,
-    "metadata": {}
-  },
-  {
-    "scene_id": "SCENE_3",
-    "narration": "মানুষ গাছ বানাচ্ছে।",
+    "narration": "আকাশ থেকে ঢাকা শহরকে দেখা যাচ্ছে। বিশ কোটির এই মেগাসিটি প্রতিনিয়ত নিজেকে নতুন করে বানাচ্ছে। এটি কেবল একটি শহর নয়, একটি জীবন্ত সত্তা।",
     "entities": [
       {
         "id": "bn_e_0",
-        "label": "মানুষ",
-        "type": "concept",
-        "importance": 1.0,
+        "label": "মেগাসিটি",
+        "type": "urban_concept",
+        "importance": 2.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      },
+      {
+        "id": "bn_e_1",
+        "label": "ঢাকা",
+        "type": "location",
+        "importance": 2.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      },
+      {
+        "id": "bn_e_2",
+        "label": "শহর",
+        "type": "location",
+        "importance": 1.5,
         "emotion": "calm",
         "scale": 1.0,
         "time": null,
@@ -45,27 +39,121 @@
         "id": "bn_a_0",
         "label": "build",
         "subject_id": "bn_e_0",
-        "object_id": null,
+        "object_id": "bn_e_2",
         "importance": 1.2
       }
     ],
-    "quantities": [],
-    "temporal_expressions": [],
-    "relations": [],
-    "scene_type": "growth",
+    "quantities": [
+      {
+        "value": 20.0,
+        "unit": "কোটি",
+        "label": "বিশ কোটি",
+        "entity_id": "bn_e_0"
+      }
+    ],
+    "temporal_expressions": [
+      {
+        "label": "প্রতিনিয়ত",
+        "value": null,
+        "type": "continuous"
+      }
+    ],
+    "relations": [
+      {
+        "id": "bn_r_1",
+        "source_id": "bn_e_1",
+        "target_id": "bn_e_0",
+        "relationship": "is_a",
+        "importance": 1.0,
+        "strength": 1.0
+      }
+    ],
+    "scene_type": "introduction",
     "emotional_tone": "calm",
     "importance_score": 1.0,
     "metadata": {}
   },
   {
-    "scene_id": "SCENE_4",
-    "narration": "ঘড়ি।",
-    "entities": [],
+    "scene_id": "SCENE_2",
+    "narration": "কংক্রিটের এই পাহাড়ের নিচে লুকিয়ে আছে এক ভয়ঙ্কর বিপদ। একে বলা হয় 'জিওলজিক্যাল টাইমবোম্ব'।",
+    "entities": [
+      {
+        "id": "bn_e_0",
+        "label": "জিওলজিক্যাল টাইমবোম্ব",
+        "type": "concept",
+        "importance": 2.0,
+        "emotion": "intense",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      },
+      {
+        "id": "bn_e_1",
+        "label": "কংক্রিট",
+        "type": "material",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      },
+      {
+        "id": "bn_e_2",
+        "label": "পাহাড়",
+        "type": "metaphor",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      }
+    ],
+    "actions": [
+      {
+        "id": "bn_a_0",
+        "label": "hidden",
+        "subject_id": "bn_e_2",
+        "object_id": "bn_e_0",
+        "importance": 1.2
+      }
+    ],
+    "quantities": [],
+    "temporal_expressions": [],
+    "relations": [
+      {
+        "id": "bn_r_1",
+        "source_id": "bn_e_1",
+        "target_id": "bn_e_2",
+        "relationship": "forms",
+        "importance": 1.0,
+        "strength": 1.0
+      }
+    ],
+    "scene_type": "reveal",
+    "emotional_tone": "intense",
+    "importance_score": 1.0,
+    "metadata": {}
+  },
+  {
+    "scene_id": "SCENE_3",
+    "narration": "বিশালাকার এক ঘড়ি টিকটিক শব্দ করে চলছে। আমাদের পায়ের নিচের মাটি ধীরে ধীরে সরে যাচ্ছে।",
+    "entities": [
+      {
+        "id": "bn_e_0",
+        "label": "টিকটিক শব্দ",
+        "type": "concept",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      }
+    ],
     "actions": [],
     "quantities": [],
     "temporal_expressions": [],
     "relations": [],
-    "scene_type": "trend",
+    "scene_type": "explanation",
     "emotional_tone": "calm",
     "importance_score": 1.0,
     "metadata": {}

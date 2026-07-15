@@ -9,20 +9,26 @@ class RemotionAdapter:
     def __init__(self):
         pass
 
+    def _is_bangla(self, text: str) -> bool:
+        return any("\u0980" <= char <= "\u09FF" for char in str(text))
+
     def adapt(self, plan_data: Dict[str, Any]) -> Dict[str, Any]:
         scenes = []
         for p_scene in plan_data["scenes"]:
             # Convert VisualObjects into CRVE-compatible overlays
             nodes = []
             for obj in p_scene["visual_objects"]:
+                font = "Sohid_bangla" if self._is_bangla(obj["label"]) else "Audiowide-Regular_english"
+
                 nodes.append({
                     "id": obj["id"],
                     "label": obj["label"],
                     "type": obj["type"],
                     "importance": obj["importance"],
                     "scale": obj["scale"],
-                    # Logic: Convert depth to parallax if renderer needs it
-                    "depth": obj["depth"]
+                    "depth": obj["depth"],
+                    "font": font,
+                    "style_preset": obj.get("style_preset", "glass_disc")
                 })
 
             links = []

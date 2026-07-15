@@ -16,9 +16,14 @@ class RelationshipEngine:
     def map_relation(self, relationship: str) -> Dict[str, Any]:
         mapping = self.rules.get(relationship, {"type": "connector", "renderer": "particle_stream", "path": "curved"})
 
+        # Add visual diversity to renderers
+        renderer = mapping["renderer"]
+        if renderer == "particle_stream" and hash(relationship) % 2 == 0:
+            renderer = "liquid_flow"
+
         return {
             "type": mapping["type"],
-            "renderer": mapping["renderer"],
+            "renderer": renderer,
             "path": GeometryPath(type=mapping["path"], control_points=[]),
             "speed": 0.8 if mapping["type"] == "construction_flow" else 1.0
         }

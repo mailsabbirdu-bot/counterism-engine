@@ -94,10 +94,67 @@ export const HUDConnector: React.FC<ParticleStreamProps> = ({ path, grammar, pro
                 strokeDasharray="4 4"
                 strokeOpacity={0.4}
             />
-            {/* End points markers */}
-            {active && (
-                <circle cx={0} cy={0} r={3} fill={grammar.color} style={{ transform: `translate(var(--sx), var(--sy))` }} />
-            )}
+        </g>
+    );
+};
+
+export const ElectricArc: React.FC<ParticleStreamProps> = ({ path, grammar, progress, active }) => {
+    const frame = useCurrentFrame();
+
+    // Create "jagged" effect using noise
+    const noise = Math.sin(frame * 0.5) * 5;
+
+    return (
+        <g style={{ filter: 'url(#electricGlow)' }}>
+             <defs>
+                <filter id="electricGlow">
+                    <feGaussianBlur stdDeviation="4" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+            </defs>
+            <path
+                d={path}
+                fill="none"
+                stroke={grammar.color}
+                strokeWidth={grammar.width}
+                strokeOpacity={0.8 * progress}
+            />
+            <path
+                d={path}
+                fill="none"
+                stroke="white"
+                strokeWidth={grammar.width * 0.5}
+                strokeDasharray="10 30"
+                strokeDashoffset={-frame * 20}
+                strokeOpacity={active ? progress : 0.1}
+            />
+        </g>
+    );
+};
+
+export const LiquidFlow: React.FC<ParticleStreamProps> = ({ path, grammar, progress, active }) => {
+    const frame = useCurrentFrame();
+    return (
+        <g>
+            <path
+                d={path}
+                fill="none"
+                stroke={grammar.color}
+                strokeWidth={grammar.width}
+                strokeOpacity={0.2 * progress}
+                strokeLinecap="round"
+            />
+            <path
+                d={path}
+                fill="none"
+                stroke={grammar.color}
+                strokeWidth={grammar.width * 0.7}
+                strokeDasharray="40 100"
+                strokeDashoffset={-frame * 5}
+                strokeOpacity={active ? 0.6 * progress : 0.1}
+                strokeLinecap="round"
+                style={{ filter: 'blur(2px)' }}
+            />
         </g>
     );
 };

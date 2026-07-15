@@ -19,15 +19,54 @@
         {
           "id": "crve_SCENE_1",
           "type": "crve",
-          "content": "calm trend",
+          "content": "calm introduction",
           "start": 0,
           "duration": 300,
           "position": {
             "x": 960,
             "y": 540
           },
-          "nodes": [],
-          "links": []
+          "nodes": [
+            {
+              "id": "মেগাসিটি",
+              "label": "মেগাসিটি",
+              "type": "structures",
+              "importance": 2.0,
+              "scale": 1.0,
+              "depth": 0.0,
+              "font": "Sohid_bangla",
+              "style_preset": "circuit_chip"
+            },
+            {
+              "id": "ঢাকা",
+              "label": "ঢাকা",
+              "type": "map_marker",
+              "importance": 2.0,
+              "scale": 1.0,
+              "depth": -500.0,
+              "font": "Sohid_bangla",
+              "style_preset": "orbital_rings"
+            },
+            {
+              "id": "শহর",
+              "label": "শহর",
+              "type": "map_marker",
+              "importance": 1.5,
+              "scale": 1.0,
+              "depth": -500.0,
+              "font": "Sohid_bangla",
+              "style_preset": "circuit_chip"
+            }
+          ],
+          "links": [
+            {
+              "id": "ঢাকা_মেগাসিটি",
+              "source": "ঢাকা",
+              "target": "মেগাসিটি",
+              "relationship": "containment",
+              "strength": 1.0
+            }
+          ]
         }
       ],
       "camera": {
@@ -36,7 +75,7 @@
           {
             "targetId": "crve_SCENE_1",
             "startFrame": 0,
-            "style": "cinematic_drift",
+            "style": "zoom_out",
             "zoom": 1.0,
             "duration": 150
           }
@@ -56,15 +95,54 @@
         {
           "id": "crve_SCENE_2",
           "type": "crve",
-          "content": "calm trend",
+          "content": "hidden danger",
           "start": 0,
           "duration": 300,
           "position": {
             "x": 960,
             "y": 540
           },
-          "nodes": [],
-          "links": []
+          "nodes": [
+            {
+              "id": "জিওলজিক্যাল টাইমবোম্ব",
+              "label": "জিওলজিক্যাল টাইমবোম্ব",
+              "type": "danger_core",
+              "importance": 2.0,
+              "scale": 1.0,
+              "depth": -200.0,
+              "font": "Sohid_bangla",
+              "style_preset": "orbital_rings"
+            },
+            {
+              "id": "কংক্রিট",
+              "label": "কংক্রিট",
+              "type": "particles",
+              "importance": 1.0,
+              "scale": 1.0,
+              "depth": 0.0,
+              "font": "Sohid_bangla",
+              "style_preset": "tactical_triangle"
+            },
+            {
+              "id": "পাহাড়",
+              "label": "পাহাড়",
+              "type": "transformation_object",
+              "importance": 1.0,
+              "scale": 1.0,
+              "depth": 0.0,
+              "font": "Sohid_bangla",
+              "style_preset": "glass_disc"
+            }
+          ],
+          "links": [
+            {
+              "id": "কংক্রিট_পাহাড়",
+              "source": "কংক্রিট",
+              "target": "পাহাড়",
+              "relationship": "aggregation",
+              "strength": 1.0
+            }
+          ]
         }
       ],
       "camera": {
@@ -73,8 +151,8 @@
           {
             "targetId": "crve_SCENE_2",
             "startFrame": 0,
-            "style": "cinematic_drift",
-            "zoom": 1.0,
+            "style": "descend",
+            "zoom": 1.5,
             "duration": 150
           }
         ]
@@ -93,7 +171,7 @@
         {
           "id": "crve_SCENE_3",
           "type": "crve",
-          "content": "calm growth",
+          "content": "calm explanation",
           "start": 0,
           "duration": 300,
           "position": {
@@ -102,12 +180,14 @@
           },
           "nodes": [
             {
-              "id": "মানুষ",
-              "label": "মানুষ",
-              "type": "abstract_core",
+              "id": "টিকটিক শব্দ",
+              "label": "টিকটিক শব্দ",
+              "type": "danger_core",
               "importance": 1.0,
               "scale": 1.0,
-              "depth": 0.0
+              "depth": 0.0,
+              "font": "Sohid_bangla",
+              "style_preset": "neon_hexagon"
             }
           ],
           "links": []
@@ -119,44 +199,7 @@
           {
             "targetId": "crve_SCENE_3",
             "startFrame": 0,
-            "style": "pan_up",
-            "zoom": 1.0,
-            "duration": 150
-          }
-        ]
-      }
-    },
-    {
-      "scene_id": "SCENE_4",
-      "duration_in_frames": 300,
-      "background": {
-        "background_type": "procedural",
-        "procedural_config": {
-          "variant": "neon_grid"
-        }
-      },
-      "overlays": [
-        {
-          "id": "crve_SCENE_4",
-          "type": "crve",
-          "content": "calm trend",
-          "start": 0,
-          "duration": 300,
-          "position": {
-            "x": 960,
-            "y": 540
-          },
-          "nodes": [],
-          "links": []
-        }
-      ],
-      "camera": {
-        "enabled": true,
-        "shots": [
-          {
-            "targetId": "crve_SCENE_4",
-            "startFrame": 0,
-            "style": "cinematic_drift",
+            "style": "focus_shift",
             "zoom": 1.0,
             "duration": 150
           }

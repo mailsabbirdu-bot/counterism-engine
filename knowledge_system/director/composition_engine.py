@@ -44,20 +44,28 @@ class CompositionEngine:
         x = "center"
         y = "center"
 
+        # Use a more diverse hash for randomization
+        node_hash = hash(node["id"] + node.get("label", ""))
+
         if layer == "background":
             y = "top"
-            x = "right" if hash(node["id"]) % 2 == 0 else "left"
+            x = "right" if node_hash % 2 == 0 else "left"
         elif layer == "subsurface":
             y = "lower_third"
-            x = "center" if is_hero else ("left" if hash(node["id"]) % 2 == 0 else "right")
+            x = "center" if is_hero else ("left" if node_hash % 2 == 0 else "right")
         elif not is_hero:
-             x = "left" if hash(node["id"]) % 2 == 0 else "right"
-             y = "top" if hash(node["id"]) % 3 == 0 else "bottom"
+             x = "left" if node_hash % 2 == 0 else "right"
+             y = "top" if node_hash % 3 == 0 else "bottom"
+
+        # Randomize preset for visual diversity
+        presets = ['glass_disc', 'neon_hexagon', 'circuit_chip', 'tactical_triangle', 'orbital_rings', 'core_pulse']
+        preset = presets[node_hash % len(presets)]
 
         return {
             "x": x,
             "y": y,
             "depth": depth,
             "layer": layer,
-            "visual_priority": 90 if is_hero else 50
+            "visual_priority": 90 if is_hero else 50,
+            "style_preset": preset
         }
