@@ -22,7 +22,12 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({ nodes: rawNodes, links: 
 
   const { nodes, links } = useMemo(() => {
     const nodes = rawNodes.map(n => ({ ...n }));
-    const links = rawLinks.map(l => ({ ...l }));
+
+    // Defensive Filter: Remotion can sometimes pass incomplete data during hot-reload or large renders
+    // D3-force link initialize will CRASH if a source/target node is missing.
+    const nodeIds = new Set(nodes.map(n => n.id));
+    const validLinks = rawLinks.filter(l => nodeIds.has(l.source) && nodeIds.has(l.target));
+    const links = validLinks.map(l => ({ ...l }));
 
     const simulation = d3.forceSimulation<any>(nodes)
       .force("link", d3.forceLink<any, any>(links).id(d => d.id).distance(350))

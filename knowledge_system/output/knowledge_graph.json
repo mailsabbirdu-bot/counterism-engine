@@ -7,23 +7,13 @@
   },
   "nodes": [
     {
-      "label": "Dhaka",
+      "label": "মানুষ",
       "type": "concept",
       "importance": 1.0,
-      "emotion": null,
+      "emotion": "calm",
       "scale": 1.0,
-      "scene_id": "SCENE_1",
-      "id": "Dhaka",
-      "visual_weight": 1.0
-    },
-    {
-      "label": "Empire",
-      "type": "concept",
-      "importance": 1.0,
-      "emotion": null,
-      "scale": 1.0,
-      "scene_id": "SCENE_2",
-      "id": "Empire",
+      "scene_id": "SCENE_3",
+      "id": "মানুষ",
       "visual_weight": 1.0
     }
   ],

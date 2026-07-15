@@ -6,43 +6,20 @@
       "duration": 300,
       "theme": "calm trend",
       "composition": {
-        "hero_object": "Dhaka",
+        "hero_object": "SCENE_TITLE",
         "support_objects": [],
         "attention_curve": [
           0.2,
-          0.6,
+          0.5,
           1.0
         ],
         "layers": [
-          "surface"
+          "background",
+          "surface",
+          "foreground"
         ]
       },
-      "visual_objects": [
-        {
-          "id": "Dhaka",
-          "label": "Dhaka",
-          "type": "abstract_core",
-          "style": "standard",
-          "x": "center",
-          "y": "center",
-          "depth": 0.0,
-          "layer": "surface",
-          "scale": 1.0,
-          "pulse": false,
-          "importance": 1.0,
-          "visual_weight": 1.0,
-          "visual_priority": 90,
-          "emotion": "calm",
-          "motion_grammar": {
-            "meaning": "stable_flow",
-            "grammar": [
-              "slow_drift",
-              "fade_reveal"
-            ],
-            "parameters": {}
-          }
-        }
-      ],
+      "visual_objects": [],
       "relationships": [],
       "transition": {
         "type": "dissolve_to_detail",
@@ -52,7 +29,7 @@
       },
       "camera": {
         "movement": "cinematic_drift",
-        "focus": "Dhaka",
+        "focus": "SCENE_TITLE",
         "zoom": 1.0,
         "duration": 150
       }
@@ -60,9 +37,42 @@
     {
       "scene_id": "SCENE_2",
       "duration": 300,
-      "theme": "calm reveal",
+      "theme": "calm trend",
       "composition": {
-        "hero_object": "Empire",
+        "hero_object": "SCENE_TITLE",
+        "support_objects": [],
+        "attention_curve": [
+          0.2,
+          0.5,
+          1.0
+        ],
+        "layers": [
+          "background",
+          "surface",
+          "foreground"
+        ]
+      },
+      "visual_objects": [],
+      "relationships": [],
+      "transition": {
+        "type": "dissolve_to_detail",
+        "from_node": "SCENE_2",
+        "to_node": "SCENE_3",
+        "meaning": "context_shift"
+      },
+      "camera": {
+        "movement": "cinematic_drift",
+        "focus": "SCENE_TITLE",
+        "zoom": 1.0,
+        "duration": 150
+      }
+    },
+    {
+      "scene_id": "SCENE_3",
+      "duration": 300,
+      "theme": "calm growth",
+      "composition": {
+        "hero_object": "মানুষ",
         "support_objects": [],
         "attention_curve": [
           0.2,
@@ -75,8 +85,8 @@
       },
       "visual_objects": [
         {
-          "id": "Empire",
-          "label": "Empire",
+          "id": "মানুষ",
+          "label": "মানুষ",
           "type": "abstract_core",
           "style": "standard",
           "x": "center",
@@ -86,25 +96,62 @@
           "scale": 1.0,
           "pulse": false,
           "importance": 1.0,
-          "visual_weight": 1.0,
+          "visual_weight": 2.0,
           "visual_priority": 90,
           "emotion": "calm",
           "motion_grammar": {
-            "meaning": "stable_flow",
+            "meaning": "accumulation",
             "grammar": [
-              "slow_drift",
-              "fade_reveal"
+              "expand",
+              "float_up",
+              "particles"
             ],
-            "parameters": {}
+            "parameters": {
+              "particles": true,
+              "direction": "upward"
+            }
           }
         }
       ],
       "relationships": [],
+      "transition": {
+        "type": "dissolve_to_detail",
+        "from_node": "SCENE_3",
+        "to_node": "SCENE_4",
+        "meaning": "context_shift"
+      },
+      "camera": {
+        "movement": "pan_up",
+        "focus": "মানুষ",
+        "zoom": 1.0,
+        "duration": 150
+      }
+    },
+    {
+      "scene_id": "SCENE_4",
+      "duration": 300,
+      "theme": "calm trend",
+      "composition": {
+        "hero_object": "SCENE_TITLE",
+        "support_objects": [],
+        "attention_curve": [
+          0.2,
+          0.5,
+          1.0
+        ],
+        "layers": [
+          "background",
+          "surface",
+          "foreground"
+        ]
+      },
+      "visual_objects": [],
+      "relationships": [],
       "transition": null,
       "camera": {
-        "movement": "push_in",
-        "focus": "Empire",
-        "zoom": 1.5,
+        "movement": "cinematic_drift",
+        "focus": "SCENE_TITLE",
+        "zoom": 1.0,
         "duration": 150
       }
     }
