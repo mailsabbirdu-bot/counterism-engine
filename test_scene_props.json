@@ -1,0 +1,39 @@
+{
+  "scene_id": "SCENE_1",
+  "duration_in_frames": 300,
+  "background": {
+    "background_type": "procedural",
+    "procedural_config": {
+      "variant": "neon_grid"
+    }
+  },
+  "overlays": [
+    {
+      "id": "crve_SCENE_1",
+      "type": "crve",
+      "content": "calm trend",
+      "start": 0,
+      "duration": 300,
+      "position": {
+        "x": 1370,
+        "y": 540
+      },
+      "nodes": [],
+      "links": [],
+      "layout_type": "force",
+      "visual_theme": "glassmorphism"
+    }
+  ],
+  "camera": {
+    "enabled": true,
+    "shots": [
+      {
+        "targetId": "crve_SCENE_1",
+        "startFrame": 0,
+        "style": "cinematic_drift",
+        "zoom": 1.0,
+        "duration": 150
+      }
+    ]
+  }
+}

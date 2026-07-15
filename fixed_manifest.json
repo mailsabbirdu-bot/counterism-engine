@@ -61,6 +61,7 @@
           "fontSize": "120px",
           "color": "#00F5FF",
           "style": "text-#00F5FF",
+          "splitMode": "word",
           "maxWidth": 800,
           "exitAnimation": "slide_down",
           "depth": 10,
@@ -129,6 +130,7 @@
         "video_path": "renders/scene_SC_01.mp4",
         "audio_enabled": false
       },
+      "semantic_role": "trend",
       "transition": {
         "type": "cinematicMatchCut",
         "duration": 15

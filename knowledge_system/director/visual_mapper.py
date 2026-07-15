@@ -18,8 +18,14 @@ class RelationshipEngine:
 
         # Add visual diversity to renderers
         renderer = mapping["renderer"]
-        if renderer == "particle_stream" and hash(relationship) % 2 == 0:
-            renderer = "liquid_flow"
+        rel_hash = hash(relationship)
+
+        if renderer == "particle_stream":
+            options = ["particle_stream", "liquid_flow", "laser_sweep", "electric_arc"]
+            renderer = options[rel_hash % len(options)]
+
+        if "sankey" in relationship.lower():
+            renderer = "sankey_link"
 
         return {
             "type": mapping["type"],

@@ -90,6 +90,58 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active
                     <rect x={-2} y={-radius*1.2} width={4} height={radius*2.4} fill={color} />
                   </g>
               );
+          case 'dna_helix':
+              return (
+                  <g>
+                      <path d={`M ${-radius/2} ${-radius} Q 0 0 ${-radius/2} ${radius}`} fill="none" stroke={color} strokeWidth={4} />
+                      <path d={`M ${radius/2} ${-radius} Q 0 0 ${radius/2} ${radius}`} fill="none" stroke={color} strokeWidth={4} />
+                      {[-0.6, -0.2, 0.2, 0.6].map(offset => (
+                          <line key={offset} x1={-radius/2-2} y1={radius*offset} x2={radius/2+2} y2={radius*offset} stroke={color} strokeWidth={2} />
+                      ))}
+                  </g>
+              );
+          case 'neural_synapse':
+              return (
+                  <g>
+                      <circle r={radius*0.4} fill={color} opacity={0.3} />
+                      {Array.from({length: 8}).map((_, i) => (
+                          <line
+                            key={i}
+                            x1={0} y1={0}
+                            x2={Math.cos(i * Math.PI/4) * radius}
+                            y2={Math.sin(i * Math.PI/4) * radius}
+                            stroke={color} strokeWidth={2}
+                            strokeDasharray="4 4"
+                          />
+                      ))}
+                  </g>
+              );
+          case 'holographic_sphere':
+              return (
+                  <g>
+                      <circle r={radius} fill="none" stroke={color} strokeWidth={1} />
+                      <ellipse cx="0" cy="0" rx={radius} ry={radius*0.3} fill="none" stroke={color} strokeWidth={0.5} />
+                      <ellipse cx="0" cy="0" rx={radius*0.3} ry={radius} fill="none" stroke={color} strokeWidth={0.5} />
+                      <circle r={radius*0.1} fill={color} />
+                  </g>
+              );
+          case 'glass_pyramid':
+              return (
+                  <path
+                    d={`M 0 ${-radius} L ${radius} ${radius*0.5} L 0 ${radius} L ${-radius} ${radius*0.5} Z M 0 ${-radius} L 0 ${radius}`}
+                    fill="rgba(255,255,255,0.1)"
+                    stroke={color}
+                    strokeWidth={2}
+                  />
+              );
+          case 'cyber_eye':
+              return (
+                  <g>
+                      <path d={`M ${-radius} 0 Q 0 ${-radius*0.8} ${radius} 0 Q 0 ${radius*0.8} ${-radius} 0`} fill="none" stroke={color} strokeWidth={2} />
+                      <circle r={radius*0.3} fill="none" stroke={color} strokeWidth={2} />
+                      <circle r={radius*0.1} fill={color} />
+                  </g>
+              );
           default:
               return (
                 <circle
