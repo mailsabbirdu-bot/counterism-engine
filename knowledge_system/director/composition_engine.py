@@ -58,8 +58,19 @@ class CompositionEngine:
              y = "top" if node_hash % 3 == 0 else "bottom"
 
         # Randomize preset for visual diversity
-        presets = ['glass_disc', 'neon_hexagon', 'circuit_chip', 'tactical_triangle', 'orbital_rings', 'core_pulse']
-        preset = presets[node_hash % len(presets)]
+        presets = [
+            'glass_disc', 'neon_hexagon', 'circuit_chip', 'tactical_triangle',
+            'orbital_rings', 'core_pulse', 'dna_helix', 'neural_synapse',
+            'holographic_sphere', 'glass_pyramid', 'cyber_eye'
+        ]
+
+        # Semantic mapping for presets
+        entity_type = node.get("type", "")
+        if "dna" in entity_type or "genetic" in entity_type: preset = "dna_helix"
+        elif "neural" in entity_type or "brain" in entity_type or "ai" in entity_type: preset = "neural_synapse"
+        elif "eye" in entity_type or "surveillance" in entity_type: preset = "cyber_eye"
+        else:
+            preset = presets[node_hash % len(presets)]
 
         return {
             "x": x,

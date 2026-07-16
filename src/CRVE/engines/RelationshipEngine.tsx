@@ -3,7 +3,7 @@ import { useCurrentFrame, useVideoConfig, spring, interpolate, AbsoluteFill } fr
 import * as d3 from 'd3';
 import { CRVENodeData, CRVELinkData } from '../lib/types';
 import { CRVENode } from '../components/CRVENode';
-import { ParticleStream, EnergyBeam, HUDConnector } from '../components/RelationshipLayers';
+import { ParticleStream, EnergyBeam, HUDConnector, ElectricArc, LiquidFlow, LaserSweep, SankeyLink } from '../components/RelationshipLayers';
 import { getGrammar } from '../lib/styleRegistry';
 import { getBezierPath } from '../lib/pathUtils';
 
@@ -14,9 +14,10 @@ interface CRVEEngineProps {
   duration: number;
   position?: { x: number, y: number };
   font?: string;
+  layout_type?: string;
 }
 
-export const CRVEEngine: React.FC<CRVEEngineProps> = ({ nodes: rawNodes, links: rawLinks, start, duration, position, font }) => {
+export const CRVEEngine: React.FC<CRVEEngineProps> = ({ nodes: rawNodes, links: rawLinks, start, duration, position, font, layout_type = 'force' }) => {
   const frame = useCurrentFrame();
   const { width, height, fps } = useVideoConfig();
 
@@ -29,15 +30,44 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({ nodes: rawNodes, links: 
     const validLinks = rawLinks.filter(l => nodeIds.has(l.source) && nodeIds.has(l.target));
     const links = validLinks.map(l => ({ ...l }));
 
-    const simulation = d3.forceSimulation<any>(nodes)
-      .force("link", d3.forceLink<any, any>(links).id(d => d.id).distance(350))
-      .force("charge", d3.forceManyBody().strength(-2000))
-      .force("center", d3.forceCenter(0, 0))
-      .stop();
+    if (layout_type === 'tree' || layout_type === 'hierarchy') {
+        try {
+            const root = d3.stratify<any>().id(d => d.id).parentId(d => {
+                const link = links.find(l => l.target === d.id);
+                return link ? link.source : null;
+            })(nodes);
+            const treeLayout = d3.tree().size([800, 600]);
+            treeLayout(root);
+            root.descendants().forEach(d => {
+                const n = nodes.find(node => node.id === d.id);
+                if (n) { (n as any).x = d.x - 400; (n as any).y = d.y - 300; }
+            });
+        } catch (e) {
+            console.error("D3 Stratify failed", e);
+        }
+    } else if (layout_type === 'radial') {
+        const simulation = d3.forceSimulation<any>(nodes)
+            .force("link", d3.forceLink<any, any>(links).id(d => d.id).distance(200))
+            .force("charge", d3.forceManyBody().strength(-1000))
+            .force("r", d3.forceRadial(300))
+            .stop();
+        for (let i = 0; i < 300; ++i) simulation.tick();
+    } else if (layout_type === 'timeline') {
+        nodes.forEach((n, i) => {
+            (n as any).x = (i - nodes.length/2) * 200;
+            (n as any).y = (i % 2 === 0 ? -100 : 100);
+        });
+    } else {
+        const simulation = d3.forceSimulation<any>(nodes)
+          .force("link", d3.forceLink<any, any>(links).id(d => d.id).distance(350))
+          .force("charge", d3.forceManyBody().strength(-2000))
+          .force("center", d3.forceCenter(0, 0))
+          .stop();
 
-    for (let i = 0; i < 300; ++i) simulation.tick();
+        for (let i = 0; i < 300; ++i) simulation.tick();
+    }
     return { nodes, links };
-  }, [rawNodes, rawLinks]);
+  }, [rawNodes, rawLinks, layout_type]);
 
   if (frame < start || frame > start + duration) return null;
 
@@ -80,6 +110,12 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({ nodes: rawNodes, links: 
             }
             if (grammar.style === 'liquid_flow') {
                 return <LiquidFlow key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
+            }
+            if (grammar.style === 'laser_sweep') {
+                return <LaserSweep key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
+            }
+            if (grammar.style === 'sankey_link') {
+                return <SankeyLink key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
             }
             return <HUDConnector key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
           })}

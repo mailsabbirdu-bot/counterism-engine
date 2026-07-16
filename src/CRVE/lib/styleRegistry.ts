@@ -54,6 +54,24 @@ export const RELATIONSHIP_GRAMMAR: Record<string, RelationshipGrammar> = {
     width: 2,
     particles: true,
     glow: true
+  },
+  'sequence': {
+    type: 'flow',
+    style: 'laser_sweep',
+    color: '#fbbf24',
+    speed: 1.5,
+    width: 2,
+    particles: false,
+    glow: true
+  },
+  'dependency': {
+    type: 'flow',
+    style: 'sankey_link',
+    color: '#8b5cf6',
+    speed: 1.0,
+    width: 5,
+    particles: false,
+    glow: false
   }
 };
 

@@ -2,97 +2,30 @@
   "directed": true,
   "multigraph": false,
   "graph": {
-    "scene_type": "introduction",
+    "scene_type": "trend",
     "emotional_tone": "calm"
   },
   "nodes": [
     {
-      "label": "মেগাসিটি",
-      "type": "urban_concept",
-      "importance": 2.0,
-      "emotion": "calm",
-      "scale": 1.0,
-      "scene_id": "SCENE_1",
-      "id": "মেগাসিটি",
-      "visual_weight": 2.0
-    },
-    {
-      "label": "ঢাকা",
-      "type": "location",
-      "importance": 2.0,
-      "emotion": "calm",
-      "scale": 1.0,
-      "scene_id": "SCENE_1",
-      "id": "ঢাকা",
-      "visual_weight": 2.0
-    },
-    {
-      "label": "শহর",
-      "type": "location",
-      "importance": 1.5,
-      "emotion": "calm",
-      "scale": 1.0,
-      "scene_id": "SCENE_1",
-      "id": "শহর",
-      "visual_weight": 1.5
-    },
-    {
-      "label": "জিওলজিক্যাল টাইমবোম্ব",
+      "label": "Dhaka",
       "type": "concept",
-      "importance": 2.0,
-      "emotion": "intense",
-      "scale": 1.0,
-      "scene_id": "SCENE_2",
-      "id": "জিওলজিক্যাল টাইমবোম্ব",
-      "visual_weight": 2.0
-    },
-    {
-      "label": "কংক্রিট",
-      "type": "material",
       "importance": 1.0,
-      "emotion": "calm",
+      "emotion": null,
       "scale": 1.0,
-      "scene_id": "SCENE_2",
-      "id": "কংক্রিট",
+      "scene_id": "SCENE_1",
+      "id": "Dhaka",
       "visual_weight": 1.0
     },
     {
-      "label": "পাহাড়",
-      "type": "metaphor",
-      "importance": 1.0,
-      "emotion": "calm",
-      "scale": 1.0,
-      "scene_id": "SCENE_2",
-      "id": "পাহাড়",
-      "visual_weight": 1.0
-    },
-    {
-      "label": "টিকটিক শব্দ",
+      "label": "Bangladesh",
       "type": "concept",
       "importance": 1.0,
-      "emotion": "calm",
+      "emotion": null,
       "scale": 1.0,
-      "scene_id": "SCENE_3",
-      "id": "টিকটিক শব্দ",
+      "scene_id": "SCENE_1",
+      "id": "Bangladesh",
       "visual_weight": 1.0
     }
   ],
-  "edges": [
-    {
-      "relationship": "is_a",
-      "scene_id": "SCENE_1",
-      "strength": 1.0,
-      "importance": 1.0,
-      "source": "ঢাকা",
-      "target": "মেগাসিটি"
-    },
-    {
-      "relationship": "forms",
-      "scene_id": "SCENE_2",
-      "strength": 1.0,
-      "importance": 1.0,
-      "source": "কংক্রিট",
-      "target": "পাহাড়"
-    }
-  ]
+  "edges": []
 }

@@ -60,6 +60,8 @@ class ScenePlan(BaseModel):
     scene_id: str
     duration: int
     theme: str
+    layout_type: str = "force" # force, radial, tree, timeline, flowchart, cycle, constellation, geographic, layered, semantic_zones, hub_spoke, cluster, matrix, sankey, bubble, metro, dna, neural, story_journey
+    visual_theme: str = "glassmorphism" # hud, blueprint, cyber_grid, minimal, glassmorphism, particle, floating_3d, wireframe, circuit, satellite, medical, space, investigation, sketch, chalkboard, neon, documentary, dashboard, ai_neural, isometric
     composition: Composition
     visual_objects: List[VisualObject] = []
     relationships: List[VisualRelationship] = []

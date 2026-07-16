@@ -8,7 +8,12 @@ export type CRVENodeStyle =
   | 'organic_blob'
   | 'tactical_triangle'
   | 'satellite_marker'
-  | 'conceptual_symbol';
+  | 'conceptual_symbol'
+  | 'dna_helix'
+  | 'neural_synapse'
+  | 'holographic_sphere'
+  | 'glass_pyramid'
+  | 'cyber_eye';
 
 export interface NodeStyleConfig {
     shape: CRVENodeStyle;
@@ -28,5 +33,10 @@ export const NODE_PRESETS: Record<CRVENodeStyle, NodeStyleConfig> = {
     'organic_blob': { shape: 'organic_blob', glow: false, rings: 0, rotation: false, opacity: 0.7 },
     'tactical_triangle': { shape: 'tactical_triangle', glow: true, rings: 1, rotation: false, opacity: 1.0 },
     'satellite_marker': { shape: 'satellite_marker', glow: false, rings: 2, rotation: true, opacity: 1.0 },
-    'conceptual_symbol': { shape: 'conceptual_symbol', glow: true, rings: 0, rotation: false, opacity: 0.9 }
+    'conceptual_symbol': { shape: 'conceptual_symbol', glow: true, rings: 0, rotation: false, opacity: 0.9 },
+    'dna_helix': { shape: 'dna_helix', glow: true, rings: 0, rotation: true, opacity: 1.0 },
+    'neural_synapse': { shape: 'neural_synapse', glow: true, rings: 2, rotation: false, opacity: 1.0 },
+    'holographic_sphere': { shape: 'holographic_sphere', glow: true, rings: 3, rotation: true, opacity: 0.8 },
+    'glass_pyramid': { shape: 'glass_pyramid', glow: true, rings: 0, rotation: true, opacity: 0.9 },
+    'cyber_eye': { shape: 'cyber_eye', glow: true, rings: 1, rotation: false, opacity: 1.0 }
 };

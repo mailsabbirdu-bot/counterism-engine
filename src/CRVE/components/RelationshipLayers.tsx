@@ -83,6 +83,58 @@ export const EnergyBeam: React.FC<ParticleStreamProps> = ({ path, grammar, progr
     );
 };
 
+export const LaserSweep: React.FC<ParticleStreamProps> = ({ path, grammar, progress, active }) => {
+    const frame = useCurrentFrame();
+    const sweepProgress = (frame * 0.05 * grammar.speed) % 1;
+
+    return (
+        <g>
+            <path
+                d={path}
+                fill="none"
+                stroke={grammar.color}
+                strokeWidth={0.5}
+                strokeOpacity={0.2 * progress}
+            />
+            <path
+                d={path}
+                fill="none"
+                stroke={grammar.color}
+                strokeWidth={grammar.width}
+                strokeDasharray="100 1000"
+                strokeDashoffset={-sweepProgress * 1000}
+                strokeOpacity={active ? progress : 0.1}
+                style={{ filter: 'blur(1px)' }}
+            />
+            {/* The "head" of the laser */}
+            <circle r={4} fill="white" style={{ filter: 'blur(2px)' }}>
+                <animateMotion path={path} dur={`${2/grammar.speed}s`} repeatCount="indefinite" />
+            </circle>
+        </g>
+    );
+};
+
+export const SankeyLink: React.FC<ParticleStreamProps> = ({ path, grammar, progress, active }) => {
+    return (
+        <g opacity={active ? 0.6 * progress : 0.1}>
+            <path
+                d={path}
+                fill="none"
+                stroke={grammar.color}
+                strokeWidth={grammar.width * 5}
+                strokeOpacity={0.3}
+            />
+            <path
+                d={path}
+                fill="none"
+                stroke={grammar.color}
+                strokeWidth={1}
+                strokeDasharray="5 5"
+            />
+        </g>
+    );
+};
+
 export const HUDConnector: React.FC<ParticleStreamProps> = ({ path, grammar, progress, active }) => {
     return (
         <g opacity={progress}>

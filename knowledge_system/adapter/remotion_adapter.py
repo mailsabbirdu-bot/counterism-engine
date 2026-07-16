@@ -48,9 +48,11 @@ class RemotionAdapter:
                 "content": p_scene.get("theme", "Semantic Concept"),
                 "start": 0,
                 "duration": p_scene["duration"],
-                "position": {"x": 960, "y": 540}, # Adapter anchors to center for simulation
+                "position": {"x": 1370, "y": 540}, # QA-Optimized Broadcast Position
                 "nodes": nodes,
-                "links": links
+                "links": links,
+                "layout_type": p_scene.get("layout_type", "force"),
+                "visual_theme": p_scene.get("visual_theme", "glassmorphism")
             }
 
             scenes.append({
