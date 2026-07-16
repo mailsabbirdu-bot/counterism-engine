@@ -1,0 +1,142 @@
+{
+  "directed": true,
+  "multigraph": false,
+  "graph": {
+    "scene_type": "introduction",
+    "emotional_tone": "calm"
+  },
+  "nodes": [
+    {
+      "label": "প্ল্যানেট",
+      "type": "concept",
+      "importance": 1.0,
+      "emotion": "calm",
+      "scale": 1.0,
+      "scene_id": "SCENE_1",
+      "id": "প্ল্যানেট",
+      "visual_weight": 1.0
+    },
+    {
+      "label": "ঢাকা",
+      "type": "location",
+      "importance": 2.0,
+      "emotion": "calm",
+      "scale": 1.0,
+      "scene_id": "SCENE_1",
+      "id": "ঢাকা",
+      "visual_weight": 2.0
+    },
+    {
+      "label": "কংক্রিট",
+      "type": "material",
+      "importance": 1.0,
+      "emotion": "calm",
+      "scale": 1.0,
+      "scene_id": "SCENE_2",
+      "id": "কংক্রিট",
+      "visual_weight": 1.0
+    },
+    {
+      "label": "মানুষ",
+      "type": "concept",
+      "importance": 1.0,
+      "emotion": "calm",
+      "scale": 1.0,
+      "scene_id": "SCENE_2",
+      "id": "মানুষ",
+      "visual_weight": 1.0
+    },
+    {
+      "label": "পাহাড়",
+      "type": "metaphor",
+      "importance": 1.0,
+      "emotion": "calm",
+      "scale": 1.0,
+      "scene_id": "SCENE_2",
+      "id": "পাহাড়",
+      "visual_weight": 1.0
+    },
+    {
+      "label": "সাম্রাজ্য",
+      "type": "organization",
+      "importance": 1.0,
+      "emotion": "calm",
+      "scale": 1.0,
+      "scene_id": "SCENE_3",
+      "id": "সাম্রাজ্য",
+      "visual_weight": 1.0
+    },
+    {
+      "label": "টাইমবোম্ব",
+      "type": "concept",
+      "importance": 2.0,
+      "emotion": "intense",
+      "scale": 1.0,
+      "scene_id": "SCENE_3",
+      "id": "টাইমবোম্ব",
+      "visual_weight": 2.0
+    },
+    {
+      "label": "জিওলজিক্যাল ক্লক",
+      "type": "concept",
+      "importance": 1.0,
+      "emotion": "calm",
+      "scale": 1.0,
+      "scene_id": "SCENE_4",
+      "id": "জিওলজিক্যাল ক্লক",
+      "visual_weight": 1.0
+    },
+    {
+      "label": "টিকটিক শব্দ",
+      "type": "concept",
+      "importance": 1.0,
+      "emotion": "calm",
+      "scale": 1.0,
+      "scene_id": "SCENE_4",
+      "id": "টিকটিক শব্দ",
+      "visual_weight": 1.0
+    }
+  ],
+  "edges": [
+    {
+      "relationship": "forms",
+      "scene_id": "SCENE_2",
+      "strength": 1.0,
+      "importance": 1.0,
+      "source": "কংক্রিট",
+      "target": "পাহাড়"
+    },
+    {
+      "relationship": "builds",
+      "scene_id": "SCENE_2",
+      "strength": 1.0,
+      "importance": 1.0,
+      "source": "মানুষ",
+      "target": "কংক্রিট"
+    },
+    {
+      "relationship": "builds",
+      "scene_id": "SCENE_3",
+      "strength": 1.0,
+      "importance": 1.0,
+      "source": "মানুষ",
+      "target": "সাম্রাজ্য"
+    },
+    {
+      "relationship": "hidden_under",
+      "scene_id": "SCENE_3",
+      "strength": 1.0,
+      "importance": 1.0,
+      "source": "সাম্রাজ্য",
+      "target": "টাইমবোম্ব"
+    },
+    {
+      "relationship": "produces",
+      "scene_id": "SCENE_4",
+      "strength": 1.0,
+      "importance": 1.0,
+      "source": "জিওলজিক্যাল ক্লক",
+      "target": "টিকটিক শব্দ"
+    }
+  ]
+}

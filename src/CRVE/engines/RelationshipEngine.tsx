@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useCurrentFrame, useVideoConfig, spring, interpolate, AbsoluteFill } from 'remotion';
 import * as d3 from 'd3';
+import Xarrow, { Xwrapper } from 'react-xarrows';
 import { CRVENodeData, CRVELinkData } from '../lib/types';
 import { CRVENode } from '../components/CRVENode';
 import {
@@ -60,7 +61,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
             treeLayout(root);
             root.descendants().forEach(d => {
                 const n = nodes.find(node => node.id === d.id);
-                if (n) { (n as any).x = d.x - 400; (n as any).y = d.y - 300; }
+                if (n) { (n as any).x = (d.x ?? 0) - 400; (n as any).y = (d.y ?? 0) - 300; }
             });
         } catch (e) {
             console.error("D3 Stratify failed", e);
@@ -129,72 +130,175 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
   };
 
   return (
-    <AbsoluteFill className="pointer-events-none">
+    <AbsoluteFill className="pointer-events-none" style={{ position: 'relative' }}>
       <EnvironmentEngine fx={background_fx} lighting={lighting_style} color={mood.colors.primary} />
-      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`}>
-        <g transform={`translate(${centerX}, ${centerY}) scale(${0.8 + progress * 0.2})`}>
-          {/* 1. Relationship Layer */}
-          {links.map((link, i) => {
-            const s = link.source as any;
-            const t = link.target as any;
-            const rawGrammar = getGrammar(link.relationship);
-            const grammar = { ...rawGrammar, color: mood.colors.primary };
-            const path = getBezierPath({ x: s.x, y: s.y }, { x: t.x, y: t.y });
-            const active = isActive(link) || isActive(s) || isActive(t);
+      <Xwrapper>
+        {/* SVG Nodes and High-Fidelity Animated Connections Layer */}
+        <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} style={{ position: 'absolute', top: 0, left: 0, zIndex: 10 }}>
+          <g transform={`translate(${centerX}, ${centerY}) scale(${0.8 + progress * 0.2})`}>
+            {/* 1. SVG Custom High-Fidelity Animated Connections */}
+            {links.map((link) => {
+              const s = link.source as any;
+              const t = link.target as any;
+              const active = isActive(link) || isActive(s) || isActive(t);
+              if (!active) return null;
 
-            if (grammar.style === 'particle_stream') {
-                return <ParticleStream key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
-            }
-            if (grammar.style === 'pulse_line' || grammar.style === 'laser_beam') {
-                return <EnergyBeam key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
-            }
-            if (grammar.style === 'electric_arc') {
-                return <ElectricArc key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
-            }
-            if (grammar.style === 'liquid_flow') {
-                return <LiquidFlow key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
-            }
-            if (grammar.style === 'laser_sweep') {
-                return <LaserSweep key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
-            }
-            if (grammar.style === 'sankey_link') {
-                return <SankeyLink key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
-            }
+              if (typeof s === 'object' && typeof t === 'object') {
+                const grammar = getGrammar(link.relationship);
+                const customGrammar = {
+                  ...grammar,
+                  color: cinematic_mood === 'cyberpunk' ? mood.colors.secondary :
+                         cinematic_mood === 'danger' ? mood.colors.accent :
+                         grammar.color
+                };
 
-            // Unique Scene Edges
-            if (grammar.style === 'dna_helix') {
-                return <DNAEdge key={link.id} path={path} color={grammar.color} progress={progress} active={active} />;
-            }
-            if (grammar.style === 'circuit_board') {
-                return <CircuitEdge key={link.id} path={path} color={grammar.color} progress={progress} active={active} />;
-            }
-            if (grammar.style === 'neural_synapse') {
-                return <NeuralEdge key={link.id} path={path} color={grammar.color} progress={progress} active={active} />;
-            }
+                const path = getBezierPath(s, t);
 
-            // Semantic Grammar Overrides
-            const relGrammar = (link as any).grammar;
-            if (relGrammar === 'discharge') return <ElectricDischarge key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
-            if (relGrammar === 'ribbon') return <EnergyRibbon key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
-            if (relGrammar === 'breaking') return <BreakingLine key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
+                switch (grammar.style) {
+                  case 'particle_stream':
+                    return <ParticleStream key={`svg-link-${link.id}`} path={path} grammar={customGrammar} progress={progress} active={active} />;
+                  case 'laser_beam':
+                    return <EnergyBeam key={`svg-link-${link.id}`} path={path} grammar={customGrammar} progress={progress} active={active} />;
+                  case 'electric_arc':
+                    return <ElectricArc key={`svg-link-${link.id}`} path={path} grammar={customGrammar} progress={progress} active={active} />;
+                  case 'liquid_flow':
+                    return <LiquidFlow key={`svg-link-${link.id}`} path={path} grammar={customGrammar} progress={progress} active={active} />;
+                  case 'laser_sweep':
+                    return <LaserSweep key={`svg-link-${link.id}`} path={path} grammar={customGrammar} progress={progress} active={active} />;
+                  case 'sankey_link':
+                    return <SankeyLink key={`svg-link-${link.id}`} path={path} grammar={customGrammar} progress={progress} active={active} />;
+                  case 'pulse_line':
+                    return <ElectricDischarge key={`svg-link-${link.id}`} path={path} grammar={customGrammar} progress={progress} active={active} />;
+                  default:
+                    return (
+                      <path
+                        key={`svg-link-${link.id}`}
+                        d={path}
+                        fill="none"
+                        stroke={customGrammar.color}
+                        strokeWidth={customGrammar.width}
+                        strokeOpacity={active ? 0.8 * progress : 0.2 * progress}
+                      />
+                    );
+                }
+              }
+              return null;
+            })}
 
-            return <HUDConnector key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
-          })}
+            {/* 2. SVG Nodes */}
+            {nodes.map((node: any) => (
+              <CRVENode
+                  key={node.id}
+                  node={node}
+                  x={node.x}
+                  y={node.y}
+                  progress={progress}
+                  active={isActive(node)}
+                  font={node.font || font}
+                  cinematic_mood={cinematic_mood}
+              />
+            ))}
+          </g>
+        </svg>
 
-          {/* 2. Node Layer */}
-          {nodes.map((node: any) => (
-            <CRVENode
-                key={node.id}
-                node={node}
-                x={node.x}
-                y={node.y}
-                progress={progress}
-                active={isActive(node)}
-                font={font}
+        {/* Dynamic Connections Layer using react-xarrows */}
+        {links.map((link, i) => {
+          const s = link.source as any;
+          const t = link.target as any;
+          const startId = typeof s === 'object' ? s.id : s;
+          const endId = typeof t === 'object' ? t.id : t;
+          const active = isActive(link) || isActive(s) || isActive(t);
+
+          if (!active) return null;
+
+          // 1. Dynamic headShape based on relationship type
+          let headShape: "arrow1" | "arrow2" | "circle" | "dot" = "arrow1";
+          const rel = link.relationship.toLowerCase();
+          if (rel === 'causes' || rel === 'threatens' || rel === 'danger' || rel === 'energy_transfer') {
+              headShape = "arrow2";
+          } else if (rel === 'is_a' || rel === 'containment' || rel === 'located_in') {
+              headShape = "dot";
+          } else if (rel === 'forms' || rel === 'aggregation' || rel === 'construction_flow') {
+              headShape = "circle";
+          }
+
+          // 2. Dynamic dashness (animation speed & patterns) unique per scene and mood
+          let dashness: any = false;
+          if (cinematic_mood === 'cyberpunk') {
+              dashness = { strokeLen: 15, nonStrokeLen: 5, animation: 1.0 };
+          } else if (cinematic_mood === 'military') {
+              dashness = { strokeLen: 4, nonStrokeLen: 4, animation: 2.0 };
+          } else if (cinematic_mood === 'scientific') {
+              dashness = { strokeLen: 8, nonStrokeLen: 4, animation: 0.5 };
+          } else if (cinematic_mood === 'danger') {
+              dashness = { strokeLen: 6, nonStrokeLen: 3, animation: 0.3 };
+          } else if (rel === 'builds' || rel === 'produces' || rel === 'construction_flow') {
+              dashness = { strokeLen: 12, nonStrokeLen: 8, animation: 1.0 };
+          } else if (rel === 'causes' || rel === 'energy_transfer') {
+              dashness = { strokeLen: 10, nonStrokeLen: 4, animation: 0.6 };
+          }
+
+          // 3. Dynamic strokeWidth & color based on mood
+          let strokeWidth = active ? 4 : 2;
+          let arrowColor = mood.colors.primary;
+          if (cinematic_mood === 'cyberpunk') {
+              strokeWidth = active ? 6 : 3;
+              arrowColor = mood.colors.secondary;
+          } else if (cinematic_mood === 'danger') {
+              strokeWidth = active ? 5 : 2;
+              arrowColor = mood.colors.accent;
+          }
+
+          // 4. Dynamic Label Sizes based on connection strength
+          const strength = link.strength || 1.0;
+          const fontSize = Math.max(12, Math.min(22, Math.round(strength * 15)));
+          const paddingY = Math.max(2, Math.round(strength * 4));
+          const paddingX = Math.max(6, Math.round(strength * 10));
+
+          return (
+            <Xarrow
+              key={link.id}
+              start={startId}
+              end={endId}
+              color={arrowColor}
+              strokeWidth={strokeWidth}
+              dashness={dashness}
+              showHead={true}
+              headShape={headShape}
+              headSize={active ? 6 : 4}
+              path={layout_type === 'timeline' ? 'grid' : 'smooth'}
+              curveness={0.3}
+              labels={{
+                middle: (
+                  <div
+                    style={{
+                      background: 'rgba(5, 5, 5, 0.85)',
+                      backdropFilter: 'blur(8px)',
+                      border: `1.5px solid ${arrowColor}`,
+                      borderRadius: '8px',
+                      padding: `${paddingY}px ${paddingX}px`,
+                      color: '#ffffff',
+                      fontSize: `${fontSize}px`,
+                      fontWeight: 900,
+                      fontFamily: font || 'Inter, sans-serif',
+                      textTransform: 'uppercase',
+                      boxShadow: `0 0 12px ${arrowColor}66`,
+                    }}
+                  >
+                    {link.relationship}
+                  </div>
+                )
+              }}
+              divContainerStyle={{
+                zIndex: 5,
+              }}
+              SVGcanvasStyle={{
+                zIndex: 5,
+              }}
             />
-          ))}
-        </g>
-      </svg>
+          );
+        })}
+      </Xwrapper>
     </AbsoluteFill>
   );
 };

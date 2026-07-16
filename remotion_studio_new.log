@@ -1,0 +1,8 @@
+
+> counterism-studio-v4@4.0.0 start
+> remotion preview --port 3000
+
+Server ready - Local: http://localhost:3000, Network: http://192.168.0.2:3000
+Building...
+Built in 7162ms
+To restart - Local: http://localhost:3000, Network: http://192.168.0.2:3000

@@ -1,0 +1,263 @@
+[
+  {
+    "scene_id": "SCENE_1",
+    "narration": "ঢাকা। এই প্ল্যানেটের অন্যতম ক্রাউডেড একটা মেগাসiটি।",
+    "entities": [
+      {
+        "id": "bn_e_0",
+        "label": "প্ল্যানেট",
+        "type": "concept",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      },
+      {
+        "id": "bn_e_1",
+        "label": "ঢাকা",
+        "type": "location",
+        "importance": 2.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      }
+    ],
+    "actions": [],
+    "quantities": [],
+    "temporal_expressions": [],
+    "relations": [],
+    "scene_type": "introduction",
+    "emotional_tone": "calm",
+    "importance_score": 1.0,
+    "metadata": {}
+  },
+  {
+    "scene_id": "SCENE_2",
+    "narration": "দুই কোটিরও বেশি মানুষ এখানে বাঁচছে, লড়ছে আর প্রতিনিয়ত কংক্রিটের পাহাড় বানাচ্ছে।",
+    "entities": [
+      {
+        "id": "bn_e_0",
+        "label": "কংক্রিট",
+        "type": "material",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      },
+      {
+        "id": "bn_e_1",
+        "label": "মানুষ",
+        "type": "concept",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      },
+      {
+        "id": "bn_e_2",
+        "label": "পাহাড়",
+        "type": "metaphor",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      }
+    ],
+    "actions": [
+      {
+        "id": "bn_a_0",
+        "label": "live",
+        "subject_id": "bn_e_1",
+        "object_id": "bn_e_0",
+        "importance": 1.2
+      },
+      {
+        "id": "bn_a_1",
+        "label": "fight",
+        "subject_id": "bn_e_1",
+        "object_id": "bn_e_0",
+        "importance": 1.2
+      },
+      {
+        "id": "bn_a_2",
+        "label": "build",
+        "subject_id": "bn_e_1",
+        "object_id": "bn_e_2",
+        "importance": 1.2
+      }
+    ],
+    "quantities": [
+      {
+        "value": 2.0,
+        "unit": "কোটি",
+        "label": "দুই কোটি",
+        "entity_id": "bn_e_1"
+      }
+    ],
+    "temporal_expressions": [
+      {
+        "label": "প্রতিনিয়ত",
+        "value": null,
+        "type": "continuous"
+      }
+    ],
+    "relations": [
+      {
+        "id": "bn_r_1",
+        "source_id": "bn_e_1",
+        "target_id": "bn_e_0",
+        "relationship": "builds",
+        "importance": 1.0,
+        "strength": 1.0
+      },
+      {
+        "id": "bn_r_2",
+        "source_id": "bn_e_0",
+        "target_id": "bn_e_2",
+        "relationship": "forms",
+        "importance": 1.0,
+        "strength": 1.0
+      }
+    ],
+    "scene_type": "growth",
+    "emotional_tone": "calm",
+    "importance_score": 1.0,
+    "metadata": {}
+  },
+  {
+    "scene_id": "SCENE_3",
+    "narration": "কিন্তু মানুষের তৈরি এই বিশাল সাম্রাজ্যের নিচেই লুকিয়ে আছে একটা টাইমবোম্ব।",
+    "entities": [
+      {
+        "id": "bn_e_0",
+        "label": "সাম্রাজ্য",
+        "type": "organization",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      },
+      {
+        "id": "bn_e_1",
+        "label": "টাইমবোম্ব",
+        "type": "concept",
+        "importance": 2.0,
+        "emotion": "intense",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      },
+      {
+        "id": "bn_e_2",
+        "label": "মানুষ",
+        "type": "concept",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      }
+    ],
+    "actions": [
+      {
+        "id": "bn_a_0",
+        "label": "hidden",
+        "subject_id": "bn_e_0",
+        "object_id": "bn_e_1",
+        "importance": 1.2
+      }
+    ],
+    "quantities": [],
+    "temporal_expressions": [],
+    "relations": [
+      {
+        "id": "bn_r_1",
+        "source_id": "bn_e_0",
+        "target_id": "bn_e_1",
+        "relationship": "hidden_under",
+        "importance": 1.0,
+        "strength": 1.0
+      },
+      {
+        "id": "bn_r_2",
+        "source_id": "bn_e_2",
+        "target_id": "bn_e_0",
+        "relationship": "builds",
+        "importance": 1.0,
+        "strength": 1.0
+      }
+    ],
+    "scene_type": "reveal",
+    "emotional_tone": "intense",
+    "importance_score": 1.0,
+    "metadata": {}
+  },
+  {
+    "scene_id": "SCENE_4",
+    "narration": "একটা জিওলজিক্যাল ক্লক, যার টিকটিক শব্দ সময়ের সাথে সাথে আরও তীব্র হচ্ছে",
+    "entities": [
+      {
+        "id": "bn_e_0",
+        "label": "জিওলজিক্যাল ক্লক",
+        "type": "concept",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      },
+      {
+        "id": "bn_e_1",
+        "label": "টিকটিক শব্দ",
+        "type": "concept",
+        "importance": 1.0,
+        "emotion": "calm",
+        "scale": 1.0,
+        "time": null,
+        "attributes": {}
+      }
+    ],
+    "actions": [
+      {
+        "id": "bn_a_0",
+        "label": "become",
+        "subject_id": "bn_e_0",
+        "object_id": "bn_e_1",
+        "importance": 1.2
+      }
+    ],
+    "quantities": [],
+    "temporal_expressions": [
+      {
+        "label": "সময়ের সাথে সাথে",
+        "value": null,
+        "type": "dynamic"
+      },
+      {
+        "label": "আরও",
+        "value": null,
+        "type": "progressive"
+      }
+    ],
+    "relations": [
+      {
+        "id": "bn_r_1",
+        "source_id": "bn_e_0",
+        "target_id": "bn_e_1",
+        "relationship": "produces",
+        "importance": 1.0,
+        "strength": 1.0
+      }
+    ],
+    "scene_type": "explanation",
+    "emotional_tone": "intense",
+    "importance_score": 1.0,
+    "metadata": {}
+  }
+]
