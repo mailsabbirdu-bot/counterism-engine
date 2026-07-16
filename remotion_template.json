@@ -1,31 +1,57 @@
 {
-  "project_name": "Tracking Test",
+  "project_id": "verification_test",
   "global_settings": {
-    "width": 1920,
-    "height": 1080,
+    "width": 1280,
+    "height": 720,
     "fps": 30
   },
   "scenes": [
     {
-      "scene_id": "SCENE_01",
-      "duration_in_frames": 150,
-      "background_type": "video",
-      "video_path": "renders/test.mp4",
+      "scene_id": "SCENE_1",
+      "duration_in_frames": 300,
+      "background": {
+        "background_type": "procedural",
+        "procedural_config": {
+          "variant": "neon_grid"
+        }
+      },
       "overlays": [
         {
-          "id": "lbl_tracking",
-          "type": "text",
-          "content": "TRACKING BUS",
-          "tracking": {
-            "enabled": true,
-            "target": "track_001",
-            "offset": {"x": 0, "y": -50}
-          },
+          "id": "crve_verification",
+          "type": "crve",
           "start": 0,
-          "duration": 150,
-          "fontSize": "120px",
-          "color": "#00FFAB",
-          "position": {"x": 960, "y": 540}
+          "duration": 300,
+          "position": {
+            "x": 640,
+            "y": 360
+          },
+          "nodes": [
+            {
+              "id": "node1",
+              "label": "AI Engine",
+              "type": "intelligence",
+              "importance": 2.0,
+              "scale": 1.2
+            },
+            {
+              "id": "node2",
+              "label": "Render",
+              "type": "output",
+              "importance": 1.5,
+              "scale": 1.0
+            }
+          ],
+          "links": [
+            {
+              "id": "link1",
+              "source": "node1",
+              "target": "node2",
+              "relationship": "processing",
+              "strength": 1.0
+            }
+          ],
+          "visual_theme": "cyberpunk",
+          "cinematic_mood": "documentary"
         }
       ]
     }

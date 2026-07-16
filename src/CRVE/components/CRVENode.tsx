@@ -17,8 +17,21 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active
   const frame = useCurrentFrame();
 
   // Custom Preset Assignment (AI/Orchestrator driven, or deterministic)
-  const styleKey: CRVENodeStyle = (node as any).style_preset || 'glass_disc';
+  let styleKey: CRVENodeStyle = (node as any).style_preset || 'glass_disc';
+
+  // Semantic Type Overrides
+  const semanticType = (node as any).semantic_type;
+  if (semanticType === 'city' || semanticType === 'location') styleKey = 'satellite_marker';
+  else if (semanticType === 'machine' || semanticType === 'technology') styleKey = 'circuit_chip';
+  else if (semanticType === 'star' || semanticType === 'planet') styleKey = 'holographic_sphere';
+  else if (semanticType === 'human' || semanticType === 'person') styleKey = 'organic_blob';
+  else if (semanticType === 'idea' || semanticType === 'concept') styleKey = 'conceptual_symbol';
+
   const config = NODE_PRESETS[styleKey] || NODE_PRESETS['glass_disc'];
+
+  // Life Cycle State Handling
+  const lifecycle = (node as any).lifecycle_state || 'active';
+  const isWarning = lifecycle === 'warning' || lifecycle === 'critical';
 
   // Floating animation
   const floatY = Math.sin(frame * 0.05 + hashString(node.id)) * 5;
@@ -32,7 +45,8 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active
   const scale = node.scale || 1.0;
   const radius = interpolate(node.importance, [1, 5], [40, 80]) * scale * progress * pulse;
 
-  const color = active ? "#00F5FF" : "rgba(255,255,255,0.4)";
+  let color = active ? "#00F5FF" : "rgba(255,255,255,0.4)";
+  if (isWarning) color = "#ef4444";
 
   const renderShape = () => {
       switch (config.shape) {
@@ -154,8 +168,15 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active
       }
   };
 
+  // Lifecycle Entrance
+  const entrance = spring({
+      frame: frame % 100, // Placeholder for real lifecycle start
+      fps: 30,
+      config: { damping: 12 }
+  });
+
   return (
-    <g transform={`translate(${x}, ${y + floatY}) rotate(${rotate})`} opacity={opacity}>
+    <g transform={`translate(${x}, ${y + floatY}) rotate(${rotate}) scale(${entrance})`} opacity={opacity}>
       <defs>
         <filter id={`node-glow-${node.id}`} x="-100%" y="-100%" width="300%" height="300%">
           <feGaussianBlur stdDeviation={active ? "15" : "5"} result="blur" />

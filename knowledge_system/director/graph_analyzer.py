@@ -15,7 +15,9 @@ class GraphAnalyzer:
                     "theme": "empty",
                     "hero_node": None,
                     "support_nodes": [],
-                    "layout_type": "force"
+                    "layout_type": "force",
+                    "visual_metaphor": "force_graph",
+                    "cinematic_mood": "documentary"
                 },
                 "centrality": {},
                 "node_count": 0,
@@ -47,12 +49,27 @@ class GraphAnalyzer:
         elif len(G.nodes) > 10:
             layout_type = "radial"
 
+        # Semantic Archetype detection
+        visual_metaphor = "force_graph"
+        cinematic_mood = "documentary"
+        if layout_type == "tree": visual_metaphor = "blueprint"
+        elif layout_type == "timeline": visual_metaphor = "subway"
+        elif layout_type == "radial": visual_metaphor = "galaxy"
+
+        if emotional_tone == "intense": cinematic_mood = "danger"
+        elif any(type(n) == str and "brain" in n.lower() for n in G.nodes):
+            cinematic_mood = "scientific"
+            visual_metaphor = "neural_net"
+        elif any(type(n) == str and "war" in n.lower() for n in G.nodes): cinematic_mood = "military"
+
         return {
             "main_structure": {
                 "theme": main_theme,
                 "hero_node": hero_node,
                 "support_nodes": [n for n in important_nodes if n != hero_node],
-                "layout_type": layout_type
+                "layout_type": layout_type,
+                "visual_metaphor": visual_metaphor,
+                "cinematic_mood": cinematic_mood
             },
             "centrality": degree_cent,
             "node_count": len(G.nodes),
