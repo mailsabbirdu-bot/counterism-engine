@@ -379,7 +379,7 @@ const CinematicNode: React.FC<{
   }
 
   const Icon = TYPE_ICONS[node.type || 'concept'] || Brain;
-  const showIcon = node.type === 'hero' || node.type === 'statistic' || node.type === 'warning' || isActive;
+  const showIcon = false;
   const isBangla = /[\u0980-\u09FF]/.test(node.label);
 
   // Dynamic Label Width

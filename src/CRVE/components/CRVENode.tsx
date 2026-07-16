@@ -41,7 +41,7 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active
   const rotate = rotationBase + Math.cos(frame * 0.03 + hashString(node.id)) * 2;
 
   // Pulse animation for active nodes
-  const pulse = active ? 1 + Math.sin(frame * 0.15) * 0.05 : 1;
+  const pulse = 1;
 
   const opacity = active ? (progress * config.opacity) : (0.4 * progress * config.opacity);
   const scale = node.scale || 1.0;
@@ -228,9 +228,9 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active
 
   // Lifecycle Entrance
   const entrance = spring({
-      frame: frame % 100, // Placeholder for real lifecycle start
+      frame: frame, // Single entrance scale at start of scene, no repeating blinking loops
       fps: 30,
-      config: { damping: 12 }
+      config: { damping: 15 }
   });
 
   return (
