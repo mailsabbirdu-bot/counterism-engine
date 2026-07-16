@@ -90,6 +90,8 @@ class KnowledgeSystemPipeline:
                     id=node["id"],
                     label=node["label"],
                     style_preset=layout["style_preset"],
+                    semantic_type=v_mapping.get("semantic_type", "concept"),
+                    lifecycle_state="active",
                     type=v_mapping["type"],
                     style=v_mapping["style"],
                     x=layout["x"],
@@ -116,6 +118,7 @@ class KnowledgeSystemPipeline:
                     target_id=edge["target"],
                     type=rel_mapping["type"],
                     renderer=rel_mapping["renderer"],
+                    grammar=rel_mapping.get("grammar", "default"),
                     path=rel_mapping["path"],
                     speed=rel_mapping["speed"],
                     strength=edge.get("strength", 1.0)
@@ -132,10 +135,25 @@ class KnowledgeSystemPipeline:
 
             theme = f"{tone} {scene_type}" if tone != "intense" else "hidden danger"
 
+            # Background and Mood
+            background_fx = "grid"
+            lighting_style = "ambient"
+            if global_analysis["main_structure"]["cinematic_mood"] == "military":
+                background_fx = "radar"
+                lighting_style = "directional"
+            elif global_analysis["main_structure"]["cinematic_mood"] == "scientific":
+                background_fx = "fog"
+                lighting_style = "volumetric"
+
             scenes.append(ScenePlan(
                 scene_id=scene_id,
                 duration=300,
                 theme=theme,
+                layout_type=global_analysis["main_structure"]["layout_type"],
+                visual_metaphor=global_analysis["main_structure"]["visual_metaphor"],
+                cinematic_mood=global_analysis["main_structure"]["cinematic_mood"],
+                lighting_style=lighting_style,
+                background_fx=background_fx,
                 composition=comp,
                 visual_objects=visual_objects,
                 relationships=visual_rels,

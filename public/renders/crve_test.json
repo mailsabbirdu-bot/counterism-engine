@@ -26,31 +26,14 @@
             "x": 1370,
             "y": 540
           },
-          "nodes": [
-            {
-              "id": "Dhaka",
-              "label": "Dhaka",
-              "type": "abstract_core",
-              "importance": 1.0,
-              "scale": 1.0,
-              "depth": 0.0,
-              "font": "Audiowide-Regular_english",
-              "style_preset": "cyber_eye"
-            },
-            {
-              "id": "Bangladesh",
-              "label": "Bangladesh",
-              "type": "abstract_core",
-              "importance": 1.0,
-              "scale": 1.0,
-              "depth": 0.0,
-              "font": "Audiowide-Regular_english",
-              "style_preset": "neural_synapse"
-            }
-          ],
+          "nodes": [],
           "links": [],
           "layout_type": "force",
-          "visual_theme": "glassmorphism"
+          "visual_theme": "glassmorphism",
+          "cinematic_mood": "documentary",
+          "visual_metaphor": "force_graph",
+          "lighting_style": "ambient",
+          "background_fx": "grid"
         }
       ],
       "camera": {

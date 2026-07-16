@@ -83,6 +83,71 @@ export const EnergyBeam: React.FC<ParticleStreamProps> = ({ path, grammar, progr
     );
 };
 
+export const ElectricDischarge: React.FC<ParticleStreamProps> = ({ path, grammar, progress, active }) => {
+    const frame = useCurrentFrame();
+    return (
+        <g style={{ filter: 'blur(1px)' }}>
+            <path
+                d={path}
+                fill="none"
+                stroke={grammar.color}
+                strokeWidth={grammar.width}
+                strokeOpacity={active ? progress : 0.2}
+            />
+            {active && [1, 2, 3].map(i => (
+                <path
+                    key={i}
+                    d={path}
+                    fill="none"
+                    stroke="white"
+                    strokeWidth={1}
+                    strokeDasharray={`${Math.random() * 20} ${Math.random() * 50}`}
+                    strokeDashoffset={frame * (5 + i)}
+                    opacity={0.8}
+                />
+            ))}
+        </g>
+    );
+};
+
+export const EnergyRibbon: React.FC<ParticleStreamProps> = ({ path, grammar, progress, active }) => {
+    return (
+        <g opacity={active ? progress : 0.2}>
+            <path
+                d={path}
+                fill="none"
+                stroke={grammar.color}
+                strokeWidth={grammar.width * 4}
+                strokeOpacity={0.1}
+            />
+            <path
+                d={path}
+                fill="none"
+                stroke={grammar.color}
+                strokeWidth={grammar.width}
+                strokeOpacity={0.6}
+            />
+        </g>
+    );
+};
+
+export const BreakingLine: React.FC<ParticleStreamProps> = ({ path, grammar, progress, active }) => {
+    const frame = useCurrentFrame();
+    const isBroken = (frame % 60) > 30;
+    return (
+        <g opacity={progress}>
+            <path
+                d={path}
+                fill="none"
+                stroke={grammar.color}
+                strokeWidth={2}
+                strokeDasharray={isBroken ? "10 5" : "none"}
+                strokeOpacity={active ? 1 : 0.3}
+            />
+        </g>
+    );
+};
+
 export const LaserSweep: React.FC<ParticleStreamProps> = ({ path, grammar, progress, active }) => {
     const frame = useCurrentFrame();
     const sweepProgress = (frame * 0.05 * grammar.speed) % 1;

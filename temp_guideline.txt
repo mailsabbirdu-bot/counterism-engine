@@ -1,2 +1,0 @@
-# CUSTOM GUIDELINE
-Rule 1: test

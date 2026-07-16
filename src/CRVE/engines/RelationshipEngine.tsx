@@ -3,9 +3,15 @@ import { useCurrentFrame, useVideoConfig, spring, interpolate, AbsoluteFill } fr
 import * as d3 from 'd3';
 import { CRVENodeData, CRVELinkData } from '../lib/types';
 import { CRVENode } from '../components/CRVENode';
-import { ParticleStream, EnergyBeam, HUDConnector, ElectricArc, LiquidFlow, LaserSweep, SankeyLink } from '../components/RelationshipLayers';
+import {
+    ParticleStream, EnergyBeam, HUDConnector, ElectricArc, LiquidFlow,
+    LaserSweep, SankeyLink, ElectricDischarge, EnergyRibbon, BreakingLine
+} from '../components/RelationshipLayers';
+import { DNAEdge, CircuitEdge, NeuralEdge } from '../components/UniqueEdges';
+import { EnvironmentEngine } from '../components/EnvironmentEngine';
 import { getGrammar } from '../lib/styleRegistry';
 import { getBezierPath } from '../lib/pathUtils';
+import { MOOD_REGISTRY, CinematicMood } from '../lib/moodRegistry';
 
 interface CRVEEngineProps {
   nodes: CRVENodeData[];
@@ -15,9 +21,23 @@ interface CRVEEngineProps {
   position?: { x: number, y: number };
   font?: string;
   layout_type?: string;
+  cinematic_mood?: CinematicMood;
+  lighting_style?: string;
+  background_fx?: string;
 }
 
-export const CRVEEngine: React.FC<CRVEEngineProps> = ({ nodes: rawNodes, links: rawLinks, start, duration, position, font, layout_type = 'force' }) => {
+export const CRVEEngine: React.FC<CRVEEngineProps> = ({
+    nodes: rawNodes,
+    links: rawLinks,
+    start,
+    duration,
+    position,
+    font,
+    layout_type = 'force',
+    cinematic_mood = 'documentary',
+    lighting_style = 'ambient',
+    background_fx = 'grid'
+}) => {
   const frame = useCurrentFrame();
   const { width, height, fps } = useVideoConfig();
 
@@ -57,6 +77,25 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({ nodes: rawNodes, links: 
             (n as any).x = (i - nodes.length/2) * 200;
             (n as any).y = (i % 2 === 0 ? -100 : 100);
         });
+    } else if (layout_type === 'solar_system' || layout_type === 'orbit') {
+        nodes.forEach((n, i) => {
+            if (i === 0) {
+                (n as any).x = 0;
+                (n as any).y = 0;
+            } else {
+                const angle = (i / (nodes.length - 1)) * Math.PI * 2;
+                const dist = 300 + (i % 2) * 50;
+                (n as any).x = Math.cos(angle) * dist;
+                (n as any).y = Math.sin(angle) * dist;
+            }
+        });
+    } else if (layout_type === 'hex_grid') {
+        nodes.forEach((n, i) => {
+            const row = Math.floor(i / 3);
+            const col = i % 3;
+            (n as any).x = (col - 1) * 300 + (row % 2) * 150;
+            (n as any).y = (row - 1) * 250;
+        });
     } else {
         const simulation = d3.forceSimulation<any>(nodes)
           .force("link", d3.forceLink<any, any>(links).id(d => d.id).distance(350))
@@ -75,6 +114,8 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({ nodes: rawNodes, links: 
   const centerX = position?.x ?? width / 2;
   const centerY = position?.y ?? height / 2;
 
+  const mood = MOOD_REGISTRY[cinematic_mood] || MOOD_REGISTRY['documentary'];
+
   const progress = spring({
     frame: relativeFrame,
     fps,
@@ -89,13 +130,15 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({ nodes: rawNodes, links: 
 
   return (
     <AbsoluteFill className="pointer-events-none">
+      <EnvironmentEngine fx={background_fx} lighting={lighting_style} color={mood.colors.primary} />
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`}>
         <g transform={`translate(${centerX}, ${centerY}) scale(${0.8 + progress * 0.2})`}>
           {/* 1. Relationship Layer */}
           {links.map((link, i) => {
             const s = link.source as any;
             const t = link.target as any;
-            const grammar = getGrammar(link.relationship);
+            const rawGrammar = getGrammar(link.relationship);
+            const grammar = { ...rawGrammar, color: mood.colors.primary };
             const path = getBezierPath({ x: s.x, y: s.y }, { x: t.x, y: t.y });
             const active = isActive(link) || isActive(s) || isActive(t);
 
@@ -117,6 +160,24 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({ nodes: rawNodes, links: 
             if (grammar.style === 'sankey_link') {
                 return <SankeyLink key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
             }
+
+            // Unique Scene Edges
+            if (grammar.style === 'dna_helix') {
+                return <DNAEdge key={link.id} path={path} color={grammar.color} progress={progress} active={active} />;
+            }
+            if (grammar.style === 'circuit_board') {
+                return <CircuitEdge key={link.id} path={path} color={grammar.color} progress={progress} active={active} />;
+            }
+            if (grammar.style === 'neural_synapse') {
+                return <NeuralEdge key={link.id} path={path} color={grammar.color} progress={progress} active={active} />;
+            }
+
+            // Semantic Grammar Overrides
+            const relGrammar = (link as any).grammar;
+            if (relGrammar === 'discharge') return <ElectricDischarge key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
+            if (relGrammar === 'ribbon') return <EnergyRibbon key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
+            if (relGrammar === 'breaking') return <BreakingLine key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
+
             return <HUDConnector key={link.id} path={path} grammar={grammar} progress={progress} active={active} />;
           })}
 

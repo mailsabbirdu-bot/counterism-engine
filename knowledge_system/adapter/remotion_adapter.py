@@ -52,7 +52,11 @@ class RemotionAdapter:
                 "nodes": nodes,
                 "links": links,
                 "layout_type": p_scene.get("layout_type", "force"),
-                "visual_theme": p_scene.get("visual_theme", "glassmorphism")
+                "visual_theme": p_scene.get("visual_theme", "glassmorphism"),
+                "cinematic_mood": p_scene.get("cinematic_mood", "documentary"),
+                "visual_metaphor": p_scene.get("visual_metaphor", "force_graph"),
+                "lighting_style": p_scene.get("lighting_style", "ambient"),
+                "background_fx": p_scene.get("background_fx", "none")
             }
 
             scenes.append({

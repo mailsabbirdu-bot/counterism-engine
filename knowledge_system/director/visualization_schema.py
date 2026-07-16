@@ -10,10 +10,13 @@ class VisualRelationship(BaseModel):
     target_id: str
     type: str # reveal, construction_flow, containment, energy_transfer, aggregation
     renderer: str # particle_stream, pulse_line, mask_reveal
+    grammar: str = "default" # electric, flow, breaking, bridge, ribbon, unstable, beam, command, discharge
     path: GeometryPath
     direction: str = "source_to_target"
     speed: float = 1.0
     strength: float = 1.0
+    arrival_animation: str = "draw"
+    departure_animation: str = "fade"
 
 class MotionLanguage(BaseModel):
     meaning: str # hidden_danger, accumulation, progressive_intensity
@@ -24,6 +27,8 @@ class VisualObject(BaseModel):
     id: str
     label: str
     style_preset: Optional[str] = "glass_disc"
+    semantic_type: str = "concept" # city, country, building, human, computer, technology, star, weapon, machine, event, idea
+    lifecycle_state: str = "active" # hidden, scanning, building, active, focused, warning, critical, destroyed
     type: str # danger_core, abstract_core, map_marker, terrain, particles, structures
     style: str # warning, standard, highlight
     x: str = "center" # left, right, center
@@ -61,6 +66,10 @@ class ScenePlan(BaseModel):
     duration: int
     theme: str
     layout_type: str = "force" # force, radial, tree, timeline, flowchart, cycle, constellation, geographic, layered, semantic_zones, hub_spoke, cluster, matrix, sankey, bubble, metro, dna, neural, story_journey
+    visual_metaphor: str = "force_graph" # galaxy, solar_system, neural_net, command_map, subway, blueprint, radar, circuit
+    cinematic_mood: str = "minimal" # minimal, military, scientific, cyberpunk, luxury_hud, organic, documentary, laboratory, danger, dream
+    lighting_style: str = "ambient" # ambient, directional, spotlight, scanning, warning, volumetric
+    background_fx: str = "none" # grid, stars, fog, blueprint, radar, topography, noise, reflections
     visual_theme: str = "glassmorphism" # hud, blueprint, cyber_grid, minimal, glassmorphism, particle, floating_3d, wireframe, circuit, satellite, medical, space, investigation, sketch, chalkboard, neon, documentary, dashboard, ai_neural, isometric
     composition: Composition
     visual_objects: List[VisualObject] = []
