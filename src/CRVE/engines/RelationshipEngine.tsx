@@ -211,13 +211,13 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
 
           if (!active) return null;
 
-          // 1. Dynamic headShape based on relationship type
-          let headShape: "arrow1" | "arrow2" | "circle" | "dot" = "arrow1";
+          // 1. Dynamic headShape based on relationship type (must be supported arrow shapes: arrow1, circle, heart)
+          let headShape: "arrow1" | "circle" = "arrow1";
           const rel = link.relationship.toLowerCase();
           if (rel === 'causes' || rel === 'threatens' || rel === 'danger' || rel === 'energy_transfer') {
-              headShape = "arrow2";
+              headShape = "arrow1";
           } else if (rel === 'is_a' || rel === 'containment' || rel === 'located_in') {
-              headShape = "dot";
+              headShape = "circle";
           } else if (rel === 'forms' || rel === 'aggregation' || rel === 'construction_flow') {
               headShape = "circle";
           }
