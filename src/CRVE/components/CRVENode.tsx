@@ -1,6 +1,7 @@
 import React from 'react';
 import { useCurrentFrame, interpolate, spring } from 'remotion';
 import { CRVENodeData } from '../lib/types';
+import { MOOD_REGISTRY, CinematicMood } from '../lib/moodRegistry';
 
 interface CRVENodeProps {
   node: CRVENodeData;
@@ -9,11 +10,12 @@ interface CRVENodeProps {
   progress: number;
   active: boolean;
   font?: string;
+  cinematic_mood?: CinematicMood;
 }
 
 import { NODE_PRESETS, CRVENodeStyle } from '../lib/nodeStyles';
 
-export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active, font }) => {
+export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active, font, cinematic_mood }) => {
   const frame = useCurrentFrame();
 
   // Custom Preset Assignment (AI/Orchestrator driven, or deterministic)
@@ -45,11 +47,67 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active
   const scale = node.scale || 1.0;
   const radius = interpolate(node.importance, [1, 5], [40, 80]) * scale * progress * pulse;
 
-  let color = active ? "#00F5FF" : "rgba(255,255,255,0.4)";
-  if (isWarning) color = "#ef4444";
+  const mood = MOOD_REGISTRY[cinematic_mood || 'documentary'] || MOOD_REGISTRY['documentary'];
+  let color = active ? mood.colors.primary : "rgba(255,255,255,0.4)";
+  if (isWarning) color = mood.colors.accent || "#ef4444";
 
   const renderShape = () => {
       switch (config.shape) {
+          case 'glass_disc':
+              return (
+                  <g>
+                    <circle r={radius} fill="rgba(255, 255, 255, 0.08)" stroke={color} strokeWidth={2} style={{ backdropFilter: 'blur(8px)' }} />
+                    <circle r={radius * 0.85} fill="none" stroke={color} strokeWidth={1} strokeDasharray="5 10" opacity={0.6} />
+                    <circle r={radius * 0.4} fill="rgba(255, 255, 255, 0.03)" stroke={color} strokeWidth={1.5} />
+                    {[0, 90, 180, 270].map((angle) => {
+                        const rad = (angle * Math.PI) / 180;
+                        return (
+                            <line
+                                key={angle}
+                                x1={Math.cos(rad) * (radius - 8)}
+                                y1={Math.sin(rad) * (radius - 8)}
+                                x2={Math.cos(rad) * radius}
+                                y2={Math.sin(rad) * radius}
+                                stroke={color}
+                                strokeWidth={1.5}
+                            />
+                        );
+                    })}
+                  </g>
+              );
+          case 'orbital_rings':
+              return (
+                  <g>
+                    <circle r={radius * 0.5} fill="none" stroke={color} strokeWidth={3} />
+                    <circle r={radius * 0.8} fill="none" stroke={color} strokeWidth={1} strokeDasharray="10 15" />
+                    <circle r={radius} fill="none" stroke={color} strokeWidth={0.5} strokeDasharray="4 4" />
+                    <circle cx={Math.cos(frame * 0.05) * radius * 0.8} cy={Math.sin(frame * 0.05) * radius * 0.8} r={6} fill={color} />
+                    <circle cx={Math.cos(frame * -0.03 + Math.PI) * radius} cy={Math.sin(frame * -0.03 + Math.PI) * radius} r={4} fill={color} />
+                  </g>
+              );
+          case 'core_pulse':
+              const waveProgress = (frame % 30) / 30;
+              return (
+                  <g>
+                    <circle r={radius * 0.3} fill={color} />
+                    <circle r={radius * 0.3 + waveProgress * radius * 0.7} fill="none" stroke={color} strokeWidth={2 * (1 - waveProgress)} opacity={1 - waveProgress} />
+                    <circle r={radius * 0.3 + ((waveProgress + 0.5) % 1) * radius * 0.7} fill="none" stroke={color} strokeWidth={2 * (1 - ((waveProgress + 0.5) % 1))} opacity={1 - ((waveProgress + 0.5) % 1)} />
+                  </g>
+              );
+          case 'conceptual_symbol':
+              return (
+                  <g transform={`rotate(${frame * 0.5})`}>
+                    <rect x={-radius * 0.6} y={-radius * 0.6} width={radius * 1.2} height={radius * 1.2} fill="none" stroke={color} strokeWidth={2.5} transform="rotate(45)" />
+                    <rect x={-radius * 0.4} y={-radius * 0.4} width={radius * 0.8} height={radius * 0.8} fill="none" stroke={color} strokeWidth={1} transform="rotate(15)" />
+                    <rect x={-radius * 0.2} y={-radius * 0.2} width={radius * 0.4} height={radius * 0.4} fill={color} opacity={0.3} transform="rotate(45)" />
+                    {[0, 90, 180, 270].map((angle) => {
+                        const rad = (angle * Math.PI) / 180;
+                        return (
+                            <circle key={angle} cx={Math.cos(rad) * radius * 0.85} cy={Math.sin(rad) * radius * 0.85} r={3} fill={color} />
+                        );
+                    })}
+                  </g>
+              );
           case 'neon_hexagon':
               return (
                 <path
@@ -176,7 +234,7 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active
   });
 
   return (
-    <g transform={`translate(${x}, ${y + floatY}) rotate(${rotate}) scale(${entrance})`} opacity={opacity}>
+    <g id={node.id} transform={`translate(${x}, ${y + floatY}) rotate(${rotate}) scale(${entrance})`} opacity={opacity}>
       <defs>
         <filter id={`node-glow-${node.id}`} x="-100%" y="-100%" width="300%" height="300%">
           <feGaussianBlur stdDeviation={active ? "15" : "5"} result="blur" />

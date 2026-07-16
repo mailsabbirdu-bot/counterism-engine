@@ -6,7 +6,7 @@ import stanza
 # Add project root to path
 sys.path.append(os.getcwd())
 
-from semantic_engine.main import SemanticEngine
+from knowledge_system.nlp.main import SemanticEngine
 
 def test_engine():
     # Pre-download Bangla model
@@ -22,7 +22,7 @@ def test_engine():
     for i, text in enumerate(test_cases):
         print(f"\n--- Bangla Test Case {i+1} ---")
         print(f"Narration: {text}")
-        result = engine.process(text, scene_id=f"test_scene_bn_{i+1}")
+        result = engine.process(text)
         print(json.dumps(result, indent=2, ensure_ascii=False))
 
 if __name__ == "__main__":

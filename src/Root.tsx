@@ -53,6 +53,23 @@ export const RemotionRoot: React.FC = () => {
                 const fontFace = new FontFace(fontName, `url(${url})`);
                 await fontFace.load();
                 document.fonts.add(fontFace);
+
+                // Inject CSS @font-face rule for bulletproof headless browser rendering
+                const styleId = `font-style-${variant}`;
+                if (!document.getElementById(styleId)) {
+                    const style = document.createElement('style');
+                    style.id = styleId;
+                    style.innerHTML = `
+                        @font-face {
+                            font-family: '${fontName}';
+                            src: url('${url}') format('${ext === 'ttf' ? 'truetype' : ext === 'otf' ? 'opentype' : ext}');
+                            font-weight: normal;
+                            font-style: normal;
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+
                 loaded = true;
                 break;
             } catch (e) {}

@@ -12,13 +12,74 @@ class RemotionAdapter:
     def _is_bangla(self, text: str) -> bool:
         return any("\u0980" <= char <= "\u09FF" for char in str(text))
 
+    def _scan_fonts(self) -> Dict[str, List[str]]:
+        import os
+        import shutil
+
+        dirs_to_check = [
+            "/content/drive/MyDrive/Counterism_Studio_V4/fonts",
+            "public/fonts",
+            "./public/fonts"
+        ]
+        bangla_fonts = []
+        english_fonts = []
+
+        default_bangla = "Sohid_bangla"
+        default_english = "Audiowide-Regular_english"
+
+        # Programmatically sync from drive to local public/fonts if available
+        drive_dir = "/content/drive/MyDrive/Counterism_Studio_V4/fonts"
+        local_dir = "public/fonts"
+        if os.path.exists(drive_dir) and os.path.isdir(drive_dir):
+            if os.path.exists(local_dir) and os.path.isdir(local_dir):
+                for filename in os.listdir(drive_dir):
+                    src_file = os.path.join(drive_dir, filename)
+                    dst_file = os.path.join(local_dir, filename)
+                    if os.path.isfile(src_file) and os.path.splitext(filename)[1].lower() in ['.ttf', '.otf', '.woff', '.woff2']:
+                        try:
+                            shutil.copy2(src_file, dst_file)
+                        except Exception as e:
+                            print(f"Warning: Failed to copy {filename} to {local_dir}: {e}")
+
+        # Scan for available fonts
+        for d in dirs_to_check:
+            if os.path.exists(d) and os.path.isdir(d):
+                for filename in os.listdir(d):
+                    name, ext = os.path.splitext(filename)
+                    if ext.lower() in ['.ttf', '.otf', '.woff', '.woff2']:
+                        lower_name = name.lower()
+                        if 'bangla' in lower_name or 'bn' in lower_name:
+                            if name not in bangla_fonts:
+                                bangla_fonts.append(name)
+                        elif 'english' in lower_name or 'en' in lower_name or 'eng' in lower_name or 'enlgish' in lower_name:
+                            if name not in english_fonts:
+                                english_fonts.append(name)
+                if bangla_fonts or english_fonts:
+                    break
+
+        if not bangla_fonts:
+            bangla_fonts.append(default_bangla)
+        if not english_fonts:
+            english_fonts.append(default_english)
+
+        return {
+            "bangla": bangla_fonts,
+            "english": english_fonts
+        }
+
     def adapt(self, plan_data: Dict[str, Any]) -> Dict[str, Any]:
+        scanned_fonts = self._scan_fonts()
         scenes = []
         for p_scene in plan_data["scenes"]:
             # Convert VisualObjects into CRVE-compatible overlays
             nodes = []
             for obj in p_scene["visual_objects"]:
-                font = "Sohid_bangla" if self._is_bangla(obj["label"]) else "Audiowide-Regular_english"
+                is_bn = self._is_bangla(obj["label"])
+                font_list = scanned_fonts["bangla"] if is_bn else scanned_fonts["english"]
+
+                # Pick font dynamically based on the label/id hash to ensure typographic richness
+                font_idx = abs(hash(obj["id"])) % len(font_list)
+                font = font_list[font_idx]
 
                 nodes.append({
                     "id": obj["id"],

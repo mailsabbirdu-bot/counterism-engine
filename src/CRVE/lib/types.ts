@@ -28,7 +28,9 @@ export type RelationshipStyle =
   | 'pulse_line'
   | 'liquid_flow'
   | 'energy_flow'
-  | 'data_stream';
+  | 'data_stream'
+  | 'laser_sweep'
+  | 'sankey_link';
 
 export interface RelationshipGrammar {
   type: string;
