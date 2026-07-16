@@ -133,59 +133,10 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
     <AbsoluteFill className="pointer-events-none" style={{ position: 'relative' }}>
       <EnvironmentEngine fx={background_fx} lighting={lighting_style} color={mood.colors.primary} />
       <Xwrapper>
-        {/* SVG Nodes and High-Fidelity Animated Connections Layer */}
+        {/* SVG Nodes Layer (react-xarrows handles all connections cleanly) */}
         <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} style={{ position: 'absolute', top: 0, left: 0, zIndex: 10 }}>
           <g transform={`translate(${centerX}, ${centerY}) scale(${0.8 + progress * 0.2})`}>
-            {/* 1. SVG Custom High-Fidelity Animated Connections */}
-            {links.map((link) => {
-              const s = link.source as any;
-              const t = link.target as any;
-              const active = isActive(link) || isActive(s) || isActive(t);
-              if (!active) return null;
-
-              if (typeof s === 'object' && typeof t === 'object') {
-                const grammar = getGrammar(link.relationship);
-                const customGrammar = {
-                  ...grammar,
-                  color: cinematic_mood === 'cyberpunk' ? mood.colors.secondary :
-                         cinematic_mood === 'danger' ? mood.colors.accent :
-                         grammar.color
-                };
-
-                const path = getBezierPath(s, t);
-
-                switch (grammar.style) {
-                  case 'particle_stream':
-                    return <ParticleStream key={`svg-link-${link.id}`} path={path} grammar={customGrammar} progress={progress} active={active} />;
-                  case 'laser_beam':
-                    return <EnergyBeam key={`svg-link-${link.id}`} path={path} grammar={customGrammar} progress={progress} active={active} />;
-                  case 'electric_arc':
-                    return <ElectricArc key={`svg-link-${link.id}`} path={path} grammar={customGrammar} progress={progress} active={active} />;
-                  case 'liquid_flow':
-                    return <LiquidFlow key={`svg-link-${link.id}`} path={path} grammar={customGrammar} progress={progress} active={active} />;
-                  case 'laser_sweep':
-                    return <LaserSweep key={`svg-link-${link.id}`} path={path} grammar={customGrammar} progress={progress} active={active} />;
-                  case 'sankey_link':
-                    return <SankeyLink key={`svg-link-${link.id}`} path={path} grammar={customGrammar} progress={progress} active={active} />;
-                  case 'pulse_line':
-                    return <ElectricDischarge key={`svg-link-${link.id}`} path={path} grammar={customGrammar} progress={progress} active={active} />;
-                  default:
-                    return (
-                      <path
-                        key={`svg-link-${link.id}`}
-                        d={path}
-                        fill="none"
-                        stroke={customGrammar.color}
-                        strokeWidth={customGrammar.width}
-                        strokeOpacity={active ? 0.8 * progress : 0.2 * progress}
-                      />
-                    );
-                }
-              }
-              return null;
-            })}
-
-            {/* 2. SVG Nodes */}
+            {/* SVG Nodes */}
             {nodes.map((node: any) => (
               <CRVENode
                   key={node.id}
