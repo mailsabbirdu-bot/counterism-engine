@@ -1,17 +1,9 @@
 import React, { useMemo } from 'react';
 import { useCurrentFrame, useVideoConfig, spring, interpolate, AbsoluteFill } from 'remotion';
 import * as d3 from 'd3';
-import Xarrow, { Xwrapper } from 'react-xarrows';
 import { CRVENodeData, CRVELinkData } from '../lib/types';
 import { CRVENode } from '../components/CRVENode';
-import {
-    ParticleStream, EnergyBeam, HUDConnector, ElectricArc, LiquidFlow,
-    LaserSweep, SankeyLink, ElectricDischarge, EnergyRibbon, BreakingLine
-} from '../components/RelationshipLayers';
-import { DNAEdge, CircuitEdge, NeuralEdge } from '../components/UniqueEdges';
 import { EnvironmentEngine } from '../components/EnvironmentEngine';
-import { getGrammar } from '../lib/styleRegistry';
-import { getBezierPath } from '../lib/pathUtils';
 import { MOOD_REGISTRY, CinematicMood } from '../lib/moodRegistry';
 
 interface CRVEEngineProps {
@@ -42,11 +34,14 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
   const frame = useCurrentFrame();
   const { width, height, fps } = useVideoConfig();
 
+  const relativeFrame = frame - start;
+  const centerX = position?.x ?? width / 2;
+  const centerY = position?.y ?? height / 2;
+
   const { nodes, links } = useMemo(() => {
     const nodes = rawNodes.map(n => ({ ...n }));
 
     // Defensive Filter: Remotion can sometimes pass incomplete data during hot-reload or large renders
-    // D3-force link initialize will CRASH if a source/target node is missing.
     const nodeIds = new Set(nodes.map(n => n.id));
     const validLinks = rawLinks.filter(l => nodeIds.has(l.source) && nodeIds.has(l.target));
     const links = validLinks.map(l => ({ ...l }));
@@ -106,14 +101,34 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
 
         for (let i = 0; i < 300; ++i) simulation.tick();
     }
+
+    // Programmatic Broadcast Safe-Zone clamping to guarantee 100% visibility of all text labels inside 1920x1080 bounds
+    nodes.forEach((n: any) => {
+        const absX = centerX + (n.x ?? 0);
+        const absY = centerY + (n.y ?? 0);
+
+        const minAbsX = 250;
+        const maxAbsX = 1670;
+        const minAbsY = 150;
+        const maxAbsY = 930;
+
+        if (absX < minAbsX) {
+            n.x = minAbsX - centerX;
+        } else if (absX > maxAbsX) {
+            n.x = maxAbsX - centerX;
+        }
+
+        if (absY < minAbsY) {
+            n.y = minAbsY - centerY;
+        } else if (absY > maxAbsY) {
+            n.y = maxAbsY - centerY;
+        }
+    });
+
     return { nodes, links };
-  }, [rawNodes, rawLinks, layout_type]);
+  }, [rawNodes, rawLinks, layout_type, centerX, centerY]);
 
   if (frame < start || frame > start + duration) return null;
-
-  const relativeFrame = frame - start;
-  const centerX = position?.x ?? width / 2;
-  const centerY = position?.y ?? height / 2;
 
   const mood = MOOD_REGISTRY[cinematic_mood] || MOOD_REGISTRY['documentary'];
 
@@ -132,124 +147,161 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
   return (
     <AbsoluteFill className="pointer-events-none" style={{ position: 'relative' }}>
       <EnvironmentEngine fx={background_fx} lighting={lighting_style} color={mood.colors.primary} />
-      <Xwrapper>
-        {/* SVG Nodes Layer (react-xarrows handles all connections cleanly) */}
-        <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} style={{ position: 'absolute', top: 0, left: 0, zIndex: 10 }}>
-          <g transform={`translate(${centerX}, ${centerY}) scale(${0.8 + progress * 0.2})`}>
-            {/* SVG Nodes */}
-            {nodes.map((node: any) => (
-              <CRVENode
-                  key={node.id}
-                  node={node}
-                  x={node.x}
-                  y={node.y}
-                  progress={progress}
-                  active={isActive(node)}
-                  font={node.font || font}
-                  cinematic_mood={cinematic_mood}
-              />
-            ))}
-          </g>
-        </svg>
 
-        {/* Dynamic Connections Layer using react-xarrows */}
-        {links.map((link, i) => {
-          const s = link.source as any;
-          const t = link.target as any;
-          const startId = typeof s === 'object' ? s.id : s;
-          const endId = typeof t === 'object' ? t.id : t;
-          const active = isActive(link) || isActive(s) || isActive(t);
+      {/*
+        Unified SVG Layer:
+        Renders BOTH nodes and arrows in the exact same SVG coordinate container.
+        This eliminates coordinate mismatching, floating offsets, and measurement jitter,
+        and guarantees pixel-perfect rendering and perfect tracking even with camera zoom/scale changes!
+      */}
+      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} style={{ position: 'absolute', top: 0, left: 0, zIndex: 10 }}>
+        <g transform={`translate(${centerX}, ${centerY}) scale(${0.8 + progress * 0.2})`}>
 
-          if (!active) return null;
+          {/* Unified Connections (Arrows & Middle Labels) */}
+          {links.map((link) => {
+            const s = link.source as any;
+            const t = link.target as any;
 
-          // 1. Dynamic headShape based on relationship type (must be supported arrow shapes: arrow1, circle, heart)
-          let headShape: "arrow1" | "circle" = "arrow1";
-          const rel = link.relationship.toLowerCase();
-          if (rel === 'causes' || rel === 'threatens' || rel === 'danger' || rel === 'energy_transfer') {
-              headShape = "arrow1";
-          } else if (rel === 'is_a' || rel === 'containment' || rel === 'located_in') {
-              headShape = "circle";
-          } else if (rel === 'forms' || rel === 'aggregation' || rel === 'construction_flow') {
-              headShape = "circle";
-          }
+            const x1 = s.x ?? 0;
+            const y1 = s.y ?? 0;
+            const x2 = t.x ?? 0;
+            const y2 = t.y ?? 0;
 
-          // 2. Dynamic dashness (animation speed & patterns) unique per scene and mood
-          let dashness: any = false;
-          if (cinematic_mood === 'cyberpunk') {
-              dashness = { strokeLen: 15, nonStrokeLen: 5, animation: 1.0 };
-          } else if (cinematic_mood === 'military') {
-              dashness = { strokeLen: 4, nonStrokeLen: 4, animation: 2.0 };
-          } else if (cinematic_mood === 'scientific') {
-              dashness = { strokeLen: 8, nonStrokeLen: 4, animation: 0.5 };
-          } else if (cinematic_mood === 'danger') {
-              dashness = { strokeLen: 6, nonStrokeLen: 3, animation: 0.3 };
-          } else if (rel === 'builds' || rel === 'produces' || rel === 'construction_flow') {
-              dashness = { strokeLen: 12, nonStrokeLen: 8, animation: 1.0 };
-          } else if (rel === 'causes' || rel === 'energy_transfer') {
-              dashness = { strokeLen: 10, nonStrokeLen: 4, animation: 0.6 };
-          }
+            const active = isActive(link) || isActive(s) || isActive(t);
+            if (!active) return null;
 
-          // 3. Dynamic strokeWidth & color based on mood
-          let strokeWidth = active ? 4 : 2;
-          let arrowColor = mood.colors.primary;
-          if (cinematic_mood === 'cyberpunk') {
-              strokeWidth = active ? 6 : 3;
-              arrowColor = mood.colors.secondary;
-          } else if (cinematic_mood === 'danger') {
-              strokeWidth = active ? 5 : 2;
-              arrowColor = mood.colors.accent;
-          }
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const length = Math.sqrt(dx * dx + dy * dy);
 
-          // 4. Dynamic Label Sizes based on connection strength
-          const strength = link.strength || 1.0;
-          const fontSize = Math.max(12, Math.min(22, Math.round(strength * 15)));
-          const paddingY = Math.max(2, Math.round(strength * 4));
-          const paddingX = Math.max(6, Math.round(strength * 10));
+            if (length < 20) return null;
 
-          return (
-            <Xarrow
-              key={link.id}
-              start={startId}
-              end={endId}
-              color={arrowColor}
-              strokeWidth={strokeWidth}
-              dashness={dashness}
-              showHead={true}
-              headShape={headShape}
-              headSize={active ? 6 : 4}
-              path={layout_type === 'timeline' ? 'grid' : 'smooth'}
-              curveness={0.3}
-              labels={{
-                middle: (
-                  <div
+            // Dynamic offset based on label length to avoid overlapping with the text
+            const sourceLabelLen = s.label ? s.label.length : 5;
+            const targetLabelLen = t.label ? t.label.length : 5;
+
+            const offsetStart = Math.max(50, sourceLabelLen * 15);
+            const offsetEnd = Math.max(60, targetLabelLen * 15);
+
+            // Safe guard against extremely short lines overlapping
+            const startFactor = length > offsetStart + offsetEnd ? offsetStart / length : 0.1;
+            const endFactor = length > offsetStart + offsetEnd ? offsetEnd / length : 0.1;
+
+            const x1_opt = x1 + dx * startFactor;
+            const y1_opt = y1 + dy * startFactor;
+            const x2_opt = x2 - dx * endFactor;
+            const y2_opt = y2 - dy * endFactor;
+
+            const angle = Math.atan2(y2_opt - y1_opt, x2_opt - x1_opt);
+
+            // Style connections per relationship and mood
+            let strokeWidth = active ? 4 : 2;
+            let arrowColor = mood.colors.primary;
+            if (cinematic_mood === 'cyberpunk') {
+                strokeWidth = active ? 5 : 2;
+                arrowColor = mood.colors.secondary;
+            } else if (cinematic_mood === 'danger') {
+                strokeWidth = active ? 5 : 2;
+                arrowColor = mood.colors.accent;
+            }
+
+            // Dash array styling based on relationship type
+            let dasharray = "none";
+            const rel = link.relationship.toLowerCase();
+            if (rel === 'causes' || rel === 'threatens' || rel === 'danger' || rel === 'energy_transfer') {
+                dasharray = "5,5";
+            } else if (rel === 'is_a' || rel === 'containment' || rel === 'located_in') {
+                dasharray = "10,5";
+            } else if (rel === 'forms' || rel === 'aggregation' || rel === 'construction_flow') {
+                dasharray = "2,2";
+            }
+
+            const mx = (x1_opt + x2_opt) / 2;
+            const my = (y1_opt + y2_opt) / 2;
+            const labelText = link.relationship;
+            const rectW = Math.max(80, labelText.length * 11 + 20);
+            const rectH = 32;
+
+            return (
+              <g key={`unified-link-${link.id}`}>
+                {/* Connection Line */}
+                <path
+                  d={`M ${x1_opt} ${y1_opt} L ${x2_opt} ${y2_opt}`}
+                  fill="none"
+                  stroke={arrowColor}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={dasharray}
+                  opacity={active ? 0.9 : 0.3}
+                />
+
+                {/* Arrow Head / Terminal Point */}
+                { (rel === 'causes' || rel === 'threatens' || rel === 'danger' || rel === 'energy_transfer') ? (
+                  <polygon
+                    points="0,0 -12,-6 -12,6"
+                    fill={arrowColor}
+                    opacity={active ? 0.9 : 0.3}
+                    transform={`translate(${x2_opt}, ${y2_opt}) rotate(${(angle * 180) / Math.PI})`}
+                  />
+                ) : (
+                  <circle
+                    cx={x2_opt}
+                    cy={y2_opt}
+                    r={6}
+                    fill={arrowColor}
+                    opacity={active ? 0.9 : 0.3}
+                  />
+                )}
+
+                {/* Glassmorphic/HUD Middle Label Box */}
+                <g transform={`translate(${mx}, ${my})`}>
+                  <rect
+                    x={-rectW / 2}
+                    y={-rectH / 2}
+                    width={rectW}
+                    height={rectH}
+                    rx={6}
+                    fill="rgba(5, 5, 5, 0.9)"
+                    stroke={arrowColor}
+                    strokeWidth={1.5}
+                    opacity={active ? 0.95 : 0.4}
+                    style={{ filter: 'drop-shadow(0 0 8px rgba(0,0,0,0.6))' }}
+                  />
+                  <text
+                    fill="white"
+                    textAnchor="middle"
+                    dy="5"
                     style={{
-                      background: 'rgba(5, 5, 5, 0.85)',
-                      backdropFilter: 'blur(8px)',
-                      border: `1.5px solid ${arrowColor}`,
-                      borderRadius: '8px',
-                      padding: `${paddingY}px ${paddingX}px`,
-                      color: '#ffffff',
-                      fontSize: `${fontSize}px`,
-                      fontWeight: 900,
+                      fontSize: '14px',
+                      fontWeight: 800,
                       fontFamily: font || 'Inter, sans-serif',
+                      letterSpacing: '1px',
                       textTransform: 'uppercase',
-                      boxShadow: `0 0 12px ${arrowColor}66`,
+                      opacity: active ? 1.0 : 0.5
                     }}
                   >
-                    {link.relationship}
-                  </div>
-                )
-              }}
-              divContainerStyle={{
-                zIndex: 5,
-              }}
-              SVGcanvasStyle={{
-                zIndex: 5,
-              }}
+                    {labelText}
+                  </text>
+                </g>
+              </g>
+            );
+          })}
+
+          {/* Unified Nodes Layer */}
+          {nodes.map((node: any) => (
+            <CRVENode
+                key={node.id}
+                node={node}
+                x={node.x}
+                y={node.y}
+                progress={progress}
+                active={isActive(node)}
+                font={node.font || font}
+                cinematic_mood={cinematic_mood}
             />
-          );
-        })}
-      </Xwrapper>
+          ))}
+
+        </g>
+      </svg>
     </AbsoluteFill>
   );
 };
