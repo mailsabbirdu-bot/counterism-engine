@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useCurrentFrame, useVideoConfig, spring, interpolate, AbsoluteFill } from 'remotion';
 import * as d3 from 'd3';
+import Xarrow, { Xwrapper, useXarrow } from 'react-xarrows';
 import { CRVENodeData, CRVELinkData } from '../lib/types';
 import { CRVENode } from '../components/CRVENode';
 import { EnvironmentEngine } from '../components/EnvironmentEngine';
@@ -33,6 +34,11 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const { width, height, fps } = useVideoConfig();
+  const updateXarrow = useXarrow();
+
+  React.useEffect(() => {
+    updateXarrow();
+  }, [frame, updateXarrow]);
 
   const relativeFrame = frame - start;
   const centerX = position?.x ?? width / 2;
@@ -184,172 +190,138 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
       return item.active_windows.some(([s, e]: [number, number]) => frame >= s && frame <= e);
   };
 
+  // Helper to construct react-xarrows props per scene mood and active state
+  const getXarrowProps = (link: any) => {
+    const s = link.source as any;
+    const t = link.target as any;
+    const active = isActive(link) || isActive(s) || isActive(t);
+
+    let arrowColor = mood.colors.primary;
+    let pathType: 'smooth' | 'grid' | 'straight' = 'smooth';
+    let dashnessSetting: any = { strokeLen: 10, nonStrokeLen: 5, animation: 1.5 };
+    let strokeWidth = active ? 4 : 2;
+    let headSize = 6;
+
+    if (resolvedMood === 'scientific') {
+      arrowColor = mood.colors.primary;
+      pathType = 'straight';
+      dashnessSetting = { strokeLen: 12, nonStrokeLen: 6, animation: 1 };
+      strokeWidth = active ? 4 : 1.5;
+    } else if (resolvedMood === 'cyberpunk') {
+      arrowColor = mood.colors.secondary;
+      pathType = 'smooth';
+      dashnessSetting = { strokeLen: 6, nonStrokeLen: 12, animation: 3 };
+      strokeWidth = active ? 5 : 2;
+      headSize = 8;
+    } else if (resolvedMood === 'danger') {
+      arrowColor = mood.colors.accent;
+      pathType = 'grid';
+      dashnessSetting = { strokeLen: 15, nonStrokeLen: 5, animation: 2 };
+      strokeWidth = active ? 5 : 2;
+      headSize = 9;
+    } else if (resolvedMood === 'luxury_hud') {
+      arrowColor = mood.colors.primary;
+      pathType = 'smooth';
+      dashnessSetting = { strokeLen: 20, nonStrokeLen: 10, animation: 0.5 };
+      strokeWidth = active ? 3.5 : 1.5;
+      headSize = 5;
+    }
+
+    return {
+      start: String(s.id),
+      end: String(t.id),
+      lineColor: arrowColor,
+      headColor: arrowColor,
+      strokeWidth,
+      showHead: true,
+      headSize,
+      path: pathType,
+      dashness: dashnessSetting,
+      animateDrawing: 1.2,
+      zIndex: 10
+    };
+  };
+
   return (
     <AbsoluteFill className="pointer-events-none" style={{ position: 'relative' }}>
       <EnvironmentEngine fx={background_fx} lighting={lighting_style} color={mood.colors.primary} />
 
-      {/*
-        Unified SVG Layer:
-        Renders BOTH nodes and arrows in the exact same SVG coordinate container.
-        This eliminates coordinate mismatching, offsets, and measurement jitter,
-        and guarantees pixel-perfect rendering and perfect tracking even with camera zoom/scale changes!
-      */}
-      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} style={{ position: 'absolute', top: 0, left: 0, zIndex: 10 }}>
-        <g transform={`translate(${centerX}, ${centerY}) scale(${0.8 + progress * 0.2})`}>
+      <Xwrapper>
+        {/*
+          Unified Scale Container:
+          Renders nodes inside a scaled container.
+        */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            zIndex: 10,
+            transform: `scale(${0.8 + progress * 0.2})`,
+            transformOrigin: `${centerX}px ${centerY}px`
+          }}
+        >
+          {/* Nodes Layer (Each Node is represented as a beautifully placed HTML component) */}
+          {nodes.map((node: any, i: number) => {
+            const floatY = Math.sin(frame * (node.isHeaderNode ? 0.02 : 0.035) + hashString(node.id)) * (node.isHeaderNode ? 3 : 5);
+            const floatX = Math.cos(frame * (node.isHeaderNode ? 0.015 : 0.025) + hashString(node.id)) * (node.isHeaderNode ? 2 : 3);
 
-          {/* Unified Connections (Arrows & Floating Knowledge Packets) */}
+            return (
+              <div
+                key={node.id}
+                id={String(node.id)}
+                style={{
+                  position: 'absolute',
+                  left: `${centerX + node.x + floatX}px`,
+                  top: `${centerY + node.y + floatY}px`,
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 20,
+                  pointerEvents: 'none'
+                }}
+              >
+                <CRVENode
+                  node={node}
+                  progress={progress}
+                  active={isActive(node)}
+                  font={node.font || font}
+                  cinematic_mood={resolvedMood}
+                  index={i}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        {/*
+          react-xarrows connections layer (rendered outside the scaled container, at 1x scale)
+          This ensures react-xarrows calculates screen-space coordinates perfectly and tracks beautifully!
+        */}
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 15 }}>
           {links.map((link) => {
             const s = link.source as any;
             const t = link.target as any;
-
-            const x1 = s.x ?? 0;
-            const y1 = s.y ?? 0;
-            const x2 = t.x ?? 0;
-            const y2 = t.y ?? 0;
-
             const active = isActive(link) || isActive(s) || isActive(t);
             if (!active) return null;
 
-            const dx = x2 - x1;
-            const dy = y2 - y1;
-            const length = Math.sqrt(dx * dx + dy * dy);
-
-            if (length < 20) return null;
-
-            // TIGHT, COMPACT start/end offsets to bring connectors extremely close to node labels
-            const sourceLabelLen = s.label ? s.label.length : 5;
-            const targetLabelLen = t.label ? t.label.length : 5;
-
-            // Bring connection lines perfectly close to the text boundaries
-            const offsetStart = Math.max(25, sourceLabelLen * 8.5);
-            const offsetEnd = Math.max(30, targetLabelLen * 8.5);
-
-            // Safe guard against line overlap
-            const startFactor = length > offsetStart + offsetEnd ? offsetStart / length : 0.1;
-            const endFactor = length > offsetStart + offsetEnd ? offsetEnd / length : 0.1;
-
-            const x1_opt = x1 + dx * startFactor;
-            const y1_opt = y1 + dy * startFactor;
-            const x2_opt = x2 - dx * endFactor;
-            const y2_opt = y2 - dy * endFactor;
-
-            const angle = Math.atan2(y2_opt - y1_opt, x2_opt - x1_opt);
-
-            // Style connections per relationship and mood
-            let strokeWidth = active ? 4 : 2;
-            let arrowColor = mood.colors.primary;
-            if (resolvedMood === 'cyberpunk') {
-                strokeWidth = active ? 5 : 2.5;
-                arrowColor = mood.colors.secondary;
-            } else if (resolvedMood === 'danger') {
-                strokeWidth = active ? 5 : 2.5;
-                arrowColor = mood.colors.accent;
-            } else if (resolvedMood === 'luxury_hud') {
-                strokeWidth = active ? 4.5 : 2;
-                arrowColor = mood.colors.primary;
-            }
-
-            // Staggered draw-in math: line starts drawing after both of its endpoint nodes have stagger-entered!
-            const sourceIdx = nodes.findIndex(n => n.id === s.id);
-            const targetIdx = nodes.findIndex(n => n.id === t.id);
-            const maxStagger = Math.max(sourceIdx, targetIdx) * 15;
-
-            const lineAge = Math.max(0, relativeFrame - maxStagger - 5);
-            const drawProgress = spring({
-                frame: lineAge,
-                fps: 30,
-                config: { damping: 16, stiffness: 50 }
-            });
-
-            // Dynamic line write-in using dash offsets
-            const lineDashArray = `${length}`;
-            const lineDashOffset = length * (1 - drawProgress);
-
-            // Traveling glowing information packet: moves continuously from source to target
-            const packetCycle = resolvedMood === 'cyberpunk' ? 35 : resolvedMood === 'danger' ? 25 : 55; // cyber & danger flow faster
-            const travelProgress = ((relativeFrame - maxStagger) % packetCycle) / packetCycle;
-            const px = x1_opt + (x2_opt - x1_opt) * travelProgress;
-            const py = y1_opt + (y2_opt - y1_opt) * travelProgress;
-
-            const isDrawing = drawProgress > 0.01;
-
             return (
-              <g key={`unified-link-${link.id}`}>
-                {/* Dynamic connection glow backing line */}
-                {active && isDrawing && (
-                  <path
-                    d={`M ${x1_opt} ${y1_opt} L ${x2_opt} ${y2_opt}`}
-                    fill="none"
-                    stroke={arrowColor}
-                    strokeWidth={strokeWidth * 3}
-                    strokeDasharray={lineDashArray}
-                    strokeDashoffset={lineDashOffset}
-                    opacity={0.15}
-                    style={{ filter: 'blur(4px)' }}
-                  />
-                )}
-
-                {/* Connection Line */}
-                <path
-                  d={`M ${x1_opt} ${y1_opt} L ${x2_opt} ${y2_opt}`}
-                  fill="none"
-                  stroke={arrowColor}
-                  strokeWidth={strokeWidth}
-                  strokeDasharray={lineDashArray}
-                  strokeDashoffset={lineDashOffset}
-                  opacity={active ? 0.9 : 0.3}
-                />
-
-                {/* Arrow Head Point (Smoothly scales up with the line write-in) */}
-                <polygon
-                  points="0,0 -12,-5 -12,5"
-                  fill={arrowColor}
-                  opacity={active ? 0.9 * drawProgress : 0.3 * drawProgress}
-                  transform={`translate(${x2_opt}, ${y2_opt}) rotate(${(angle * 180) / Math.PI}) scale(${drawProgress})`}
-                />
-
-                {/* Highly dynamic traveling glowing packet (draws user eye attention) */}
-                {active && isDrawing && travelProgress >= 0 && (
-                  <g>
-                    {/* Outer soft aura */}
-                    <circle
-                      cx={px}
-                      cy={py}
-                      r={resolvedMood === 'danger' ? 12 : 9}
-                      fill={arrowColor}
-                      opacity={0.5}
-                      style={{ filter: 'blur(3px)' }}
-                    />
-                    {/* Inner intense core */}
-                    <circle
-                      cx={px}
-                      cy={py}
-                      r={4}
-                      fill="#ffffff"
-                    />
-                  </g>
-                )}
-              </g>
+              <Xarrow
+                key={`xarrow-${link.id}`}
+                {...getXarrowProps(link)}
+              />
             );
           })}
-
-          {/* Unified Nodes Layer */}
-          {nodes.map((node: any, i: number) => (
-            <CRVENode
-                key={node.id}
-                node={node}
-                x={node.x}
-                y={node.y}
-                progress={progress}
-                active={isActive(node)}
-                font={node.font || font}
-                cinematic_mood={resolvedMood}
-                index={i}
-            />
-          ))}
-
-        </g>
-      </svg>
+        </div>
+      </Xwrapper>
     </AbsoluteFill>
   );
 };
+
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return hash;
+}

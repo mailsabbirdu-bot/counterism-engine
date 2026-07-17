@@ -5,8 +5,6 @@ import { MOOD_REGISTRY, CinematicMood } from '../lib/moodRegistry';
 
 interface CRVENodeProps {
   node: CRVENodeData;
-  x: number;
-  y: number;
   progress: number;
   active: boolean;
   font?: string;
@@ -14,15 +12,10 @@ interface CRVENodeProps {
   index: number;
 }
 
-export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active, font, cinematic_mood, index }) => {
+export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font, cinematic_mood, index }) => {
   const frame = useCurrentFrame();
 
   const isHeader = (node as any).isHeaderNode;
-
-  // Slow, beautiful organic drift/breathing animation (perfectly horizontal, no rotation)
-  // Header titles drift even slower and more majestically
-  const floatY = Math.sin(frame * (isHeader ? 0.02 : 0.035) + hashString(node.id)) * (isHeader ? 3 : 5);
-  const floatX = Math.cos(frame * (isHeader ? 0.015 : 0.025) + hashString(node.id)) * (isHeader ? 2 : 3);
 
   // Staggered entry
   const staggerOffset = index * 15;
@@ -38,126 +31,122 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active
   const finalOpacity = nodeOpacity * progress;
 
   const mood = MOOD_REGISTRY[cinematic_mood || 'documentary'] || MOOD_REGISTRY['documentary'];
-  const glowColor = active ? mood.colors.primary : "rgba(255, 255, 255, 0.4)";
+  const glowColor = active ? mood.colors.primary : "rgba(255, 255, 255, 0.2)";
+
+  // Language Detection (English vs Bangla)
+  const isBangla = /[\u0980-\u09FF]/.test(node.label);
+  const fontStyle = {
+    fontFamily: font || (isBangla ? 'Sohid_bangla, sans-serif' : 'Audiowide-Regular_english, Inter, sans-serif')
+  };
 
   if (isHeader) {
-    // Beautiful, cinematic Header Title styling with an accent line below it
+    // Elegant glassmorphic title card with unique stylistic accents depending on cinematic_mood
     return (
-      <g id={node.id} transform={`translate(${x + floatX}, ${y + floatY}) scale(${entryScale})`} opacity={finalOpacity}>
-        <defs>
-          <filter id={`header-glow-${node.id}`} x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="20" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-
-        {/* Soft, wide ambient glow behind the title */}
-        <text
-          fill={mood.colors.primary}
-          textAnchor="middle"
-          dy="0"
+      <div
+        className="flex flex-col items-center justify-center p-6 rounded-2xl relative select-none"
+        style={{
+          background: 'radial-gradient(100% 100% at 50% 0%, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%)',
+          backdropFilter: 'blur(16px)',
+          border: `1px solid rgba(255, 255, 255, 0.08)`,
+          boxShadow: `0 20px 50px rgba(0, 0, 0, 0.3)`,
+          minWidth: '420px',
+          ...fontStyle,
+          opacity: finalOpacity,
+          transform: `scale(${entryScale})`
+        }}
+      >
+        {/* Animated dynamic line indicator */}
+        <div
+          className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px]"
           style={{
-              fontSize: '44px',
-              fontWeight: 900,
-              fontFamily: font || 'Inter, sans-serif',
-              letterSpacing: '8px',
-              textTransform: 'uppercase',
-              opacity: 0.15,
-              filter: `url(#header-glow-${node.id})`
+            width: '120px',
+            background: `linear-gradient(90deg, transparent, ${mood.colors.primary}, transparent)`,
+            boxShadow: `0 0 10px ${mood.colors.primary}`
+          }}
+        />
+
+        {/* Cinematic subtitle label */}
+        <span
+          className="text-xs uppercase tracking-[0.4em] mb-2 font-bold opacity-60"
+          style={{ color: mood.colors.primary }}
+        >
+          {cinematic_mood} perspective
+        </span>
+
+        {/* Majestic Title text */}
+        <h1
+          className="text-4xl font-extrabold text-white tracking-widest text-center uppercase"
+          style={{
+            textShadow: active ? `0 0 30px ${mood.colors.primary}` : 'none',
           }}
         >
           {node.label}
-        </text>
+        </h1>
 
-        {/* Main sharp Title text */}
-        <text
-          fill="white"
-          textAnchor="middle"
-          dy="0"
-          style={{
-              fontSize: '40px',
-              fontWeight: 900,
-              fontFamily: font || 'Inter, sans-serif',
-              letterSpacing: '8px',
-              textTransform: 'uppercase',
-              paintOrder: 'stroke',
-              stroke: 'rgba(0,0,0,0.95)',
-              strokeWidth: 8
-          }}
-        >
-          {node.label}
-        </text>
-
-        {/* Cinematic thin horizontal separator below the title */}
-        <line
-          x1="-150"
-          y1="25"
-          x2="150"
-          y2="25"
-          stroke={mood.colors.primary}
-          strokeWidth="1.5"
-          opacity={0.6 * entryScale}
-          strokeDasharray="10 15"
-        />
-        {/* Central glowing beacon */}
-        <circle
-          cx="0"
-          cy="25"
-          r="4"
-          fill={mood.colors.primary}
-          style={{ filter: `drop-shadow(0 0 5px ${mood.colors.primary})` }}
-          opacity={entryScale}
-        />
-      </g>
+        {/* Accent dots and lines below */}
+        <div className="flex items-center gap-4 mt-4 w-full justify-center">
+          <div className="h-[1px] w-16 bg-white opacity-20" />
+          <div
+            className="w-2 h-2 rounded-full"
+            style={{
+              backgroundColor: mood.colors.primary,
+              boxShadow: `0 0 8px ${mood.colors.primary}`
+            }}
+          />
+          <div className="h-[1px] w-16 bg-white opacity-20" />
+        </div>
+      </div>
     );
   }
 
+  // Beautiful Mood-specific custom card presets for relationship nodes!
   return (
-    <g id={node.id} transform={`translate(${x + floatX}, ${y + floatY}) scale(${entryScale})`} opacity={finalOpacity}>
-      {/* Cinematic typography glowing background for active nodes */}
-      {active && (
-        <defs>
-          <filter id={`text-glow-${node.id}`} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="15" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
+    <div
+      className="px-6 py-3 rounded-lg border flex items-center justify-center font-bold text-lg select-none relative"
+      style={{
+        ...fontStyle,
+        color: '#ffffff',
+        opacity: finalOpacity,
+        transform: `scale(${entryScale})`,
+        transition: 'all 0.3s ease',
+        background: active
+          ? `linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01))`
+          : 'rgba(0, 0, 0, 0.4)',
+        borderColor: active ? `${mood.colors.primary}50` : 'rgba(255, 255, 255, 0.1)',
+        boxShadow: active
+          ? `0 10px 30px rgba(0,0,0,0.2), inset 0 0 15px ${mood.colors.primary}20, 0 0 25px ${mood.colors.primary}30`
+          : 'none',
+      }}
+    >
+      {/* Corner aesthetic brackets for Scientific or Cyberpunk */}
+      {active && (cinematic_mood === 'scientific' || cinematic_mood === 'cyberpunk') && (
+        <>
+          <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2" style={{ borderColor: mood.colors.primary }} />
+          <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2" style={{ borderColor: mood.colors.primary }} />
+        </>
       )}
 
-      {/* Modern, High-End Typographic Node Representation */}
-      <text
-        fill="white"
-        textAnchor="middle"
-        dy="10"
+      {/* Warning blinker for Danger mood */}
+      {active && cinematic_mood === 'danger' && (
+        <div
+          className="absolute -left-2 top-1/2 -translate-y-1/2 w-[4px] h-[70%] rounded-full animate-pulse"
+          style={{
+            backgroundColor: mood.colors.accent,
+            boxShadow: `0 0 8px ${mood.colors.accent}`
+          }}
+        />
+      )}
+
+      {/* Main Text Content */}
+      <span
+        className="tracking-wider uppercase"
         style={{
-            fontSize: active ? '34px' : '26px',
-            fontWeight: 900,
-            fontFamily: font || 'Inter, sans-serif',
-            letterSpacing: '3px',
-            textTransform: 'uppercase',
-            paintOrder: 'stroke',
-            stroke: 'rgba(0, 0, 0, 0.95)',
-            strokeWidth: 6,
-            filter: active ? `url(#text-glow-${node.id})` : 'none',
-            transition: 'all 0.3s ease-in-out'
+          fontSize: active ? '21px' : '17px',
+          textShadow: active ? `0 0 10px ${mood.colors.primary}` : 'none',
         }}
       >
         {node.label}
-      </text>
-    </g>
+      </span>
+    </div>
   );
 };
-
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return hash;
-}
