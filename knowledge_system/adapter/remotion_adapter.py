@@ -68,6 +68,7 @@ class RemotionAdapter:
         }
 
     def adapt(self, plan_data: Dict[str, Any]) -> Dict[str, Any]:
+        import zlib
         scanned_fonts = self._scan_fonts()
         scenes = []
         for p_scene in plan_data["scenes"]:
@@ -77,8 +78,9 @@ class RemotionAdapter:
                 is_bn = self._is_bangla(obj["label"])
                 font_list = scanned_fonts["bangla"] if is_bn else scanned_fonts["english"]
 
-                # Pick font dynamically based on the label/id hash to ensure typographic richness
-                font_idx = abs(hash(obj["id"])) % len(font_list)
+                # Pick font dynamically based on a deterministic hash to ensure absolute reproducibility
+                font_hash = zlib.adler32(obj["id"].encode('utf-8'))
+                font_idx = font_hash % len(font_list)
                 font = font_list[font_idx]
 
                 nodes.append({
