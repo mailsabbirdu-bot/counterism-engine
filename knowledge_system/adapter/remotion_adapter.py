@@ -91,6 +91,7 @@ class RemotionAdapter:
                     "scale": obj["scale"],
                     "depth": obj["depth"],
                     "font": font,
+                    "font_size": obj.get("font_size"),
                     "style_preset": obj.get("style_preset", "glass_disc")
                 })
 

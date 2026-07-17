@@ -9,6 +9,7 @@ export interface CRVENodeData {
   scale?: number;
   active_windows?: [number, number][];
   scene_id?: string;
+  font_size?: number;
 }
 
 export interface CRVELinkData {

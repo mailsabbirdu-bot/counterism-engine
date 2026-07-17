@@ -37,7 +37,10 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
   const updateXarrow = useXarrow();
 
   React.useEffect(() => {
-    updateXarrow();
+    const handle = requestAnimationFrame(() => {
+      updateXarrow();
+    });
+    return () => cancelAnimationFrame(handle);
   }, [frame, updateXarrow]);
 
   const relativeFrame = frame - start;
@@ -218,10 +221,74 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
     config: { damping: 20, stiffness: 40 }
   }) * interpolate(relativeFrame, [duration - 15, duration], [1, 0], { extrapolateLeft: 'clamp' });
 
-  // Function to check if a relationship or node is currently "active" based on narration
+  // Function to calculate smooth continuous opacity based on active window and transition cushion
+  const getActiveOpacity = (item: any) => {
+      if (!item.active_windows) return 1.0; // Default to active if no windows defined
+
+      // Calculate a smooth 10-frame cushion for fading in/out
+      let maxOpacity = 0.0;
+      const cushion = 10;
+      for (const [s, e] of item.active_windows) {
+          if (frame >= s && frame <= e) {
+              const fromStart = frame - s;
+              const fromEnd = e - frame;
+              const fadeIn = interpolate(fromStart, [0, cushion], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+              const fadeOut = interpolate(fromEnd, [0, cushion], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+              const currentOpacity = Math.min(fadeIn, fadeOut);
+              if (currentOpacity > maxOpacity) {
+                  maxOpacity = currentOpacity;
+              }
+          }
+      }
+      return maxOpacity;
+  };
+
   const isActive = (item: any) => {
-      if (!item.active_windows) return true; // Default to active if no windows defined
-      return item.active_windows.some(([s, e]: [number, number]) => frame >= s && frame <= e);
+      if (!item.active_windows) return true;
+      return getActiveOpacity(item) > 0.0;
+  };
+
+  const getNodeOpacityAtFrame = (node: any) => {
+    if (!node) return 0;
+    const isHeader = node.isHeaderNode;
+    const nodeRank = node.rank ?? 0;
+    const rankDelay = isHeader ? 0 : nodeRank * 35;
+    const entryFrame = Math.max(0, relativeFrame - rankDelay);
+
+    const entryScale = spring({
+        frame: entryFrame,
+        fps,
+        config: { damping: 16, stiffness: 60 }
+    });
+
+    let windowOpacity = 1.0;
+    if (node.active_windows) {
+        let maxOpacity = 0.0;
+        const cushion = 10;
+        for (const [s, e] of node.active_windows) {
+            if (frame >= s && frame <= e) {
+                const fromStart = frame - s;
+                const fromEnd = e - frame;
+                const fadeIn = interpolate(fromStart, [0, cushion], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+                const fadeOut = interpolate(fromEnd, [0, cushion], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+                const currentOpacity = Math.min(fadeIn, fadeOut);
+                if (currentOpacity > maxOpacity) {
+                    maxOpacity = currentOpacity;
+                }
+            }
+        }
+        windowOpacity = maxOpacity;
+    }
+
+    const nodeOpacity = interpolate(entryScale, [0, 1], [0, windowOpacity]);
+    return nodeOpacity * progress;
+  };
+
+  const getLinkOpacityAtFrame = (link: any, sourceNode: any, targetNode: any) => {
+    const linkActiveOpacity = getActiveOpacity(link);
+    const sourceOpacity = getNodeOpacityAtFrame(sourceNode);
+    const targetOpacity = getNodeOpacityAtFrame(targetNode);
+    return linkActiveOpacity * sourceOpacity * targetOpacity;
   };
 
   // Helper to construct react-xarrows props per scene mood and active state
@@ -355,11 +422,24 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
 
             if (!active) return null;
 
+            // Calculate precise smooth connection line opacity based on parent and child node visibility
+            const linkOpacity = getLinkOpacityAtFrame(link, sourceNode, targetNode);
+
+            if (linkOpacity <= 0.01) return null;
+
             return (
-              <Xarrow
-                key={`xarrow-${link.id}`}
-                {...getXarrowProps(link)}
-              />
+              <div
+                key={`xarrow-wrapper-${link.id}`}
+                style={{
+                  opacity: linkOpacity,
+                  transition: 'opacity 0.25s ease-out'
+                }}
+              >
+                <Xarrow
+                  key={`xarrow-${link.id}`}
+                  {...getXarrowProps(link)}
+                />
+              </div>
             );
           })}
         </div>
