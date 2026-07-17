@@ -49,20 +49,26 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
 
   // Dynamic Scene-Level Style, Mood, & Layout Planning Override
   // This guarantees that every scene has a completely unique visual theme, color scheme, and topology!
+  // Supports both English (SCENE_N) and Bangla (দৃশ্য_N) identifiers robustly.
   const { resolvedMood, resolvedLayout } = useMemo(() => {
     let resolvedMood: CinematicMood = cinematic_mood;
     let resolvedLayout = layout_type;
 
-    if (activeSceneId === 'SCENE_1') {
+    const isScene1 = activeSceneId === 'SCENE_1' || activeSceneId === 'দৃশ্য_১' || activeSceneId === 'দৃশ্য ১' || activeSceneId.includes('1') || activeSceneId.includes('১');
+    const isScene2 = activeSceneId === 'SCENE_2' || activeSceneId === 'দৃশ্য_২' || activeSceneId === 'দৃশ্য ২' || activeSceneId.includes('2') || activeSceneId.includes('২');
+    const isScene3 = activeSceneId === 'SCENE_3' || activeSceneId === 'দৃশ্য_৩' || activeSceneId === 'দৃশ্য ৩' || activeSceneId.includes('3') || activeSceneId.includes('৩');
+    const isScene4 = activeSceneId === 'SCENE_4' || activeSceneId === 'দৃশ্য_৪' || activeSceneId === 'দৃশ্য ৪' || activeSceneId.includes('4') || activeSceneId.includes('৪');
+
+    if (isScene1) {
       resolvedMood = 'scientific';
       resolvedLayout = 'solar_system';
-    } else if (activeSceneId === 'SCENE_2') {
+    } else if (isScene2) {
       resolvedMood = 'cyberpunk';
       resolvedLayout = 'radial';
-    } else if (activeSceneId === 'SCENE_3') {
+    } else if (isScene3) {
       resolvedMood = 'danger';
       resolvedLayout = 'force';
-    } else if (activeSceneId === 'SCENE_4') {
+    } else if (isScene4) {
       resolvedMood = 'luxury_hud';
       resolvedLayout = 'timeline';
     }
@@ -192,9 +198,13 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
 
   // Helper to construct react-xarrows props per scene mood and active state
   const getXarrowProps = (link: any) => {
-    const s = link.source as any;
-    const t = link.target as any;
-    const active = isActive(link) || isActive(s) || isActive(t);
+    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+
+    const sourceNode = nodes.find(n => n.id === sourceId);
+    const targetNode = nodes.find(n => n.id === targetId);
+
+    const active = isActive(link) || (sourceNode ? isActive(sourceNode) : false) || (targetNode ? isActive(targetNode) : false);
 
     let arrowColor = mood.colors.primary;
     let pathType: 'smooth' | 'grid' | 'straight' = 'smooth';
@@ -228,8 +238,8 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
     }
 
     return {
-      start: String(s.id),
-      end: String(t.id),
+      start: String(sourceId),
+      end: String(targetId),
       lineColor: arrowColor,
       headColor: arrowColor,
       strokeWidth,
@@ -248,8 +258,9 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
 
       <Xwrapper>
         {/*
-          Unified Scale Container:
-          Renders nodes inside a scaled container.
+          Unified Node Container:
+          Renders nodes inside a 1x-scaled absolute container so that DOM coordinates
+          measured via getBoundingClientRect() exactly match the react-xarrows viewport coordinates.
         */}
         <div
           style={{
@@ -258,9 +269,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
             left: 0,
             width: '100%',
             height: '100%',
-            zIndex: 10,
-            transform: `scale(${0.8 + progress * 0.2})`,
-            transformOrigin: `${centerX}px ${centerY}px`
+            zIndex: 10
           }}
         >
           {/* Nodes Layer (Each Node is represented as a beautifully placed HTML component) */}
@@ -300,9 +309,13 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
         */}
         <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 15 }}>
           {links.map((link) => {
-            const s = link.source as any;
-            const t = link.target as any;
-            const active = isActive(link) || isActive(s) || isActive(t);
+            const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
+            const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
+
+            const sourceNode = (nodes as any[]).find((n: any) => n.id === sourceId);
+            const targetNode = (nodes as any[]).find((n: any) => n.id === targetId);
+
+            const active = isActive(link) || (sourceNode ? isActive(sourceNode) : false) || (targetNode ? isActive(targetNode) : false);
             if (!active) return null;
 
             return (
