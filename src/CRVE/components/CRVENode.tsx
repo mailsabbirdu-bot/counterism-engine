@@ -10,16 +10,20 @@ interface CRVENodeProps {
   font?: string;
   cinematic_mood?: CinematicMood;
   index: number;
+  startFrame?: number;
 }
 
-export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font, cinematic_mood, index }) => {
+export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font, cinematic_mood, index, startFrame = 0 }) => {
   const frame = useCurrentFrame();
 
   const isHeader = (node as any).isHeaderNode;
 
-  // Staggered entry
-  const staggerOffset = index * 15;
-  const entryFrame = Math.max(0, frame - staggerOffset);
+  // Topological rank-based entry to follow the proper flow of information
+  // Rank 0 displays first, then Rank 1, Rank 2, etc. with a substantial spacing (35 frames)
+  const nodeRank = (node as any).rank ?? 0;
+  const rankDelay = isHeader ? 0 : nodeRank * 35;
+  const relativeFrame = frame - startFrame;
+  const entryFrame = Math.max(0, relativeFrame - rankDelay);
 
   const entryScale = spring({
       frame: entryFrame,

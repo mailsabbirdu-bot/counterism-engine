@@ -177,6 +177,34 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
         }
     });
 
+    // Topological ranking relaxation algorithm for flow of information
+    const ranks: { [id: string]: number } = {};
+    nodes.forEach(n => {
+        ranks[n.id] = 0;
+    });
+
+    // Relax up to 10 times to propagate ranks correctly (DAG structure)
+    for (let i = 0; i < 10; i++) {
+        let changed = false;
+        links.forEach(l => {
+            const srcId = typeof l.source === 'object' ? (l.source as any).id : l.source;
+            const tgtId = typeof l.target === 'object' ? (l.target as any).id : l.target;
+            if (ranks[srcId] !== undefined && ranks[tgtId] !== undefined) {
+                const targetRank = ranks[srcId] + 1;
+                if (targetRank > ranks[tgtId]) {
+                    ranks[tgtId] = targetRank;
+                    changed = true;
+                }
+            }
+        });
+        if (!changed) break;
+    }
+
+    // Attach ranks to nodes
+    nodes.forEach((n: any) => {
+        n.rank = ranks[n.id] ?? 0;
+    });
+
     return { nodes, links };
   }, [rawNodes, rawLinks, resolvedLayout, centerX, centerY]);
 
@@ -225,7 +253,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
       headSize = 8;
     } else if (resolvedMood === 'danger') {
       arrowColor = mood.colors.accent;
-      pathType = 'grid';
+      pathType = 'smooth'; // Smooth paths prevent awkward disjointed orthogonal turns in scene 3
       dashnessSetting = { strokeLen: 15, nonStrokeLen: 5, animation: 2 };
       strokeWidth = active ? 5 : 2;
       headSize = 9;
@@ -297,6 +325,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                   font={node.font || font}
                   cinematic_mood={resolvedMood}
                   index={i}
+                  startFrame={start}
                 />
               </div>
             );
@@ -315,7 +344,15 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
             const sourceNode = (nodes as any[]).find((n: any) => n.id === sourceId);
             const targetNode = (nodes as any[]).find((n: any) => n.id === targetId);
 
-            const active = isActive(link) || (sourceNode ? isActive(sourceNode) : false) || (targetNode ? isActive(targetNode) : false);
+            // Determine if both source and target have begun revealing to follow information flow
+            const sourceRank = sourceNode ? ((sourceNode as any).rank ?? 0) : 0;
+            const targetRank = targetNode ? ((targetNode as any).rank ?? 0) : 0;
+            const isSourceRevealed = relativeFrame >= (sourceNode?.isHeaderNode ? 0 : sourceRank * 35);
+            const isTargetRevealed = relativeFrame >= (targetNode?.isHeaderNode ? 0 : targetRank * 35);
+
+            const active = (isActive(link) || (sourceNode ? isActive(sourceNode) : false) || (targetNode ? isActive(targetNode) : false)) &&
+                           isSourceRevealed && isTargetRevealed;
+
             if (!active) return null;
 
             return (
