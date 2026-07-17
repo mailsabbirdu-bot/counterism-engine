@@ -8,6 +8,7 @@ export interface CRVENodeData {
   emotion?: string;
   scale?: number;
   active_windows?: [number, number][];
+  scene_id?: string;
 }
 
 export interface CRVELinkData {
