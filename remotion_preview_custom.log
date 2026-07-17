@@ -1,0 +1,14 @@
+Server ready - Local: http://localhost:3002, Network: http://192.168.0.2:3002
+Building...
+Built in 4562ms
+To restart - Local: http://localhost:3002, Network: http://192.168.0.2:3002
+To restart - Local: http://localhost:3002, Network: http://192.168.0.2:3002
+Building...
+Built in 5299ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/app/node_modules/.cache/webpack/remotion-development-4.0.468/5589b7f0b7909609796b006377ae23bf/8.pack_' -> '/app/node_modules/.cache/webpack/remotion-development-4.0.468/5589b7f0b7909609796b006377ae23bf/8.pack'
+To restart - Local: http://localhost:3002, Network: http://192.168.0.2:3002
+Building...
+Built in 1807ms
+To restart - Local: http://localhost:3002, Network: http://192.168.0.2:3002
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/app/node_modules/.cache/webpack/remotion-development-4.0.468/5589b7f0b7909609796b006377ae23bf/0.pack_' -> '/app/node_modules/.cache/webpack/remotion-development-4.0.468/5589b7f0b7909609796b006377ae23bf/0.pack'
+To restart - Local: http://localhost:3002, Network: http://192.168.0.2:3002
