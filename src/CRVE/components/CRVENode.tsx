@@ -11,33 +11,41 @@ interface CRVENodeProps {
   active: boolean;
   font?: string;
   cinematic_mood?: CinematicMood;
+  index: number; // For staggered entry offsets
 }
 
-export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active, font, cinematic_mood }) => {
+export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active, font, cinematic_mood, index }) => {
   const frame = useCurrentFrame();
 
-  // Gentle, non-rotating floating/drift animation (very slow and elegant)
-  const floatY = Math.sin(frame * 0.04 + hashString(node.id)) * 4;
+  // Slow, beautiful organic drift/breathing animation (perfectly horizontal, no rotation)
+  const floatY = Math.sin(frame * 0.035 + hashString(node.id)) * 5;
+  const floatX = Math.cos(frame * 0.025 + hashString(node.id)) * 3;
 
-  const opacity = active ? progress : 0.4 * progress;
+  // Staggered entry: each node starts its transition 15 frames after the previous one
+  const staggerOffset = index * 15;
+  const entryFrame = Math.max(0, frame - staggerOffset);
 
-  const mood = MOOD_REGISTRY[cinematic_mood || 'documentary'] || MOOD_REGISTRY['documentary'];
-  const color = active ? mood.colors.primary : "rgba(255,255,255,0.6)";
-
-  // Single clean entrance animation at the start of the scene (no looping)
-  const entrance = spring({
-      frame: frame,
+  // Single clean typographic entrance animation with a spring transition (damping for smooth settlement)
+  const entryScale = spring({
+      frame: entryFrame,
       fps: 30,
-      config: { damping: 15 }
+      config: { damping: 16, stiffness: 60 }
   });
 
+  // Staggered fade-in corresponding to the entrance scale
+  const nodeOpacity = interpolate(entryScale, [0, 1], [0, active ? 1 : 0.4]);
+  const finalOpacity = nodeOpacity * progress;
+
+  const mood = MOOD_REGISTRY[cinematic_mood || 'documentary'] || MOOD_REGISTRY['documentary'];
+  const glowColor = active ? mood.colors.primary : "rgba(255, 255, 255, 0.4)";
+
   return (
-    <g id={node.id} transform={`translate(${x}, ${y + floatY}) scale(${entrance})`} opacity={opacity}>
-      {/* Dynamic glow effect to draw focus to active semantic elements */}
+    <g id={node.id} transform={`translate(${x + floatX}, ${y + floatY}) scale(${entryScale})`} opacity={finalOpacity}>
+      {/* Cinematic typography glowing background for active nodes */}
       {active && (
         <defs>
           <filter id={`text-glow-${node.id}`} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="12" result="blur" />
+            <feGaussianBlur stdDeviation="15" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
@@ -46,7 +54,7 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, x, y, progress, active
         </defs>
       )}
 
-      {/* Modern, High-End Typographic Node Representation */}
+      {/* Modern, High-End Typographic Node Presentation */}
       <text
         fill="white"
         textAnchor="middle"
