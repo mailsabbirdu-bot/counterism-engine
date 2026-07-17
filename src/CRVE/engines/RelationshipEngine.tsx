@@ -151,13 +151,13 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
       {/*
         Unified SVG Layer:
         Renders BOTH nodes and arrows in the exact same SVG coordinate container.
-        This eliminates coordinate mismatching, floating offsets, and measurement jitter,
+        This eliminates coordinate mismatching, offsets, and measurement jitter,
         and guarantees pixel-perfect rendering and perfect tracking even with camera zoom/scale changes!
       */}
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} style={{ position: 'absolute', top: 0, left: 0, zIndex: 10 }}>
         <g transform={`translate(${centerX}, ${centerY}) scale(${0.8 + progress * 0.2})`}>
 
-          {/* Unified Connections (Arrows & Middle Labels) */}
+          {/* Unified Connections (Arrows & Floating Knowledge Packets) */}
           {links.map((link) => {
             const s = link.source as any;
             const t = link.target as any;
@@ -176,14 +176,14 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
 
             if (length < 20) return null;
 
-            // Dynamic offset based on label length to avoid overlapping with the text
+            // TIGHT, COMPACT start/end offsets to bring connectors extremely close to node labels
             const sourceLabelLen = s.label ? s.label.length : 5;
             const targetLabelLen = t.label ? t.label.length : 5;
 
-            const offsetStart = Math.max(50, sourceLabelLen * 15);
-            const offsetEnd = Math.max(60, targetLabelLen * 15);
+            const offsetStart = Math.max(25, sourceLabelLen * 8.5);
+            const offsetEnd = Math.max(30, targetLabelLen * 8.5);
 
-            // Safe guard against extremely short lines overlapping
+            // Safe guard against line overlap
             const startFactor = length > offsetStart + offsetEnd ? offsetStart / length : 0.1;
             const endFactor = length > offsetStart + offsetEnd ? offsetEnd / length : 0.1;
 
@@ -205,22 +205,29 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                 arrowColor = mood.colors.accent;
             }
 
-            // Dash array styling based on relationship type
-            let dasharray = "none";
-            const rel = link.relationship.toLowerCase();
-            if (rel === 'causes' || rel === 'threatens' || rel === 'danger' || rel === 'energy_transfer') {
-                dasharray = "5,5";
-            } else if (rel === 'is_a' || rel === 'containment' || rel === 'located_in') {
-                dasharray = "10,5";
-            } else if (rel === 'forms' || rel === 'aggregation' || rel === 'construction_flow') {
-                dasharray = "2,2";
-            }
+            // Staggered draw-in math: line starts drawing after both of its endpoint nodes have stagger-entered!
+            const sourceIdx = nodes.findIndex(n => n.id === s.id);
+            const targetIdx = nodes.findIndex(n => n.id === t.id);
+            const maxStagger = Math.max(sourceIdx, targetIdx) * 15;
 
-            const mx = (x1_opt + x2_opt) / 2;
-            const my = (y1_opt + y2_opt) / 2;
-            const labelText = link.relationship;
-            const rectW = Math.max(80, labelText.length * 11 + 20);
-            const rectH = 32;
+            const lineAge = Math.max(0, relativeFrame - maxStagger - 5);
+            const drawProgress = spring({
+                frame: lineAge,
+                fps: 30,
+                config: { damping: 16, stiffness: 50 }
+            });
+
+            // Dynamic line write-in using dash offsets
+            const lineDashArray = `${length}`;
+            const lineDashOffset = length * (1 - drawProgress);
+
+            // Traveling glowing information packet: moves continuously from source to target
+            const packetCycle = 50; // frames per cycle
+            const travelProgress = ((relativeFrame - maxStagger) % packetCycle) / packetCycle;
+            const px = x1_opt + (x2_opt - x1_opt) * travelProgress;
+            const py = y1_opt + (y2_opt - y1_opt) * travelProgress;
+
+            const isDrawing = drawProgress > 0.01;
 
             return (
               <g key={`unified-link-${link.id}`}>
@@ -230,64 +237,46 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                   fill="none"
                   stroke={arrowColor}
                   strokeWidth={strokeWidth}
-                  strokeDasharray={dasharray}
+                  strokeDasharray={lineDashArray}
+                  strokeDashoffset={lineDashOffset}
                   opacity={active ? 0.9 : 0.3}
                 />
 
-                {/* Arrow Head / Terminal Point */}
-                { (rel === 'causes' || rel === 'threatens' || rel === 'danger' || rel === 'energy_transfer') ? (
-                  <polygon
-                    points="0,0 -12,-6 -12,6"
-                    fill={arrowColor}
-                    opacity={active ? 0.9 : 0.3}
-                    transform={`translate(${x2_opt}, ${y2_opt}) rotate(${(angle * 180) / Math.PI})`}
-                  />
-                ) : (
-                  <circle
-                    cx={x2_opt}
-                    cy={y2_opt}
-                    r={6}
-                    fill={arrowColor}
-                    opacity={active ? 0.9 : 0.3}
-                  />
-                )}
+                {/* Arrow Head Point (Smoothly scales up with the line write-in) */}
+                <polygon
+                  points="0,0 -12,-5 -12,5"
+                  fill={arrowColor}
+                  opacity={active ? 0.9 * drawProgress : 0.3 * drawProgress}
+                  transform={`translate(${x2_opt}, ${y2_opt}) rotate(${(angle * 180) / Math.PI}) scale(${drawProgress})`}
+                />
 
-                {/* Glassmorphic/HUD Middle Label Box */}
-                <g transform={`translate(${mx}, ${my})`}>
-                  <rect
-                    x={-rectW / 2}
-                    y={-rectH / 2}
-                    width={rectW}
-                    height={rectH}
-                    rx={6}
-                    fill="rgba(5, 5, 5, 0.9)"
-                    stroke={arrowColor}
-                    strokeWidth={1.5}
-                    opacity={active ? 0.95 : 0.4}
-                    style={{ filter: 'drop-shadow(0 0 8px rgba(0,0,0,0.6))' }}
-                  />
-                  <text
-                    fill="white"
-                    textAnchor="middle"
-                    dy="5"
-                    style={{
-                      fontSize: '14px',
-                      fontWeight: 800,
-                      fontFamily: font || 'Inter, sans-serif',
-                      letterSpacing: '1px',
-                      textTransform: 'uppercase',
-                      opacity: active ? 1.0 : 0.5
-                    }}
-                  >
-                    {labelText}
-                  </text>
-                </g>
+                {/* Highly dynamic traveling glowing packet (draws user eye attention) */}
+                {active && isDrawing && travelProgress >= 0 && (
+                  <g>
+                    {/* Outer soft aura */}
+                    <circle
+                      cx={px}
+                      cy={py}
+                      r={9}
+                      fill={arrowColor}
+                      opacity={0.4}
+                      style={{ filter: 'blur(3px)' }}
+                    />
+                    {/* Inner intense core */}
+                    <circle
+                      cx={px}
+                      cy={py}
+                      r={4}
+                      fill="#ffffff"
+                    />
+                  </g>
+                )}
               </g>
             );
           })}
 
           {/* Unified Nodes Layer */}
-          {nodes.map((node: any) => (
+          {nodes.map((node: any, i: number) => (
             <CRVENode
                 key={node.id}
                 node={node}
@@ -297,6 +286,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                 active={isActive(node)}
                 font={node.font || font}
                 cinematic_mood={cinematic_mood}
+                index={i}
             />
           ))}
 
