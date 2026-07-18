@@ -1,0 +1,34 @@
+{
+  "domains": [
+    {
+      "id": "megacity",
+      "synonyms": ["megacity", "metropolis", "city", "dhaka", "capital", "populous", "cities", "urban area", "municipalities"],
+      "causes": ["rapid urbanization", "rural-urban migration", "centralized administration", "employment opportunities"],
+      "bn_causes": ["দ্রুত নগরায়ণ", "গ্রাম-শহর অভিবাসন", "কেন্দ্রীভূত প্রশাসন", "কর্মসংস্থান"]
+    },
+    {
+      "id": "pollution",
+      "synonyms": ["pollution", "environment", "air quality", "waste", "carbon", "contamination", "industrial", "emissions", "effluent"],
+      "causes": ["industrial emissions", "unplanned waste disposal", "deforestation", "fossil fuel consumption"],
+      "bn_causes": ["শিল্প নির্গমন", "পরিকল্পনাহীন বর্জ্য", "বন উজাড়করণ", "জীবাশ্ম জ্বালানি"]
+    },
+    {
+      "id": "traffic",
+      "synonyms": ["traffic", "congestion", "jam", "road", "gridlock", "rickshaws", "infrastructure", "transport"],
+      "causes": ["unplanned road network", "narrow roads", "high vehicle volume", "illegal parking"],
+      "bn_causes": ["ত্রুটিপূর্ণ সড়ক নেটওয়ার্ক", "সংকীর্ণ রাস্তা", "অতিরিক্ত যানবাহন", "অবৈধ পার্কিং"]
+    },
+    {
+      "id": "climate",
+      "synonyms": ["climate", "global warming", "disaster", "flood", "cyclone", "monsoon", "disasters", "extreme weather"],
+      "causes": ["greenhouse gas emissions", "deforestation", "rising global temperature", "rising sea levels"],
+      "bn_causes": ["গ্রিনহাউস গ্যাস নির্গমন", "বন উজাড়করণ", "বৈশ্বিক তাপমাত্রা বৃদ্ধি", "সমুদ্রপৃষ্ঠের উচ্চতা বৃদ্ধি"]
+    },
+    {
+      "id": "economy",
+      "synonyms": ["economy", "inflation", "growth", "poverty", "market", "finance", "crisis", "financial", "growth rate"],
+      "causes": ["market volatility", "inflationary pressures", "resource misallocation", "economic recession"],
+      "bn_causes": ["বাজারের অস্থিরতা", "মুদ্রাস্ফীতির চাপ", "সম্পদের অপব্যবহার", "অর্থনৈতিক মন্দা"]
+    }
+  ]
+}
