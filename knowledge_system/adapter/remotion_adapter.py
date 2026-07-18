@@ -97,13 +97,30 @@ class RemotionAdapter:
 
             links = []
             for rel in p_scene["relationships"]:
-                links.append({
-                    "id": f"{rel['source_id']}_{rel['target_id']}",
-                    "source": rel["source_id"],
-                    "target": rel["target_id"],
-                    "relationship": rel["type"],
-                    "strength": rel["strength"]
-                })
+                is_dict = isinstance(rel, dict)
+                rel_type = rel["type"] if is_dict else rel.type
+                rel_strength = rel["strength"] if is_dict else rel.strength
+                rel_source = rel["source_id"] if is_dict else rel.source_id
+                rel_target = rel["target_id"] if is_dict else rel.target_id
+
+                link_obj = {
+                    "id": f"{rel_source}_{rel_target}",
+                    "source": rel_source,
+                    "target": rel_target,
+                    "relationship": rel_type,
+                    "strength": rel_strength
+                }
+
+                # Support decoupled frame controls
+                frame_start = rel.get("revealFrameStart") if is_dict else getattr(rel, "revealFrameStart", None)
+                duration = rel.get("revealDuration") if is_dict else getattr(rel, "revealDuration", None)
+
+                if frame_start is not None:
+                    link_obj["revealFrameStart"] = frame_start
+                if duration is not None:
+                    link_obj["revealDuration"] = duration
+
+                links.append(link_obj)
 
             # Create the CRVE overlay
             crve_overlay = {

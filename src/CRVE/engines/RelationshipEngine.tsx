@@ -407,7 +407,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
   return (
     <AbsoluteFill className="pointer-events-none" style={{ position: 'relative' }}>
       {/* GLOBAL SVG DEFINITIONS: Rendered safely exactly once to prevent tree duplications or performance bottlenecks */}
-      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+      <svg style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none' }}>
         <defs>
           <filter id="engine-cyan-glow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="5" result="blur" />
@@ -422,6 +422,18 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
+          </filter>
+          <filter id="engine-luxury-gold" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* Fractal Turbulence filter for organic electric discharge ripples */}
+          <filter id="electric-distortion" x="-20%" y="-20%" width="140%" height="140%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" result="noise" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="7" xChannelSelector="R" yChannelSelector="G" />
           </filter>
         </defs>
       </svg>
@@ -504,6 +516,28 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
 
             if (linkOpacity <= 0.01) return null;
 
+            // Decoupled frame control (structural determinism fallback to rank stagger)
+            const startFrame = (link as any).revealFrameStart !== undefined
+              ? (link as any).revealFrameStart
+              : (Math.max(sourceRank, targetRank) * 35);
+            const duration = (link as any).revealDuration !== undefined
+              ? (link as any).revealDuration
+              : 40;
+            const endFrame = startFrame + duration;
+
+            const drawProgress = interpolate(relativeFrame, [startFrame, endFrame], [1, 0], {
+              extrapolateLeft: 'clamp',
+              extrapolateRight: 'clamp',
+            });
+
+            const rel = (link.relationship || '').toLowerCase();
+            const baseProps = {
+              start: String(sourceId),
+              end: String(targetId),
+              startAnchor: { position: 'auto' },
+              endAnchor: { position: 'auto' },
+            };
+
             return (
               <div
                 key={`xarrow-wrapper-${link.id}`}
@@ -512,10 +546,144 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                   transition: 'opacity 0.25s ease-out'
                 }}
               >
-                <Xarrow
-                  key={`xarrow-${link.id}`}
-                  {...getXarrowProps(link)}
-                />
+                {/*
+                  MULTI-PASS DOCUMENTARY RENDERING ENGINES
+                  Converts flat SVG paths into deep, high-end multi-layer glow vectors!
+                */}
+                {(() => {
+                  if (rel === 'containment' || rel === 'is_a') {
+                    // double trace cleanest vector look
+                    return (
+                      <React.Fragment>
+                        <Xarrow
+                          {...baseProps}
+                          startAnchor={{ position: 'auto', offset: { x: -4, y: -4 } }}
+                          endAnchor={{ position: 'auto', offset: { x: -4, y: -4 } }}
+                          color={resolvedMood === 'danger' ? mood.colors.accent : mood.colors.primary}
+                          strokeWidth={1.5}
+                          path={resolvedMood === 'cyberpunk' ? 'smooth' : 'straight'}
+                          showHead={false}
+                          arrowBodyProps={{
+                            strokeDasharray: '1000',
+                            strokeDashoffset: (drawProgress * 1000).toString(),
+                          }}
+                        />
+                        <Xarrow
+                          {...baseProps}
+                          startAnchor={{ position: 'auto', offset: { x: 4, y: 4 } }}
+                          endAnchor={{ position: 'auto', offset: { x: 4, y: 4 } }}
+                          color={resolvedMood === 'danger' ? mood.colors.accent : mood.colors.primary}
+                          strokeWidth={1.5}
+                          path={resolvedMood === 'cyberpunk' ? 'smooth' : 'straight'}
+                          showHead={false}
+                          arrowBodyProps={{
+                            strokeDasharray: '1000',
+                            strokeDashoffset: (drawProgress * 1000).toString(),
+                          }}
+                        />
+                      </React.Fragment>
+                    );
+                  }
+
+                  if (rel === 'construction_flow' || rel === 'builds') {
+                    // Cyber Quantum Pipeline (broad cyan glow conduit + core moving flow)
+                    return (
+                      <React.Fragment>
+                        <Xarrow
+                          {...baseProps}
+                          color="rgba(0, 243, 255, 0.12)"
+                          strokeWidth={7}
+                          path="smooth"
+                          curveness={0.7}
+                          showHead={false}
+                          arrowBodyProps={{
+                            filter: 'url(#engine-cyan-glow)',
+                            strokeLinecap: 'round',
+                          }}
+                        />
+                        <Xarrow
+                          {...baseProps}
+                          color="#00f3ff"
+                          strokeWidth={2}
+                          path="smooth"
+                          curveness={0.7}
+                          headSize={5}
+                          arrowHeadProps={{ fill: '#00f3ff', stroke: 'none' }}
+                          arrowBodyProps={{
+                            strokeDasharray: '20, 100',
+                            strokeDashoffset: (drawProgress * 600 + frame * 3.5).toString(),
+                            strokeLinecap: 'round',
+                          }}
+                        />
+                      </React.Fragment>
+                    );
+                  }
+
+                  if (rel === 'energy_transfer' || rel === 'causes' || rel === 'produces') {
+                    // Glowing electric pulse with genuine organic fractal noise distortion!
+                    return (
+                      <React.Fragment>
+                        <Xarrow
+                          {...baseProps}
+                          color="rgba(239, 68, 68, 0.12)"
+                          strokeWidth={7}
+                          path="smooth"
+                          curveness={0.65}
+                          showHead={false}
+                          arrowBodyProps={{
+                            filter: 'url(#engine-orange-glow)',
+                            strokeLinecap: 'round',
+                          }}
+                        />
+                        <Xarrow
+                          {...baseProps}
+                          color="#ef4444"
+                          strokeWidth={2.2}
+                          path="smooth"
+                          curveness={0.65}
+                          headSize={4}
+                          arrowBodyProps={{
+                            strokeDasharray: '30, 10, 10, 10',
+                            strokeDashoffset: (-frame * 5.5).toString(),
+                            filter: 'url(#electric-distortion) url(#engine-orange-glow)',
+                          }}
+                        />
+                      </React.Fragment>
+                    );
+                  }
+
+                  if (rel === 'reveal' || rel === 'hidden_under') {
+                    // Microchip grid trace with amber data packet marching sequences
+                    return (
+                      <Xarrow
+                        {...baseProps}
+                        color="rgba(255, 198, 0, 0.45)"
+                        strokeWidth={1.5}
+                        path="grid"
+                        gridBreak="50%"
+                        headSize={4}
+                        arrowBodyProps={{
+                          strokeDasharray: '8, 8',
+                          strokeDashoffset: (-frame * 2.0).toString(),
+                          filter: 'url(#engine-luxury-gold)',
+                        }}
+                      />
+                    );
+                  }
+
+                  // Default Fallback: Clean smooth organic write-on bezier
+                  return (
+                    <Xarrow
+                      key={`xarrow-${link.id}`}
+                      {...getXarrowProps(link)}
+                      arrowBodyProps={{
+                        strokeDasharray: '1000',
+                        strokeDashoffset: (drawProgress * 1000).toString(),
+                        strokeLinecap: 'round',
+                      }}
+                    />
+                  );
+                })()}
               </div>
             );
           })}

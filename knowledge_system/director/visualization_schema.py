@@ -17,6 +17,8 @@ class VisualRelationship(BaseModel):
     strength: float = 1.0
     arrival_animation: str = "draw"
     departure_animation: str = "fade"
+    revealFrameStart: Optional[int] = None
+    revealDuration: Optional[int] = None
 
 class MotionLanguage(BaseModel):
     meaning: str # hidden_danger, accumulation, progressive_intensity
