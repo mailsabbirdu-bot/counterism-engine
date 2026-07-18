@@ -3,10 +3,10 @@ import urllib.parse
 import json
 import re
 import os
+from collections import OrderedDict
 from typing import List, Dict, Optional
-from .semantic_model import Entity, Relation
 
-# Try importing Spacy and Transformers for the high-end Colab runtime
+# Attempt to load high-fidelity libraries if running in fully equipped runtimes
 try:
     import spacy
     HAS_SPACY = True
@@ -19,6 +19,36 @@ try:
 except ImportError:
     HAS_TRANSFORMERS = False
 
+try:
+    import torch
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+
+
+# Minimal schema declarations for graph rendering steps with Pydantic fallback compatibility
+try:
+    from .semantic_model import Entity, Relation
+except ImportError:
+    # Standard class fallback for single file system usage
+    class Entity:
+        def __init__(self, id: str, label: str, type: str, importance: float = 1.0, scale: float = 1.0, emotion: str = "neutral"):
+            self.id = id
+            self.label = label
+            self.type = type
+            self.importance = importance
+            self.scale = scale
+            self.emotion = emotion
+
+    class Relation:
+        def __init__(self, id: str, source_id: str, target_id: str, relationship: str, importance: float = 1.0, strength: float = 1.0):
+            self.id = id
+            self.source_id = source_id
+            self.target_id = target_id
+            self.relationship = relationship
+            self.importance = importance
+            self.strength = strength
+
 
 class NormalizedKnowledgeEngine:
     def __init__(self, kb_path: str = "knowledge_base.json"):
@@ -28,7 +58,7 @@ class NormalizedKnowledgeEngine:
         self.kb_path = kb_path
         self.knowledge_base = self._load_knowledge_base()
 
-        # 2. Translation Engine & CPU Performance Cache
+        # 2. Translation Engine Configuration
         if HAS_TRANSFORMERS:
             try:
                 model_name = "facebook/m2m100_418M"
@@ -44,7 +74,12 @@ class NormalizedKnowledgeEngine:
             self.model = None
             self.tokenizer = None
 
-        self.translation_cache = {}
+        # Bounded Translation Cache (LRU-based eviction to prevent wiping out data mid-run)
+        self.translation_cache = OrderedDict()
+        self.translation_cache_max = 2000
+
+        # Dedicated Network and Timeout Failure Cache for Wikipedia API lookups
+        self.wikipedia_cache = {}
 
         # 3. Linguistic Parsers
         if HAS_SPACY:
@@ -52,19 +87,19 @@ class NormalizedKnowledgeEngine:
                 self.nlp = spacy.load("en_core_web_sm")
                 print("✅ SpaCy en_core_web_sm model initialized successfully.")
             except Exception as e:
-                print(f"⚠️ SpaCy model load failed: {e}. Using regex/stanza fallback parser.")
+                print(f"⚠️ SpaCy model load failed: {e}. Using regex fallback parser.")
                 self.nlp = None
         else:
-            print("⚠️ SpaCy not available. Using regex/stanza fallback parser.")
+            print("⚠️ SpaCy not available. Using regex fallback parser.")
             self.nlp = None
 
-        # 4. Wikipedia Junk Category Filter
+        # 4. Wikipedia Junk Filtering Parameters
         self.banned_category_keywords = [
             "living people", "articles", "dates", "wikipedia",
             "pages", "cs1", "webarchive", "use dmy"
         ]
 
-        # Standard Offline High-Fidelity translation map to guarantee zero-fail offline mode
+        # Standard Offline translation map to guarantee zero-fail local workflows
         self.fallback_translation_map = {
             "bn_to_en": {
                 "মেগাসিটি": "megacity",
@@ -82,14 +117,12 @@ class NormalizedKnowledgeEngine:
                 "অর্থনীতি": "economy",
                 "প্রবৃদ্ধি": "economic growth",
                 "দারিদ্র্য": "poverty",
-                "চাকরি": "employment",
-                "বাংলাদেশের রাজধানী এবং এটি একটি জনবহুল শহর": "Capital of Bangladesh and a populous city",
-                "২০২৪ সালে অ্যাপল ইনকর্পোরেটেড ১৫ শতাংশ প্রবৃদ্ধি রিপোর্ট করেছে": "In 2024 Apple Incorporated reported 15 percent growth"
+                "চাকরি": "employment"
             },
             "en_to_bn": {
                 "rapid urbanization": "দ্রুত নগরায়ণ",
                 "rural-urban migration": "গ্রাম-শহর অভিবাসন",
-                "centralized administration": "কেন্দ্রীভূত প্রশাসন",
+                "centralized administration": "কেন্দ্রেীভূত প্রশাসন",
                 "employment opportunities": "কর্মসংস্থান",
                 "industrial emissions": "শিল্প নির্গমন",
                 "unplanned waste disposal": "পরিকল্পনাহীন বর্জ্য",
@@ -100,7 +133,7 @@ class NormalizedKnowledgeEngine:
                 "high vehicle volume": "অতিরিক্ত যানবাহন",
                 "illegal parking": "অবৈধ পার্কিং",
                 "greenhouse gas emissions": "গ্রিনহাউস গ্যাস নির্গমন",
-                "rising global temperature": "বৈশ্বিক তাপমাত্রা বৃদ্ধি",
+                "rising global temperature": "বৈস্মিক তাপমাত্রা বৃদ্ধি",
                 "rising sea levels": "সমুদ্রপৃষ্ঠের উচ্চতা বৃদ্ধি",
                 "market volatility": "বাজারের অস্থিরতা",
                 "inflationary pressures": "মুদ্রাস্ফীতির চাপ",
@@ -123,67 +156,76 @@ class NormalizedKnowledgeEngine:
             return {"domains": []}
 
     def _cached_translate(self, text: str, src_lang: str, tgt_lang: str) -> str:
-        """Reduces CPU overhead by matching pre-translated strings."""
+        """Translates text utilizing performance optimizations and an LRU eviction strategy."""
         text_clean = text.strip()
         if not text_clean:
             return ""
 
         cache_key = f"{src_lang}:{tgt_lang}:{text_clean.lower()}"
         if cache_key in self.translation_cache:
+            # Move key to end to track recent usage
+            self.translation_cache.move_to_end(cache_key)
             return self.translation_cache[cache_key]
 
-        # 1. Use high-performance M2M100 Transformer if initialized
+        # 1. High-Performance Transformer Translation Loop
+        translated_text = None
         if self.model and self.tokenizer:
             try:
                 self.tokenizer.src_lang = src_lang
                 encoded_input = self.tokenizer(text_clean, return_tensors="pt")
                 forced_bos_token_id = self.tokenizer.get_lang_id(tgt_lang)
 
-                generated_tokens = self.model.generate(**encoded_input, forced_bos_token_id=forced_bos_token_id)
+                # inference_mode eliminates autograd overhead and tracking updates completely on CPU
+                if HAS_TORCH:
+                    import torch
+                    with torch.inference_mode():
+                        generated_tokens = self.model.generate(**encoded_input, forced_bos_token_id=forced_bos_token_id)
+                else:
+                    generated_tokens = self.model.generate(**encoded_input, forced_bos_token_id=forced_bos_token_id)
+
                 translated_text = self.tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
-
-                self.translation_cache[cache_key] = translated_text
-                return translated_text
             except Exception as e:
-                print(f"⚠️ M2M100 Translation failed: {e}. Falling back to preloaded map.")
+                print(f"⚠️ Transformer Translation failed: {e}. Falling back to preloaded map.")
 
-        # 2. Offline-First Dictionary Mapping fallback
-        map_key = "bn_to_en" if src_lang == "bn" else "en_to_bn"
-        fallback_map = self.fallback_translation_map.get(map_key, {})
+        # 2. Resilient Offline Dictionary Mapping Fallback
+        if not translated_text:
+            map_key = "bn_to_en" if src_lang == "bn" else "en_to_bn"
+            fallback_map = self.fallback_translation_map.get(map_key, {})
 
-        # Check direct or substring matches
-        for src_phrase, tgt_phrase in fallback_map.items():
-            if src_phrase.lower() in text_clean.lower() or text_clean.lower() in src_phrase.lower():
-                self.translation_cache[cache_key] = tgt_phrase
-                return tgt_phrase
+            for src_phrase, tgt_phrase in fallback_map.items():
+                if src_phrase.lower() in text_clean.lower() or text_clean.lower() in src_phrase.lower():
+                    translated_text = tgt_phrase
+                    break
 
-        # If no mapping exists, return English or Bangla safely
-        self.translation_cache[cache_key] = text_clean
-        return text_clean
+        if not translated_text:
+            translated_text = text_clean
+
+        # Bounded LRU Cache Management: Evict oldest item if max capacity reached
+        if len(self.translation_cache) >= self.translation_cache_max:
+            self.translation_cache.popitem(last=False)
+
+        self.translation_cache[cache_key] = translated_text
+        return translated_text
 
     def _extract_ranked_concepts(self, english_text: str) -> List[str]:
-        """
-        Upgraded Entity Extraction: Extracts named entities, compound nouns,
-        and high-value noun chunks, ranking them by descriptive value.
-        """
+        """Extracts technical alphanumeric concepts, noun chunks, and entities from descriptions."""
         candidates = []
 
-        # A. High-Fidelity SpaCy Parser if available
         if self.nlp:
             try:
                 doc = self.nlp(english_text)
-                # Priority 1: Named Entities (e.g., "Dhaka")
+                # Group 1: Named geographic and organizational entities
                 for ent in doc.ents:
                     if ent.label_ in ("GPE", "ORG", "LOC"):
                         candidates.append(ent.text.lower())
 
-                # Priority 2: Full Noun Chunks (e.g., "world's largest megacities")
+                # Group 2: Compound Noun Phrases
                 for chunk in doc.noun_chunks:
                     clean_chunk = " ".join([t.text.lower() for t in chunk if t.pos_ not in ("DET", "PRON")])
                     if clean_chunk and clean_chunk not in candidates:
                         candidates.append(clean_chunk)
 
-                # Priority 3: Individual core lemmas as fallbacks
+                # Group 3: Core subjects and direct objects
                 for token in doc:
                     if token.pos_ in ("NOUN", "PROPN") and token.dep_ in ("nsubj", "attr", "dobj"):
                         lemma = token.lemma_.lower()
@@ -191,113 +233,129 @@ class NormalizedKnowledgeEngine:
                             candidates.append(lemma)
                 return candidates
             except Exception as e:
-                print(f"⚠️ SpaCy concept extraction failed: {e}. Falling back to regex.")
+                print(f"⚠️ High-fidelity extraction failed: {e}. Falling back to regex parser.")
 
-        # B. Robust Regex/String Fallback for offline/lightweight execution
-        # Extracts title-cased words (proper nouns) and long words (>3 letters)
-        words = re.findall(r'\b[a-zA-Z]{4,20}\b', english_text)
+        # Upgraded Alphanumeric Regex Tokenizer: Catches complex metrics (AI, PM2.5, CO2, 5G)
+        words = re.findall(r'\b[a-zA-Z0-9\.\-_]{2,25}\b', english_text)
         for w in words:
             w_lower = w.lower()
-            if w_lower not in candidates and w_lower not in {"with", "that", "this", "from", "their"}:
+            if w_lower not in candidates and w_lower not in {"with", "that", "this", "from", "their", "the", "and"}:
                 candidates.append(w_lower)
 
-        # Also include title-case sequences (e.g., "Apple Incorporated")
         prop_nouns = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', english_text)
         for pn in prop_nouns:
             pn_lower = pn.lower()
             if pn_lower not in candidates:
-                candidates.insert(0, pn_lower) # Prioritize proper nouns
+                candidates.insert(0, pn_lower)
 
         return candidates
 
     def _match_local_knowledge(self, search_string: str) -> Optional[Dict]:
-        """Performs soft matching against the domain IDs and synonym lists."""
-        search_str_clean = search_string.lower()
+        """Performs token-aware exact set and full phrase evaluations to block false matches."""
+        search_str_clean = search_string.lower().strip()
+        if not search_str_clean:
+            return None
+
+        search_tokens = set(re.findall(r'\w+', search_str_clean))
+        if not search_tokens:
+            return None
+
         for domain in self.knowledge_base.get("domains", []):
-            if domain["id"] in search_str_clean:
+            if domain["id"] == search_str_clean:
                 return domain
+
             for synonym in domain.get("synonyms", []):
-                if synonym in search_str_clean or search_str_clean in synonym:
+                syn_lower = synonym.lower().strip()
+
+                # Check 1: Direct structural phrase equality
+                if syn_lower == search_str_clean:
+                    return domain
+
+                # Check 2: Token-set equivalence to allow fluid token reordering
+                syn_tokens = set(re.findall(r'\w+', syn_lower))
+                if search_tokens == syn_tokens:
                     return domain
         return None
 
     def _query_wikipedia_normalization_tags(self, entity: str) -> List[str]:
-        """Queries Wikipedia API to discover semantic categories, filtering out system junk."""
+        """Queries Wikipedia API with robust performance caching to prevent network stalls."""
+        entity_clean = entity.lower().strip()
+        if not entity_clean:
+            return []
+
+        # Instant return if concept was previously searched, matched, or timed out
+        if entity_clean in self.wikipedia_cache:
+            return self.wikipedia_cache[entity_clean]
+
+        valid_categories = []
         try:
-            safe_query = urllib.parse.quote(entity)
+            safe_query = urllib.parse.quote(entity_clean)
             search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={safe_query}&format=json"
 
-            req = urllib.request.Request(search_url, headers={'User-Agent': 'CRVE-Engine/4.0.0'})
+            req = urllib.request.Request(search_url, headers={'User-Agent': 'CRVE-Engine/5.0.0'})
             title = None
+
+            # Bound search by a strict network timeout
             with urllib.request.urlopen(req, timeout=3) as res:
                 data = json.loads(res.read().decode('utf-8'))
                 results = data.get("query", {}).get("search", [])
                 if results:
                     title = results[0]["title"]
 
-            if not title:
-                return []
+            if title:
+                safe_title = urllib.parse.quote(title)
+                cat_url = f"https://en.wikipedia.org/w/api.php?action=query&prop=categories&titles={safe_title}&cllimit=20&format=json"
+                req_cat = urllib.request.Request(cat_url, headers={'User-Agent': 'CRVE-Engine/5.0.0'})
 
-            safe_title = urllib.parse.quote(title)
-            cat_url = f"https://en.wikipedia.org/w/api.php?action=query&prop=categories&titles={safe_title}&cllimit=20&format=json"
+                with urllib.request.urlopen(req_cat, timeout=3) as res:
+                    cat_data = json.loads(res.read().decode('utf-8'))
+                    pages = cat_data.get("query", {}).get("pages", {})
+                    for _, pinfo in pages.items():
+                        for cat in pinfo.get("categories", []):
+                            cat_title = cat.get("title", "").lower()
+                            if not any(keyword in cat_title for keyword in self.banned_category_keywords):
+                                clean_cat = cat_title.replace("category:", "").strip()
+                                valid_categories.append(clean_cat)
 
-            req_cat = urllib.request.Request(cat_url, headers={'User-Agent': 'CRVE-Engine/4.0.0'})
-            valid_categories = []
-            with urllib.request.urlopen(req_cat, timeout=3) as res:
-                cat_data = json.loads(res.read().decode('utf-8'))
-                pages = cat_data.get("query", {}).get("pages", {})
-                for _, pinfo in pages.items():
-                    for cat in pinfo.get("categories", []):
-                        cat_title = cat.get("title", "").lower()
-
-                        if not any(keyword in cat_title for keyword in self.banned_category_keywords):
-                            clean_cat = cat_title.replace("category:", "").strip()
-                            valid_categories.append(clean_cat)
-            return valid_categories
         except Exception as e:
-            print(f"⚠️ Normalization mapping failed for '{entity}': {e}")
-            return []
+            print(f"⚠️ Normalization connection exception for '{entity_clean}': {e}. Caching failure state.")
+            # Fall through to save an empty list to prevent repeating timeouts on bad tags
+
+        # Cache the result (success dataset or baseline empty failure state)
+        self.wikipedia_cache[entity_clean] = valid_categories
+        return valid_categories
 
 
 class CauseProber:
     def __init__(self, kb_path: str = "knowledge_base.json"):
-        # Instantiate our unified normalized knowledge engine
         self.engine = NormalizedKnowledgeEngine(kb_path=kb_path)
 
     def _is_bangla(self, text: str) -> bool:
         return any("\u0980" <= char <= "\u09FF" for char in str(text))
 
     def probe_causes(self, scene_text: str, entities: List[Entity], next_scene_text: Optional[str] = None) -> List[dict]:
-        """
-        Drives the Concept Normalization pipeline:
-        1. Translates input to English.
-        2. Extracts ranked concept nouns.
-        3. Normalizes concepts against local and Wikipedia category domains.
-        4. Translates matched domain causes back to clean Bangla or uses preloaded translations.
-        """
+        """Resolves descriptive narratives into highly contextual conceptual core causes."""
         is_bn = self._is_bangla(scene_text)
 
-        # Translate to English to run concept extraction
         english_text = scene_text
         if is_bn:
             english_text = self.engine._cached_translate(scene_text, src_lang="bn", tgt_lang="en")
 
-        # Extract candidates
         extracted_concepts = self.engine._extract_ranked_concepts(english_text)
         print(f"🔍 Extracted Concepts for Normalization: {extracted_concepts}")
 
         matched_domain = None
 
-        # 1. Attempt Soft Matching on direct extracted concepts
+        # Tier 1: Local Knowledge Domain matching
         for concept in extracted_concepts:
             matched_domain = self.engine._match_local_knowledge(concept)
             if matched_domain:
                 print(f"🎯 Direct Concept Normalization Hit: Matched '{concept}' -> Domain ID '{matched_domain['id']}'")
                 break
 
-        # 2. Attempt Wikipedia Category-based Concept Normalization
+        # Tier 2: Wikipedia Semantic Expansion Category Mapping
         if not matched_domain:
-            for concept in extracted_concepts[:2]: # Check top 2 concepts to maintain speed
+            for concept in extracted_concepts[:2]:
                 categories = self.engine._query_wikipedia_normalization_tags(concept)
                 print(f"📖 Wikipedia Categories for '{concept}': {categories}")
                 for category in categories:
@@ -308,27 +366,43 @@ class CauseProber:
                 if matched_domain:
                     break
 
-        # 3. Fallback: If no match found, fallback to first matching domain in text or default 'megacity'/'economy'
+        # Tier 3: Hard Word-Boundary Fallback Matching (Prevents sub-string trapping like "war" inside "forward")
         if not matched_domain:
             text_lower = english_text.lower()
             for domain in self.engine.knowledge_base.get("domains", []):
-                if domain["id"] in text_lower or any(s in text_lower for s in domain.get("synonyms", [])):
+                domain_id = domain["id"].lower()
+
+                # Enforce strict word boundaries on the primary Domain ID
+                id_match = re.search(r'\b' + re.escape(domain_id) + r'\b', text_lower)
+
+                # Enforce strict word boundaries across custom synonyms
+                synonym_match = any(
+                    re.search(r'\b' + re.escape(s.lower()) + r'\b', text_lower)
+                    for s in domain.get("synonyms", [])
+                )
+
+                if id_match or synonym_match:
                     matched_domain = domain
-                    print(f"📌 Substring Fallback Match: Resolved to Domain '{domain['id']}'")
+                    print(f"📌 Boundary-Safe Fallback Match: Resolved to Domain '{domain['id']}'")
                     break
 
         if not matched_domain:
-            # Absolute default
-            matched_domain = self.engine.knowledge_base.get("domains", [])[0]
-            print(f"ℹ️ No domain mapped. Using default Domain ID '{matched_domain['id']}'")
+            domains = self.engine.knowledge_base.get("domains", [])
+            if domains:
+                matched_domain = domains[0]
+                print(f"ℹ️ No domain mapped. Using default Domain ID '{matched_domain['id']}'")
+            else:
+                return [{
+                    "label": "কাঠামোগত পরিবর্তন" if is_bn else "Structural Changes",
+                    "english": "structural changes"
+                }]
 
-        # Collect causes
+        # Construct mapped operational output models
         detected_causes = []
-        causes_en = matched_domain["causes"]
+        causes_en = matched_domain.get("causes", [])
         causes_bn = matched_domain.get("bn_causes", [])
 
         for idx, en_cause in enumerate(causes_en):
-            # If the output language is Bangla, check if we have preloaded Bangla causes
             if is_bn:
                 bn_cause = causes_bn[idx] if idx < len(causes_bn) else self.engine._cached_translate(en_cause, src_lang="en", tgt_lang="bn")
                 detected_causes.append({
@@ -343,8 +417,8 @@ class CauseProber:
                     "search_trigger": [en_cause.lower()]
                 })
 
-        # 4. Context-Aware Deduplication (Next Scene check)
-        if next_scene_text:
+        # Tier 4: Context-Aware Deduplication via Type Guarding
+        if next_scene_text and isinstance(next_scene_text, str):
             next_text_lower = next_scene_text.lower()
             filtered_causes = []
             for cause in detected_causes:
@@ -359,21 +433,17 @@ class CauseProber:
         return detected_causes[:4]
 
     def inject_causes_to_scene(self, scene_idx: int, scene_model: any, next_scene_text: Optional[str] = None) -> None:
-        """
-        Modifies a SemanticSceneModel by probing and appending new cause Entities and Relations.
-        """
+        """Modifies a scene structure dynamically by appending calculated causal Entities and Relations."""
         probed_reasons = self.probe_causes(scene_model.narration, scene_model.entities, next_scene_text)
         if not probed_reasons:
             return
 
-        # Find the primary entity (Hero or most important concept) in the scene to connect causes to
         target_entity_id = None
         for entity in scene_model.entities:
-            if entity.importance >= 2.0:
+            if getattr(entity, 'importance', 0) >= 2.0:
                 target_entity_id = entity.id
                 break
 
-        # Fallback to first entity if no high-importance entity found
         if not target_entity_id and scene_model.entities:
             target_entity_id = scene_model.entities[0].id
 
@@ -388,12 +458,10 @@ class CauseProber:
             ))
             target_entity_id = root_id
 
-        # Inject each probed cause as a new node and a relation
         entity_start_idx = len(scene_model.entities) + 1
         for i, cause in enumerate(probed_reasons):
             cause_node_id = f"e_cause_{scene_idx}_{entity_start_idx + i}"
 
-            # Inject Cause Node
             scene_model.entities.append(Entity(
                 id=cause_node_id,
                 label=cause["label"],
@@ -403,7 +471,6 @@ class CauseProber:
                 emotion="intense" if i % 2 == 0 else "calm"
             ))
 
-            # Inject Relation Link (with causes relationship type so it renders with custom styled electric arrows!)
             relation_id = f"r_cause_{scene_idx}_{entity_start_idx + i}"
             scene_model.relations.append(Relation(
                 id=relation_id,
