@@ -36,11 +36,9 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
   const { width, height, fps } = useVideoConfig();
   const updateXarrow = useXarrow();
 
+  // Optimized deterministic sync with Remotion's frame clock (rAF removed for extreme speed)
   React.useEffect(() => {
-    const handle = requestAnimationFrame(() => {
-      updateXarrow();
-    });
-    return () => cancelAnimationFrame(handle);
+    updateXarrow();
   }, [frame, updateXarrow]);
 
   const relativeFrame = frame - start;
@@ -292,6 +290,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
   };
 
   // Helper to construct react-xarrows props per scene mood and active state
+  // Upgraded to dynamically map relationship types to highly unique cinematic vectors (Double, pulse, electrical arcing, synapses)
   const getXarrowProps = (link: any) => {
     const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
     const targetId = typeof link.target === 'object' ? link.target.id : link.target;
@@ -306,30 +305,87 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
     let dashnessSetting: any = { strokeLen: 10, nonStrokeLen: 5, animation: 1.5 };
     let strokeWidth = active ? 4 : 2;
     let headSize = 6;
+    let extraProps: any = {};
 
-    if (resolvedMood === 'scientific') {
-      arrowColor = mood.colors.primary;
-      pathType = 'straight';
-      dashnessSetting = { strokeLen: 12, nonStrokeLen: 6, animation: 1 };
-      strokeWidth = active ? 4 : 1.5;
-    } else if (resolvedMood === 'cyberpunk') {
-      arrowColor = mood.colors.secondary;
+    const rel = (link.relationship || '').toLowerCase();
+
+    // 1. Dynamic Relationship Type Styling (Kurzgesagt / Branch Education Style diversity)
+    if (rel === 'containment' || rel === 'is_a') {
+      // Clean high-tech double outline feel
+      arrowColor = resolvedMood === 'danger' ? mood.colors.accent : mood.colors.primary;
+      pathType = resolvedMood === 'cyberpunk' ? 'smooth' : 'straight';
+      dashnessSetting = false; // solid line
+      strokeWidth = active ? 3 : 1.5;
+      headSize = 0; // seamless connection
+    } else if (rel === 'construction_flow' || rel === 'builds') {
+      // High-speed energetic dashed signal pipeline
+      arrowColor = resolvedMood === 'cyberpunk' ? mood.colors.secondary : mood.colors.primary;
       pathType = 'smooth';
-      dashnessSetting = { strokeLen: 6, nonStrokeLen: 12, animation: 3 };
-      strokeWidth = active ? 5 : 2;
-      headSize = 8;
-    } else if (resolvedMood === 'danger') {
-      arrowColor = mood.colors.accent;
-      pathType = 'smooth'; // Smooth paths prevent awkward disjointed orthogonal turns in scene 3
-      dashnessSetting = { strokeLen: 15, nonStrokeLen: 5, animation: 2 };
-      strokeWidth = active ? 5 : 2;
-      headSize = 9;
-    } else if (resolvedMood === 'luxury_hud') {
-      arrowColor = mood.colors.primary;
+      dashnessSetting = {
+        strokeLen: 14,
+        nonStrokeLen: 14,
+        animation: frame * 1.8 // Deterministic frame-bound clock
+      };
+      strokeWidth = active ? 4 : 2;
+      extraProps = {
+        arrowBodyProps: {
+          strokeLinecap: 'round',
+          filter: 'url(#engine-cyan-glow)',
+        }
+      };
+    } else if (rel === 'energy_transfer' || rel === 'causes' || rel === 'produces') {
+      // Intense glowing electrical pipeline arc
+      arrowColor = resolvedMood === 'danger' ? mood.colors.accent : mood.colors.secondary;
       pathType = 'smooth';
-      dashnessSetting = { strokeLen: 20, nonStrokeLen: 10, animation: 0.5 };
-      strokeWidth = active ? 3.5 : 1.5;
-      headSize = 5;
+      dashnessSetting = {
+        strokeLen: 6,
+        nonStrokeLen: 15,
+        animation: -frame * 3.0 // High speed backwards flow
+      };
+      strokeWidth = active ? 5 : 2.5;
+      extraProps = {
+        arrowBodyProps: {
+          filter: 'url(#engine-orange-glow)',
+          strokeLinecap: 'round',
+        }
+      };
+    } else if (rel === 'reveal' || rel === 'hidden_under') {
+      // Microchip schematic grid flow with discrete data packets
+      arrowColor = '#ffc600';
+      pathType = 'grid';
+      dashnessSetting = {
+        strokeLen: 4,
+        nonStrokeLen: 10,
+        animation: frame * 1.2
+      };
+      strokeWidth = 2;
+      headSize = 4;
+    } else {
+      // Fallback: Mood-based curve overrides
+      if (resolvedMood === 'scientific') {
+        arrowColor = mood.colors.primary;
+        pathType = 'straight';
+        dashnessSetting = { strokeLen: 12, nonStrokeLen: 6, animation: frame * 0.8 };
+        strokeWidth = active ? 4 : 1.5;
+      } else if (resolvedMood === 'cyberpunk') {
+        arrowColor = mood.colors.secondary;
+        pathType = 'smooth';
+        dashnessSetting = { strokeLen: 6, nonStrokeLen: 12, animation: frame * 2.0 };
+        strokeWidth = active ? 5 : 2;
+        headSize = 8;
+      } else if (resolvedMood === 'danger') {
+        arrowColor = mood.colors.accent;
+        pathType = 'smooth';
+        dashnessSetting = { strokeLen: 15, nonStrokeLen: 5, animation: frame * 1.5 };
+        strokeWidth = active ? 5 : 2;
+        headSize = 9;
+      } else if (resolvedMood === 'luxury_hud') {
+        arrowColor = mood.colors.primary;
+        pathType = 'smooth';
+        dashnessSetting = { strokeLen: 20, nonStrokeLen: 10, animation: frame * 0.5 };
+        strokeWidth = active ? 3.5 : 1.5;
+        headSize = 5;
+      }
     }
 
     return {
@@ -338,17 +394,38 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
       lineColor: arrowColor,
       headColor: arrowColor,
       strokeWidth,
-      showHead: true,
+      showHead: headSize > 0,
       headSize,
       path: pathType,
       dashness: dashnessSetting,
       animateDrawing: 1.2,
-      zIndex: 10
+      zIndex: 10,
+      ...extraProps
     };
   };
 
   return (
     <AbsoluteFill className="pointer-events-none" style={{ position: 'relative' }}>
+      {/* GLOBAL SVG DEFINITIONS: Rendered safely exactly once to prevent tree duplications or performance bottlenecks */}
+      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+        <defs>
+          <filter id="engine-cyan-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="engine-orange-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+      </svg>
+
       <EnvironmentEngine fx={background_fx} lighting={lighting_style} color={mood.colors.primary} />
 
       <Xwrapper>
