@@ -31,7 +31,33 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font
       config: { damping: 16, stiffness: 60 }
   });
 
-  const nodeOpacity = interpolate(entryScale, [0, 1], [0, active ? 1 : 0.4]);
+  // Calculate dynamic continuous active window fade-in/out opacity
+  const getActiveWindowOpacity = () => {
+      const windows = (node as any).active_windows;
+      if (!windows) return 1.0;
+
+      let maxOpacity = 0.0;
+      const cushion = 10;
+      for (const [s, e] of windows) {
+          if (frame >= s && frame <= e) {
+              const fromStart = frame - s;
+              const fromEnd = e - frame;
+              const fadeIn = interpolate(fromStart, [0, cushion], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+              const fadeOut = interpolate(fromEnd, [0, cushion], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+              const currentOpacity = Math.min(fadeIn, fadeOut);
+              if (currentOpacity > maxOpacity) {
+                  maxOpacity = currentOpacity;
+              }
+          }
+      }
+      return maxOpacity;
+  };
+
+  const windowOpacity = getActiveWindowOpacity();
+  // If active window is defined, node is hidden when not inside the window
+  const activeTargetOpacity = (node as any).active_windows ? windowOpacity : (active ? 1 : 0.4);
+
+  const nodeOpacity = interpolate(entryScale, [0, 1], [0, activeTargetOpacity]);
   const finalOpacity = nodeOpacity * progress;
 
   const mood = MOOD_REGISTRY[cinematic_mood || 'documentary'] || MOOD_REGISTRY['documentary'];
@@ -42,6 +68,10 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font
   const fontStyle = {
     fontFamily: font || (isBangla ? 'Sohid_bangla, sans-serif' : 'Audiowide-Regular_english, Inter, sans-serif')
   };
+
+  // Compute customized or responsive font sizes based on visual settings and importance weight
+  const baseSize = node.font_size || (14 + (node.importance ?? 1) * 3.5);
+  const displayFontSize = active ? `${baseSize * 1.2}px` : `${baseSize}px`;
 
   if (isHeader) {
     // Elegant glassmorphic title card with unique stylistic accents depending on cinematic_mood
@@ -79,8 +109,9 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font
 
         {/* Majestic Title text */}
         <h1
-          className="text-4xl font-extrabold text-white tracking-widest text-center uppercase"
+          className="font-extrabold text-white tracking-widest text-center uppercase"
           style={{
+            fontSize: node.font_size ? `${node.font_size}px` : '36px',
             textShadow: active ? `0 0 30px ${mood.colors.primary}` : 'none',
           }}
         >
@@ -145,7 +176,7 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font
       <span
         className="tracking-wider uppercase"
         style={{
-          fontSize: active ? '21px' : '17px',
+          fontSize: displayFontSize,
           textShadow: active ? `0 0 10px ${mood.colors.primary}` : 'none',
         }}
       >
