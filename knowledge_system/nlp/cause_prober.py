@@ -333,8 +333,124 @@ class CauseProber:
     def _is_bangla(self, text: str) -> bool:
         return any("\u0980" <= char <= "\u09FF" for char in str(text))
 
-    def probe_causes(self, scene_text: str, entities: List[Entity], next_scene_text: Optional[str] = None) -> List[dict]:
-        """Resolves descriptive narratives into highly contextual conceptual core causes."""
+    def _interact_with_gemini(self, prompt: str) -> str:
+        """Interactive prompt-and-paste loop using Google Colab UI or command line input."""
+        try:
+            from google.colab import output
+            import uuid
+            u_id = uuid.uuid4().hex[:8]
+            header_color = "#2196F3"
+
+            feedback_html = """
+            <div style='color: #00FFAB; margin-bottom: 15px; border-left: 4px solid #00FFAB; padding-left: 15px; background: #0c1a12; padding: 10px;'>
+                <strong style='font-size: 16px;'>🧠 Gemini Knowledge extraction prompt ready</strong>
+                <p style='font-size: 13px; margin-top: 4px;'>Copy the prompt below, paste it into Gemini, and copy the resulting JSON back here.</p>
+            </div>
+            """
+
+            js_code = f"""
+                (async () => {{
+                    const u_id = "{u_id}";
+                    const container = document.createElement('div');
+                    container.style = "background: #0a0a0a; color: #fff; padding: 25px; border-radius: 16px; border: 2px solid {header_color}; font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 850px; margin: 20px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5);";
+                    container.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h3 style="color: {header_color}; margin: 0; font-size: 22px;">🧠 Studio V4 Knowledge System</h3>
+                            <span style="background: {header_color}; color: #000; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 14px;">GEMINI EXTRACTOR</span>
+                        </div>
+                        {feedback_html}
+                        <div style="background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333; margin-bottom: 15px;">
+                            <p style="margin: 0 0 10px 0; font-size: 14px; color: #aaa;">1. Copy the dynamically generated extraction prompt.</p>
+                            <button id="copy-${{u_id}}" style="background: {header_color}; color: #000; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; transition: opacity 0.2s;">📋 COPY PROMPT TO CLIPBOARD</button>
+                        </div>
+                        <div style="background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333;">
+                            <p style="margin: 0 0 10px 0; font-size: 14px; color: #aaa;">2. Paste Gemini's JSON response below.</p>
+                            <textarea id="paste-${{u_id}}" style="width: 100%; height: 250px; background: #000; color: #00FFAB; border: 1px solid #444; padding: 12px; font-family: 'Cascadia Code', 'Courier New', monospace; font-size: 13px; border-radius: 6px; resize: vertical;" placeholder="Paste Gemini's JSON block here..."></textarea>
+                            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                                <button id="submit-${{u_id}}" style="flex: 2; background: #2196F3; color: #fff; border: none; padding: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);">🚀 SUBMIT EXTRACTED CAUSES</button>
+                                <button id="force-${{u_id}}" style="flex: 1; background: #FF3E6C; color: #fff; border: none; padding: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 4px 15px rgba(255, 62, 108, 0.3);">🛑 USE OFFLINE FALLBACK</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(container);
+                    document.getElementById('copy-'+u_id).onclick = () => {{
+                        navigator.clipboard.writeText({json.dumps(prompt)});
+                        document.getElementById('copy-'+u_id).innerText = "COPIED TO CLIPBOARD!";
+                    }};
+                    return new Promise((resolve) => {{
+                        document.getElementById('submit-'+u_id).onclick = () => {{
+                            const val = document.getElementById('paste-'+u_id).value.trim();
+                            if (!val) {{ alert("Please paste Gemini's response first."); return; }}
+                            container.remove(); resolve(val);
+                        }};
+                        document.getElementById('force-'+u_id).onclick = () => {{
+                            container.remove(); resolve("USE_FALLBACK_SIGNAL");
+                        }};
+                    }});
+                }})();
+            """
+            return output.eval_js(js_code)
+        except Exception:
+            # Fallback for standard non-Colab terminal
+            print("\n" + "="*80)
+            print("📋 GEMINI KNOWLEDGE EXTRACTION PROMPT")
+            print("="*80)
+            print(prompt)
+            print("="*80 + "\n")
+            print("Please copy the prompt above, paste it into Gemini, and paste the resulting JSON below.")
+            print("(Type 'fallback' to use the offline-first rule-based extraction engine instead)\n")
+            val = ""
+            while not val.strip():
+                val = input("Paste Gemini JSON (or 'fallback'): ").strip()
+            return val
+
+    def generate_dynamic_prompt(self, scenes_data: List[dict]) -> str:
+        """Generates a comprehensive, carefully designed prompt asking Gemini to extract causes."""
+        prompt = """TASK: EXTRACT CONTEXTUAL CAUSAL FACTORS FOR SCENE KNOWLEDGE GRAPHS.
+
+You are acting as an expert documentary director and cognitive systems analyst.
+We are building a cinematic knowledge graph. To make the visuals interesting, each scene needs to map to 2 to 4 underlying causes/reasons that describe "why" the assertions or events in the scene narration happen.
+
+--- THE NARRATIVE STORY CONTEXT ---
+"""
+        for s in scenes_data:
+            prompt += f"Scene [{s['scene_id']}]: \"{s['narration']}\"\n"
+
+        prompt += """
+--- STRUCTURAL CONSTRAINTS & INSTRUCTIONS (STRICT) ---
+1. EXTRACT 2-4 CAUSES PER SCENE: Focus on deeply logical, non-obvious, and highly contextual causes.
+2. STABLE TYPOGRAPHY (CRITICAL):
+   - 'label' (Bangla): Must be written in pristine, premium Bangla. Strictly 2 to 3 words maximum. Never exceed 3 words (to prevent layout wrapping/clipping in UI graph nodes).
+   - 'english': The direct, clean English translation. Strictly 2 to 3 words maximum.
+3. CONTEXT-AWARE DEDUPLICATION: If a cause/reason is already described or explained in subsequent scenes, exclude it from the earlier scene to preserve progressive story discovery.
+4. EMOTION Presets: Map each cause to a valid visual-emotional tone: "calm" or "intense".
+5. OUTPUT: Respond with ONLY a raw, un-enclosed JSON block matching the output schema. No explanations, no chatbot chat, no preamble.
+
+--- REQUIRED OUTPUT JSON SCHEMA ---
+{
+  "scenes": [
+    {
+      "scene_id": "SCENE_1",
+      "causes": [
+        {
+          "label": "দ্রুত নগরায়ণ",
+          "english": "Rapid Urbanization",
+          "emotion": "intense"
+        },
+        {
+          "label": "গ্রাম-শহর অভিবাসন",
+          "english": "Rural-Urban Migration",
+          "emotion": "calm"
+        }
+      ]
+    }
+  ]
+}
+"""
+        return prompt
+
+    def probe_causes_fallback(self, scene_text: str, entities: List[Entity], next_scene_text: Optional[str] = None) -> List[dict]:
+        """Resolves descriptive narratives into highly contextual conceptual core causes using local KB fallbacks."""
         is_bn = self._is_bangla(scene_text)
 
         english_text = scene_text
@@ -342,55 +458,43 @@ class CauseProber:
             english_text = self.engine._cached_translate(scene_text, src_lang="bn", tgt_lang="en")
 
         extracted_concepts = self.engine._extract_ranked_concepts(english_text)
-        print(f"🔍 Extracted Concepts for Normalization: {extracted_concepts}")
-
         matched_domain = None
 
         # Tier 1: Local Knowledge Domain matching
         for concept in extracted_concepts:
             matched_domain = self.engine._match_local_knowledge(concept)
             if matched_domain:
-                print(f"🎯 Direct Concept Normalization Hit: Matched '{concept}' -> Domain ID '{matched_domain['id']}'")
                 break
 
         # Tier 2: Wikipedia Semantic Expansion Category Mapping
         if not matched_domain:
             for concept in extracted_concepts[:2]:
                 categories = self.engine._query_wikipedia_normalization_tags(concept)
-                print(f"📖 Wikipedia Categories for '{concept}': {categories}")
                 for category in categories:
                     matched_domain = self.engine._match_local_knowledge(category)
                     if matched_domain:
-                        print(f"🎯 Category-Based Normalization Hit: Normalized '{concept}' via category '{category}' -> Domain ID '{matched_domain['id']}'")
                         break
                 if matched_domain:
                     break
 
-        # Tier 3: Hard Word-Boundary Fallback Matching (Prevents sub-string trapping like "war" inside "forward")
+        # Tier 3: Hard Word-Boundary Fallback Matching
         if not matched_domain:
             text_lower = english_text.lower()
             for domain in self.engine.knowledge_base.get("domains", []):
                 domain_id = domain["id"].lower()
-
-                # Enforce strict word boundaries on the primary Domain ID
                 id_match = re.search(r'\b' + re.escape(domain_id) + r'\b', text_lower)
-
-                # Enforce strict word boundaries across custom synonyms
                 synonym_match = any(
                     re.search(r'\b' + re.escape(s.lower()) + r'\b', text_lower)
                     for s in domain.get("synonyms", [])
                 )
-
                 if id_match or synonym_match:
                     matched_domain = domain
-                    print(f"📌 Boundary-Safe Fallback Match: Resolved to Domain '{domain['id']}'")
                     break
 
         if not matched_domain:
             domains = self.engine.knowledge_base.get("domains", [])
             if domains:
                 matched_domain = domains[0]
-                print(f"ℹ️ No domain mapped. Using default Domain ID '{matched_domain['id']}'")
             else:
                 return [{
                     "label": "কাঠামোগত পরিবর্তন" if is_bn else "Structural Changes",
@@ -426,59 +530,118 @@ class CauseProber:
                 already_described = any(trig in next_text_lower for trig in triggers)
                 if not already_described:
                     filtered_causes.append(cause)
-                else:
-                    print(f"💡 Context Deduplicator: Excluded '{cause['label']}' as subsequent scenes describe it.")
             detected_causes = filtered_causes
 
         return detected_causes[:4]
 
-    def inject_causes_to_scene(self, scene_idx: int, scene_model: any, next_scene_text: Optional[str] = None) -> None:
-        """Modifies a scene structure dynamically by appending calculated causal Entities and Relations."""
-        probed_reasons = self.probe_causes(scene_model.narration, scene_model.entities, next_scene_text)
-        if not probed_reasons:
+    def probe_and_inject_all(self, all_scene_models: List[any]) -> None:
+        """
+        Coordinates the interactive Gemini loop:
+        - Extracts narration from all scenes.
+        - Presents the HTML / CLI prompt interface.
+        - Recovers and parses the pasted JSON.
+        - Dynamically injects causes and relations, falling back to local normalizations gracefully.
+        """
+        if not all_scene_models:
             return
 
-        target_entity_id = None
-        for entity in scene_model.entities:
-            if getattr(entity, 'importance', 0) >= 2.0:
-                target_entity_id = entity.id
-                break
+        scenes_data = []
+        for model in all_scene_models:
+            scenes_data.append({
+                "scene_id": model.scene_id,
+                "narration": model.narration
+            })
 
-        if not target_entity_id and scene_model.entities:
-            target_entity_id = scene_model.entities[0].id
+        # Generate prompt and trigger Gemini interaction loop
+        prompt = self.generate_dynamic_prompt(scenes_data)
+        raw_result = self._interact_with_gemini(prompt)
 
-        if not target_entity_id:
-            root_label = "ঢাকা" if self._is_bangla(scene_model.narration) else "Dhaka"
-            root_id = "e_root_baseline"
-            scene_model.entities.append(Entity(
-                id=root_id,
-                label=root_label,
-                type="map_marker",
-                importance=2.0
-            ))
-            target_entity_id = root_id
+        pasted_causes = {}
+        use_fallback = False
 
-        entity_start_idx = len(scene_model.entities) + 1
-        for i, cause in enumerate(probed_reasons):
-            cause_node_id = f"e_cause_{scene_idx}_{entity_start_idx + i}"
+        if "USE_FALLBACK_SIGNAL" in raw_result or raw_result.strip().lower() == "fallback":
+            use_fallback = True
+        else:
+            try:
+                # Sanitize to find JSON block
+                json_match = re.search(r'(\{.*\})', raw_result, re.DOTALL)
+                if json_match:
+                    pasted_json = json.loads(json_match.group(1))
+                else:
+                    pasted_json = json.loads(raw_result)
 
-            scene_model.entities.append(Entity(
-                id=cause_node_id,
-                label=cause["label"],
-                type="danger_core" if i % 2 == 0 else "abstract_core",
-                importance=1.5,
-                scale=1.0,
-                emotion="intense" if i % 2 == 0 else "calm"
-            ))
+                # Map extracted causes by scene ID
+                for sc in pasted_json.get("scenes", []):
+                    p_id = sc.get("scene_id")
+                    if p_id:
+                        p_id = f"SCENE_{re.search(r'(\d+)', str(p_id)).group(1)}" # Standardize key
+                        p_causes = []
+                        for cause in sc.get("causes", []):
+                            p_causes.append({
+                                "label": cause.get("label", "কারণ"),
+                                "english": cause.get("english", "Cause"),
+                                "emotion": cause.get("emotion", "calm")
+                            })
+                        pasted_causes[p_id] = p_causes
+            except Exception as e:
+                print(f"⚠️ Failed to parse Gemini output: {e}. Falling back to rule-based system.")
+                use_fallback = True
 
-            relation_id = f"r_cause_{scene_idx}_{entity_start_idx + i}"
-            scene_model.relations.append(Relation(
-                id=relation_id,
-                source_id=cause_node_id,
-                target_id=target_entity_id,
-                relationship="causes",
-                importance=1.2,
-                strength=1.0
-            ))
+        # Process and inject causes scene-by-scene
+        for i, model in enumerate(all_scene_models):
+            scene_id = model.scene_id
 
-        print(f"✅ Probed & Injected {len(probed_reasons)} cause-and-effect connections into Scene {scene_idx + 1}")
+            # Determine which causes to use (Gemini vs Fallback)
+            if not use_fallback and scene_id in pasted_causes and pasted_causes[scene_id]:
+                probed_reasons = pasted_causes[scene_id]
+                print(f"⚡ Injected {len(probed_reasons)} causes into {scene_id} from Gemini.")
+            else:
+                next_scene_text = all_scene_models[i + 1].narration if i + 1 < len(all_scene_models) else None
+                probed_reasons = self.probe_causes_fallback(model.narration, model.entities, next_scene_text)
+                print(f"🌲 Injected {len(probed_reasons)} causes into {scene_id} from Local Normalization engine.")
+
+            # Map the selected target node
+            target_entity_id = None
+            for entity in model.entities:
+                if getattr(entity, 'importance', 0) >= 2.0:
+                    target_entity_id = entity.id
+                    break
+
+            if not target_entity_id and model.entities:
+                target_entity_id = model.entities[0].id
+
+            if not target_entity_id:
+                root_label = "ঢাকা" if self._is_bangla(model.narration) else "Dhaka"
+                root_id = "e_root_baseline"
+                model.entities.append(Entity(
+                    id=root_id,
+                    label=root_label,
+                    type="map_marker",
+                    importance=2.0
+                ))
+                target_entity_id = root_id
+
+            # Inject Cause Entities and Relations
+            entity_start_idx = len(model.entities) + 1
+            for idx, cause in enumerate(probed_reasons):
+                cause_node_id = f"e_cause_{i}_{entity_start_idx + idx}"
+                cause_emotion = cause.get("emotion", "intense" if idx % 2 == 0 else "calm")
+
+                model.entities.append(Entity(
+                    id=cause_node_id,
+                    label=cause["label"],
+                    type="danger_core" if idx % 2 == 0 else "abstract_core",
+                    importance=1.5,
+                    scale=1.0,
+                    emotion=cause_emotion
+                ))
+
+                relation_id = f"r_cause_{i}_{entity_start_idx + idx}"
+                model.relations.append(Relation(
+                    id=relation_id,
+                    source_id=cause_node_id,
+                    target_id=target_entity_id,
+                    relationship="causes",
+                    importance=1.2,
+                    strength=1.0
+                ))

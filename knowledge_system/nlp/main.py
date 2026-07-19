@@ -123,9 +123,7 @@ class SemanticEngine:
         # E. Context-Aware Cause Probing & Injection Heuristics
         from .cause_prober import CauseProber
         prober = CauseProber()
-        for i, model in enumerate(all_scene_models):
-            next_scene_text = all_scene_models[i + 1].narration if i + 1 < len(all_scene_models) else None
-            prober.inject_causes_to_scene(i, model, next_scene_text)
+        prober.probe_and_inject_all(all_scene_models)
 
         # 4. Build Unified Multi-Scene Model
         # (For now we return a list, but we could build a master graph)
