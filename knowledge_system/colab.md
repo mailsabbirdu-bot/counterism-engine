@@ -1,6 +1,6 @@
 # 🧠 Unified Cinematic Knowledge System
 
-Extract structured meaning and generate cinematic visualization blueprints from your narration script in a single step. This cell mounts Google Drive, installs all dependencies, and processes your `story.txt`.
+Extract structured meaning and generate cinematic visualization blueprints from your narration script in a single step using the manual Gemini NLP loop. This cell mounts Google Drive, installs all lightweight dependencies, and processes your `story.txt`.
 
 ```python
 # ==============================================================================
@@ -29,14 +29,7 @@ if not os.path.exists(PROJECT_NAME):
 
 # --- 3. INSTALL DEPENDENCIES ---
 print("🛠️ Installing System Dependencies...")
-!pip install -q stanza networkx pydantic regex
-import stanza
-print("Downloading NLP models (English & Bangla)...")
-stanza.download('en', verbose=False)
-try:
-    stanza.download('bn', verbose=False)
-except Exception as e:
-    print(f"⚠️ Stanza Bangla model download skipped: {e}")
+!pip install -q networkx pydantic regex
 
 # --- 4. RUN UNIFIED PIPELINE ---
 print("🚀 Initializing Knowledge System...")
