@@ -85,6 +85,23 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
     const validLinks = rawLinks.filter(l => nodeIds.has(l.source) && nodeIds.has(l.target));
     const links = validLinks.map(l => ({ ...l }));
 
+    // 1. Identify which nodes act as causes (source of a "causes" or "energy_transfer" relation)
+    const causeNodeIds = new Set<string>();
+    links.forEach(l => {
+        const srcId = typeof l.source === 'object' ? (l.source as any).id : l.source;
+        const rel = (l.relationship || '').toLowerCase();
+        if (rel === 'causes' || rel === 'energy_transfer') {
+            causeNodeIds.add(srcId);
+        }
+    });
+
+    nodes.forEach((n: any) => {
+        if (causeNodeIds.has(n.id) || n.id.includes('cause')) {
+            n.isCauseNode = true;
+        }
+    });
+
+    // 2. Compute Layout with anti-collision force models
     if (resolvedLayout === 'tree' || resolvedLayout === 'hierarchy') {
         try {
             const root = d3.stratify<any>().id(d => d.id).parentId(d => {
@@ -101,40 +118,44 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
             console.error("D3 Stratify failed", e);
         }
     } else if (resolvedLayout === 'radial') {
+        // High-force radial layout to prevent multi-word text collisions
         const simulation = d3.forceSimulation<any>(nodes)
-            .force("link", d3.forceLink<any, any>(links).id(d => d.id).distance(220))
-            .force("charge", d3.forceManyBody().strength(-1200))
-            .force("r", d3.forceRadial(260))
+            .force("link", d3.forceLink<any, any>(links).id(d => d.id).distance(340))
+            .force("charge", d3.forceManyBody().strength(-3000))
+            .force("collide", d3.forceCollide().radius(220))
+            .force("r", d3.forceRadial(320))
             .stop();
         for (let i = 0; i < 300; ++i) simulation.tick();
     } else if (resolvedLayout === 'timeline') {
         nodes.forEach((n, i) => {
-            (n as any).x = (i - (nodes.length - 1)/2) * 280;
-            (n as any).y = (i % 2 === 0 ? -80 : 80);
+            (n as any).x = (i - (nodes.length - 1)/2) * 320;
+            (n as any).y = (i % 2 === 0 ? -110 : 110);
         });
     } else if (resolvedLayout === 'solar_system' || resolvedLayout === 'orbit') {
-        // Place the title / disconnected node first, orbit others around
+        // Space out orbiting satellite elements to leave wide collision-free corridors
         const orbitingNodes = nodes.filter(n => {
             const hasLinks = links.some(l => l.source === n.id || l.target === n.id);
             return hasLinks;
         });
         orbitingNodes.forEach((n, i) => {
             const angle = (i / orbitingNodes.length) * Math.PI * 2 + Math.PI / 4;
-            const dist = 240;
+            const dist = 320; // Increased distance from central sun node
             (n as any).x = Math.cos(angle) * dist;
-            (n as any).y = Math.sin(angle) * dist + 60; // offset downwards to leave space for Title
+            (n as any).y = Math.sin(angle) * dist + 40;
         });
     } else if (resolvedLayout === 'hex_grid') {
         nodes.forEach((n, i) => {
             const row = Math.floor(i / 3);
             const col = i % 3;
-            (n as any).x = (col - 1) * 300 + (row % 2) * 150;
-            (n as any).y = (row - 1) * 220;
+            (n as any).x = (col - 1) * 350 + (row % 2) * 175;
+            (n as any).y = (row - 1) * 240;
         });
     } else {
+        // Powerful force layout with large collide radius and negative charge to space nodes out
         const simulation = d3.forceSimulation<any>(nodes)
-          .force("link", d3.forceLink<any, any>(links).id(d => d.id).distance(280))
-          .force("charge", d3.forceManyBody().strength(-1800))
+          .force("link", d3.forceLink<any, any>(links).id(d => d.id).distance(380))
+          .force("charge", d3.forceManyBody().strength(-4500))
+          .force("collide", d3.forceCollide().radius(240))
           .force("center", d3.forceCenter(0, 40))
           .stop();
 
@@ -311,20 +332,18 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
 
     // 1. Dynamic Relationship Type Styling (Kurzgesagt / Branch Education Style diversity)
     if (rel === 'containment' || rel === 'is_a') {
-      // Clean high-tech double outline feel
       arrowColor = resolvedMood === 'danger' ? mood.colors.accent : mood.colors.primary;
       pathType = resolvedMood === 'cyberpunk' ? 'smooth' : 'straight';
-      dashnessSetting = false; // solid line
+      dashnessSetting = false;
       strokeWidth = active ? 3 : 1.5;
-      headSize = 0; // seamless connection
+      headSize = 0;
     } else if (rel === 'construction_flow' || rel === 'builds') {
-      // High-speed energetic dashed signal pipeline
       arrowColor = resolvedMood === 'cyberpunk' ? mood.colors.secondary : mood.colors.primary;
       pathType = 'smooth';
       dashnessSetting = {
         strokeLen: 14,
         nonStrokeLen: 14,
-        animation: frame * 1.8 // Deterministic frame-bound clock
+        animation: frame * 1.8
       };
       strokeWidth = active ? 4 : 2;
       extraProps = {
@@ -334,13 +353,12 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
         }
       };
     } else if (rel === 'energy_transfer' || rel === 'causes' || rel === 'produces') {
-      // Intense glowing electrical pipeline arc
       arrowColor = resolvedMood === 'danger' ? mood.colors.accent : mood.colors.secondary;
       pathType = 'smooth';
       dashnessSetting = {
         strokeLen: 6,
         nonStrokeLen: 15,
-        animation: -frame * 3.0 // High speed backwards flow
+        animation: -frame * 3.0
       };
       strokeWidth = active ? 5 : 2.5;
       extraProps = {
@@ -350,7 +368,6 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
         }
       };
     } else if (rel === 'reveal' || rel === 'hidden_under') {
-      // Microchip schematic grid flow with discrete data packets
       arrowColor = '#ffc600';
       pathType = 'grid';
       dashnessSetting = {
@@ -361,7 +378,6 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
       strokeWidth = 2;
       headSize = 4;
     } else {
-      // Fallback: Mood-based curve overrides
       if (resolvedMood === 'scientific') {
         arrowColor = mood.colors.primary;
         pathType = 'straight';
@@ -406,7 +422,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
 
   return (
     <AbsoluteFill className="pointer-events-none" style={{ position: 'relative' }}>
-      {/* GLOBAL SVG DEFINITIONS: Rendered safely exactly once to prevent tree duplications or performance bottlenecks */}
+      {/* GLOBAL SVG DEFINITIONS */}
       <svg style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none' }}>
         <defs>
           <filter id="engine-cyan-glow" x="-50%" y="-50%" width="200%" height="200%">
@@ -430,7 +446,6 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          {/* Fractal Turbulence filter for organic electric discharge ripples */}
           <filter id="electric-distortion" x="-20%" y="-20%" width="140%" height="140%">
             <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" result="noise" />
             <feDisplacementMap in="SourceGraphic" in2="noise" scale="7" xChannelSelector="R" yChannelSelector="G" />
@@ -441,11 +456,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
       <EnvironmentEngine fx={background_fx} lighting={lighting_style} color={mood.colors.primary} />
 
       <Xwrapper>
-        {/*
-          Unified Node Container:
-          Renders nodes inside a 1x-scaled absolute container so that DOM coordinates
-          measured via getBoundingClientRect() exactly match the react-xarrows viewport coordinates.
-        */}
+        {/* Unified Node Container */}
         <div
           style={{
             position: 'absolute',
@@ -456,7 +467,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
             zIndex: 10
           }}
         >
-          {/* Nodes Layer (Each Node is represented as a beautifully placed HTML component) */}
+          {/* Nodes Layer */}
           {nodes.map((node: any, i: number) => {
             const floatY = Math.sin(frame * (node.isHeaderNode ? 0.02 : 0.035) + hashString(node.id)) * (node.isHeaderNode ? 3 : 5);
             const floatX = Math.cos(frame * (node.isHeaderNode ? 0.015 : 0.025) + hashString(node.id)) * (node.isHeaderNode ? 2 : 3);
@@ -488,10 +499,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
           })}
         </div>
 
-        {/*
-          react-xarrows connections layer (rendered outside the scaled container, at 1x scale)
-          This ensures react-xarrows calculates screen-space coordinates perfectly and tracks beautifully!
-        */}
+        {/* react-xarrows connections layer */}
         <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 15 }}>
           {links.map((link) => {
             const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
@@ -500,7 +508,6 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
             const sourceNode = (nodes as any[]).find((n: any) => n.id === sourceId);
             const targetNode = (nodes as any[]).find((n: any) => n.id === targetId);
 
-            // Determine if both source and target have begun revealing to follow information flow
             const sourceRank = sourceNode ? ((sourceNode as any).rank ?? 0) : 0;
             const targetRank = targetNode ? ((targetNode as any).rank ?? 0) : 0;
             const isSourceRevealed = relativeFrame >= (sourceNode?.isHeaderNode ? 0 : sourceRank * 35);
@@ -511,12 +518,10 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
 
             if (!active) return null;
 
-            // Calculate precise smooth connection line opacity based on parent and child node visibility
             const linkOpacity = getLinkOpacityAtFrame(link, sourceNode, targetNode);
 
             if (linkOpacity <= 0.01) return null;
 
-            // Decoupled frame control (structural determinism fallback to rank stagger)
             const startFrame = (link as any).revealFrameStart !== undefined
               ? (link as any).revealFrameStart
               : (Math.max(sourceRank, targetRank) * 35);
@@ -546,13 +551,9 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                   transition: 'opacity 0.25s ease-out'
                 }}
               >
-                {/*
-                  MULTI-PASS DOCUMENTARY RENDERING ENGINES
-                  Converts flat SVG paths into deep, high-end multi-layer glow vectors!
-                */}
+                {/* MULTI-PASS DOCUMENTARY RENDERING ENGINES */}
                 {(() => {
                   if (rel === 'containment' || rel === 'is_a') {
-                    // double trace cleanest vector look
                     return (
                       <React.Fragment>
                         <Xarrow
@@ -586,7 +587,6 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                   }
 
                   if (rel === 'construction_flow' || rel === 'builds') {
-                    // Cyber Quantum Pipeline (broad cyan glow conduit + core moving flow)
                     return (
                       <React.Fragment>
                         <Xarrow
@@ -594,7 +594,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color="rgba(0, 243, 255, 0.12)"
                           strokeWidth={7}
                           path="smooth"
-                          curveness={0.7}
+                          curveness={0.9} // Increased curveness to swoop collision-free around other elements
                           showHead={false}
                           arrowBodyProps={{
                             filter: 'url(#engine-cyan-glow)',
@@ -606,7 +606,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color="#00f3ff"
                           strokeWidth={2}
                           path="smooth"
-                          curveness={0.7}
+                          curveness={0.9}
                           headSize={5}
                           arrowHeadProps={{ fill: '#00f3ff', stroke: 'none' }}
                           arrowBodyProps={{
@@ -620,7 +620,6 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                   }
 
                   if (rel === 'energy_transfer' || rel === 'causes' || rel === 'produces') {
-                    // Glowing electric pulse with genuine organic fractal noise distortion!
                     return (
                       <React.Fragment>
                         <Xarrow
@@ -628,7 +627,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color="rgba(239, 68, 68, 0.12)"
                           strokeWidth={7}
                           path="smooth"
-                          curveness={0.65}
+                          curveness={0.85} // Curved to create clean paths avoiding other connector crossings
                           showHead={false}
                           arrowBodyProps={{
                             filter: 'url(#engine-orange-glow)',
@@ -640,7 +639,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color="#ef4444"
                           strokeWidth={2.2}
                           path="smooth"
-                          curveness={0.65}
+                          curveness={0.85}
                           headSize={4}
                           arrowBodyProps={{
                             strokeDasharray: '30, 10, 10, 10',
@@ -653,7 +652,6 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                   }
 
                   if (rel === 'reveal' || rel === 'hidden_under') {
-                    // Microchip grid trace with amber data packet marching sequences
                     return (
                       <Xarrow
                         {...baseProps}
@@ -671,7 +669,6 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                     );
                   }
 
-                  // Default Fallback: Clean smooth organic write-on bezier
                   return (
                     <Xarrow
                       key={`xarrow-${link.id}`}
