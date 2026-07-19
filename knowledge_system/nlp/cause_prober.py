@@ -116,10 +116,10 @@ class CauseProber:
 
     def generate_dynamic_prompt(self, scenes_data: List[dict]) -> str:
         """Generates a comprehensive, carefully designed prompt asking Gemini to extract all NLP and causal concepts."""
-        prompt = """TASK: HIGH-FIDELITY COGNITIVE NLP & CAUSAL FACTOR EXTRACTION FOR CINEMATIC KNOWLEDGE GRAPHS.
+        prompt = """TASK: HIGH-FIDELITY COGNITIVE NLP & ADVANCED SEMANTIC RELATIONSHIP EXTRACTION FOR CINEMATIC KNOWLEDGE GRAPHS.
 
 You are acting as an expert documentary director, cognitive systems analyst, and senior NLP extraction model.
-Your task is to analyze the sequence of scene narrations below, extract their underlying entities, actions, quantities, relationships, and dynamically probe 2 to 4 contextual causes/reasons behind each scene's core assertions.
+Your task is to analyze the sequence of scene narrations below, extract their underlying entities, actions, quantities, relationships, and dynamically assign highly specific semantic relation types to create an exceptionally rich, diverse, and non-repetitive visualization plan.
 
 --- THE NARRATIVE STORY CONTEXT ---
 """
@@ -127,28 +127,47 @@ Your task is to analyze the sequence of scene narrations below, extract their un
             prompt += f"Scene [{s['scene_id']}]: \"{s['narration']}\"\n"
 
         prompt += """
+--- RELATIONSHIP SEMANTIC REGISTRY (MANDATORY INJECTION) ---
+Choose from these exact semantic relationship keys based on the logical structure of each narration:
+1. ENERGY TRANSITIONS (Renders as Pulsing Crimson Electric Lightning):
+   - 'cause_effect', 'effect_cause', 'trigger_response', 'action_consequence', 'feedback_loop', 'influence', 'causes', 'produces'.
+2. PIPELINE FLOWS (Renders as Cyber Quantum Cyan Pipeline with glowing sliding beads):
+   - 'construction_flow', 'builds', 'input_output', 'process_flow', 'supply_chain', 'migration_flow'.
+3. LOGIC & DATA (Renders as Gold Schematic Traces with micro marching dot sequences):
+   - 'evidence_conclusion', 'claim_evidence', 'fact_explanation', 'reason_result', 'reveal', 'hidden_under'.
+4. STRUCTURES & GROUPS (Renders as HUD Double Outlines):
+   - 'containment', 'is_a', 'part_whole', 'whole_parts', 'hierarchy', 'membership', 'ownership'.
+5. TIME & TRANSFORMATION (Renders as Emerald Gradient Bio-Chemical Fluid flow):
+   - 'lifecycle', 'transformation', 'evolution', 'cycle'.
+6. CHRONOLOGY & DEPENDENCIES (Renders as Indigo Laser Pulse Trails):
+   - 'timeline', 'sequence', 'dependency', 'dependency_chain', 'dependency_network'.
+7. TENSION & OPPOSITION (Renders as Double Opposing Red Blazing Laser Sweeps):
+   - 'conflict', 'contrast', 'trade_off', 'risk_impact'.
+8. ASSOCIATIONS & CONTEXTS (Renders as Broad Glassmorphic Translucent Sankey Conduits):
+   - 'grouping', 'classification', 'comparison', 'similarity', 'analogy', 'association', 'correlation', 'context', 'reference', 'semantic_link', 'importance', 'collaboration', 'narrative_flow'.
+
 --- STRUCTURAL CONSTRAINTS & EXTRACTION GUIDELINES (STRICT) ---
 For each scene, you must extract:
 1. ENTITIES:
-   - 'id': ASCII-safe lowercase slug (e.g. "dhaka", "apple_inc").
+   - 'id': Clean ASCII-safe lowercase identifier (e.g. "dhaka", "apple_inc"). Avoid raw non-ASCII Bangla characters for IDs.
    - 'label': In clean Bangla or English matching the narration.
-   - 'type': Must be one of: "hero" (most important topic), "concept", "organization", "location", "metric", "event".
-   - 'importance': Float (1.0 to 5.0). Primary/hero node should be >= 2.0.
+   - 'type': Must be one of: "hero" (central subject, e.g. "dhaka"), "concept", "organization", "location", "metric", "event".
+   - 'importance': Float (1.0 to 5.0).
    - 'emotion': One of: "calm", "intense", "growing", "danger", "stable".
-   - 'active_windows': A list of frame ranges when the entity is spoken or shown, e.g. [[30, 90]] (each scene lasts 300 frames, from 0 to 300).
-2. ACTIONS: Extract significant verbs/actions matching entity IDs as subject/object.
-3. QUANTITIES: Extract numbers, ratios, or metrics with labels/units (e.g., "15%", "50 billion").
-4. RELATIONS: Extract relationships between entities:
-   - 'relationship': e.g. "membership", "leads_to", "part_of", "depends_on".
+   - 'active_windows': A list of frame ranges when the entity is spoken or shown, e.g. [[30, 90]] (scene duration: 0 to 300).
+2. ACTIONS, QUANTITIES, TEMPORAL EXPRESSIONS: Extract significant verbs, quantities (with values/units), and chronological points.
+3. RELATIONS (CONVERT NARRAIVES TO RICH MAPS):
+   - 'source_id' / 'target_id': Match entity IDs.
+   - 'relationship': Select the exact matching relationship key from our SEMANTIC REGISTRY (e.g., 'risk_impact', 'process_flow', 'claim_evidence'). Avoid generic 'connector' or 'energy_transfer' where a specific semantic key applies!
    - 'importance': 1.0 to 3.0.
    - 'strength': 1.0 to 3.0.
-5. PROBE CAUSAL FACTORS (2-4 per scene):
-   - For the primary entity in each scene, automatically map 2 to 4 underlying causes/reasons why this phenomenon occurs.
-   - 'label' (Bangla): Must be written in pristine, premium Bangla. Strictly 2 to 3 words maximum. Never exceed 3 words (to prevent layout wrapping/clipping in UI graph nodes).
-   - 'english': Direct English translation of the cause. Strictly 2 to 3 words maximum.
-   - Connect each cause to the target primary entity using the relationship type "causes" (this is essential to trigger our glowing electric shock arrow visuals!).
-6. CONTEXT-AWARE DEDUPLICATION: If a cause/reason is already described or explicitly explained in subsequent scenes, exclude it from the earlier scene to preserve progressive story discovery.
-7. SCENE CLASSIFICATION: Classify 'scene_type' (trend | conflict | comparison | historical) and 'emotional_tone' (calm | intense | growing | danger).
+4. PROBE CAUSAL/CONSEQUENCE FACTORS (2-4 per scene):
+   - Identify the primary assertions in each scene, and connect them dynamically to 2 to 4 underlying causes/milestones.
+   - 'label' (Bangla): Pristine, premium Bangla. Strictly 2 to 3 words maximum. Never exceed 3 words (to prevent layout wrapping/clipping in UI graph nodes).
+   - 'english': Direct English translation. Strictly 2 to 3 words maximum.
+   - Connect these using the appropriate relation type (e.g., 'cause_effect', 'risk_impact', 'dependency') to trigger distinct glowing modern connector paths automatically.
+5. CONTEXT-AWARE DEDUPLICATION: If a cause/reason is already described or explicitly explained in subsequent scenes, exclude it from the earlier scene to preserve progressive story discovery.
+6. SCENE CLASSIFICATION: Classify 'scene_type' (trend | conflict | comparison | historical) and 'emotional_tone' (calm | intense | growing | danger).
 
 --- REQUIRED OUTPUT JSON SCHEMA ---
 {
@@ -169,46 +188,24 @@ For each scene, you must extract:
           "active_windows": [[15, 120]]
         },
         {
-          "id": "e_cause_1",
+          "id": "rapid_urbanization",
           "label": "দ্রুত নগরায়ণ",
-          "english": "Rapid Urbanization",
-          "type": "danger_core",
+          "type": "concept",
           "importance": 1.5,
           "scale": 1.0,
           "emotion": "intense",
           "active_windows": [[45, 150]]
         }
       ],
-      "actions": [
-        {
-          "id": "a_1",
-          "label": "report",
-          "subject_id": "apple_inc",
-          "object_id": "growth",
-          "importance": 1.5
-        }
-      ],
-      "quantities": [
-        {
-          "value": 15.0,
-          "unit": "%",
-          "label": "১৫ শতাংশ",
-          "entity_id": null
-        }
-      ],
-      "temporal_expressions": [
-        {
-          "label": "২০২৪",
-          "value": "2024",
-          "type": "point"
-        }
-      ],
+      "actions": [],
+      "quantities": [],
+      "temporal_expressions": [],
       "relations": [
         {
           "id": "r_1",
-          "source_id": "e_cause_1",
+          "source_id": "rapid_urbanization",
           "target_id": "dhaka",
-          "relationship": "causes",
+          "relationship": "cause_effect",
           "importance": 1.2,
           "strength": 1.0
         }
@@ -220,6 +217,91 @@ For each scene, you must extract:
 NO PREAMBLE. NO CHATTER. RETURN ONLY THE CORRECT RAW JSON BLOCK.
 """
         return prompt
+
+    def probe_causes_fallback(self, scene_text: str, entities: List[Entity], next_scene_text: Optional[str] = None) -> List[dict]:
+        """Resolves descriptive narratives into highly contextual conceptual core causes using local KB fallbacks."""
+        is_bn = self._is_bangla(scene_text)
+
+        english_text = scene_text
+        if is_bn:
+            english_text = self.engine._cached_translate(scene_text, src_lang="bn", tgt_lang="en")
+
+        extracted_concepts = self.engine._extract_ranked_concepts(english_text)
+        matched_domain = None
+
+        # Tier 1: Local Knowledge Domain matching
+        for concept in extracted_concepts:
+            matched_domain = self.engine._match_local_knowledge(concept)
+            if matched_domain:
+                break
+
+        # Tier 2: Wikipedia Semantic Expansion Category Mapping
+        if not matched_domain:
+            for concept in extracted_concepts[:2]:
+                categories = self.engine._query_wikipedia_normalization_tags(concept)
+                for category in categories:
+                    matched_domain = self.engine._match_local_knowledge(category)
+                    if matched_domain:
+                        break
+                if matched_domain:
+                    break
+
+        # Tier 3: Hard Word-Boundary Fallback Matching
+        if not matched_domain:
+            text_lower = english_text.lower()
+            for domain in self.engine.knowledge_base.get("domains", []):
+                domain_id = domain["id"].lower()
+                id_match = re.search(r'\b' + re.escape(domain_id) + r'\b', text_lower)
+                synonym_match = any(
+                    re.search(r'\b' + re.escape(s.lower()) + r'\b', text_lower)
+                    for s in domain.get("synonyms", [])
+                )
+                if id_match or synonym_match:
+                    matched_domain = domain
+                    break
+
+        if not matched_domain:
+            domains = self.engine.knowledge_base.get("domains", [])
+            if domains:
+                matched_domain = domains[0]
+            else:
+                return [{
+                    "label": "কাঠামোগত পরিবর্তন" if is_bn else "Structural Changes",
+                    "english": "structural changes"
+                }]
+
+        # Construct mapped operational output models
+        detected_causes = []
+        causes_en = matched_domain.get("causes", [])
+        causes_bn = matched_domain.get("bn_causes", [])
+
+        for idx, en_cause in enumerate(causes_en):
+            if is_bn:
+                bn_cause = causes_bn[idx] if idx < len(causes_bn) else self.engine._cached_translate(en_cause, src_lang="en", tgt_lang="bn")
+                detected_causes.append({
+                    "label": bn_cause,
+                    "english": en_cause,
+                    "search_trigger": [bn_cause.lower(), en_cause.lower()]
+                })
+            else:
+                detected_causes.append({
+                    "label": en_cause.capitalize(),
+                    "english": en_cause,
+                    "search_trigger": [en_cause.lower()]
+                })
+
+        # Tier 4: Context-Aware Deduplication via Type Guarding
+        if next_scene_text and isinstance(next_scene_text, str):
+            next_text_lower = next_scene_text.lower()
+            filtered_causes = []
+            for cause in detected_causes:
+                triggers = cause.get("search_trigger", []) + [cause["label"].lower(), cause["english"].lower()]
+                already_described = any(trig in next_text_lower for trig in triggers)
+                if not already_described:
+                    filtered_causes.append(cause)
+            detected_causes = filtered_causes
+
+        return detected_causes[:4]
 
     def probe_and_inject_all(self, all_scene_models: List[any]) -> dict:
         """
