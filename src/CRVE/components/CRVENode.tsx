@@ -70,10 +70,20 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font
   const displayFontSize = active ? `${baseSize * 1.15}px` : `${baseSize}px`;
 
   // Determine distinctive type category
-  const isCauseNode = node.type === 'danger_core' || node.type === 'abstract_core' || node.id.includes('cause') || node.type.includes('cause');
+  const isCauseNode = (node as any).isCauseNode || node.id.includes('cause') || node.type.includes('cause');
   let nodeCategory = String(node.type).toLowerCase();
+
   if (isCauseNode) {
     nodeCategory = 'cause';
+  } else {
+    // Non-cause nodes styled purely by their primary semantic roles
+    if (node.id === 'ঢাকা' || node.id === 'dhaka' || node.type === 'hero') {
+      nodeCategory = 'hero'; // "ঢাকা" styled as our Cyberpunk Neon Cyan/Blue panel style (Hero)
+    } else if (node.type === 'danger_core' || node.type === 'abstract_core') {
+      nodeCategory = 'danger'; // "মানুষ", "কংক্রিটের পাহাড়", "টাইমবোম্ব" styled as danger/warning panels (which the user liked!)
+    } else if (node.type === 'map_marker' || node.type === 'concept') {
+      nodeCategory = 'concept'; // "মেগাসিটি" styled as the clean glass disc concept (which the user liked!)
+    }
   }
 
   // Header render block
@@ -135,7 +145,7 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font
   let childrenAccents: React.ReactNode = null;
 
   switch (nodeCategory) {
-    case 'cause': // Crimson/Amber Warning Panel Style
+    case 'cause': // Crimson/Amber Warning Panel Style (Unified Look for All Causes)
       containerStyle = {
         background: active
           ? 'repeating-linear-gradient(45deg, rgba(244, 63, 94, 0.04) 0px, rgba(244, 63, 94, 0.04) 8px, rgba(0, 0, 0, 0.6) 8px, rgba(0, 0, 0, 0.6) 16px)'
@@ -151,12 +161,12 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font
             <span className="w-1 h-1 rounded-full bg-[#f43f5e] animate-ping" />
             <span className="w-1.5 h-1.5 rounded-full bg-[#f43f5e]" />
           </div>
-          <span className="absolute bottom-1 left-2 text-[8px] tracking-[0.2em] font-extrabold text-[#f43f5e] opacity-70">ALERT.CORE</span>
+          <span className="absolute bottom-1 left-2 text-[8px] tracking-[0.2em] font-extrabold text-[#f43f5e] opacity-70">ALERT.CAUSE</span>
         </>
       ) : null;
       break;
 
-    case 'hero': // Cyberpunk Tech Neon Cyan Panel Style
+    case 'hero': // Cyberpunk Tech Neon Cyan Panel Style (Distinct for Hero Nodes)
       containerStyle = {
         background: active
           ? 'linear-gradient(135deg, rgba(0, 245, 255, 0.08), rgba(0, 245, 255, 0.01))'
@@ -170,9 +180,26 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font
         <>
           <div className="absolute top-1 right-1 w-2 h-2 border-r-[2px] border-t-[2px] border-[#00f5ff]" />
           <div className="absolute bottom-1 left-1 w-2 h-2 border-l-[2px] border-b-[2px] border-[#00f5ff]" />
-          {/* Subtle grid of background dots */}
           <div className="absolute inset-0 pointer-events-none opacity-20" style={{ backgroundImage: 'radial-gradient(rgba(0, 245, 255, 0.4) 1px, transparent 0)', backgroundSize: '8px 8px' }} />
           <span className="absolute bottom-1 right-2 text-[8px] tracking-[0.2em] font-extrabold text-[#00f5ff]">HERO.TARGET</span>
+        </>
+      ) : null;
+      break;
+
+    case 'danger': // Warning Panel Style (Liked for "মানুষ")
+      containerStyle = {
+        background: active
+          ? 'linear-gradient(135deg, rgba(249, 115, 22, 0.06), rgba(0, 0, 0, 0.65))'
+          : 'rgba(25, 15, 10, 0.7)',
+        borderColor: active ? '#f97316' : 'rgba(249, 115, 22, 0.2)',
+        borderLeft: active ? '4px solid #f97316' : '1px solid rgba(249, 115, 22, 0.2)',
+        boxShadow: active ? '0 10px 30px rgba(249, 115, 22, 0.2)' : 'none',
+        borderRadius: '6px',
+      };
+      childrenAccents = active ? (
+        <>
+          <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-[4px] h-[70%] rounded-full animate-pulse" style={{ backgroundColor: '#f97316' }} />
+          <span className="absolute bottom-1 right-2 text-[8px] tracking-[0.2em] font-extrabold text-[#f97316]">ALERT.CORE</span>
         </>
       ) : null;
       break;
@@ -205,11 +232,10 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font
           : 'rgba(10, 25, 15, 0.7)',
         borderColor: active ? '#10b981' : 'rgba(16, 185, 129, 0.2)',
         boxShadow: active ? '0 12px 30px rgba(16, 185, 129, 0.15)' : 'none',
-        borderRadius: '30px', // High rounded tag
+        borderRadius: '30px',
       };
       childrenAccents = active ? (
         <>
-          {/* Map coordinate pulse dot */}
           <div className="absolute left-2 w-2 h-2 rounded-full bg-[#10b981] animate-ping" />
           <div className="absolute left-2 w-2 h-2 rounded-full bg-[#10b981]" />
           <span className="absolute right-3 top-1 text-[7px] text-[#10b981] tracking-widest uppercase">LOC.NODE</span>
@@ -247,7 +273,7 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font
       break;
 
     case 'concept':
-    default: // Premium Minimalist Glass Disc style
+    default: // Premium Minimalist Glass Disc style (Liked for "মেগাসিটি")
       containerStyle = {
         background: active
           ? 'rgba(255, 255, 255, 0.03)'
