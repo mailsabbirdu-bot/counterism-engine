@@ -6,6 +6,7 @@ import { CRVENodeData, CRVELinkData } from '../lib/types';
 import { CRVENode } from '../components/CRVENode';
 import { EnvironmentEngine } from '../components/EnvironmentEngine';
 import { MOOD_REGISTRY, CinematicMood } from '../lib/moodRegistry';
+import { getGrammar } from '../lib/styleRegistry';
 
 interface CRVEEngineProps {
   nodes: CRVENodeData[];
@@ -90,7 +91,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
     links.forEach(l => {
         const srcId = typeof l.source === 'object' ? (l.source as any).id : l.source;
         const rel = (l.relationship || '').toLowerCase();
-        if (rel === 'causes' || rel === 'energy_transfer') {
+        if (rel === 'causes' || rel === 'energy_transfer' || rel === 'cause_effect' || rel === 'effect_cause' || rel === 'trigger_response' || rel === 'action_consequence') {
             causeNodeIds.add(srcId);
         }
     });
@@ -310,116 +311,6 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
     return linkActiveOpacity * sourceOpacity * targetOpacity;
   };
 
-  // Helper to construct react-xarrows props per scene mood and active state
-  // Upgraded to dynamically map relationship types to highly unique cinematic vectors (Double, pulse, electrical arcing, synapses)
-  const getXarrowProps = (link: any) => {
-    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-
-    const sourceNode = nodes.find(n => n.id === sourceId);
-    const targetNode = nodes.find(n => n.id === targetId);
-
-    const active = isActive(link) || (sourceNode ? isActive(sourceNode) : false) || (targetNode ? isActive(targetNode) : false);
-
-    let arrowColor = mood.colors.primary;
-    let pathType: 'smooth' | 'grid' | 'straight' = 'smooth';
-    let dashnessSetting: any = { strokeLen: 10, nonStrokeLen: 5, animation: 1.5 };
-    let strokeWidth = active ? 4 : 2;
-    let headSize = 6;
-    let extraProps: any = {};
-
-    const rel = (link.relationship || '').toLowerCase();
-
-    // 1. Dynamic Relationship Type Styling (Kurzgesagt / Branch Education Style diversity)
-    if (rel === 'containment' || rel === 'is_a') {
-      arrowColor = resolvedMood === 'danger' ? mood.colors.accent : mood.colors.primary;
-      pathType = resolvedMood === 'cyberpunk' ? 'smooth' : 'straight';
-      dashnessSetting = false;
-      strokeWidth = active ? 3 : 1.5;
-      headSize = 0;
-    } else if (rel === 'construction_flow' || rel === 'builds') {
-      arrowColor = resolvedMood === 'cyberpunk' ? mood.colors.secondary : mood.colors.primary;
-      pathType = 'smooth';
-      dashnessSetting = {
-        strokeLen: 14,
-        nonStrokeLen: 14,
-        animation: frame * 1.8
-      };
-      strokeWidth = active ? 4 : 2;
-      extraProps = {
-        arrowBodyProps: {
-          strokeLinecap: 'round',
-          filter: 'url(#engine-cyan-glow)',
-        }
-      };
-    } else if (rel === 'energy_transfer' || rel === 'causes' || rel === 'produces') {
-      arrowColor = resolvedMood === 'danger' ? mood.colors.accent : mood.colors.secondary;
-      pathType = 'smooth';
-      dashnessSetting = {
-        strokeLen: 6,
-        nonStrokeLen: 15,
-        animation: -frame * 3.0
-      };
-      strokeWidth = active ? 5 : 2.5;
-      extraProps = {
-        arrowBodyProps: {
-          filter: 'url(#engine-orange-glow)',
-          strokeLinecap: 'round',
-        }
-      };
-    } else if (rel === 'reveal' || rel === 'hidden_under') {
-      arrowColor = '#ffc600';
-      pathType = 'grid';
-      dashnessSetting = {
-        strokeLen: 4,
-        nonStrokeLen: 10,
-        animation: frame * 1.2
-      };
-      strokeWidth = 2;
-      headSize = 4;
-    } else {
-      if (resolvedMood === 'scientific') {
-        arrowColor = mood.colors.primary;
-        pathType = 'straight';
-        dashnessSetting = { strokeLen: 12, nonStrokeLen: 6, animation: frame * 0.8 };
-        strokeWidth = active ? 4 : 1.5;
-      } else if (resolvedMood === 'cyberpunk') {
-        arrowColor = mood.colors.secondary;
-        pathType = 'smooth';
-        dashnessSetting = { strokeLen: 6, nonStrokeLen: 12, animation: frame * 2.0 };
-        strokeWidth = active ? 5 : 2;
-        headSize = 8;
-      } else if (resolvedMood === 'danger') {
-        arrowColor = mood.colors.accent;
-        pathType = 'smooth';
-        dashnessSetting = { strokeLen: 15, nonStrokeLen: 5, animation: frame * 1.5 };
-        strokeWidth = active ? 5 : 2;
-        headSize = 9;
-      } else if (resolvedMood === 'luxury_hud') {
-        arrowColor = mood.colors.primary;
-        pathType = 'smooth';
-        dashnessSetting = { strokeLen: 20, nonStrokeLen: 10, animation: frame * 0.5 };
-        strokeWidth = active ? 3.5 : 1.5;
-        headSize = 5;
-      }
-    }
-
-    return {
-      start: String(sourceId),
-      end: String(targetId),
-      lineColor: arrowColor,
-      headColor: arrowColor,
-      strokeWidth,
-      showHead: headSize > 0,
-      headSize,
-      path: pathType,
-      dashness: dashnessSetting,
-      animateDrawing: 1.2,
-      zIndex: 10,
-      ...extraProps
-    };
-  };
-
   return (
     <AbsoluteFill className="pointer-events-none" style={{ position: 'relative' }}>
       {/* GLOBAL SVG DEFINITIONS */}
@@ -434,6 +325,20 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
           </filter>
           <filter id="engine-orange-glow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="6" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="engine-green-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="engine-purple-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
@@ -535,12 +440,16 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
               extrapolateRight: 'clamp',
             });
 
-            const rel = (link.relationship || '').toLowerCase();
+            // Map relationship to dynamic visual grammar structure
+            const grammar = getGrammar(link.relationship);
+            const relCategory = grammar.type;
+            const relColor = grammar.color;
+
             const baseProps = {
               start: String(sourceId),
               end: String(targetId),
-              startAnchor: { position: 'auto' },
-              endAnchor: { position: 'auto' },
+              startAnchor: { position: 'auto' as any },
+              endAnchor: { position: 'auto' as any },
             };
 
             return (
@@ -551,83 +460,20 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                   transition: 'opacity 0.25s ease-out'
                 }}
               >
-                {/* MULTI-PASS DOCUMENTARY RENDERING ENGINES */}
+                {/*
+                  MULTI-PASS RELATIONSHIP VISUALIZATION ENGINES (12+ Custom Connector Presets)
+                */}
                 {(() => {
-                  if (rel === 'containment' || rel === 'is_a') {
+                  // 1. Energy Transfer / Causes / Action Consequences (Glowing Electric Discharge Sparks)
+                  if (relCategory === 'energy_transfer') {
                     return (
                       <React.Fragment>
                         <Xarrow
                           {...baseProps}
-                          startAnchor={{ position: 'auto', offset: { x: -4, y: -4 } }}
-                          endAnchor={{ position: 'auto', offset: { x: -4, y: -4 } }}
-                          color={resolvedMood === 'danger' ? mood.colors.accent : mood.colors.primary}
-                          strokeWidth={1.5}
-                          path={resolvedMood === 'cyberpunk' ? 'smooth' : 'straight'}
-                          showHead={false}
-                          arrowBodyProps={{
-                            strokeDasharray: '1000',
-                            strokeDashoffset: (drawProgress * 1000).toString(),
-                          }}
-                        />
-                        <Xarrow
-                          {...baseProps}
-                          startAnchor={{ position: 'auto', offset: { x: 4, y: 4 } }}
-                          endAnchor={{ position: 'auto', offset: { x: 4, y: 4 } }}
-                          color={resolvedMood === 'danger' ? mood.colors.accent : mood.colors.primary}
-                          strokeWidth={1.5}
-                          path={resolvedMood === 'cyberpunk' ? 'smooth' : 'straight'}
-                          showHead={false}
-                          arrowBodyProps={{
-                            strokeDasharray: '1000',
-                            strokeDashoffset: (drawProgress * 1000).toString(),
-                          }}
-                        />
-                      </React.Fragment>
-                    );
-                  }
-
-                  if (rel === 'construction_flow' || rel === 'builds') {
-                    return (
-                      <React.Fragment>
-                        <Xarrow
-                          {...baseProps}
-                          color="rgba(0, 243, 255, 0.12)"
+                          color={`${relColor}20`}
                           strokeWidth={7}
                           path="smooth"
-                          curveness={0.9} // Increased curveness to swoop collision-free around other elements
-                          showHead={false}
-                          arrowBodyProps={{
-                            filter: 'url(#engine-cyan-glow)',
-                            strokeLinecap: 'round',
-                          }}
-                        />
-                        <Xarrow
-                          {...baseProps}
-                          color="#00f3ff"
-                          strokeWidth={2}
-                          path="smooth"
-                          curveness={0.9}
-                          headSize={5}
-                          arrowHeadProps={{ fill: '#00f3ff', stroke: 'none' }}
-                          arrowBodyProps={{
-                            strokeDasharray: '20, 100',
-                            strokeDashoffset: (drawProgress * 600 + frame * 3.5).toString(),
-                            strokeLinecap: 'round',
-                          }}
-                        />
-                      </React.Fragment>
-                    );
-                  }
-
-                  if (rel === 'energy_transfer' || rel === 'causes' || rel === 'produces') {
-                    return (
-                      <React.Fragment>
-                        <Xarrow
-                          {...baseProps}
-                          color="rgba(239, 68, 68, 0.12)"
-                          strokeWidth={7}
-                          path="smooth"
-                          curveness={0.85} // Curved to create clean paths avoiding other connector crossings
+                          curveness={0.85}
                           showHead={false}
                           arrowBodyProps={{
                             filter: 'url(#engine-orange-glow)',
@@ -636,11 +482,12 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                         />
                         <Xarrow
                           {...baseProps}
-                          color="#ef4444"
-                          strokeWidth={2.2}
+                          color={relColor}
+                          strokeWidth={2.5}
                           path="smooth"
                           curveness={0.85}
-                          headSize={4}
+                          headSize={5}
+                          arrowHeadProps={{ fill: relColor, stroke: 'none' }}
                           arrowBodyProps={{
                             strokeDasharray: '30, 10, 10, 10',
                             strokeDashoffset: (-frame * 5.5).toString(),
@@ -651,28 +498,239 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                     );
                   }
 
-                  if (rel === 'reveal' || rel === 'hidden_under') {
+                  // 2. Construction Flows / Inputs / Supply Chains (Cyber Quantum Pipeline)
+                  if (relCategory === 'construction_flow') {
+                    return (
+                      <React.Fragment>
+                        <Xarrow
+                          {...baseProps}
+                          color={`${relColor}20`}
+                          strokeWidth={8}
+                          path="smooth"
+                          curveness={0.9}
+                          showHead={false}
+                          arrowBodyProps={{
+                            filter: 'url(#engine-cyan-glow)',
+                            strokeLinecap: 'round',
+                          }}
+                        />
+                        <Xarrow
+                          {...baseProps}
+                          color={relColor}
+                          strokeWidth={2.2}
+                          path="smooth"
+                          curveness={0.9}
+                          headSize={6}
+                          arrowHeadProps={{ fill: relColor, stroke: 'none' }}
+                          arrowBodyProps={{
+                            strokeDasharray: '15, 80',
+                            strokeDashoffset: (drawProgress * 600 + frame * 4.0).toString(),
+                            strokeLinecap: 'round',
+                          }}
+                        />
+                      </React.Fragment>
+                    );
+                  }
+
+                  // 3. Logic / Evidence / Reasons (Gold Schematic Traces)
+                  if (relCategory === 'reveal') {
+                    return (
+                      <React.Fragment>
+                        <Xarrow
+                          {...baseProps}
+                          color={`${relColor}15`}
+                          strokeWidth={4}
+                          path="grid"
+                          gridBreak="50%"
+                          showHead={false}
+                        />
+                        <Xarrow
+                          {...baseProps}
+                          color={relColor}
+                          strokeWidth={2.0}
+                          path="grid"
+                          gridBreak="50%"
+                          headSize={5}
+                          arrowBodyProps={{
+                            strokeDasharray: '8, 8',
+                            strokeDashoffset: (-frame * 2.0).toString(),
+                            filter: 'url(#engine-luxury-gold)',
+                          }}
+                        />
+                      </React.Fragment>
+                    );
+                  }
+
+                  // 4. Lifecycles / Cycles / Transformations (Bio-Chemical Gradient Conduit)
+                  if (relCategory === 'lifecycle') {
+                    return (
+                      <React.Fragment>
+                        <Xarrow
+                          {...baseProps}
+                          color={`${relColor}25`}
+                          strokeWidth={10}
+                          path="smooth"
+                          curveness={0.8}
+                          showHead={false}
+                          arrowBodyProps={{
+                            filter: 'url(#engine-green-glow)',
+                            strokeLinecap: 'round',
+                          }}
+                        />
+                        <Xarrow
+                          {...baseProps}
+                          color="#ffffff"
+                          strokeWidth={1.8}
+                          path="smooth"
+                          curveness={0.8}
+                          headSize={4}
+                          arrowBodyProps={{
+                            strokeDasharray: '40, 140',
+                            strokeDashoffset: (frame * 2.5).toString(),
+                            strokeLinecap: 'round',
+                          }}
+                        />
+                      </React.Fragment>
+                    );
+                  }
+
+                  // 5. Timeline / Dependency (Dashed Laser Pulse Indigo Train)
+                  if (relCategory === 'sequence') {
+                    return (
+                      <React.Fragment>
+                        <Xarrow
+                          {...baseProps}
+                          color={`${relColor}30`}
+                          strokeWidth={1.5}
+                          path="smooth"
+                          curveness={0.7}
+                          showHead={false}
+                        />
+                        <Xarrow
+                          {...baseProps}
+                          color={relColor}
+                          strokeWidth={2.8}
+                          path="smooth"
+                          curveness={0.7}
+                          headSize={6}
+                          arrowBodyProps={{
+                            strokeDasharray: '4, 18',
+                            strokeDashoffset: (frame * 3.5).toString(),
+                            filter: 'url(#engine-purple-glow)',
+                          }}
+                        />
+                      </React.Fragment>
+                    );
+                  }
+
+                  // 6. Conflict / Contrasts / Trade-Off (Double Opposing Blazing Laser Sweeps)
+                  if (relCategory === 'conflict') {
+                    return (
+                      <React.Fragment>
+                        <Xarrow
+                          {...baseProps}
+                          color={`${relColor}20`}
+                          strokeWidth={5}
+                          path="smooth"
+                          curveness={0.9}
+                          showHead={false}
+                        />
+                        <Xarrow
+                          {...baseProps}
+                          color={relColor}
+                          strokeWidth={2.0}
+                          path="smooth"
+                          curveness={0.9}
+                          showHead={false}
+                          arrowBodyProps={{
+                            strokeDasharray: '30, 150',
+                            strokeDashoffset: (frame * 5.0).toString(),
+                          }}
+                        />
+                        <Xarrow
+                          {...baseProps}
+                          color={relColor}
+                          strokeWidth={2.0}
+                          path="smooth"
+                          curveness={0.9}
+                          showHead={false}
+                          arrowBodyProps={{
+                            strokeDasharray: '30, 150',
+                            strokeDashoffset: (-frame * 5.0).toString(),
+                          }}
+                        />
+                      </React.Fragment>
+                    );
+                  }
+
+                  // 7. Structure / Containment / Parts (HUD Double Outline)
+                  if (relCategory === 'containment') {
+                    return (
+                      <React.Fragment>
+                        <Xarrow
+                          {...baseProps}
+                          startAnchor={{ position: 'auto', offset: { x: -4, y: -4 } }}
+                          endAnchor={{ position: 'auto', offset: { x: -4, y: -4 } }}
+                          color={relColor}
+                          strokeWidth={1.5}
+                          path="smooth"
+                          curveness={0.75}
+                          showHead={false}
+                          arrowBodyProps={{
+                            strokeDasharray: '1000',
+                            strokeDashoffset: (drawProgress * 1000).toString(),
+                          }}
+                        />
+                        <Xarrow
+                          {...baseProps}
+                          startAnchor={{ position: 'auto', offset: { x: 4, y: 4 } }}
+                          endAnchor={{ position: 'auto', offset: { x: 4, y: 4 } }}
+                          color={relColor}
+                          strokeWidth={1.5}
+                          path="smooth"
+                          curveness={0.75}
+                          showHead={false}
+                          arrowBodyProps={{
+                            strokeDasharray: '1000',
+                            strokeDashoffset: (drawProgress * 1000).toString(),
+                          }}
+                        />
+                      </React.Fragment>
+                    );
+                  }
+
+                  // 8. Loose Associations / Contexts (Translucent High-Tech Sankey Conduit)
+                  if (relCategory === 'association') {
                     return (
                       <Xarrow
                         {...baseProps}
-                        color="rgba(255, 198, 0, 0.45)"
-                        strokeWidth={1.5}
-                        path="grid"
-                        gridBreak="50%"
-                        headSize={4}
+                        color={relColor}
+                        strokeWidth={grammar.width || 4}
+                        path="smooth"
+                        curveness={0.8}
+                        showHead={false}
                         arrowBodyProps={{
-                          strokeDasharray: '8, 8',
-                          strokeDashoffset: (-frame * 2.0).toString(),
-                          filter: 'url(#engine-luxury-gold)',
+                          strokeLinecap: 'round',
+                          strokeDasharray: '20, 20',
+                          strokeDashoffset: (frame * 0.8).toString()
                         }}
                       />
                     );
                   }
 
+                  // Fallback: Clean smooth organic write-on bezier
                   return (
                     <Xarrow
                       key={`xarrow-${link.id}`}
-                      {...getXarrowProps(link)}
+                      start={String(sourceId)}
+                      end={String(targetId)}
+                      lineColor={grammar.color || mood.colors.primary}
+                      headColor={grammar.color || mood.colors.primary}
+                      strokeWidth={grammar.width || 2}
+                      showHead={grammar.particles}
+                      headSize={6}
+                      path="smooth"
+                      dashness={grammar.particles ? { strokeLen: 10, nonStrokeLen: 5, animation: frame * 1.5 } : false}
                       arrowBodyProps={{
                         strokeDasharray: '1000',
                         strokeDashoffset: (drawProgress * 1000).toString(),
