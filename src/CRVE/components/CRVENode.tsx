@@ -69,20 +69,22 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font
   const baseSize = node.font_size || (14 + (node.importance ?? 1) * 3.5);
   const displayFontSize = active ? `${baseSize * 1.15}px` : `${baseSize}px`;
 
-  // Determine distinctive type category
+  // Determine distinctive type category (Supporting 11 fully unique text styles)
   const isCauseNode = (node as any).isCauseNode || node.id.includes('cause') || node.type.includes('cause');
-  let nodeCategory = String(node.type).toLowerCase();
+  let nodeCategory = String(node.type).toLowerCase().trim();
 
   if (isCauseNode) {
     nodeCategory = 'cause';
   } else {
     // Non-cause nodes styled purely by their primary semantic roles
-    if (node.id === 'ঢাকা' || node.id === 'dhaka' || node.type === 'hero') {
+    if (node.id === 'ঢাকা' || node.id === 'dhaka' || nodeCategory === 'hero') {
       nodeCategory = 'hero'; // "ঢাকা" styled as our Cyberpunk Neon Cyan/Blue panel style (Hero)
-    } else if (node.type === 'danger_core' || node.type === 'abstract_core') {
-      nodeCategory = 'danger'; // "মানুষ", "কংক্রিটের পাহাড়", "টাইমবোম্ব" styled as danger/warning panels (which the user liked!)
-    } else if (node.type === 'map_marker' || node.type === 'concept') {
-      nodeCategory = 'concept'; // "মেগাসিটি" styled as the clean glass disc concept (which the user liked!)
+    } else if (nodeCategory === 'danger_core' || nodeCategory === 'danger') {
+      nodeCategory = 'danger'; // "মানুষ", "কংক্রিটের পাহাড়" styled as bold warning panels
+    } else if (nodeCategory === 'abstract_core') {
+      nodeCategory = 'hero'; // "ঢাকা", "টাইমবোম্ব" target cores mapped as Hero panels
+    } else if (nodeCategory === 'map_marker' || nodeCategory === 'concept') {
+      nodeCategory = 'concept'; // "মেগাসিটি" styled as the clean glass disc concept
     }
   }
 
@@ -269,6 +271,55 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font
           <div className="absolute -left-1 w-2 h-[1px] bg-[#f97316]" />
           <div className="absolute -right-1 w-2 h-[1px] bg-[#f97316]" />
         </>
+      ) : null;
+      break;
+
+    case 'evidence': // High-fidelity Sapphire Blue badge style
+      containerStyle = {
+        background: active ? 'rgba(59, 130, 246, 0.05)' : 'rgba(10, 15, 25, 0.7)',
+        borderColor: active ? '#3b82f6' : 'rgba(59, 130, 246, 0.2)',
+        borderRadius: '8px',
+        boxShadow: active ? '0 10px 25px rgba(59, 130, 246, 0.15)' : 'none',
+        borderBottom: active ? '3px solid #3b82f6' : '1px solid rgba(59, 130, 246, 0.2)',
+      };
+      childrenAccents = active ? (
+        <>
+          <div className="absolute top-1 right-2 flex gap-0.5">
+            <div className="w-1 h-3 bg-[#3b82f6]" />
+            <div className="w-1 h-3 bg-[#3b82f6] opacity-60" />
+          </div>
+          <span className="absolute bottom-1 left-2 text-[6px] text-[#3b82f6] tracking-widest uppercase">EVID.DATA</span>
+        </>
+      ) : null;
+      break;
+
+    case 'goal': // Radiant Diamond Teal style
+      containerStyle = {
+        background: active ? 'rgba(20, 184, 166, 0.05)' : 'rgba(10, 20, 20, 0.7)',
+        borderColor: active ? '#14b8a6' : 'rgba(20, 184, 166, 0.2)',
+        borderRadius: '4px',
+        boxShadow: active ? '0 10px 25px rgba(20, 184, 166, 0.15)' : 'none',
+      };
+      childrenAccents = active ? (
+        <>
+          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-[#14b8a6]" />
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-[#14b8a6]" />
+          <span className="absolute bottom-1 right-2 text-[6px] text-[#14b8a6] tracking-widest uppercase">GOAL.FOCUS</span>
+        </>
+      ) : null;
+      break;
+
+    case 'action': // Industrial Slate Grey style
+      containerStyle = {
+        background: active ? 'rgba(100, 116, 139, 0.05)' : 'rgba(15, 15, 15, 0.7)',
+        borderColor: active ? '#64748b' : 'rgba(100, 116, 139, 0.2)',
+        borderRadius: '0px',
+        borderLeft: active ? '4px solid #64748b' : '1px solid rgba(100, 116, 139, 0.2)',
+        borderRight: active ? '4px solid #64748b' : '1px solid rgba(100, 116, 139, 0.2)',
+        boxShadow: active ? '0 10px 25px rgba(100, 116, 139, 0.15)' : 'none',
+      };
+      childrenAccents = active ? (
+        <span className="absolute top-1 left-2 text-[6px] text-[#64748b] tracking-widest uppercase">ACT.EXEC</span>
       ) : null;
       break;
 
