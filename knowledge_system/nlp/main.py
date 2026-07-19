@@ -166,19 +166,30 @@ class SemanticEngine:
                         matching_model.scene_type = s_data.get("scene_type", "trend")
                         matching_model.emotional_tone = s_data.get("emotional_tone", "calm")
 
-                        # Populate Entities
+                        # Populate Entities with strict dict validation and word-length trimming
                         for ent in s_data.get("entities", []):
+                            if not isinstance(ent, dict):
+                                continue
+
+                            # Trim label strictly to 2-3 words maximum
+                            label = ent.get("label", "")
+                            words = label.split()
+                            if len(words) > 3:
+                                label = " ".join(words[:3])
+
                             matching_model.entities.append(Entity(
                                 id=ent.get("id"),
-                                label=ent.get("label"),
+                                label=label,
                                 type=ent.get("type", "concept"),
                                 importance=ent.get("importance", 1.0),
                                 emotion=ent.get("emotion"),
                                 scale=ent.get("scale", 1.0),
                                 attributes=ent.get("attributes", {})
                             ))
-                        # Populate Actions
+                        # Populate Actions with strict dict validation
                         for act in s_data.get("actions", []):
+                            if not isinstance(act, dict):
+                                continue
                             matching_model.actions.append(Action(
                                 id=act.get("id"),
                                 label=act.get("label"),
@@ -186,23 +197,29 @@ class SemanticEngine:
                                 object_id=act.get("object_id"),
                                 importance=act.get("importance", 1.0)
                             ))
-                        # Populate Quantities
+                        # Populate Quantities with strict dict validation
                         for q in s_data.get("quantities", []):
+                            if not isinstance(q, dict):
+                                continue
                             matching_model.quantities.append(Quantity(
                                 value=q.get("value", 0.0),
                                 unit=q.get("unit"),
                                 label=q.get("label", ""),
                                 entity_id=q.get("entity_id")
                             ))
-                        # Populate Temporals
+                        # Populate Temporals with strict dict validation
                         for t in s_data.get("temporal_expressions", []):
+                            if not isinstance(t, dict):
+                                continue
                             matching_model.temporal_expressions.append(TemporalExpression(
                                 label=t.get("label"),
                                 value=t.get("value"),
                                 type=t.get("type", "point")
                             ))
-                        # Populate Relations
+                        # Populate Relations with strict dict validation
                         for rel in s_data.get("relations", []):
+                            if not isinstance(rel, dict):
+                                continue
                             matching_model.relations.append(Relation(
                                 id=rel.get("id"),
                                 source_id=rel.get("source_id"),
@@ -215,7 +232,13 @@ class SemanticEngine:
             # Run our lightweight, high-speed, zero-fail offline fallback
             self._run_offline_fallback(all_scene_models)
 
-        # 5. Build Unified Multi-Scene graph
+        # 5. Build Unified Multi-Scene graph and enforce word constraints on fallback labels too
+        for model in all_scene_models:
+            for ent in model.entities:
+                words = ent.label.split()
+                if len(words) > 3:
+                    ent.label = " ".join(words[:3])
+
         self.graph_builder = GraphBuilder()
         G = self.graph_builder.build_multi(all_scene_models)
         graph_data = self.graph_builder.to_json(G)
