@@ -50,8 +50,6 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
   const activeSceneId = rawNodes[0]?.scene_id || "SCENE_1";
 
   // Dynamic Scene-Level Style, Mood, & Layout Planning Override
-  // This guarantees that every scene has a completely unique visual theme, color scheme, and topology!
-  // Supports both English (SCENE_N) and Bangla (দৃশ্য_N) identifiers robustly.
   const { resolvedMood, resolvedLayout } = useMemo(() => {
     let resolvedMood: CinematicMood = cinematic_mood;
     let resolvedLayout = layout_type;
@@ -102,57 +100,75 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
         }
     });
 
-    // 2. Compute Layout with anti-collision force models
-    if (resolvedLayout === 'tree' || resolvedLayout === 'hierarchy') {
-        try {
-            const root = d3.stratify<any>().id(d => d.id).parentId(d => {
-                const link = links.find(l => l.target === d.id);
-                return link ? link.source : null;
-            })(nodes);
-            const treeLayout = d3.tree().size([800, 500]);
-            treeLayout(root);
-            root.descendants().forEach(d => {
-                const n = nodes.find(node => node.id === d.id);
-                if (n) { (n as any).x = (d.x ?? 0) - 400; (n as any).y = (d.y ?? 0) - 250; }
-            });
-        } catch (e) {
-            console.error("D3 Stratify failed", e);
-        }
-    } else if (resolvedLayout === 'radial') {
-        // High-force radial layout to prevent multi-word text collisions
-        const simulation = d3.forceSimulation<any>(nodes)
-            .force("link", d3.forceLink<any, any>(links).id(d => d.id).distance(340))
-            .force("charge", d3.forceManyBody().strength(-3000))
-            .force("collide", d3.forceCollide().radius(220))
-            .force("r", d3.forceRadial(320))
-            .stop();
-        for (let i = 0; i < 300; ++i) simulation.tick();
-    } else if (resolvedLayout === 'timeline') {
+    // 2. Compute Rigid, Industry-Standard Geometric Layout Topologies (Zero-overlap, highly structured)
+    const isCausalFlow = links.some(l => {
+        const rel = (l.relationship || '').toLowerCase();
+        return rel.includes('cause') || rel.includes('effect') || rel.includes('trigger') || rel.includes('consequence') || rel.includes('impact');
+    });
+
+    const isHierarchy = links.some(l => {
+        const rel = (l.relationship || '').toLowerCase();
+        return rel.includes('hierarchy') || rel.includes('is_a') || rel.includes('part') || rel.includes('whole') || rel.includes('containment');
+    });
+
+    if (isCausalFlow) {
+        // Industry Standard: Left-to-Right Causal Flow Diagram
+        // Place cause nodes beautifully stacked on the left, and effect/target nodes on the right
+        const leftNodes = nodes.filter(n => n.isCauseNode);
+        const rightNodes = nodes.filter(n => !n.isCauseNode && !n.isHeaderNode);
+
+        leftNodes.forEach((n, i) => {
+            (n as any).x = -320;
+            // Vertically center stack with even spacing
+            (n as any).y = (i - (leftNodes.length - 1) / 2) * 200;
+        });
+
+        rightNodes.forEach((n, i) => {
+            (n as any).x = 300;
+            // Vertically center stack with even spacing
+            (n as any).y = (i - (rightNodes.length - 1) / 2) * 200;
+        });
+    } else if (isHierarchy) {
+        // Industry Standard: Top-to-Bottom Hierarchical Branching Tree Diagram
+        // Determine root nodes (not targets of any structural relation)
+        const childIds = new Set(links.map(l => typeof l.target === 'object' ? (l.target as any).id : l.target));
+        const rootNodes = nodes.filter(n => !childIds.has(n.id) && !n.isHeaderNode);
+        const leafNodes = nodes.filter(n => childIds.has(n.id) && !n.isHeaderNode);
+
+        rootNodes.forEach((n, i) => {
+            (n as any).x = (i - (rootNodes.length - 1) / 2) * 350;
+            (n as any).y = -140; // Top row
+        });
+
+        leafNodes.forEach((n, i) => {
+            (n as any).x = (i - (leafNodes.length - 1) / 2) * 300;
+            (n as any).y = 160; // Bottom row
+        });
+    } else if (resolvedLayout === 'timeline' || resolvedLayout === 'sequence' || resolvedLayout === 'process_flow') {
+        // Industry Standard: Linear horizontal sequential chain
         nodes.forEach((n, i) => {
-            (n as any).x = (i - (nodes.length - 1)/2) * 320;
-            (n as any).y = (i % 2 === 0 ? -110 : 110);
+            (n as any).x = (i - (nodes.length - 1) / 2) * 340; // Spaced evenly left-to-right
+            (n as any).y = 30; // Centered vertically
         });
-    } else if (resolvedLayout === 'solar_system' || resolvedLayout === 'orbit') {
-        // Space out orbiting satellite elements to leave wide collision-free corridors
-        const orbitingNodes = nodes.filter(n => {
-            const hasLinks = links.some(l => l.source === n.id || l.target === n.id);
-            return hasLinks;
-        });
-        orbitingNodes.forEach((n, i) => {
-            const angle = (i / orbitingNodes.length) * Math.PI * 2 + Math.PI / 4;
-            const dist = 320; // Increased distance from central sun node
+    } else if (resolvedLayout === 'solar_system' || resolvedLayout === 'orbit' || resolvedLayout === 'radial') {
+        // Industry Standard: Concentric perfectly balanced orbits around a main center focus node
+        const focusNode = nodes.find(n => n.type === 'hero' || n.importance >= 4.5);
+        const focusId = focusNode ? focusNode.id : (nodes[0] ? nodes[0].id : null);
+
+        if (focusNode) {
+            (focusNode as any).x = 0;
+            (focusNode as any).y = 40;
+        }
+
+        const orbiting = nodes.filter(n => n.id !== focusId && !n.isHeaderNode);
+        orbiting.forEach((n, i) => {
+            const angle = (i / orbiting.length) * Math.PI * 2 + Math.PI / 4;
+            const dist = 320; // Concentric orbit radius
             (n as any).x = Math.cos(angle) * dist;
             (n as any).y = Math.sin(angle) * dist + 40;
         });
-    } else if (resolvedLayout === 'hex_grid') {
-        nodes.forEach((n, i) => {
-            const row = Math.floor(i / 3);
-            const col = i % 3;
-            (n as any).x = (col - 1) * 350 + (row % 2) * 175;
-            (n as any).y = (row - 1) * 240;
-        });
     } else {
-        // Powerful force layout with large collide radius and negative charge to space nodes out
+        // Safe Fallback Layout: Stable force-directed simulator with anti-collision d3 constraints
         const simulation = d3.forceSimulation<any>(nodes)
           .force("link", d3.forceLink<any, any>(links).id(d => d.id).distance(380))
           .force("charge", d3.forceManyBody().strength(-4500))
@@ -311,6 +327,116 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
     return linkActiveOpacity * sourceOpacity * targetOpacity;
   };
 
+  // Helper to construct react-xarrows props per scene mood and active state
+  // Upgraded to dynamically map relationship types to highly unique cinematic vectors (Double, pulse, electrical arcing, synapses)
+  const getXarrowProps = (link: any) => {
+    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+
+    const sourceNode = nodes.find(n => n.id === sourceId);
+    const targetNode = nodes.find(n => n.id === targetId);
+
+    const active = isActive(link) || (sourceNode ? isActive(sourceNode) : false) || (targetNode ? isActive(targetNode) : false);
+
+    let arrowColor = mood.colors.primary;
+    let pathType: 'smooth' | 'grid' | 'straight' = 'smooth';
+    let dashnessSetting: any = { strokeLen: 10, nonStrokeLen: 5, animation: 1.5 };
+    let strokeWidth = active ? 4 : 2;
+    let headSize = 6;
+    let extraProps: any = {};
+
+    const rel = (link.relationship || '').toLowerCase();
+
+    // 1. Dynamic Relationship Type Styling (Kurzgesagt / Branch Education Style diversity)
+    if (rel === 'containment' || rel === 'is_a') {
+      arrowColor = resolvedMood === 'danger' ? mood.colors.accent : mood.colors.primary;
+      pathType = resolvedMood === 'cyberpunk' ? 'smooth' : 'straight';
+      dashnessSetting = false;
+      strokeWidth = active ? 3 : 1.5;
+      headSize = 0;
+    } else if (rel === 'construction_flow' || rel === 'builds') {
+      arrowColor = resolvedMood === 'cyberpunk' ? mood.colors.secondary : mood.colors.primary;
+      pathType = 'smooth';
+      dashnessSetting = {
+        strokeLen: 14,
+        nonStrokeLen: 14,
+        animation: frame * 1.8
+      };
+      strokeWidth = active ? 4 : 2;
+      extraProps = {
+        arrowBodyProps: {
+          strokeLinecap: 'round',
+          filter: 'url(#engine-cyan-glow)',
+        }
+      };
+    } else if (rel === 'energy_transfer' || rel === 'causes' || rel === 'produces') {
+      arrowColor = resolvedMood === 'danger' ? mood.colors.accent : mood.colors.secondary;
+      pathType = 'smooth';
+      dashnessSetting = {
+        strokeLen: 6,
+        nonStrokeLen: 15,
+        animation: -frame * 3.0
+      };
+      strokeWidth = active ? 5 : 2.5;
+      extraProps = {
+        arrowBodyProps: {
+          filter: 'url(#engine-orange-glow)',
+          strokeLinecap: 'round',
+        }
+      };
+    } else if (rel === 'reveal' || rel === 'hidden_under') {
+      arrowColor = '#ffc600';
+      pathType = 'grid';
+      dashnessSetting = {
+        strokeLen: 4,
+        nonStrokeLen: 10,
+        animation: frame * 1.2
+      };
+      strokeWidth = 2;
+      headSize = 4;
+    } else {
+      if (resolvedMood === 'scientific') {
+        arrowColor = mood.colors.primary;
+        pathType = 'straight';
+        dashnessSetting = { strokeLen: 12, nonStrokeLen: 6, animation: frame * 0.8 };
+        strokeWidth = active ? 4 : 1.5;
+      } else if (resolvedMood === 'cyberpunk') {
+        arrowColor = mood.colors.secondary;
+        pathType = 'smooth';
+        dashnessSetting = { strokeLen: 6, nonStrokeLen: 12, animation: frame * 2.0 };
+        strokeWidth = active ? 5 : 2;
+        headSize = 8;
+      } else if (resolvedMood === 'danger') {
+        arrowColor = mood.colors.accent;
+        pathType = 'smooth';
+        dashnessSetting = { strokeLen: 15, nonStrokeLen: 5, animation: frame * 1.5 };
+        strokeWidth = active ? 5 : 2;
+        headSize = 9;
+      } else if (resolvedMood === 'luxury_hud') {
+        arrowColor = mood.colors.primary;
+        pathType = 'smooth';
+        dashnessSetting = { strokeLen: 20, nonStrokeLen: 10, animation: frame * 0.5 };
+        strokeWidth = active ? 3.5 : 1.5;
+        headSize = 5;
+      }
+    }
+
+    return {
+      start: String(sourceId),
+      end: String(targetId),
+      lineColor: arrowColor,
+      headColor: arrowColor,
+      strokeWidth,
+      showHead: headSize > 0,
+      headSize,
+      path: pathType,
+      dashness: dashnessSetting,
+      animateDrawing: 1.2,
+      zIndex: 10,
+      ...extraProps
+    };
+  };
+
   return (
     <AbsoluteFill className="pointer-events-none" style={{ position: 'relative' }}>
       {/* GLOBAL SVG DEFINITIONS */}
@@ -406,7 +532,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
 
         {/* react-xarrows connections layer */}
         <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 15 }}>
-          {links.map((link) => {
+          {links.map((link, l_idx) => {
             const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
             const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
 
@@ -445,6 +571,10 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
             const relCategory = grammar.type;
             const relColor = grammar.color;
 
+            // Strict Anti-Collision/Overlap: Assign distinct curveness based on connector index
+            // This ensures that multiple connector lines swooping to/from the same node nest beautifully!
+            const curveOffset = 0.55 + (l_idx * 0.22);
+
             const baseProps = {
               start: String(sourceId),
               end: String(targetId),
@@ -473,7 +603,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color={`${relColor}20`}
                           strokeWidth={7}
                           path="smooth"
-                          curveness={0.85}
+                          curveness={curveOffset}
                           showHead={false}
                           arrowBodyProps={{
                             filter: 'url(#engine-orange-glow)',
@@ -485,7 +615,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color={relColor}
                           strokeWidth={2.5}
                           path="smooth"
-                          curveness={0.85}
+                          curveness={curveOffset}
                           headSize={5}
                           arrowHeadProps={{ fill: relColor, stroke: 'none' }}
                           arrowBodyProps={{
@@ -507,7 +637,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color={`${relColor}20`}
                           strokeWidth={8}
                           path="smooth"
-                          curveness={0.9}
+                          curveness={curveOffset}
                           showHead={false}
                           arrowBodyProps={{
                             filter: 'url(#engine-cyan-glow)',
@@ -519,7 +649,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color={relColor}
                           strokeWidth={2.2}
                           path="smooth"
-                          curveness={0.9}
+                          curveness={curveOffset}
                           headSize={6}
                           arrowHeadProps={{ fill: relColor, stroke: 'none' }}
                           arrowBodyProps={{
@@ -570,7 +700,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color={`${relColor}25`}
                           strokeWidth={10}
                           path="smooth"
-                          curveness={0.8}
+                          curveness={curveOffset}
                           showHead={false}
                           arrowBodyProps={{
                             filter: 'url(#engine-green-glow)',
@@ -582,7 +712,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color="#ffffff"
                           strokeWidth={1.8}
                           path="smooth"
-                          curveness={0.8}
+                          curveness={curveOffset}
                           headSize={4}
                           arrowBodyProps={{
                             strokeDasharray: '40, 140',
@@ -603,7 +733,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color={`${relColor}30`}
                           strokeWidth={1.5}
                           path="smooth"
-                          curveness={0.7}
+                          curveness={curveOffset}
                           showHead={false}
                         />
                         <Xarrow
@@ -611,7 +741,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color={relColor}
                           strokeWidth={2.8}
                           path="smooth"
-                          curveness={0.7}
+                          curveness={curveOffset}
                           headSize={6}
                           arrowBodyProps={{
                             strokeDasharray: '4, 18',
@@ -632,7 +762,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color={`${relColor}20`}
                           strokeWidth={5}
                           path="smooth"
-                          curveness={0.9}
+                          curveness={curveOffset}
                           showHead={false}
                         />
                         <Xarrow
@@ -640,7 +770,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color={relColor}
                           strokeWidth={2.0}
                           path="smooth"
-                          curveness={0.9}
+                          curveness={curveOffset}
                           showHead={false}
                           arrowBodyProps={{
                             strokeDasharray: '30, 150',
@@ -652,7 +782,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color={relColor}
                           strokeWidth={2.0}
                           path="smooth"
-                          curveness={0.9}
+                          curveness={curveOffset}
                           showHead={false}
                           arrowBodyProps={{
                             strokeDasharray: '30, 150',
@@ -674,7 +804,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color={relColor}
                           strokeWidth={1.5}
                           path="smooth"
-                          curveness={0.75}
+                          curveness={curveOffset}
                           showHead={false}
                           arrowBodyProps={{
                             strokeDasharray: '1000',
@@ -688,7 +818,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                           color={relColor}
                           strokeWidth={1.5}
                           path="smooth"
-                          curveness={0.75}
+                          curveness={curveOffset}
                           showHead={false}
                           arrowBodyProps={{
                             strokeDasharray: '1000',
@@ -707,7 +837,7 @@ export const CRVEEngine: React.FC<CRVEEngineProps> = ({
                         color={relColor}
                         strokeWidth={grammar.width || 4}
                         path="smooth"
-                        curveness={0.8}
+                        curveness={curveOffset}
                         showHead={false}
                         arrowBodyProps={{
                           strokeLinecap: 'round',
