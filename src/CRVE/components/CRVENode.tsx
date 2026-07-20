@@ -30,6 +30,12 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font
       config: { damping: 16, stiffness: 60 }
   });
 
+  // Dynamic continuous organic breathing and wave rotation drift (ultra-modern, non-static)
+  // Breath scale gently expands/contracts node scale by ±2%
+  const breathScale = isHeader ? 1.0 : (Math.sin(frame * 0.05 + index) * 0.02 + 1.0);
+  // Rotational drift gently tilts tech nodes by ±1.5 degrees
+  const rotDrift = isHeader ? 0 : (Math.sin(frame * 0.03 + index) * 1.5);
+
   // Calculate dynamic continuous active window fade-in/out opacity
   const getActiveWindowOpacity = () => {
       const windows = (node as any).active_windows;
@@ -353,7 +359,7 @@ export const CRVENode: React.FC<CRVENodeProps> = ({ node, progress, active, font
         ...fontStyle,
         color: '#ffffff',
         opacity: finalOpacity,
-        transform: `scale(${entryScale})`,
+        transform: `scale(${entryScale * breathScale}) rotate(${rotDrift}deg)`,
         transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
         ...containerStyle
       }}
