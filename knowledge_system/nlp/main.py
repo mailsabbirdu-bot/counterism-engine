@@ -166,68 +166,114 @@ class SemanticEngine:
                         matching_model.scene_type = s_data.get("scene_type", "trend")
                         matching_model.emotional_tone = s_data.get("emotional_tone", "calm")
 
-                        # Populate Entities with strict dict validation and word-length trimming
-                        for ent in s_data.get("entities", []):
+                        # Populate Entities with strict dict validation, default coercions, and word-length trimming
+                        for ent_idx, ent in enumerate(s_data.get("entities", [])):
                             if not isinstance(ent, dict):
                                 continue
 
+                            ent_id = ent.get("id") or f"ent_{target_id}_{ent_idx}"
+                            label = ent.get("label") or "Entity"
+
                             # Trim label strictly to 2-3 words maximum
-                            label = ent.get("label", "")
-                            words = label.split()
+                            words = str(label).split()
                             if len(words) > 3:
                                 label = " ".join(words[:3])
 
-                            matching_model.entities.append(Entity(
-                                id=ent.get("id"),
-                                label=label,
-                                type=ent.get("type", "concept"),
-                                importance=ent.get("importance", 1.0),
-                                emotion=ent.get("emotion"),
-                                scale=ent.get("scale", 1.0),
-                                attributes=ent.get("attributes", {})
-                            ))
-                        # Populate Actions with strict dict validation
-                        for act in s_data.get("actions", []):
+                            try:
+                                matching_model.entities.append(Entity(
+                                    id=str(ent_id),
+                                    label=str(label),
+                                    type=str(ent.get("type", "concept")),
+                                    importance=float(ent.get("importance", 1.0)),
+                                    emotion=str(ent.get("emotion")) if ent.get("emotion") else "calm",
+                                    scale=float(ent.get("scale", 1.0)),
+                                    attributes=ent.get("attributes", {}) if isinstance(ent.get("attributes"), dict) else {}
+                                ))
+                            except Exception as e:
+                                print(f"⚠️ Skipping invalid entity mapping: {e}")
+
+                        # Populate Actions with strict dict validation and default coercions
+                        for act_idx, act in enumerate(s_data.get("actions", [])):
                             if not isinstance(act, dict):
                                 continue
-                            matching_model.actions.append(Action(
-                                id=act.get("id"),
-                                label=act.get("label"),
-                                subject_id=act.get("subject_id"),
-                                object_id=act.get("object_id"),
-                                importance=act.get("importance", 1.0)
-                            ))
-                        # Populate Quantities with strict dict validation
-                        for q in s_data.get("quantities", []):
+
+                            act_id = act.get("id") or f"act_{target_id}_{act_idx}"
+                            label = act.get("label") or "action"
+
+                            try:
+                                matching_model.actions.append(Action(
+                                    id=str(act_id),
+                                    label=str(label),
+                                    subject_id=str(act.get("subject_id")) if act.get("subject_id") else None,
+                                    object_id=str(act.get("object_id")) if act.get("object_id") else None,
+                                    importance=float(act.get("importance", 1.0))
+                                ))
+                            except Exception as e:
+                                print(f"⚠️ Skipping invalid action mapping: {e}")
+
+                        # Populate Quantities with strict dict validation and default coercions
+                        for q_idx, q in enumerate(s_data.get("quantities", [])):
                             if not isinstance(q, dict):
                                 continue
-                            matching_model.quantities.append(Quantity(
-                                value=q.get("value", 0.0),
-                                unit=q.get("unit"),
-                                label=q.get("label", ""),
-                                entity_id=q.get("entity_id")
-                            ))
-                        # Populate Temporals with strict dict validation
-                        for t in s_data.get("temporal_expressions", []):
+
+                            val = q.get("value")
+                            try:
+                                val = float(val) if val is not None else 0.0
+                            except:
+                                val = 0.0
+                            label = q.get("label") or str(val)
+
+                            try:
+                                matching_model.quantities.append(Quantity(
+                                    value=val,
+                                    unit=str(q.get("unit")) if q.get("unit") else None,
+                                    label=str(label),
+                                    entity_id=str(q.get("entity_id")) if q.get("entity_id") else None
+                                ))
+                            except Exception as e:
+                                print(f"⚠️ Skipping invalid quantity mapping: {e}")
+
+                        # Populate Temporals with strict dict validation and default coercions
+                        for t_idx, t in enumerate(s_data.get("temporal_expressions", [])):
                             if not isinstance(t, dict):
                                 continue
-                            matching_model.temporal_expressions.append(TemporalExpression(
-                                label=t.get("label"),
-                                value=t.get("value"),
-                                type=t.get("type", "point")
-                            ))
-                        # Populate Relations with strict dict validation
-                        for rel in s_data.get("relations", []):
+
+                            label = t.get("label")
+                            if not label:
+                                continue
+
+                            try:
+                                matching_model.temporal_expressions.append(TemporalExpression(
+                                    label=str(label),
+                                    value=str(t.get("value")) if t.get("value") else None,
+                                    type=str(t.get("type", "point"))
+                                ))
+                            except Exception as e:
+                                print(f"⚠️ Skipping invalid temporal mapping: {e}")
+
+                        # Populate Relations with strict dict validation, default coercions, and target safety
+                        for rel_idx, rel in enumerate(s_data.get("relations", [])):
                             if not isinstance(rel, dict):
                                 continue
-                            matching_model.relations.append(Relation(
-                                id=rel.get("id"),
-                                source_id=rel.get("source_id"),
-                                target_id=rel.get("target_id"),
-                                relationship=rel.get("relationship"),
-                                importance=rel.get("importance", 1.0),
-                                strength=rel.get("strength", 1.0)
-                            ))
+
+                            rel_id = rel.get("id") or f"rel_{target_id}_{rel_idx}"
+                            src = rel.get("source_id") or rel.get("source")
+                            tgt = rel.get("target_id") or rel.get("target")
+                            relationship = rel.get("relationship") or "connector"
+                            if not src or not tgt:
+                                continue
+
+                            try:
+                                matching_model.relations.append(Relation(
+                                    id=str(rel_id),
+                                    source_id=str(src),
+                                    target_id=str(tgt),
+                                    relationship=str(relationship),
+                                    importance=float(rel.get("importance", 1.0)),
+                                    strength=float(rel.get("strength", 1.0))
+                                ))
+                            except Exception as e:
+                                print(f"⚠️ Skipping invalid relation mapping: {e}")
         else:
             # Run our lightweight, high-speed, zero-fail offline fallback
             self._run_offline_fallback(all_scene_models)
