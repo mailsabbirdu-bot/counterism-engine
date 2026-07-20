@@ -154,15 +154,15 @@ For each scene, you must extract:
    - 'type': Must be one of: "hero" (central subject, e.g. "dhaka"), "concept", "organization", "location", "metric", "event".
    - 'importance': Float (1.0 to 5.0).
    - 'emotion': One of: "calm", "intense", "growing", "danger", "stable".
-   - 'active_windows': A list of frame ranges when the entity is spoken or shown, e.g. [[30, 90]] (scene duration: 0 to 300).
+   - 'active_windows': A list of frame ranges when the entity is spoken or shown, e.g. [[15, 120]] (scene relative duration: 0 to 300). Normal range: [[15, 285]].
 2. ACTIONS, QUANTITIES, TEMPORAL EXPRESSIONS: Extract significant verbs, quantities (with values/units), and chronological points.
 3. RELATIONS (CONVERT NARRAIVES TO RICH MAPS):
    - 'source_id' / 'target_id': Match entity IDs.
    - 'relationship': Select the exact matching relationship key from our SEMANTIC REGISTRY (e.g., 'risk_impact', 'process_flow', 'claim_evidence'). Avoid generic 'connector' or 'energy_transfer' where a specific semantic key applies!
    - 'importance': 1.0 to 3.0.
    - 'strength': 1.0 to 3.0.
-4. PROBE CAUSAL/CONSEQUENCE FACTORS (2-4 per scene):
-   - Identify the primary assertions in each scene, and connect them dynamically to 2 to 4 underlying causes/milestones.
+4. PROBE CAUSAL/CONSEQUENCE FACTORS (STRICTLY 2 TO 3 per scene):
+   - You MUST extract strictly at least 2, and maximum 3 causes/reasons for the main topic/assertions of each scene. NEVER return more than 3, and NEVER return less than 2!
    - 'label' (Bangla): Pristine, premium Bangla. Strictly 2 to 3 words maximum. Never exceed 3 words (to prevent layout wrapping/clipping in UI graph nodes).
    - 'english': Direct English translation. Strictly 2 to 3 words maximum.
    - Connect these using the appropriate relation type (e.g., 'cause_effect', 'risk_impact', 'dependency') to trigger distinct glowing modern connector paths automatically.
@@ -219,7 +219,7 @@ NO PREAMBLE. NO CHATTER. RETURN ONLY THE CORRECT RAW JSON BLOCK.
         return prompt
 
     def probe_causes_fallback(self, scene_text: str, entities: List[Entity], next_scene_text: Optional[str] = None) -> List[dict]:
-        """Resolves descriptive narratives into highly contextual conceptual core causes using local KB fallbacks."""
+        """Resolves descriptive narratives into highly contextual conceptual core causes using local KB fallbacks. (Strictly 2 to 3 causes max)."""
         is_bn = self._is_bangla(scene_text)
 
         english_text = scene_text
@@ -301,7 +301,7 @@ NO PREAMBLE. NO CHATTER. RETURN ONLY THE CORRECT RAW JSON BLOCK.
                     filtered_causes.append(cause)
             detected_causes = filtered_causes
 
-        return detected_causes[:4]
+        return detected_causes[:3] # Strictly 3 max causes
 
     def probe_and_inject_all(self, all_scene_models: List[any]) -> dict:
         """

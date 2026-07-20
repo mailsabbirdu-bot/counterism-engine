@@ -12,7 +12,7 @@ class SemanticEngine:
 
     def _split_scenes(self, text: str) -> List[tuple]:
         # Regex for markers like 'দৃশ্য ১', 'Scene 1', 'দৃশ্য 1'
-        pattern = r'(?:दृश्य\s*[০-৯\d]+|Scene\s*\d+|দৃশ্য\s*[০-৯\d]+:?|Scene\s*\d+:?)'
+        pattern = r'(?:দৃশ্য\s*[০-৯\d]+|Scene\s*\d+|দৃশ্য\s*[০-৯\d]+:?|Scene\s*\d+:?)'
         markers = re.findall(pattern, text)
         segments = re.split(pattern, text)
 
@@ -33,20 +33,18 @@ class SemanticEngine:
         return any("\u0980" <= char <= "\u09FF" for char in text)
 
     def _run_offline_fallback(self, all_scene_models: List[SemanticSceneModel]) -> None:
-        """Lightweight, offline-first rule-based fallback to populate scenes without any external models."""
+        """Lightweight, offline-first rule-based fallback to populate scenes with exactly 2 to 3 causes."""
         for idx, model in enumerate(all_scene_models):
             is_bn = self._is_bangla(model.narration)
 
             # Simple Entity Extraction based on Capitalized words or basic Bangla words
             extracted_labels = []
             if is_bn:
-                # Extract 2-3 significant Bangla words
                 words = [w for w in re.findall(r'[\u0980-\u09FF]+', model.narration) if len(w) > 2]
                 extracted_labels = words[:2]
                 if not extracted_labels:
                     extracted_labels = ["ঢাকা"]
             else:
-                # Extract English proper nouns
                 pns = re.findall(r'\b[A-Z][a-z]+\b', model.narration)
                 extracted_labels = [p for p in pns if p not in {"In", "The", "Because", "On"}]
                 if not extracted_labels:
@@ -71,34 +69,31 @@ class SemanticEngine:
                 root_label = "ঢাকা" if is_bn else "Dhaka"
                 model.entities.append(Entity(id="e_root_baseline", label=root_label, type="hero", importance=2.5))
 
-            # 2. Inject local rule-based causes based on keyword matches
+            # 2. Inject local rule-based causes based on keyword matches (Strictly 2 to 3 causes)
             causes_list = []
             text_lower = model.narration.lower()
             if any(kw in text_lower for kw in ["growth", "revenue", "apple", "প্রবৃদ্ধি", "অর্থ"]):
                 causes_list = [
                     {"label": "বাজারের অস্থিরতা" if is_bn else "Market volatility", "english": "Market volatility", "emotion": "intense"},
                     {"label": "মুদ্রাস্ফীতির চাপ" if is_bn else "Inflationary pressures", "english": "Inflationary pressures", "emotion": "calm"},
-                    {"label": "সম্পদের অপব্যবহার" if is_bn else "Resource misallocation", "english": "Resource misallocation", "emotion": "intense"},
                     {"label": "অর্থনৈতিক মন্দা" if is_bn else "Economic recession", "english": "Economic recession", "emotion": "calm"}
                 ]
             elif any(kw in text_lower for kw in ["city", "dhaka", "populous", "ঢাকা", "জনবহুল", "শহর"]):
                 causes_list = [
                     {"label": "দ্রুত নগরায়ণ" if is_bn else "Rapid urbanization", "english": "Rapid urbanization", "emotion": "intense"},
                     {"label": "গ্রাম-শহর অভিবাসন" if is_bn else "Rural-urban migration", "english": "Rural-urban migration", "emotion": "calm"},
-                    {"label": "কেন্দ্রীভূত প্রশাসন" if is_bn else "Centralized administration", "english": "Centralized administration", "emotion": "intense"},
                     {"label": "কর্মসংস্থান" if is_bn else "Employment opportunities", "english": "Employment opportunities", "emotion": "calm"}
                 ]
             else:
                 causes_list = [
                     {"label": "গ্রিনহাউস গ্যাস নির্গমন" if is_bn else "Greenhouse gas emissions", "english": "Greenhouse gas emissions", "emotion": "intense"},
                     {"label": "বন উজাড়করণ" if is_bn else "Deforestation", "english": "Deforestation", "emotion": "calm"},
-                    {"label": "বৈশ্বিক তাপমাত্রা বৃদ্ধি" if is_bn else "Rising global temperature", "english": "Rising global temperature", "emotion": "intense"},
                     {"label": "সমুদ্রপৃষ্ঠের উচ্চতা বৃদ্ধি" if is_bn else "Rising sea levels", "english": "Rising sea levels", "emotion": "calm"}
                 ]
 
-            # Append causes and relations
+            # Append exactly 2 to 3 causes and relations
             e_start_idx = len(model.entities) + 1
-            for c_idx, cause in enumerate(causes_list[:4]):
+            for c_idx, cause in enumerate(causes_list[:3]): # Strict limit to 3 max
                 cause_node_id = f"e_cause_{idx}_{e_start_idx + c_idx}"
                 model.entities.append(Entity(
                     id=cause_node_id,
@@ -179,6 +174,25 @@ class SemanticEngine:
                             if len(words) > 3:
                                 label = " ".join(words[:3])
 
+                            # Normalize active_windows to always fall relative within [15, 285] of local scene timeline [0, 300]
+                            raw_windows = ent.get("active_windows", [])
+                            normalized_windows = []
+                            if isinstance(raw_windows, list):
+                                for win in raw_windows:
+                                    if isinstance(win, list) and len(win) == 2:
+                                        s_win = int(win[0]) % 300
+                                        e_win = int(win[1]) % 300
+                                        # Clamping values to [15, 285]
+                                        s_win = max(15, min(285, s_win))
+                                        e_win = max(15, min(285, e_win))
+                                        if s_win >= e_win:
+                                            e_win = min(285, s_win + 120)
+                                        normalized_windows.append([s_win, e_win])
+
+                            if not normalized_windows:
+                                # Default active window cushion if none defined
+                                normalized_windows = [[30, 270]]
+
                             try:
                                 matching_model.entities.append(Entity(
                                     id=str(ent_id),
@@ -187,6 +201,7 @@ class SemanticEngine:
                                     importance=float(ent.get("importance", 1.0)),
                                     emotion=str(ent.get("emotion")) if ent.get("emotion") else "calm",
                                     scale=float(ent.get("scale", 1.0)),
+                                    active_windows=normalized_windows,
                                     attributes=ent.get("attributes", {}) if isinstance(ent.get("attributes"), dict) else {}
                                 ))
                             except Exception as e:
