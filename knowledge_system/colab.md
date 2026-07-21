@@ -26,6 +26,8 @@ PROJECT_NAME = "counterism-engine"
 if not os.path.exists(PROJECT_NAME):
     !git clone https://github.com/mailsabbirdu-bot/counterism-engine
 %cd {PROJECT_NAME}
+# Fetch and checkout active feature branch containing the threading loop fix
+!git fetch origin && git checkout feature/evidence-asyncio-loop-fix || true
 
 # --- 3. INSTALL DEPENDENCIES ---
 print("🛠️ Installing System Dependencies...")
