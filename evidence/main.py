@@ -2,6 +2,7 @@ import os
 import re
 import hashlib
 import unicodedata
+import threading
 import json
 import urllib.request
 import urllib.parse
@@ -609,36 +610,41 @@ def execute_documentary_task(intent, query, narration="", preferred_site=None, f
         sorted_urls = sorted(raw_urls, key=lambda u: get_source_credibility(u, context_type), reverse=True)
 
         if HAS_PLAYWRIGHT:
-            with sync_playwright() as p:
-                try:
-                    browser = p.chromium.launch(headless=True)
-                    context = browser.new_context(viewport={"width": 1920, "height": 1080})
-                    page = context.new_page()
+            def playwright_worker():
+                with sync_playwright() as p:
+                    try:
+                        browser = p.chromium.launch(headless=True)
+                        context = browser.new_context(viewport={"width": 1920, "height": 1080})
+                        page = context.new_page()
 
-                    for url in sorted_urls[:3]:
-                        try:
-                            page.goto(url, wait_until="domcontentloaded", timeout=12000)
+                        for url in sorted_urls[:3]:
+                            try:
+                                page.goto(url, wait_until="domcontentloaded", timeout=12000)
 
-                            success, computed_score, diagnostic_code, matched_text = process_page_and_crop(
-                                page, narration, url, context_type, output_name
-                            )
+                                success, computed_score, diagnostic_code, matched_text = process_page_and_crop(
+                                    page, narration, url, context_type, output_name
+                                )
 
-                            contract["telemetry_log"].append({
-                                "url": url, "status": "PROCESSED", "diagnostic": diagnostic_code, "score": round(computed_score, 2)
-                            })
-
-                            if success:
-                                contract.update({
-                                    "asset_generated": True, "source_url": url,
-                                    "confidence_score": round(computed_score, 2), "file_path": output_name
+                                contract["telemetry_log"].append({
+                                    "url": url, "status": "PROCESSED", "diagnostic": diagnostic_code, "score": round(computed_score, 2)
                                 })
-                                break
-                        except Exception as e:
-                            contract["telemetry_log"].append({"url": url, "status": "FAILED", "reason": f"NAVIGATION_TIMEOUT: {e}"})
-                            continue
-                    browser.close()
-                except Exception as e:
-                    contract["telemetry_log"].append({"error": f"Playwright browser execution failed: {e}"})
+
+                                if success:
+                                    contract.update({
+                                        "asset_generated": True, "source_url": url,
+                                        "confidence_score": round(computed_score, 2), "file_path": output_name
+                                    })
+                                    break
+                            except Exception as e:
+                                contract["telemetry_log"].append({"url": url, "status": "FAILED", "reason": f"NAVIGATION_TIMEOUT: {e}"})
+                                continue
+                        browser.close()
+                    except Exception as e:
+                        contract["telemetry_log"].append({"error": f"Playwright browser execution failed: {e}"})
+
+            thread = threading.Thread(target=playwright_worker)
+            thread.start()
+            thread.join()
 
         if not contract["asset_generated"]:
             # Fallback: Save a beautifully styled typography quote card instead of a plain dark canvas
