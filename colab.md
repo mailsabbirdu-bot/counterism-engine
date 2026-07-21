@@ -36,6 +36,8 @@ else:
     print(f"✅ Project folder '{PROJECT_NAME}' already exists.")
 
 %cd {PROJECT_NAME}
+# Fetch and checkout active feature branch containing the threading loop fix
+!git fetch origin && git checkout feature/evidence-asyncio-loop-fix || true
 
 # 3. Handle External Assets (Renders, Audio, Fonts, SFX)
 print_banner("🔍 ASSET VERIFICATION & COPYING")
