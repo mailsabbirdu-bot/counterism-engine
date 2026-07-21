@@ -427,6 +427,10 @@ def interact_with_gemini_evidence(prompt: str) -> str:
         print("="*80)
         print(prompt)
         print("="*80 + "\n")
+        print("💡 NOTE: For a gorgeous interactive HTML UI with Clipboard Copying and Submit buttons,")
+        print("run this directly in a Colab code cell using python:")
+        print(">>> import evidence.main; evidence.main.run_gdrive_evidence_processing()")
+        print("Do not run it via '!python3 evidence/main.py' in a shell command.\n")
         print("Please copy the prompt above, paste it into Gemini, and paste the resulting JSON below.")
         print("(Type 'fallback' to use the offline-first rule-based evidence acquisition plan)\n")
         val = ""
@@ -701,13 +705,38 @@ def run_gdrive_evidence_processing():
         use_fallback = True
     else:
         try:
-            # Sanitize to find JSON block
-            json_match = re.search(r'(\{.*\})', raw_result, re.DOTALL)
-            if json_match:
-                parsed_plan = json.loads(json_match.group(1))
+            # Clean up potential markdown formatting block like ```json ... ```
+            cleaned = raw_result.strip()
+            if cleaned.startswith("```"):
+                cleaned = re.sub(r'^```[a-zA-Z]*', '', cleaned)
+                cleaned = re.sub(r'```$', '', cleaned)
+            cleaned = cleaned.strip()
+
+            parsed = None
+            # Attempt direct parse first
+            try:
+                parsed = json.loads(cleaned)
+            except Exception:
+                # Fallback: Extract list [...] or object {...} using regex
+                list_match = re.search(r'(\[.*\])', cleaned, re.DOTALL)
+                if list_match:
+                    parsed = json.loads(list_match.group(1))
+                else:
+                    obj_match = re.search(r'(\{.*\})', cleaned, re.DOTALL)
+                    if obj_match:
+                        parsed = json.loads(obj_match.group(1))
+                    else:
+                        raise ValueError("No valid JSON list or object found")
+
+            # Map to tasks
+            if isinstance(parsed, list):
+                tasks = parsed
+            elif isinstance(parsed, dict):
+                tasks = parsed.get("evidence_tasks", [])
             else:
-                parsed_plan = json.loads(raw_result)
-            tasks = parsed_plan.get("evidence_tasks", [])
+                raise ValueError("JSON is neither a list nor a dictionary")
+
+            print(f"⚡ Successfully parsed evidence plan containing {len(tasks)} tasks!")
         except Exception as e:
             print(f"⚠️ Failed to parse Gemini evidence plan output: {e}. Falling back to hardcoded rules.")
             use_fallback = True
