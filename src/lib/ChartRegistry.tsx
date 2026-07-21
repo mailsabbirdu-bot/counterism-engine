@@ -107,8 +107,8 @@ const renderLineLike = (props: ChartRendererProps, options: { enableArea?: boole
             enableGridX={false}
             lineWidth={4}
             enableSlices="x"
-            pointSize={node => {
-                const s = animatedData.find(d => d.id === (node as any).serieId);
+            pointSize={(node: any) => {
+                const s = animatedData.find((d: any) => d.id === (node as any).serieId);
                 const imp = s?.importance || 1;
                 return (imp >= 4 ? 14 : imp >= 2 ? 8 : 4) * dataProgress;
             }}

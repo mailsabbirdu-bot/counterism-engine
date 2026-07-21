@@ -17,6 +17,7 @@ interface Node extends d3.SimulationNodeDatum {
 }
 
 interface Link extends d3.SimulationLinkDatum<Node> {
+  id: string;
   source: string | Node;
   target: string | Node;
   relationship?: string;

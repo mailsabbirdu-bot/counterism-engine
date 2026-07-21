@@ -70,7 +70,7 @@ export const Connector: React.FC<ConnectorProps & { start?: number; duration?: n
   });
 
   const finalStyle = { ...config.style, ...userStyle };
-  const finalAnimation = { ...config.animation, ...userAnimation };
+  const finalAnimation: any = { ...config.animation, ...userAnimation };
 
   // Pulse effect
   const pulseScale = pulse ? 1 + Math.sin(frame / 5) * 0.1 : 1;

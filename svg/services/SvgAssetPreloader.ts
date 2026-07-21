@@ -13,7 +13,7 @@ export class SvgAssetPreloader {
   static async preloadScene(scene: SvgScene) {
     const queries = new Set<{ query: string; provider: SvgProvider }>();
     const sceneProvider = scene.sceneIconTheme || 'lucide';
-    const elements = scene.elements || scene.overlays || [];
+    const elements = scene.elements || (scene as any).overlays || [];
 
     // 1. Scan elements
     elements.forEach(el => this.scanElement(el, sceneProvider, queries));

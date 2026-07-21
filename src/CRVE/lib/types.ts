@@ -10,6 +10,11 @@ export interface CRVENodeData {
   active_windows?: [number, number][];
   scene_id?: string;
   font_size?: number;
+  isCauseNode?: boolean;
+  isHeaderNode?: boolean;
+  rank?: number;
+  x?: number;
+  y?: number;
 }
 
 export interface CRVELinkData {
