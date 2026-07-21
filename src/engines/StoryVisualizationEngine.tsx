@@ -28,7 +28,7 @@ const DOCUMENTARY_PRESETS: Record<string, any> = {
 };
 
 // Map legacy personalities to new presets
-const CHART_PERSONALITIES = {
+const CHART_PERSONALITIES: Record<string, any> = {
     ...DOCUMENTARY_PRESETS,
     scientific: DOCUMENTARY_PRESETS.nasa,
     financial: DOCUMENTARY_PRESETS.bloomberg,

@@ -5,7 +5,8 @@ export type SvgProvider =
   | 'solar'
   | 'phosphor'
   | 'hugeicons'
-  | 'material-symbols';
+  | 'material-symbols'
+  | 'simple-icons';
 
 export type AnimationType =
   | 'fade'
