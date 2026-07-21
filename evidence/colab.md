@@ -36,7 +36,7 @@ if not os.path.exists(PROJECT_NAME):
 print_banner("INSTALLING PYTHON SYSTEM DEPENDENCIES")
 # Install Playwright, Sentence-Transformers, RapidFuzz and SerpAPI
 !pip install -q playwright sentence-transformers rapidfuzz google-search-results Pillow httpx numpy
-!playwright install chromium --with-deps --silent
+!playwright install chromium --with-deps
 
 # --- 4. EXECUTE EVIDENCE CAPTURE ENGINE ---
 print_banner("STARTING EVIDENCE ACQUISITION SEQUENCE")
