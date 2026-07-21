@@ -40,9 +40,9 @@ print_banner("INSTALLING PYTHON SYSTEM DEPENDENCIES")
 
 # --- 4. EXECUTE EVIDENCE CAPTURE ENGINE ---
 print_banner("STARTING EVIDENCE ACQUISITION SEQUENCE")
-# Run main.py which automatically reads story.txt from GDrive, segment scenes,
-# captures web page regions matching narrations and stitches headers.
-!python3 evidence/main.py
+# Run directly as python functions so the Google Colab HTML/JS clipboard UI renders beautifully!
+import evidence.main
+evidence.main.run_gdrive_evidence_processing()
 
 print_banner("COMPLETED EVIDENCE EXTRACITON PIPELINE")
 print("✨ Photos and documentary evidence saved directly to: ")
