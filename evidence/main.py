@@ -3,6 +3,8 @@ import re
 import hashlib
 import unicodedata
 import json
+import urllib.request
+import urllib.parse
 from io import BytesIO
 from urllib.parse import urlparse
 import numpy as np
@@ -440,7 +442,7 @@ def run_gdrive_evidence_processing():
         story_content = f.read()
 
     # Split into Scene segment narrations
-    pattern = r'(?:Scene|দৃশ্য)\s*[0-9০-৯]+[:\s]*'
+    pattern = r'(?:Scene|দৃশ্য)\s*[0-9০-৯+[:\s]*'
     scenes = [s.strip() for s in re.split(pattern, story_content) if s.strip()]
     if not scenes:
         scenes = [story_content]
