@@ -458,7 +458,14 @@ def test_manifest_quality(filepath, public_dir=None):
                 scores["timing"] -= 10
 
             pos = ov.get('position', {})
-            x, y = pos.get('x', 960), pos.get('y', 540)
+            if isinstance(pos, list):
+                x = int(pos[0]) if len(pos) > 0 else 960
+                y = int(pos[1]) if len(pos) > 1 else 540
+            elif isinstance(pos, dict):
+                x = int(pos.get('x', 960))
+                y = int(pos.get('y', 540))
+            else:
+                x, y = 960, 540
 
             # Center Stacking (Bypass for motion tracked elements)
             if not ov.get('tracking', {}).get('enabled'):
