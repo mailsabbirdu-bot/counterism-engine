@@ -476,6 +476,106 @@ class RemotionJsonMaker:
         if var == 'crypto_card' and 'sparkline' not in ov:
             ov['sparkline'] = [10, 25, 15, 45, 30, 60]
 
+        # Thematic Data Injections for Charts & Indicators
+        if 'chart' in o_type:
+            title = str(ov.get('title', ov.get('content', ''))).strip()
+            # If the data is empty or generic, populate it
+            has_valid_data = False
+            if 'data' in ov and isinstance(ov['data'], list) and len(ov['data']) > 0:
+                # Check if first element is not just a generic placeholder
+                first = ov['data'][0]
+                if isinstance(first, dict) and first.get('id') not in ['A', 'B'] and first.get('name') not in ['A', 'B']:
+                    has_valid_data = True
+
+            if not has_valid_data:
+                # Inject story-relevant data
+                text_to_check = (title + " " + scene_context).lower()
+                is_bn = any('\u0980' <= c <= '\u09FF' for c in text_to_check)
+
+                if any(x in text_to_check for x in ["tension", "escalation", "risk", "hazard", "threat", "seismic", "geological", "clock", "timebomb", "টাইমবোম্ব", "ঝুঁকি"]):
+                    if is_bn:
+                        ov['data'] = [
+                            {"id": "২০২০", "name": "২০২০", "x": "২০২০", "y": 20, "value": 20, "value2": 15},
+                            {"id": "২০২১", "name": "২০২১", "x": "২০২১", "y": 38, "value": 38, "value2": 28},
+                            {"id": "২০২২", "name": "২০২২", "x": "২০২২", "y": 55, "value": 55, "value2": 42},
+                            {"id": "২০২৩", "name": "২০২৩", "x": "২০২৩", "y": 78, "value": 78, "value2": 65},
+                            {"id": "২০২৪", "name": "২০২৪", "x": "২০২৪", "y": 95, "value": 95, "value2": 82}
+                        ]
+                    else:
+                        ov['data'] = [
+                            {"id": "2020", "name": "2020", "x": "2020", "y": 20, "value": 20, "value2": 15},
+                            {"id": "2021", "name": "2021", "x": "2021", "y": 38, "value": 38, "value2": 28},
+                            {"id": "2022", "name": "2022", "x": "2022", "y": 55, "value": 55, "value2": 42},
+                            {"id": "2023", "name": "2023", "x": "2023", "y": 78, "value": 78, "value2": 65},
+                            {"id": "2024", "name": "2024", "x": "2024", "y": 95, "value": 95, "value2": 82}
+                        ]
+                elif any(x in text_to_check for x in ["population", "people", "dense", "density", "কোটি", "মানুষ", "ঘনত্ব"]):
+                    if is_bn:
+                        ov['data'] = [
+                            {"id": "২০১২", "name": "২০১২", "x": "২০১২", "y": 12, "value": 12, "value2": 15},
+                            {"id": "২০১৫", "name": "২০১৫", "x": "২০১৫", "y": 15, "value": 15, "value2": 18},
+                            {"id": "২০১৮", "name": "২০১৮", "x": "২০১৮", "y": 18, "value": 18, "value2": 20},
+                            {"id": "২০২১", "name": "২০২১", "x": "২০২১", "y": 20, "value": 20, "value2": 22},
+                            {"id": "২০২৪", "name": "২০২৪", "x": "২০২৪", "y": 22, "value": 22, "value2": 25}
+                        ]
+                    else:
+                        ov['data'] = [
+                            {"id": "2012", "name": "2012", "x": "2012", "y": 1.2, "value": 1.2, "value2": 1.5},
+                            {"id": "2015", "name": "2015", "x": "2015", "y": 1.5, "value": 1.5, "value2": 1.8},
+                            {"id": "2018", "name": "2018", "x": "2018", "y": 1.8, "value": 1.8, "value2": 2.0},
+                            {"id": "2021", "name": "2021", "x": "2021", "y": 2.0, "value": 2.0, "value2": 2.2},
+                            {"id": "2024", "name": "2024", "x": "2024", "y": 2.2, "value": 2.2, "value2": 2.5}
+                        ]
+                else:
+                    if is_bn:
+                        ov['data'] = [
+                            {"id": "ক", "name": "ক", "x": "ক", "y": 30, "value": 30},
+                            {"id": "খ", "name": "খ", "x": "খ", "y": 60, "value": 60},
+                            {"id": "গ", "name": "গ", "x": "গ", "y": 90, "value": 90}
+                        ]
+                    else:
+                        ov['data'] = [
+                            {"id": "A", "name": "A", "x": "A", "y": 30, "value": 30},
+                            {"id": "B", "name": "B", "x": "B", "y": 60, "value": 60},
+                            {"id": "C", "name": "C", "x": "C", "y": 90, "value": 90}
+                        ]
+
+            if o_type == 'chart' and 'title' not in ov:
+                ov['title'] = title if title else "Geological Data"
+            if 'keys' not in ov:
+                ov['keys'] = ['value']
+
+        if 'indicator' in o_type:
+            lbl = str(ov.get('label', ov.get('content', ''))).strip()
+            text_to_check = (lbl + " " + scene_context).lower()
+            is_bn = any('\u0980' <= c <= '\u09FF' for c in text_to_check)
+
+            val = ov.get('value')
+            if not val or val == 8420:
+                if any(x in text_to_check for x in ["population", "people", "dense", "density", "কোটি", "মানুষ", "ঘনত্ব"]):
+                    if is_bn:
+                        ov['value'] = "২,২৪,০০,০০০+"
+                        ov['label'] = "মোট জনসংখ্যা"
+                    else:
+                        ov['value'] = "22,400,000+"
+                        ov['label'] = "TOTAL POPULATION"
+                elif any(x in text_to_check for x in ["tension", "escalation", "risk", "hazard", "threat", "seismic", "geological", "clock", "timebomb", "টাইমবোম্ব", "ঝুঁকি"]):
+                    if is_bn:
+                        ov['value'] = "৯৫%"
+                        ov['label'] = "সর্বোচ্চ ঝুঁকি"
+                    else:
+                        ov['value'] = "95%"
+                        ov['label'] = "MAXIMUM RISK"
+                else:
+                    if is_bn:
+                        ov['value'] = "১০০%"
+                        ov['label'] = "চলমান"
+                    else:
+                        ov['value'] = "100%"
+                        ov['label'] = "ACTIVE"
+            elif not ov.get('label'):
+                ov['label'] = lbl
+
     def finalize_json_durations(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
         """Hardens layout, timing, camera, and assets with Geometry-Aware Logic and Adaptive Scaling."""
         if not data: return data
