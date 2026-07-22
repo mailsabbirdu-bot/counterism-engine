@@ -613,13 +613,18 @@ def execute_documentary_task(intent, query, narration="", preferred_site=None, f
             def playwright_worker():
                 with sync_playwright() as p:
                     try:
-                        browser = p.chromium.launch(headless=True)
+                        browser = p.chromium.launch(
+                            headless=True,
+                            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+                        )
                         context = browser.new_context(viewport={"width": 1920, "height": 1080})
+                        context.set_default_timeout(3500)
+                        context.set_default_navigation_timeout(7000)
                         page = context.new_page()
 
                         for url in sorted_urls[:3]:
                             try:
-                                page.goto(url, wait_until="domcontentloaded", timeout=12000)
+                                page.goto(url, wait_until="domcontentloaded", timeout=7000)
 
                                 success, computed_score, diagnostic_code, matched_text = process_page_and_crop(
                                     page, narration, url, context_type, output_name
