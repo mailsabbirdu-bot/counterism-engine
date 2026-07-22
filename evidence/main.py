@@ -43,10 +43,11 @@ print("Loading Documentary Core Infrastructure Engine V5...")
 embed_model = None
 if HAS_TRANSFORMERS:
     try:
-        embed_model = SentenceTransformer("sentence-transformers/LaBSE")
-        print("✅ LaBSE model loaded successfully.")
+        # Use highly-optimized, lightweight multilingual paraphrase-multilingual-MiniLM-L12-v2 model (220 MB vs 1.88 GB LaBSE)
+        embed_model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+        print("✅ Paraphrase-multilingual-MiniLM model loaded successfully.")
     except Exception as e:
-        print(f"⚠️ LaBSE load failed: {e}. Using rule-based fallback similarity.")
+        print(f"⚠️ Multilingual model load failed: {e}. Using rule-based fallback similarity.")
 
 
 # ==========================================
@@ -102,6 +103,39 @@ def get_source_credibility(url, context_type="news"):
     for trusted_domain, score in matrix.items():
         if trusted_domain in domain: return score
     return 0.4
+
+def is_title_relevant(page_title: str, query: str) -> bool:
+    """
+    Checks if the page title has significant keyword overlap with the search query.
+    Prevents crawling/cropping completely unrelated pages (e.g. 'Tokyo' for 'Dhaka' queries).
+    """
+    title_norm = normalize_bangla_text(page_title)
+    query_norm = normalize_bangla_text(query)
+
+    # Extract meaningful keywords of length > 3 (or length > 2 for Bangla)
+    query_words = {w for w in query_norm.split() if len(w) > (2 if any("\u0980" <= c <= "\u09FF" for c in w) else 3)}
+
+    # Common stop words/filler words to ignore
+    stop_words = {"most", "world", "list", "ranking", "threat", "report", "view", "aerial", "density", "line", "about", "with", "from"}
+    query_words = query_words - stop_words
+
+    if not query_words:
+        return True # Fallback if query is too generic
+
+    title_words = set(title_norm.split())
+
+    # Check if there's any stem-overlap or direct keyword match
+    overlap = query_words.intersection(title_words)
+    if overlap:
+        return True
+
+    # Check partial substring matches (e.g., 'earthquake' in 'dhaka-earthquake-risk')
+    for qw in query_words:
+        for tw in title_words:
+            if qw in tw or tw in qw:
+                return True
+
+    return False
 
 
 # ==========================================
@@ -323,8 +357,8 @@ def process_page_and_crop(page, target_narration, url, context_type, output_path
         (0.20 * text_qual)
     )
 
-    # RELAXED TOLERANCE THRESHOLD: Decreased from 0.55 to 0.15 for maximum resilience
-    if highest_combined_similarity < 0.15:
+    # RELAXED TOLERANCE THRESHOLD: Raised to 0.35 to guarantee high relevance of page content
+    if highest_combined_similarity < 0.35:
         return False, final_confidence, "LOW_BLENDED_SIMILARITY", None
 
     success = capture_and_stitch(page, matched_node['id'], output_path)
@@ -592,9 +626,11 @@ def execute_documentary_task(intent, query, narration="", preferred_site=None, f
                     with urllib.request.urlopen(req, timeout=3) as r:
                         res = json.loads(r.read().decode('utf-8'))
                         s_results = res.get("query", {}).get("search", [])
-                        for item in s_results[:3]:
-                            title = urllib.parse.quote(item["title"])
-                            raw_urls.append(f"https://{lang}.wikipedia.org/wiki/{title}")
+                        for item in s_results[:4]:
+                            title = item["title"]
+                            if is_title_relevant(title, search_term):
+                                title_encoded = urllib.parse.quote(title)
+                                raw_urls.append(f"https://{lang}.wikipedia.org/wiki/{title_encoded}")
                     if raw_urls:
                         break
                 except Exception as e:
