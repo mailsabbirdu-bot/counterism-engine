@@ -85,7 +85,12 @@ print("\n✍️ --- SYNCING FONTS ---")
 print("\n✨ All Drive assets successfully linked to local public folder.")
 
 print_banner("🛠️ INSTALLING PROJECT DEPENDENCIES")
-!apt-get update -y -qq && apt-get install -y -qq ffmpeg build-essential
+import shutil
+if not shutil.which('ffmpeg'):
+    print("📡 ffmpeg not found. Installing via apt-get...")
+    !apt-get update -y -qq && apt-get install -y -qq ffmpeg build-essential
+else:
+    print("✅ ffmpeg and build-essential are already installed. Skipping slow apt-get update.")
 !pip install -q -r remotion_jsonMaker/requirements.txt
 
 # 👁️ VISUAL EYE STAGE
