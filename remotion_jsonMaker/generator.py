@@ -654,7 +654,14 @@ class RemotionJsonMaker:
                 ov['depth'], ov['parallax'] = prio - 50, max(0.2, min(1.0, prio / 100.0))
 
             pos = ov.get('position', {})
-            ax, ay = int(pos.get('x', 960)), int(pos.get('y', 540))
+            if isinstance(pos, list):
+                ax = int(pos[0]) if len(pos) > 0 else 960
+                ay = int(pos[1]) if len(pos) > 1 else 540
+            elif isinstance(pos, dict):
+                ax = int(pos.get('x', 960))
+                ay = int(pos.get('y', 540))
+            else:
+                ax, ay = 960, 540
             ax = max(self.CLAMP_MIN_X, min(self.CLAMP_MAX_X, ax))
             ay = max(self.CLAMP_MIN_Y, min(self.CLAMP_MAX_Y, ay))
 
@@ -1251,6 +1258,12 @@ class RemotionJsonMaker:
 
                 # C. Spatial Purity (Titan Clamping)
                 pos = ov.get('position', {'x': 960, 'y': 540})
+                if isinstance(pos, list):
+                    pos = {
+                        'x': int(pos[0]) if len(pos) > 0 else 960,
+                        'y': int(pos[1]) if len(pos) > 1 else 540
+                    }
+                    ov['position'] = pos
                 try:
                     nx = max(150, min(1770, int(pos.get('x', 960))))
                     ny = max(150, min(930, int(pos.get('y', 540))))
