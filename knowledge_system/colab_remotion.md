@@ -54,7 +54,12 @@ if os.path.exists(f"{DRIVE_BASE_PATH}/fonts"):
 
 # --- 4. INSTALL SYSTEM DEPENDENCIES ---
 print_banner("🛠️ INSTALLING SYSTEM DEPENDENCIES")
-!apt-get update -y -qq && apt-get install -y -qq ffmpeg build-essential
+import shutil
+if not shutil.which('ffmpeg'):
+    print("📡 ffmpeg not found. Installing via apt-get...")
+    !apt-get update -y -qq && apt-get install -y -qq ffmpeg build-essential
+else:
+    print("✅ ffmpeg and build-essential are already installed. Skipping slow apt-get update.")
 !npm install --silent
 
 # --- 5. EXECUTE REMOTION RENDER ---
