@@ -47,7 +47,7 @@ def test_manifest_quality(filepath, public_dir=None):
     # --- ASSET & TYPE REGISTRY (Surgical Validation) ---
     VALID_TYPES = [
         'text', 'ui_panel', 'shape', 'chart', 'indicator', 'data_indicator',
-        'graph', 'video', 'image', 'shadcn_chart', 'shadcn_indicator', 'svg', 'connector',
+        'video', 'image', 'shadcn_chart', 'shadcn_indicator', 'svg', 'connector',
         'hub_network', 'flow_diagram', 'process', 'kpi_card', 'timeline', 'compositions', 'groups',
         'ambient_graphic', 'callout', 'label', 'crve'
     ]
@@ -181,7 +181,7 @@ def test_manifest_quality(filepath, public_dir=None):
         'media': (960, 540), 'image': (960, 540), 'video': (960, 540),
         'label': (300, 100), 'callout': (400, 200),
         'compositions': (1200, 675), 'groups': (1200, 675),
-        'graph': (1000, 700), 'shape': (400, 400),
+        'shape': (400, 400),
         'connector': (400, 100), 'ambient_graphic': (1920, 1080)
     }
 

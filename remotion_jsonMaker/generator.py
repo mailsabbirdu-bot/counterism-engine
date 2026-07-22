@@ -75,7 +75,7 @@ class RemotionJsonMaker:
         'timeline': (1200, 300), 'hub_network': (800, 800), 'flow_diagram': (1000, 562), 'process': (1000, 562),
         'media': (960, 540), 'image': (960, 540), 'video': (960, 540),
         'label': (300, 100), 'callout': (400, 200), 'compositions': (1200, 675), 'groups': (1200, 675),
-        'graph': (1000, 700), 'shape': (400, 400), 'data_emphasis': (600, 200), 'ambient_graphic': (1920, 1080),
+        'shape': (400, 400), 'data_emphasis': (600, 200), 'ambient_graphic': (1920, 1080),
         'connector': (400, 100)
     }
 
@@ -98,7 +98,7 @@ class RemotionJsonMaker:
 
     PRIORITY = {
         'hero': 1000, 'text': 60, 'hub_network': 90, 'flow_diagram': 90, 'process': 90,
-        'chart': 40, 'shadcn_chart': 40, 'graph': 50, 'kpi_card': 40, 'timeline': 75, 'ui_panel': 60,
+        'chart': 40, 'shadcn_chart': 40, 'kpi_card': 40, 'timeline': 75, 'ui_panel': 60,
         'compositions': 55, 'groups': 55, 'data_indicator': 40, 'shadcn_indicator': 40,
         'label': 45, 'callout': 45, 'svg': 40, 'kpi': 40, 'connector': 30,
         'shape': 10, 'ambient_graphic': 5, 'background': 0
@@ -450,21 +450,8 @@ class RemotionJsonMaker:
         if var in ['stepIndicator', 'step_indicator_glass'] and 'steps' not in ov:
             ov['steps'] = ["Initiate", "Process", "Complete"]
 
-        if o_type == 'graph':
-            if 'nodes' not in ov:
-                ov['nodes'] = [{"id": "node_1", "label": "Concept", "importance": 1.0}]
-            if 'links' not in ov:
-                ov['links'] = []
-            # Ensure every node has an ID and label
-            for i, n in enumerate(ov['nodes']):
-                if 'id' not in n: n['id'] = f"n_{i}"
-                if 'label' not in n: n['label'] = f"Entity {i}"
-                if 'importance' not in n: n['importance'] = 1.0
-
         # Font Decision Logic (Hardened)
         content = str(ov.get('content', '')).strip()
-        if o_type == 'graph' and not content:
-            content = " ".join([str(n.get('label', '')) for n in ov.get('nodes', [])])
 
         is_content_bangla = VisionConstants.is_bangla(content)
         ai_font = ov.get('font')
@@ -510,29 +497,6 @@ class RemotionJsonMaker:
                 story_context = self.story_scenes.get(s_id, "")
                 scene['semantic_role'] = self._auto_assign_semantic_role(story_context)
 
-            # --- KNOWLEDGE GRAPH DE-CLUTTERING (v4.5) ---
-            # If a graph is present, standard text overlays often repeat the same words.
-            # This logic strips redundant text overlays to prevent visual mess.
-            has_graph = any(ov.get('type') == 'graph' for ov in scene.get('overlays', []))
-            if has_graph:
-                graph_words = set()
-                for ov in scene.get('overlays', []):
-                    if ov.get('type') == 'graph':
-                        for node in ov.get('nodes', []):
-                            graph_words.update(re.sub(r'[.।]', '', str(node.get('label', ''))).lower().split())
-
-                # Filter overlays: Remove text layers that are >70% redundant with graph labels
-                cleaned_overlays = []
-                for ov in scene.get('overlays', []):
-                    if ov.get('type') == 'text':
-                        text_words = re.sub(r'[.।]', '', str(ov.get('content', ''))).lower().split()
-                        if not text_words: continue
-                        redundant_count = sum(1 for w in text_words if w in graph_words)
-                        if redundant_count / len(text_words) > 0.7:
-                            print(f"   🧹 DE-CLUTTER: Stripped redundant text layer '{ov.get('id')}' (Redundancy: {int(redundant_count/len(text_words)*100)}%)")
-                            continue
-                    cleaned_overlays.append(ov)
-                scene['overlays'] = cleaned_overlays
             print(f"   🎬 Processing: {s_id}")
 
             pattern = f"SC_{id_num:02d}".lower()
@@ -562,33 +526,6 @@ class RemotionJsonMaker:
                         scene['overlays'].append(item)
                     del scene[key]
 
-            # Special Handling for 'graph_evolution' and 'graph' hallucination
-            if 'graph_evolution' in scene and isinstance(scene['graph_evolution'], dict):
-                graph_data = scene['graph_evolution']
-                graph_overlay = {
-                    "id": f"graph_{id_num}",
-                    "type": "graph",
-                    "nodes": graph_data.get('nodes', []),
-                    "links": graph_data.get('links', []),
-                    "importance": "hero" if graph_data.get('hero_node') else "secondary",
-                    "start": 0,
-                    "duration": scene_duration
-                }
-                scene['overlays'].append(graph_overlay)
-                del scene['graph_evolution']
-
-            if 'graph' in scene:
-                g = scene['graph']
-                if isinstance(g, dict):
-                    g['type'] = 'graph'
-                    if 'id' not in g: g['id'] = f"graph_{id_num}"
-                    scene['overlays'].append(g)
-                elif isinstance(g, list):
-                    for item in g:
-                        if isinstance(item, dict):
-                            item['type'] = 'graph'
-                            scene['overlays'].append(item)
-                del scene['graph']
 
             valid_overlays = []
             text_count, focal_count, svg_count = 0, 0, 0
@@ -612,7 +549,7 @@ class RemotionJsonMaker:
                 elif o_type in ['chart', 'shadcn_chart', 'hub_network', 'flow_diagram', 'process', 'kpi_card', 'timeline', 'compositions', 'groups']:
                     if focal_count >= 3: continue
                     focal_count += 1
-                elif o_type in ['svg', 'label', 'callout', 'data_indicator', 'shadcn_indicator', 'shape', 'graph', 'ambient_graphic', 'connector']:
+                elif o_type in ['svg', 'label', 'callout', 'data_indicator', 'shadcn_indicator', 'shape', 'ambient_graphic', 'connector']:
                     if svg_count >= 15: continue
                     svg_count += 1
                 elif o_type in ['image', 'video']:
@@ -700,7 +637,7 @@ class RemotionJsonMaker:
 
         for i, ov in enumerate(valid_overlays):
             o_type = str(ov.get('type', 'text')).lower()
-            if o_type in ['graph', 'shape']: ov['start'] = 0
+            if o_type in ['shape']: ov['start'] = 0
             elif self.PRIORITY.get(o_type, 0) < 50: ov['start'] = 5
             else: ov['start'] = 15 + i * stagger_step
             ov['duration'] = max(30, scene_duration - ov['start'] - 30)
@@ -746,7 +683,7 @@ class RemotionJsonMaker:
             for scale_step in range(5):
                 scale = max(0.4, 1.0 - (scale_step * 0.15))
                 if imp == 'hero' and scale < 0.8: scale = 0.8
-                if o_type in ['graph', 'shape']: scale = min(scale, 0.8)
+                if o_type in ['shape']: scale = min(scale, 0.8)
 
                 if o_type == 'text':
                     curr_fs = max(self.MIN_FONT_SIZE, int(fs * scale))
@@ -1149,11 +1086,10 @@ class RemotionJsonMaker:
         REGISTRY = {
             'types': [
                 'text', 'ui_panel', 'shape', 'chart', 'indicator', 'data_indicator',
-                'graph', 'video', 'image', 'shadcn_chart', 'shadcn_indicator', 'svg', 'connector',
+                'video', 'image', 'shadcn_chart', 'shadcn_indicator', 'svg', 'connector',
                 'hub_network', 'flow_diagram', 'process', 'kpi_card', 'timeline', 'compositions', 'groups',
                 'ambient_graphic', 'callout', 'label'
             ],
-            'node_types': ['hero', 'data', 'concept', 'relationship', 'image', 'statistic'],
             'chart': ['bar', 'line', 'area', 'metaphor_mountain', 'metaphor_skyscraper'],
             'shadcn_chart': [
                 'glass_area', 'neon_bar', 'stacked_line', 'radial_score', 'radar_web', 'composed_tech',
@@ -1225,30 +1161,6 @@ class RemotionJsonMaker:
                     scene_initiatives.append(f"RECOVERY: Harvested semantic key '{key}' into canonical overlays.")
                     corrections_made += 1
 
-            if 'graph_evolution' in scene and isinstance(scene['graph_evolution'], dict):
-                graph_data = scene['graph_evolution']
-                scene['overlays'].append({
-                    "id": f"graph_{scene_idx+1}", "type": "graph",
-                    "nodes": graph_data.get('nodes', []), "links": graph_data.get('links', []),
-                    "importance": "hero", "start": 0, "duration": scene.get('duration_in_frames', 300)
-                })
-                del scene['graph_evolution']
-                scene_initiatives.append("RECOVERY: Converted 'graph_evolution' to 'graph' overlay.")
-                corrections_made += 1
-
-            if 'graph' in scene:
-                g = scene['graph']
-                if isinstance(g, dict):
-                    g['type'] = 'graph'
-                    scene['overlays'].append(g)
-                elif isinstance(g, list):
-                    for item in g:
-                        if isinstance(item, dict):
-                            item['type'] = 'graph'
-                            scene['overlays'].append(item)
-                del scene['graph']
-                scene_initiatives.append("RECOVERY: Converted 'graph' key to overlays.")
-                corrections_made += 1
 
             if 'duration_frames' in scene and 'duration_in_frames' not in scene:
                 scene['duration_in_frames'] = scene['duration_frames']
@@ -1351,12 +1263,7 @@ class RemotionJsonMaker:
                 # D. Dependency Validation (Connectors)
                 if o_type == 'connector':
                     src, tgt = ov.get('source'), ov.get('target')
-                    # Logic: Connectors can target graph nodes! Check nodes in all graph overlays in the scene.
-                    all_node_ids = []
-                    for other_ov in scene.get('overlays', []):
-                        if other_ov.get('type') == 'graph':
-                            all_node_ids.extend([n.get('id') for n in other_ov.get('nodes', [])])
-                    valid_targets = overlay_ids + all_node_ids
+                    valid_targets = overlay_ids
 
                     if src not in valid_targets or tgt not in valid_targets:
                         # Coerce to center if targets are hallucinated
@@ -1364,43 +1271,6 @@ class RemotionJsonMaker:
                         if tgt not in valid_targets: ov['target'] = {"x": 960, "y": 540}
                         scene_initiatives.append(f"DEPENDENCY: Connector '{ov_id}' targeted missing IDs -> anchored to center")
                         corrections_made += 1
-
-                # E. Knowledge Graph Integrity (Audit for Depth)
-                if o_type == 'graph':
-                    nodes = ov.get('nodes', [])
-                    if len(nodes) < 4:
-                        scene_initiatives.append(f"QUALITY: Graph '{ov_id}' is too sparse ({len(nodes)} nodes). Depth improvement suggested.")
-
-                    if not nodes:
-                        ov['nodes'] = [{"id": "n1", "label": "Concept", "importance": 1.0, "type": "concept", "category": "what", "emotion": "stable"}]
-                        scene_initiatives.append(f"DATA: Graph '{ov_id}' missing nodes -> injected fallback")
-                        corrections_made += 1
-                    else:
-                        node_ids = []
-                        for i, n in enumerate(ov['nodes']):
-                            if 'id' not in n: n['id'] = f"n_{i}"; corrections_made += 1
-                            if 'label' not in n: n['label'] = f"Entity {i}"; corrections_made += 1
-                            if n.get('type') not in REGISTRY['node_types']:
-                                n['type'] = 'concept'; corrections_made += 1
-                            if 'category' not in n: n['category'] = 'what'; corrections_made += 1
-                            if 'emotion' not in n: n['emotion'] = 'stable'; corrections_made += 1
-                            node_ids.append(n['id'])
-
-                        # Validate Links
-                        if 'links' in ov:
-                            for l in ov['links']:
-                                if l.get('source') not in node_ids or l.get('target') not in node_ids:
-                                    l['source'] = node_ids[0]
-                                    l['target'] = node_ids[min(1, len(node_ids)-1)]
-                                    scene_initiatives.append(f"DATA: Fixed invalid link in graph '{ov_id}'")
-                                    corrections_made += 1
-
-                        # Narration Sync: Ensure active_at or active_windows exists
-                        for node in ov['nodes']:
-                            if 'active_windows' not in node:
-                                start = node.get('active_at', int(ov.get('start', 0)) + 30)
-                                node['active_windows'] = [[start, start + 60]]
-                                corrections_made += 1
 
                 # F. Hierarchy Enforcement
                 prio = self.PRIORITY.get(o_type, 20)
@@ -1411,8 +1281,6 @@ class RemotionJsonMaker:
 
                 # G. Font Enforcements
                 content = str(ov.get('content', ov.get('text', '')))
-                if o_type == 'graph' and not content:
-                    content = " ".join([str(n.get('label', '')) for n in ov.get('nodes', [])])
 
                 is_bn = VisionConstants.is_bangla(content)
                 current_font = ov.get('font')
@@ -1529,31 +1397,28 @@ class RemotionJsonMaker:
             f"REASONING PIPELINE (MANDATORY):\n"
             f"1. NARRATIVE SYNC: Identify ALL frame ranges where every concept/data series is discussed. Use `active_windows`.\n"
             f"2. STORY DIRECTOR: Assign a `semantic_role` (trend | conflict | comparison | historical) to the ENTIRE SCENE. This drives the global visual language (lighting, particles, motion).\n"
-            f"3. SEMANTIC VISUALIZATION: Choose 'graph' (concepts/logic), 'chart' (metaphorical/story), or 'shadcn_chart' (numbers/data).\n"
+            f"3. SEMANTIC VISUALIZATION: Choose 'chart' (metaphorical/story) or 'shadcn_chart' (numbers/data).\n"
             f"4. DIRECTORIAL PRESET: nasa (sci-fi tech), bloomberg (financial/crisp), cyberpunk (intense/dark), minimal_apple (sleek), military (alert/tactical), archive (historical), nat_geo (organic).\n"
             f"5. STORY BEATS: Assign `story_beat`: introduction | growth | plateau | collapse | forecast.\n\n"
             f"--- 3. PRODUCTION QUALITY RULES ---\n"
             f"- For `chart` or `shadcn_chart`, use `semantic_role`: trend | comparison | proportion | hierarchy | flow | distribution.\n"
             f"- STORY VISUAL METAPHORS: metaphor_mountain (for trends/growth), metaphor_skyscraper (for comparisons/scale).\n"
-            f"- Nodes/Series MUST have `importance` (1.0-5.0) and `active_windows` (lists of [start, end]).\n"
-            f"- Assign `emotion` to nodes/series: alert | intense | growing | scientific | historical | calm.\n\n"
+            f"- Series MUST have `importance` (1.0-5.0) and `active_windows` (lists of [start, end]).\n"
+            f"- Assign `emotion` to series: alert | intense | growing | scientific | historical | calm.\n\n"
             f"--- 4. CINEMATIC PROTOCOL ---\n"
             f"- VISUAL LANGUAGE: Role 'conflict' = Red mood, high jitter. Role 'trend' = Blue mood, ascending data particles. Role 'comparison' = Green mood.\n"
             f"- STORY DIRECTOR: Every scene MUST have a `semantic_role`. Use 'conflict' for threats/problems, 'trend' for growth/data, 'comparison' for scales.\n"
-            f"- VISUAL HIERARCHY: Strip redundant 'text' layers if the Chart/Graph title covers the narration.\n"
-            f"- CAMERA: Use `lookAt` targeting IDs of specific graph nodes or chart peaks for semantic tracking.\n"
-            f"- SPATIAL: Force nodes into `semantic_zone`: input | process | result | threat | context.\n\n"
+            f"- VISUAL HIERARCHY: Strip redundant 'text' layers if the Chart title covers the narration.\n"
+            f"- CAMERA: Use `lookAt` targeting IDs of specific overlays or chart peaks for semantic tracking.\n"
+            f"- SPATIAL: Force components into `semantic_zone`: input | process | result | threat | context.\n\n"
             f"--- 5. SCHEMA AUTHORITY ---\n"
-            f"- 'graph': requires 'nodes' and 'links'.\n"
-            f"  - nodes: {{ id, label, type(hero|data|concept|statistic|warning), importance, active_windows, semantic_zone, emotion, category, position: {{x, y}} }}\n"
-            f"  - links: {{ id, source, target, relationship, display_label }}\n"
-            f"- 'connector': source/target MUST be node IDs from the graph. Preset: relationship type.\n\n"
+            f"- 'connector': source/target MUST be valid overlay IDs in the scene. Preset: relationship type.\n\n"
             f"--- 6. VARIANT REGISTRY (STRICT) ---\n"
             f"CHARTS: metaphor_mountain, metaphor_skyscraper, glass_area, neon_bar, stacked_line, radial_score, radar_web, composed_tech, pie_donut_glass, scatter_bubble, horizontal_pill_bar, step_area, multi_bar_stack, curved_edge_line, double_radar, funnel_glass, vertical_stepper, micro_sparkline, grid_dots, smooth_area_dual, bar_race_top, thick_line_glow, layered_pies, range_area, pixel_bars, curved_scatter, staircase_line, floating_bars, hollow_pie, dual_axis_tech, jagged_peak, dot_matrix_chart, area, bar, line.\n"
             f"INDICATORS: metric_tile, tech_badge, activity_ring, crypto_card, server_status, user_profile_stat, weather_glass, storage_pill, upload_cloud, score_board, notification_stack, data_ticker, network_ping, step_indicator_glass, battery_pack, media_controls, social_stats, tech_folder, system_cpu, location_tag, search_bar_glass, badge_collection, data_download, wifi_radar, system_lock, clock_modern, status_grid, floating_icon_text, mini_stat_card, activity_dots, kpiNumber, deltaIndicator, semiGauge, milestoneTimeline, statGrid, batteryLevel, statusBadge, stepIndicator, pulseRadar, multiProgress.\n"
             f"CONNECTORS: causes, leads_to, depends_on, located_in, transforms_into, increases, decreases, supports, threatens, flows_to, triggers, influences, smooth_curve, soft_arc, straight_flow, energy_flow, signal_beam, data_stream, s_curve, zigzag_soft, multi_branch, network_web, callout_line, camera_focus, timeline_path, route_path, curved_route, neon_connector, blueprint_connector, organic_connector.\n\n"
             f"--- 7. MANDATORY OUTPUT STRUCTURE ---\n"
-            f"FIRST, provide a <GRAPH_PLAN> block detailing concepts, relationships, hero, layout, and evolution.\n"
+            f"FIRST, provide a <VISUAL_PLAN> block detailing layout, theme, and entry transitions/stagger times.\n"
             f"SECOND, provide the RAW JSON block starting with {{ \"project_id\": ... }}.\n\n"
             f"{drive_guideline}\n"
             f"{memory_context}\n"
