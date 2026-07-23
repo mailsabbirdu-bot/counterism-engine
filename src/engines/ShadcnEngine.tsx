@@ -366,6 +366,24 @@ const ShadcnIndicator = ({ overlay, relativeFrame, fps, font }: any) => {
     const secondaryColor = overlay.color2 || '#8b5cf6';
     const safeFrame = isNaN(relativeFrame) ? 0 : relativeFrame;
 
+    const renderValue = (val: any) => {
+        if (val === undefined || val === null) return '8,420';
+        if (typeof val === 'number') {
+            return val.toLocaleString();
+        }
+        return String(val);
+    };
+
+    const getNumericValue = (val: any, fallback = 75) => {
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string') {
+            const clean = val.replace(/[০-৯]/g, (m) => String(['০','১','২','৩','৪','৫','৬','৭','৮','৯'].indexOf(m)));
+            const parsed = parseInt(clean.replace(/[^0-9]/g, ''));
+            if (!isNaN(parsed)) return parsed;
+        }
+        return fallback;
+    };
+
     switch(type) {
         case 'metric_tile':
             return (
@@ -375,7 +393,7 @@ const ShadcnIndicator = ({ overlay, relativeFrame, fps, font }: any) => {
                         <span className="text-emerald-400 text-xs font-bold bg-emerald-500/10 px-2 py-1 rounded-lg">+12.5%</span>
                     </div>
                     <p className="text-white/40 text-[10px] font-black uppercase tracking-widest leading-none">{overlay.label || 'CORE ACTIVITY'}</p>
-                    <p className="text-white text-4xl font-black mt-2 tabular-nums tracking-tighter">{Math.round(overlay.value || 8420).toLocaleString()}</p>
+                    <p className="text-white text-4xl font-black mt-2 tabular-nums tracking-tighter">{renderValue(overlay.value)}</p>
                 </div>
             );
         case 'tech_badge':
@@ -384,12 +402,12 @@ const ShadcnIndicator = ({ overlay, relativeFrame, fps, font }: any) => {
                     <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center"><Zap size={20} className="text-white fill-white" /></div>
                     <div className="flex flex-col">
                         <span className="text-white/60 text-[8px] font-black uppercase tracking-tighter">System Power</span>
-                        <span className="text-white text-2xl font-black leading-none uppercase">{overlay.value || 'Active'}</span>
+                        <span className="text-white text-2xl font-black leading-none uppercase">{renderValue(overlay.value)}</span>
                     </div>
                 </div>
             );
         case 'activity_ring':
-            const progress = interpolate(safeFrame, [10, 70], [0, overlay.value || 75], { extrapolateRight: 'clamp' });
+            const progress = interpolate(safeFrame, [10, 70], [0, getNumericValue(overlay.value, 75)], { extrapolateRight: 'clamp' });
             return (
                 <div className="relative w-48 h-48 flex items-center justify-center">
                     <svg className="w-full h-full -rotate-90">

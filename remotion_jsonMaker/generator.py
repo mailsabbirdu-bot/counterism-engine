@@ -753,6 +753,28 @@ class RemotionJsonMaker:
                 prio = self.PRIORITY.get(o_type, 40)
                 ov['depth'], ov['parallax'] = prio - 50, max(0.2, min(1.0, prio / 100.0))
 
+            fs_match = re.search(r'\d+', str(ov.get('fontSize', '120')))
+            fs = int(fs_match.group()) if fs_match else 120
+
+            # Estimate width/height early to clamp center safely inside screen margins
+            if o_type == 'text':
+                w = min(ov.get('maxWidth', 800), len(ov.get('content', '')) * fs * 0.7)
+                h = fs * 1.5
+            else:
+                w = max(300, base_w)
+                h = max(200, base_h)
+
+            margin = 150
+            # Calculate dynamic clamp ranges to guarantee no part of the element ever bleeds off-screen
+            clamp_min_x = max(margin + w/2, self.CLAMP_MIN_X)
+            clamp_max_x = min(1920 - margin - w/2, self.CLAMP_MAX_X)
+            clamp_min_y = max(margin + h/2, self.CLAMP_MIN_Y)
+            clamp_max_y = min(1080 - margin - h/2, self.CLAMP_MAX_Y)
+
+            # Ensure min <= max
+            if clamp_min_x > clamp_max_x: clamp_min_x = clamp_max_x = 960
+            if clamp_min_y > clamp_max_y: clamp_min_y = clamp_max_y = 540
+
             pos = ov.get('position', {})
             if isinstance(pos, list):
                 ax = int(pos[0]) if len(pos) > 0 else 960
@@ -762,8 +784,9 @@ class RemotionJsonMaker:
                 ay = int(pos.get('y', 540))
             else:
                 ax, ay = 960, 540
-            ax = max(self.CLAMP_MIN_X, min(self.CLAMP_MAX_X, ax))
-            ay = max(self.CLAMP_MIN_Y, min(self.CLAMP_MAX_Y, ay))
+
+            ax = max(clamp_min_x, min(clamp_max_x, ax))
+            ay = max(clamp_min_y, min(clamp_max_y, ay))
 
             if abs(ax - 960) < 200 and (abs(ay - 540) < 150 or abs(ay - 700) < 150):
                 if "left" in recommended_region: ax, ay = self.ANCHORS["L_MID"]
