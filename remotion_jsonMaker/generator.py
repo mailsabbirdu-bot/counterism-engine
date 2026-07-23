@@ -672,7 +672,7 @@ class RemotionJsonMaker:
                     if not ov.get('hero_config'):
                         hero = self._get_scene_hero_word(s_id, ov['content'], scene_duration)
                         if not hero: hero = self._get_fallback_hero(ov['content'])
-                        if hero: ov['hero_config'] = {"word": hero['word'], "start": hero['start'], "color": self.MODERN_COLORS[(scene_idx + 2) % len(self.MODERN_COLORS)], "animation": self.VALID_TEXT_ANIMS[scene_idx % len(self.VALID_TEXT_ANIMS)]}
+                        if hero: ov['hero_config'] = {"word": hero['word'], "start": hero['start'], "color": self.MODERN_COLORS[(scene_idx + 2) % len(self.MODERN_COLORS)], "animation": ov.get('intro_animation', self.VALID_TEXT_ANIMS[scene_idx % len(self.VALID_TEXT_ANIMS)])}
                     else:
                         # EXTREMELY IMPORTANT: Always correct and align any existing/hallucinated hero word start frame
                         # with the actual ground-truth voiceover timestamp from timestamp.txt!
@@ -684,6 +684,8 @@ class RemotionJsonMaker:
                             if hero:
                                 print(f"   🎙️ Syncing hero word '{clean_word}' start frame to {hero['start']}f")
                                 h_conf['start'] = hero['start']
+                        if 'intro_animation' in ov:
+                            h_conf['animation'] = ov['intro_animation']
                     ov['color'] = self.MODERN_COLORS[scene_idx % len(self.MODERN_COLORS)]
                     ov['fontSize'] = ov.get('fontSize', "120px")
                 valid_overlays.append(ov)

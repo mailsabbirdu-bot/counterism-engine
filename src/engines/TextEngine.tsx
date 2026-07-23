@@ -20,7 +20,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
   const items = text.split(/\s+/);
 
   const heroConfig = overlay.hero_config;
-  const heroWord = heroConfig?.word?.replace(/[.।]/g, '');
+  const heroWord = heroConfig?.word?.replace(/[:.,;!?।]/g, '');
 
   const baseFontSize = typeof overlay.fontSize === 'number' ? `${overlay.fontSize}px` : (overlay.fontSize || "120px");
   const x = safeNumber(overlay.position?.x, width / 2);
@@ -89,7 +89,7 @@ export const TextEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
           const progress = entrance * exit;
 
           // Hero Word Logic
-          const isHero = item.replace(/[.।]/g, '') === heroWord;
+          const isHero = item.replace(/[:.,;!?।]/g, '') === heroWord;
           const heroStart = heroConfig?.start ?? 0;
           const heroActive = !!(heroConfig && frame >= heroStart);
           const heroFrame = heroConfig ? Math.max(0, frame - heroStart) : 0;
