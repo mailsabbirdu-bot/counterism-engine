@@ -31,15 +31,21 @@ OUTPUT_DIR = f"{DRIVE_BASE_PATH}/analysis/semantic"
 PROJECT_NAME = "counterism-engine"
 REPO_URL = "https://github.com/mailsabbirdu-bot/counterism-engine"
 
+# --- 3. Fresh Clone Repository (Strictly deletes previous stale caches to guarantee latest code updates)
 %cd /content
-if not os.path.exists(PROJECT_NAME):
-    print(f"🚀 Cloning repository: {REPO_URL}")
-    !git clone {REPO_URL}
+if os.path.exists(PROJECT_NAME):
+    print("🧹 Cleaning stale engine directory for a fresh clone...")
+    shutil.rmtree(PROJECT_NAME)
+
+print(f"🚀 Cloning freshest version of repository: {REPO_URL}")
+!git clone {REPO_URL}
+
 %cd {PROJECT_NAME}
 # Fetch and checkout active branch feature/data-visualization-pipeline to ensure latest logic is executed
 !git fetch origin && git checkout feature/data-visualization-pipeline || true
+!git pull origin feature/data-visualization-pipeline || true
 
-# --- 3. SYNC ASSETS & MANIFEST ---
+# --- 4. SYNC ASSETS & MANIFEST ---
 print_banner("📡 SYNCING ASSETS & MANIFEST")
 if os.path.exists(MANIFEST_FILE):
     # Copy manifest to local for rendering
@@ -55,7 +61,7 @@ else:
 if os.path.exists(f"{DRIVE_BASE_PATH}/fonts"):
     !cp -r {DRIVE_BASE_PATH}/fonts/* public/fonts/
 
-# --- 4. INSTALL SYSTEM DEPENDENCIES ---
+# --- 5. INSTALL SYSTEM DEPENDENCIES ---
 print_banner("🛠️ INSTALLING SYSTEM DEPENDENCIES")
 import shutil
 if not shutil.which('ffmpeg'):
@@ -65,12 +71,12 @@ else:
     print("✅ ffmpeg and build-essential are already installed. Skipping slow apt-get update.")
 !npm install --silent
 
-# --- 5. EXECUTE REMOTION RENDER ---
+# --- 6. EXECUTE REMOTION RENDER ---
 print_banner("🎬 STARTING RENDERING PIPELINE")
 # Pass the custom manifest to the render script
 !npm run render -- --template=remotion_render.json --concurrency=1
 
-# --- 6. SAVE OUTPUT TO DRIVE ---
+# --- 7. SAVE OUTPUT TO DRIVE ---
 print_banner("💾 SAVING FINAL VIDEO TO DRIVE")
 renders = glob.glob("renders/**/*.mp4", recursive=True)
 

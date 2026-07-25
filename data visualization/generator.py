@@ -301,7 +301,7 @@ class DataVisualizationGenerator:
 
             for ov_idx, ov in enumerate(overlays):
                 o_type = str(ov.get('type', 'text')).lower()
-                ov_id = ov.get('id', '')
+                ov_id = str(ov.get('id', ''))
 
                 # STRICTION 1: Aggressively drop any 'text' overlays (including if ID starts with txt)
                 if o_type == 'text' or o_type == 'text_overlay' or ov_id.startswith('txt_'):

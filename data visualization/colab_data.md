@@ -37,17 +37,19 @@ try:
 except Exception as e:
     print(f"⚠️ Drive mount skipped or failed: {e}")
 
-# 3. Clone Repository
+# 3. Fresh Clone Repository (Strictly deletes previous stale caches to guarantee latest code updates)
 %cd /content
-if not os.path.exists(PROJECT_PATH):
-    print("🚀 Cloning engine...")
-    !git clone https://github.com/mailsabbirdu-bot/counterism-engine {PROJECT_PATH}
-else:
-    print("✅ Engine already cloned.")
+if os.path.exists(PROJECT_PATH):
+    print("🧹 Cleaning stale engine directory for a fresh clone...")
+    shutil.rmtree(PROJECT_PATH)
+
+print("🚀 Cloning freshest engine version...")
+!git clone https://github.com/mailsabbirdu-bot/counterism-engine {PROJECT_PATH}
 
 %cd {PROJECT_PATH}
 # Fetch and checkout active branch feature/data-visualization-pipeline to ensure latest logic is executed
 !git fetch origin && git checkout feature/data-visualization-pipeline || true
+!git pull origin feature/data-visualization-pipeline || true
 
 # 4. Locate story.txt
 story_file = None
