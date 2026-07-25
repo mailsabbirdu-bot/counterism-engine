@@ -1,0 +1,347 @@
+{
+  "project_name": "Studio V4 - Final Master Showcase",
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "scenes": [
+    {
+      "scene_id": "SCENE_1",
+      "duration_in_frames": 300,
+      "overlays": [
+        {
+          "id": "house",
+          "type": "svg",
+          "query": "house",
+          "provider": "lucide",
+          "animation": "wordReveal",
+          "start": 5,
+          "duration": 265,
+          "position": {
+            "x": 1500,
+            "y": 540
+          },
+          "width": 495,
+          "height": 495,
+          "color": "#3b82f6",
+          "strokeWidth": 4,
+          "font": "Audiowide-Regular_english",
+          "exitAnimation": "fade_out",
+          "depth": -10,
+          "parallax": 0.4,
+          "visual_anchor": true,
+          "zIndex": 40
+        },
+        {
+          "id": "cpu",
+          "type": "svg",
+          "query": "cpu",
+          "provider": "lucide",
+          "animation": "wordReveal",
+          "start": 5,
+          "duration": 265,
+          "position": {
+            "x": 1143,
+            "y": 766
+          },
+          "width": 150,
+          "height": 150,
+          "color": "#f43f5e",
+          "font": "Audiowide-Regular_english",
+          "exitAnimation": "fade_out",
+          "depth": -10,
+          "parallax": 0.4,
+          "visual_anchor": true,
+          "zIndex": 40
+        },
+        {
+          "id": "t1",
+          "type": "text",
+          "content": "স্মার্ট মেগাসিটি",
+          "start": 15,
+          "duration": 255,
+          "position": {
+            "x": 550,
+            "y": 320
+          },
+          "font": "Sohid_bangla",
+          "splitMode": "word",
+          "maxWidth": 800,
+          "hero_config": {
+            "word": "মেগাসিটি",
+            "start": 45,
+            "color": "#FF3E6C",
+            "animation": "glow_pulse"
+          },
+          "color": "#00F5FF",
+          "fontSize": "120px",
+          "exitAnimation": "slide_down",
+          "depth": 10,
+          "parallax": 0.6,
+          "visual_anchor": true,
+          "zIndex": 60
+        },
+        {
+          "id": "wifi",
+          "type": "svg",
+          "query": "wifi",
+          "provider": "lucide",
+          "animation": "wordReveal",
+          "start": 20,
+          "duration": 265,
+          "position": {
+            "x": 1143,
+            "y": 546
+          },
+          "width": 150,
+          "height": 150,
+          "color": "#10b881",
+          "font": "Audiowide-Regular_english",
+          "exitAnimation": "fade_out",
+          "depth": -10,
+          "parallax": 0.4,
+          "visual_anchor": true,
+          "zIndex": 40
+        }
+      ],
+      "infographic_lines": [
+        {
+          "start_pos": {
+            "x": 960,
+            "y": 540
+          },
+          "end_pos": {
+            "x": 1400,
+            "y": 300
+          },
+          "start": 60,
+          "duration": 30,
+          "color": "rgba(59,130,246,0.4)",
+          "from_id": "house",
+          "to_id": "wifi"
+        },
+        {
+          "start_pos": {
+            "x": 960,
+            "y": 540
+          },
+          "end_pos": {
+            "x": 1400,
+            "y": 700
+          },
+          "start": 90,
+          "duration": 30,
+          "color": "rgba(59,130,246,0.4)",
+          "from_id": "wifi",
+          "to_id": "house"
+        }
+      ],
+      "infographic_nodes": [
+        {
+          "x": 1400,
+          "y": 300,
+          "start": 60,
+          "color": "#10b881"
+        },
+        {
+          "x": 1400,
+          "y": 700,
+          "start": 90,
+          "color": "#f43f5e"
+        }
+      ],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "house",
+            "startFrame": 0,
+            "duration": 300,
+            "zoom": 1.1,
+            "style": "slow_push",
+            "ease": "cubicOut"
+          }
+        ]
+      },
+      "background": {
+        "background_type": "video",
+        "video_path": "renders/scene_SC_01.mp4",
+        "audio_enabled": false
+      },
+      "semantic_role": "trend",
+      "transition": {
+        "type": "cinematicMatchCut",
+        "duration": 15
+      },
+      "beats": [
+        {
+          "frame": 15,
+          "event": "t1_reveal"
+        }
+      ],
+      "connections": []
+    },
+    {
+      "scene_id": "SCENE_2",
+      "duration_in_frames": 300,
+      "overlays": [
+        {
+          "id": "chart_glass",
+          "type": "shadcn_chart",
+          "chart_type": "glass_area",
+          "title": "Struggle Milestones (1952-1971)",
+          "data": [
+            {
+              "id": "1952",
+              "name": "Language Movement",
+              "x": "1952",
+              "y": 20,
+              "value": 20,
+              "value2": 20,
+              "label": "Language Mov.",
+              "active_windows": [
+                [
+                  65,
+                  185
+                ]
+              ]
+            },
+            {
+              "id": "1966",
+              "name": "Six Points",
+              "x": "1966",
+              "y": 50,
+              "value": 50,
+              "value2": 50,
+              "label": "Six Points",
+              "active_windows": [
+                [
+                  65,
+                  185
+                ]
+              ]
+            },
+            {
+              "id": "1969",
+              "name": "Mass Upsurge",
+              "x": "1969",
+              "y": 70,
+              "value": 70,
+              "value2": 70,
+              "label": "Mass Upsurge",
+              "active_windows": [
+                [
+                  65,
+                  185
+                ]
+              ]
+            },
+            {
+              "id": "1970",
+              "name": "General Election",
+              "x": "1970",
+              "y": 90,
+              "value": 90,
+              "value2": 90,
+              "label": "Election",
+              "active_windows": [
+                [
+                  65,
+                  185
+                ]
+              ]
+            },
+            {
+              "id": "1971",
+              "name": "Independence",
+              "x": "1971",
+              "y": 100,
+              "value": 100,
+              "value2": 100,
+              "label": "Independence",
+              "active_windows": [
+                [
+                  65,
+                  185
+                ]
+              ]
+            }
+          ],
+          "start": 5,
+          "duration": 265,
+          "position": {
+            "x": 550,
+            "y": 540
+          },
+          "width": 800,
+          "height": 500,
+          "font": "Audiowide-Regular_english",
+          "keys": [
+            "value"
+          ],
+          "exitAnimation": "fade_out",
+          "depth": -10,
+          "parallax": 0.4,
+          "visual_anchor": true,
+          "zIndex": 40
+        },
+        {
+          "id": "ind_crypto",
+          "type": "shadcn_indicator",
+          "indicator_type": "crypto_card",
+          "label": "YEAR OF DECLARATION",
+          "value": "1971",
+          "start": 20,
+          "duration": 265,
+          "position": {
+            "x": 1370,
+            "y": 540
+          },
+          "content": "ETHEREUM",
+          "font": "Audiowide-Regular_english",
+          "sparkline": [
+            10,
+            25,
+            15,
+            45,
+            30,
+            60
+          ],
+          "exitAnimation": "fade_out",
+          "depth": -10,
+          "parallax": 0.4,
+          "visual_anchor": true,
+          "zIndex": 40
+        }
+      ],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "chart_glass",
+            "startFrame": 30,
+            "duration": 240,
+            "zoom": 1.2,
+            "style": "dramatic_reveal",
+            "ease": "cubicOut"
+          }
+        ]
+      },
+      "background": {
+        "background_type": "video",
+        "video_path": "renders/scene_SC_02.mp4",
+        "audio_enabled": false
+      },
+      "semantic_role": "trend",
+      "transition": {
+        "type": "cinematicMatchCut",
+        "duration": 15
+      },
+      "beats": [],
+      "connections": [],
+      "infographic_lines": []
+    }
+  ],
+  "audio_sfx_manifest": []
+}
