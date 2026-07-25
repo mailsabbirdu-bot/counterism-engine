@@ -1,0 +1,177 @@
+{
+  "project_id": "data_visualization_project",
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "scenes": [
+    {
+      "scene_id": "SCENE_1",
+      "duration_in_frames": 300,
+      "background": {
+        "background_type": "procedural",
+        "procedural_config": {
+          "variant": "neon_grid"
+        }
+      },
+      "overlays": [
+        {
+          "type": "text",
+          "content": "ঢাকা বাংলাদেশের রাজধানী এবং এটি একটি জনবহুল মেগাসিটি।",
+          "fontSize": "110px",
+          "position": {
+            "x": 960,
+            "y": 320
+          },
+          "zIndex": 60,
+          "id": "ov_1_1",
+          "font": "Sohid_bangla",
+          "splitMode": "word",
+          "start": 15,
+          "duration": 255
+        },
+        {
+          "type": "indicator",
+          "indicator_type": "kpiNumber",
+          "label": "ঢাকার মোট জনসংখ্যা",
+          "value": "২,২৪,০০,০০০+",
+          "position": {
+            "x": 1370,
+            "y": 730
+          },
+          "zIndex": 50,
+          "id": "ov_1_2",
+          "font": "Sohid_bangla",
+          "start": 45,
+          "duration": 225
+        }
+      ],
+      "transition": {
+        "type": "cinematicMatchCut",
+        "duration": 15
+      },
+      "beats": [
+        {
+          "frame": 15,
+          "event": "ov_1_1_reveal"
+        },
+        {
+          "frame": 45,
+          "event": "ov_1_2_reveal"
+        }
+      ],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "ov_1_1",
+            "startFrame": 0,
+            "duration": 150,
+            "style": "slow_push",
+            "zoom": 1.1,
+            "ease": "cubicOut"
+          },
+          {
+            "targetId": "ov_1_2",
+            "startFrame": 150,
+            "duration": 150,
+            "style": "cinematic_drift",
+            "zoom": 1.1,
+            "ease": "cubicOut"
+          }
+        ]
+      }
+    },
+    {
+      "scene_id": "SCENE_2",
+      "duration_in_frames": 300,
+      "background": {
+        "background_type": "procedural",
+        "procedural_config": {
+          "variant": "neon_grid"
+        }
+      },
+      "overlays": [
+        {
+          "type": "text",
+          "content": "১৯৭১ সালের ২৬ মার্চ প্রথম প্রহরে বঙ্গবন্ধু শেখ মুজিবুর রহমান স্বাধীনতা ঘোষণা করেন।",
+          "fontSize": "100px",
+          "position": {
+            "x": 960,
+            "y": 320
+          },
+          "zIndex": 60,
+          "id": "ov_2_1",
+          "font": "Sohid_bangla",
+          "splitMode": "word",
+          "start": 15,
+          "duration": 255
+        },
+        {
+          "type": "indicator",
+          "indicator_type": "milestoneTracker",
+          "label": "স্বাধীনতার ঐতিহাসিক মাইলফলক",
+          "position": {
+            "x": 1370,
+            "y": 730
+          },
+          "zIndex": 50,
+          "id": "ov_2_2",
+          "font": "Sohid_bangla",
+          "start": 45,
+          "duration": 225,
+          "milestones": [
+            {
+              "label": "ছয় দফা আন্দোলন",
+              "date": "১৯৬৬"
+            },
+            {
+              "label": "৭০-এর সাধারণ নির্বাচন",
+              "date": "১৯৭০"
+            },
+            {
+              "label": "স্বাধীনতা ঘোষণা",
+              "date": "১৯৭১"
+            }
+          ]
+        }
+      ],
+      "transition": {
+        "type": "cinematicMatchCut",
+        "duration": 15
+      },
+      "beats": [
+        {
+          "frame": 15,
+          "event": "ov_2_1_reveal"
+        },
+        {
+          "frame": 45,
+          "event": "ov_2_2_reveal"
+        }
+      ],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "ov_2_1",
+            "startFrame": 0,
+            "duration": 150,
+            "style": "slow_push",
+            "zoom": 1.1,
+            "ease": "cubicOut"
+          },
+          {
+            "targetId": "ov_2_2",
+            "startFrame": 150,
+            "duration": 150,
+            "style": "cinematic_drift",
+            "zoom": 1.1,
+            "ease": "cubicOut"
+          }
+        ]
+      }
+    }
+  ]
+}
