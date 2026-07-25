@@ -298,9 +298,10 @@ class DataVisualizationGenerator:
 
             for ov_idx, ov in enumerate(overlays):
                 o_type = str(ov.get('type', 'text')).lower()
+                ov_id = ov.get('id', '')
 
-                # STRICTION 1: Bulletproof drop of any 'text' overlays
-                if o_type == 'text':
+                # STRICTION 1: Aggressively drop any 'text' overlays (including if ID starts with txt)
+                if o_type == 'text' or o_type == 'text_overlay' or ov_id.startswith('txt_'):
                     print(f"   🗑️ Dropped text layer '{ov.get('id')}' to preserve visualization-only focus.")
                     continue
 
@@ -324,16 +325,19 @@ class DataVisualizationGenerator:
                 val = str(ov.get('value', '')).strip()
 
                 # Clean percentage double signs
-                if var in ['percentageCounter', 'activity_ring', 'circularProgress', 'semiGauge', 'ringChart', 'metricRing']:
-                    # Remove % signs to prevent double percentage signs
+                if var in ['percentageCounter', 'activity_ring', 'circularProgress', 'semiGauge', 'ringChart', 'metricRing', 'deltaIndicator']:
+                    # Remove % and + signs to prevent double formatting
                     if '%' in val:
                         val = val.replace('%', '').strip()
                         ov['value'] = val
                         print(f"   🔧 Cleansed percentage metric '{ov['id']}': {val}% -> {val}")
+                    if '+' in val and var != 'deltaIndicator':
+                        val = val.replace('+', '').strip()
+                        ov['value'] = val
 
-                    # If value is non-numeric text like "CRITICAL", convert to a safe badge type or replace with 85
-                    has_letters = any(c.isalpha() for c in val)
-                    if has_letters or val.lower() in ['critical', 'risk', 'high', 'alarm']:
+                    # If value is non-numeric text like "সংকট আসন্ন" or "CRITICAL", convert to a safe badge type or replace with 85
+                    has_letters = any(c.isalpha() for c in val) or any('\u0980' <= c <= '\u09FF' for c in val)
+                    if has_letters or val.lower() in ['critical', 'risk', 'high', 'alarm', 'সংকট আসন্ন', 'আশঙ্কাজনক']:
                         # Automatically mutate to status badge to render beautifully
                         ov['indicator_type'] = 'statusBadge'
                         var = 'statusBadge'
