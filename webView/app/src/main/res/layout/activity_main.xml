@@ -133,6 +133,38 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- Custom JavaScript Runner Console -->
+    <LinearLayout
+        android:id="@+id/llJsConsole"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#E0F7FA"
+        android:padding="8dp"
+        android:gravity="center_vertical">
+
+        <EditText
+            android:id="@+id/etJsCode"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Type custom JavaScript to execute in page..."
+            android:singleLine="true"
+            android:textSize="12sp"
+            android:background="#FFFFFF"
+            android:padding="6dp" />
+
+        <Button
+            android:id="@+id/btnRunJs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⚡ RUN JS"
+            android:textSize="10sp"
+            android:backgroundTint="#00BCD4"
+            android:textColor="#FFFFFF"
+            android:layout_marginStart="6dp" />
+    </LinearLayout>
+
     <!-- Container to support dynamic multi-tab popups cleanly (e.g. Google Drive auth redirects) -->
     <LinearLayout
         android:id="@+id/webViewContainer"

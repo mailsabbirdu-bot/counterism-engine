@@ -46,6 +46,8 @@ public class MainActivity extends AppCompatActivity {
     private Button btnCopyColabCode;
     private Button btnPasteCode;
     private Button btnToggleView;
+    private EditText etJsCode;
+    private Button btnRunJs;
     private LinearLayout webViewContainer;
 
     private boolean isServiceRunning = false;
@@ -162,6 +164,8 @@ public class MainActivity extends AppCompatActivity {
         btnCopyColabCode = findViewById(R.id.btnCopyColabCode);
         btnPasteCode = findViewById(R.id.btnPasteCode);
         btnToggleView = findViewById(R.id.btnToggleView);
+        etJsCode = findViewById(R.id.etJsCode);
+        btnRunJs = findViewById(R.id.btnRunJs);
         webViewContainer = findViewById(R.id.webViewContainer);
 
         ImageButton btnBack = findViewById(R.id.btnBack);
@@ -227,6 +231,19 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(this, "Switched to Mobile Layout (Android Chrome Bypass UA)", Toast.LENGTH_SHORT).show();
             }
             webView.reload();
+        });
+
+        // Execute Custom JavaScript inside WebView context
+        btnRunJs.setOnClickListener(v -> {
+            String js = etJsCode.getText().toString().trim();
+            if (!js.isEmpty()) {
+                webView.evaluateJavascript(js, value -> {
+                    Toast.makeText(MainActivity.this, "JS Result: " + value, Toast.LENGTH_LONG).show();
+                    Log.d(TAG, "Custom JavaScript executed. Result: " + value);
+                });
+            } else {
+                Toast.makeText(this, "Please enter JavaScript code to execute.", Toast.LENGTH_SHORT).show();
+            }
         });
 
         // Toggle Foreground Service for persistent run
