@@ -280,6 +280,8 @@ public class MainActivity extends AppCompatActivity {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 etUrl.setText(url);
+                // Flush cookies to ensure credential propagation across domains
+                CookieManager.getInstance().flush();
             }
         });
 
@@ -347,6 +349,8 @@ public class MainActivity extends AppCompatActivity {
                     public void onPageFinished(WebView v, String url) {
                         super.onPageFinished(v, url);
                         etUrl.setText(url);
+                        // Flush cookies so OAuth credentials propagate immediately to main WebView
+                        CookieManager.getInstance().flush();
                     }
                 });
 
