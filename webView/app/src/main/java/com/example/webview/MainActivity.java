@@ -11,6 +11,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Message;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.util.Log;
@@ -24,6 +25,7 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -44,6 +46,7 @@ public class MainActivity extends AppCompatActivity {
     private Button btnCopyColabCode;
     private Button btnPasteCode;
     private Button btnToggleView;
+    private LinearLayout webViewContainer;
 
     private boolean isServiceRunning = false;
     private boolean isDesktopMode = true; // Default is Desktop Mode for Colab fully active execution
@@ -159,6 +162,7 @@ public class MainActivity extends AppCompatActivity {
         btnCopyColabCode = findViewById(R.id.btnCopyColabCode);
         btnPasteCode = findViewById(R.id.btnPasteCode);
         btnToggleView = findViewById(R.id.btnToggleView);
+        webViewContainer = findViewById(R.id.webViewContainer);
 
         ImageButton btnBack = findViewById(R.id.btnBack);
         ImageButton btnForward = findViewById(R.id.btnForward);
@@ -252,7 +256,10 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowContentAccess(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
 
-        // Crucial: Use a Macintosh Safari Desktop User-Agent to bypass Google login restrictions in WebViews
+        // Crucial: Support multiple windows to capture Google Drive mounts or popups cleanly inside separate temporary tabs
+        settings.setSupportMultipleWindows(true);
+
+        // Use a Macintosh Safari Desktop User-Agent to bypass Google login restrictions in WebViews
         settings.setUserAgentString(DESKTOP_USER_AGENT);
 
         // Enable cookies and third party cookies
@@ -303,6 +310,80 @@ public class MainActivity extends AppCompatActivity {
                     return false;
                 }
                 return true;
+            }
+
+            // Capture new tab/window creation (like Google Drive Sync popups) and overlay a secondary tab safely
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
+                Log.d(TAG, "onCreateWindow triggered");
+                WebView newWebView = new WebView(MainActivity.this);
+
+                WebSettings newSettings = newWebView.getSettings();
+                newSettings.setJavaScriptEnabled(true);
+                newSettings.setDomStorageEnabled(true);
+                newSettings.setDatabaseEnabled(true);
+                newSettings.setJavaScriptCanOpenWindowsAutomatically(true);
+                newSettings.setSupportMultipleWindows(true);
+                newSettings.setUserAgentString(isDesktopMode ? DESKTOP_USER_AGENT : MOBILE_USER_AGENT);
+
+                CookieManager cm = CookieManager.getInstance();
+                cm.setAcceptCookie(true);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    cm.setAcceptThirdPartyCookies(newWebView, true);
+                }
+
+                newWebView.setLayoutParams(new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.MATCH_PARENT
+                ));
+
+                newWebView.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView v, String url) {
+                        return false; // Load OAuth redirect flows inside the secondary tab itself
+                    }
+
+                    @Override
+                    public void onPageFinished(WebView v, String url) {
+                        super.onPageFinished(v, url);
+                        etUrl.setText(url);
+                    }
+                });
+
+                newWebView.setWebChromeClient(new WebChromeClient() {
+                    @Override
+                    public void onCloseWindow(WebView window) {
+                        Log.d(TAG, "onCloseWindow triggered for secondary WebView");
+                        if (webViewContainer != null) {
+                            webViewContainer.removeView(window);
+                        }
+                        window.destroy();
+                        // Restore visibility of original Colab session WebView
+                        webView.setVisibility(View.VISIBLE);
+                        etUrl.setText(webView.getUrl());
+                    }
+                });
+
+                if (webViewContainer != null) {
+                    webView.setVisibility(View.GONE); // Hide background Colab session
+                    webViewContainer.addView(newWebView);
+                }
+
+                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+                transport.setWebView(newWebView);
+                resultMsg.sendToTarget();
+                return true;
+            }
+
+            @Override
+            public void onCloseWindow(WebView window) {
+                Log.d(TAG, "onCloseWindow triggered for main WebChromeClient");
+                if (webViewContainer != null) {
+                    webViewContainer.removeView(window);
+                }
+                window.destroy();
+                webView.setVisibility(View.VISIBLE);
+                etUrl.setText(webView.getUrl());
             }
         });
 
@@ -430,7 +511,18 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (webView.canGoBack()) {
+        // Intercept back click if a dynamic popup tab WebView is overlayed inside webViewContainer
+        if (webViewContainer != null && webViewContainer.getChildCount() > 1) {
+            View activePopup = webViewContainer.getChildAt(1);
+            if (activePopup instanceof WebView) {
+                webViewContainer.removeView(activePopup);
+                ((WebView) activePopup).destroy();
+                Log.d(TAG, "Successfully closed authorization tab via onBackPressed");
+            }
+            webView.setVisibility(View.VISIBLE);
+            etUrl.setText(webView.getUrl());
+            Toast.makeText(this, "Closed authorization tab.", Toast.LENGTH_SHORT).show();
+        } else if (webView.canGoBack()) {
             webView.goBack();
         } else {
             super.onBackPressed();

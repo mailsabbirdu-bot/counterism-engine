@@ -133,11 +133,18 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- WebView component -->
-    <WebView
-        android:id="@+id/webView"
+    <!-- Container to support dynamic multi-tab popups cleanly (e.g. Google Drive auth redirects) -->
+    <LinearLayout
+        android:id="@+id/webViewContainer"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <WebView
+            android:id="@+id/webView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </LinearLayout>
 
 </LinearLayout>
