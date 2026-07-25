@@ -56,9 +56,9 @@ public class MainActivity extends AppCompatActivity {
     private ValueCallback<Uri[]> uploadMessage;
 
     // Standard User-Agents
-    private final String DESKTOP_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"; // Standard Chrome on Windows Desktop UA
+    // Chromebook Desktop UA is Chromium-based, bypasses secure login blocks perfectly, and renders all SVG icons beautifully on startup
+    private final String DESKTOP_USER_AGENT = "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
     private final String MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"; // Bypassed UA without "; wv"
-    private final String GOOGLE_AUTH_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"; // macOS Safari UA to bypass secure login blocks
 
     // The automated pipeline python script from colab.md
     private final String COLAB_PYTHON_SCRIPT =
@@ -274,7 +274,7 @@ public class MainActivity extends AppCompatActivity {
         // Crucial: Support multiple windows to capture Google Drive mounts or popups cleanly inside separate temporary tabs
         settings.setSupportMultipleWindows(true);
 
-        // Initial default: Chrome Windows Desktop UA (renders play buttons and icons perfectly)
+        // Initial default: Chromebook Chrome Desktop UA (renders play buttons and icons perfectly, and passes sign-in)
         settings.setUserAgentString(DESKTOP_USER_AGENT);
 
         // Enable cookies and third party cookies
@@ -287,15 +287,8 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                adjustUserAgent(view, url);
                 etUrl.setText(url);
                 return false;
-            }
-
-            @Override
-            public void onPageStarted(WebView view, String url, Bitmap favicon) {
-                super.onPageStarted(view, url, favicon);
-                adjustUserAgent(view, url);
             }
 
             @Override
@@ -364,14 +357,7 @@ public class MainActivity extends AppCompatActivity {
                 newWebView.setWebViewClient(new WebViewClient() {
                     @Override
                     public boolean shouldOverrideUrlLoading(WebView v, String url) {
-                        adjustUserAgent(v, url);
                         return false; // Load OAuth redirect flows inside the secondary tab itself
-                    }
-
-                    @Override
-                    public void onPageStarted(WebView v, String url, Bitmap favicon) {
-                        super.onPageStarted(v, url, favicon);
-                        adjustUserAgent(v, url);
                     }
 
                     @Override
@@ -422,21 +408,6 @@ public class MainActivity extends AppCompatActivity {
 
         // Initial Page load
         webView.loadUrl("https://colab.research.google.com");
-    }
-
-    /**
-     * Dynamically swaps User-Agent to Safari macOS only for accounts.google.com requests
-     * to bypass secure Google WebView blocks, and restores standard Chromium desktop UA elsewhere.
-     */
-    private void adjustUserAgent(WebView view, String url) {
-        if (view == null) return;
-        WebSettings settings = view.getSettings();
-        if (url != null && url.contains("accounts.google.com")) {
-            settings.setUserAgentString(GOOGLE_AUTH_USER_AGENT);
-            Log.d(TAG, "Adjusted User-Agent to GOOGLE_AUTH_USER_AGENT (Safari macOS) for secure sign-in.");
-        } else {
-            settings.setUserAgentString(isDesktopMode ? DESKTOP_USER_AGENT : MOBILE_USER_AGENT);
-        }
     }
 
     private void performSmartPaste() {
