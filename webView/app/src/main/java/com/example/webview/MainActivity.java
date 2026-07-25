@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -55,8 +56,9 @@ public class MainActivity extends AppCompatActivity {
     private ValueCallback<Uri[]> uploadMessage;
 
     // Standard User-Agents
-    private final String DESKTOP_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    private final String DESKTOP_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"; // Standard Chrome on Windows Desktop UA
     private final String MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"; // Bypassed UA without "; wv"
+    private final String GOOGLE_AUTH_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"; // macOS Safari UA to bypass secure login blocks
 
     // The automated pipeline python script from colab.md
     private final String COLAB_PYTHON_SCRIPT =
@@ -209,11 +211,7 @@ public class MainActivity extends AppCompatActivity {
         // Paste clipboard text programmatically into active document element
         btnPasteCode.setOnClickListener(v -> performSmartPaste());
 
-        // Long click on WebView also triggers smart paste as an intuitive fallback
-        webView.setOnLongClickListener(v -> {
-            performSmartPaste();
-            return true;
-        });
+        // Note: webView.setOnLongClickListener is NOT set here to restore Android's native text selection highlighting and standard actions
 
         // Toggle layout user agent mode between Desktop & Mobile view
         btnToggleView.setOnClickListener(v -> {
@@ -223,7 +221,7 @@ public class MainActivity extends AppCompatActivity {
                 settings.setUserAgentString(DESKTOP_USER_AGENT);
                 btnToggleView.setText("🖥️ DESKTOP");
                 btnToggleView.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#673AB7")));
-                Toast.makeText(this, "Switched to Desktop Layout (macOS Safari UA)", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Switched to Desktop Layout (Chrome Desktop UA)", Toast.LENGTH_SHORT).show();
             } else {
                 settings.setUserAgentString(MOBILE_USER_AGENT);
                 btnToggleView.setText("📱 MOBILE");
@@ -276,7 +274,7 @@ public class MainActivity extends AppCompatActivity {
         // Crucial: Support multiple windows to capture Google Drive mounts or popups cleanly inside separate temporary tabs
         settings.setSupportMultipleWindows(true);
 
-        // Use a Macintosh Safari Desktop User-Agent to bypass Google login restrictions in WebViews
+        // Initial default: Chrome Windows Desktop UA (renders play buttons and icons perfectly)
         settings.setUserAgentString(DESKTOP_USER_AGENT);
 
         // Enable cookies and third party cookies
@@ -289,8 +287,15 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                adjustUserAgent(view, url);
                 etUrl.setText(url);
                 return false;
+            }
+
+            @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                adjustUserAgent(view, url);
             }
 
             @Override
@@ -359,7 +364,14 @@ public class MainActivity extends AppCompatActivity {
                 newWebView.setWebViewClient(new WebViewClient() {
                     @Override
                     public boolean shouldOverrideUrlLoading(WebView v, String url) {
+                        adjustUserAgent(v, url);
                         return false; // Load OAuth redirect flows inside the secondary tab itself
+                    }
+
+                    @Override
+                    public void onPageStarted(WebView v, String url, Bitmap favicon) {
+                        super.onPageStarted(v, url, favicon);
+                        adjustUserAgent(v, url);
                     }
 
                     @Override
@@ -410,6 +422,21 @@ public class MainActivity extends AppCompatActivity {
 
         // Initial Page load
         webView.loadUrl("https://colab.research.google.com");
+    }
+
+    /**
+     * Dynamically swaps User-Agent to Safari macOS only for accounts.google.com requests
+     * to bypass secure Google WebView blocks, and restores standard Chromium desktop UA elsewhere.
+     */
+    private void adjustUserAgent(WebView view, String url) {
+        if (view == null) return;
+        WebSettings settings = view.getSettings();
+        if (url != null && url.contains("accounts.google.com")) {
+            settings.setUserAgentString(GOOGLE_AUTH_USER_AGENT);
+            Log.d(TAG, "Adjusted User-Agent to GOOGLE_AUTH_USER_AGENT (Safari macOS) for secure sign-in.");
+        } else {
+            settings.setUserAgentString(isDesktopMode ? DESKTOP_USER_AGENT : MOBILE_USER_AGENT);
+        }
     }
 
     private void performSmartPaste() {
