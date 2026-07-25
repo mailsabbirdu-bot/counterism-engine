@@ -173,17 +173,10 @@ class DataVisualizationGenerator:
                         "background": {"background_type": "procedural", "procedural_config": {"variant": "neon_grid"}},
                         "overlays": [
                             {
-                                "type": "text",
-                                "content": "ঢাকা বাংলাদেশের রাজধানী এবং এটি একটি জনবহুল মেগাসিটি।",
-                                "fontSize": "110px",
-                                "position": {"x": 960, "y": 320},
-                                "zIndex": 60
-                            },
-                            {
                                 "type": "indicator",
                                 "indicator_type": "kpiNumber",
-                                "label": "ঢাকার মোট জনসংখ্যা",
-                                "value": "২,২৪,০০,০০০+",
+                                "label": "ঘনবসতি র্যাংক",
+                                "value": "#১",
                                 "position": {"x": 1370, "y": 760},
                                 "zIndex": 50
                             }
@@ -195,16 +188,10 @@ class DataVisualizationGenerator:
                         "background": {"background_type": "procedural", "procedural_config": {"variant": "neon_grid"}},
                         "overlays": [
                             {
-                                "type": "text",
-                                "content": "১৯৭১ সালের ২৬ মার্চ প্রথম প্রহরে বঙ্গবন্ধু শেখ মুজিবুর রহমান স্বাধীনতা ঘোষণা করেন।",
-                                "fontSize": "100px",
-                                "position": {"x": 960, "y": 320},
-                                "zIndex": 60
-                            },
-                            {
                                 "type": "indicator",
-                                "indicator_type": "milestoneTracker",
-                                "label": "স্বাধীনতার ঐতিহাসিক মাইলফলক",
+                                "indicator_type": "percentageCounter",
+                                "label": "শহরায়ণ বৃদ্ধি",
+                                "value": "৯৫",
                                 "position": {"x": 1370, "y": 760},
                                 "zIndex": 50
                             }
@@ -218,19 +205,22 @@ class DataVisualizationGenerator:
         """Formulates the extensive guideline-driven Gemini prompt."""
         prompt = (
             "You are a professional Creative Director specializing in ultra-modern, minimalistic, and high-end video graphics production.\n"
-            "Your task is to design a visual animation schema using Bklit UI components matching the provided story text.\n\n"
+            "Your task is to design a visual animation schema using ONLY Bklit UI components matching the provided story text.\n\n"
             "--- STORY DESCRIPTION ---\n"
             f"{story}\n\n"
-            "--- MINIMALISTIC & MODERN DESIGN PRINCIPLES ---\n"
-            "1. NO OVERCROWDING: Ensure the screen feels incredibly spacious and high-end. Keep a cinematic negative space.\n"
-            "2. TEXT & VISUAL CO-EXISTENCE: Most overlays will be text narration layers. The Bklit UI visual components should function as secondary supportive visual anchors, OR occasionally serve as the primary visual focus of a scene, OR be completely absent if the narration is purely personal or dramatic. Let the narration text drive this decision!\n"
-            "3. BKLIT UI COMPONENT TYPES:\n"
-            "   - INDICATORS (kpiNumber, percentageCounter, deltaIndicator, milestoneTracker, statGrid, ringChart, stepIndicator)\n"
+            "--- STRICT DESIGN & COMPONENT RULES (MUST OBEY) ---\n"
+            "1. NO TEXT LAYERS ALLOWED: Do not generate any overlays of type 'text'. There must be absolutely ZERO text narrative overlays.\n"
+            "2. CLEAN & COGNITIVE VISUALIZATION VALUES:\n"
+            "   - PERCENTAGE INDICATORS: Indicator types like 'percentageCounter', 'activity_ring', 'circularProgress', 'semiGauge', 'ringChart', and 'metricRing' must receive clean numbers as their 'value' (e.g. '৯৫' or 95). DO NOT include '%', 'percent', or qualitative words in their 'value' because the React engine renders the percent suffix automatically. Double percent signs (e.g. '৯৫%%') or text in circular progress triggers rendering errors.\n"
+            "   - TEXT STATUSES: If you want to display qualitative text words (such as 'আশঙ্কাজনক', 'CRITICAL', 'তীব্র', 'ONLINE', 'ACTIVE'), you MUST use 'statusBadge' or 'tech_badge' indicator types. NEVER use qualitative strings like 'CRITICAL' or 'High' in progress rings, speedometers, charts, or progress bars which expect numeric values.\n"
+            "3. NO OVERCROWDING: Ensure the screen feels incredibly spacious and high-end. Keep a cinematic negative space. Limit visual overlays to 1-2 per scene.\n"
+            "4. BKLIT UI COMPONENT TYPES:\n"
+            "   - INDICATORS (kpiNumber, percentageCounter, deltaIndicator, milestoneTracker, statGrid, ringChart, stepIndicator, statusBadge, tech_badge)\n"
             "   - CHARTS (glass_area, neon_bar, step_area, pie_donut_glass)\n"
-            "   - OTHER (timeline, milestoneTimeline, statusBadge, batteryLevel)\n"
-            "4. HIGH-FIDELITY INJECTIONS: If the scene is in Bangla, use exquisite Bangla labeling and numeric formatting for KPIs/Indicators (e.g., '২,২৪,০০,০০০+', '৯৫%', '২৬ মার্চ ১৯৭১').\n"
-            "5. TYPOGRAPHY RULES: Bangla text layers must set 'font': 'Sohid_bangla'. English/mixed layers must set 'font': 'Audiowide-Regular_english'.\n"
-            "6. TIMING & SEQUENCING: Stagger the entry of layers (e.g. text starts at frame 15, visual indicator follows 45 frames later) to create a premium, fluid viewing experience.\n\n"
+            "   - OTHER (timeline, milestoneTimeline, batteryLevel)\n"
+            "5. HIGH-FIDELITY INJECTIONS: If the scene is in Bangla, use exquisite Bangla labeling and numeric formatting for KPIs/Indicators (e.g., '২,২৪,০০,০০০+', '৯৫', '২৬ মার্চ ১৯৭১').\n"
+            "6. TYPOGRAPHY RULES: All components must set 'font': 'Sohid_bangla' if they have Bangla labels, or 'Audiowide-Regular_english' for English.\n"
+            "7. TIMING & SEQUENCING: Stagger the entry of layers to create a premium, fluid viewing experience.\n\n"
             "--- JSON SCHEMA STRUCTURE ---\n"
             "Output your design as a single valid JSON block formatted as follows:\n"
             "{\n"
@@ -246,22 +236,11 @@ class DataVisualizationGenerator:
             "      },\n"
             "      \"overlays\": [\n"
             "        {\n"
-            "          \"id\": \"txt_1_1\",\n"
-            "          \"type\": \"text\",\n"
-            "          \"content\": \"Scene Text Content Here\",\n"
-            "          \"fontSize\": \"110px\",\n"
-            "          \"position\": { \"x\": 960, \"y\": 320 },\n"
-            "          \"start\": 15,\n"
-            "          \"duration\": 250,\n"
-            "          \"zIndex\": 60,\n"
-            "          \"font\": \"Sohid_bangla\"\n"
-            "        },\n"
-            "        {\n"
             "          \"id\": \"ind_1_1\",\n"
             "          \"type\": \"indicator\",\n"
             "          \"indicator_type\": \"kpiNumber\",\n"
             "          \"label\": \"INDICATOR LABEL\",\n"
-            "          \"value\": \"১০০%\",\n"
+            "          \"value\": \"১০০\",\n"
             "          \"position\": { \"x\": 1370, \"y\": 760 },\n"
             "          \"start\": 60,\n"
             "          \"duration\": 210,\n"
@@ -279,6 +258,8 @@ class DataVisualizationGenerator:
     def harden_manifest(self, data: Dict[str, Any], public_dir: str = "../public") -> Dict[str, Any]:
         """
         Applies meticulous, line-by-line hardening to the manifest:
+        - Drops any overlays of type 'text' to strictly prevent narrative text overlays.
+        - Sanitizes values to ensure percent meters only have pure numbers and text is converted to badge types.
         - Harmonizes timing and stagger entries.
         - Resolves spatial collisions and clamps layout to secure broadcast margins.
         - Directs typography rules to valid registered fonts (Bangla / English).
@@ -318,6 +299,11 @@ class DataVisualizationGenerator:
             for ov_idx, ov in enumerate(overlays):
                 o_type = str(ov.get('type', 'text')).lower()
 
+                # STRICTION 1: Bulletproof drop of any 'text' overlays
+                if o_type == 'text':
+                    print(f"   🗑️ Dropped text layer '{ov.get('id')}' to preserve visualization-only focus.")
+                    continue
+
                 # Normalize types to registry
                 if o_type == 'kpi' or o_type == 'counter':
                     ov['type'] = 'indicator'
@@ -331,14 +317,34 @@ class DataVisualizationGenerator:
                 if not ov.get('id'):
                     ov['id'] = f"ov_{scene_idx+1}_{ov_idx+1}"
 
+                # STRICTION 2: Cognitive Visual Value Cleansing
+                var = ov.get('indicator_type') or ov.get('chart_type')
+
+                # Check indicator values for non-sense format
+                val = str(ov.get('value', '')).strip()
+
+                # Clean percentage double signs
+                if var in ['percentageCounter', 'activity_ring', 'circularProgress', 'semiGauge', 'ringChart', 'metricRing']:
+                    # Remove % signs to prevent double percentage signs
+                    if '%' in val:
+                        val = val.replace('%', '').strip()
+                        ov['value'] = val
+                        print(f"   🔧 Cleansed percentage metric '{ov['id']}': {val}% -> {val}")
+
+                    # If value is non-numeric text like "CRITICAL", convert to a safe badge type or replace with 85
+                    has_letters = any(c.isalpha() for c in val)
+                    if has_letters or val.lower() in ['critical', 'risk', 'high', 'alarm']:
+                        # Automatically mutate to status badge to render beautifully
+                        ov['indicator_type'] = 'statusBadge'
+                        var = 'statusBadge'
+                        print(f"   🔧 Mutated numeric '{ov['id']}' with non-numeric value '{val}' to 'statusBadge'")
+
                 # Typography Hardening
                 content = str(ov.get('content', ov.get('label', ''))).strip()
                 is_bn = any('\u0980' <= c <= '\u09FF' for c in content)
 
                 if is_bn:
                     ov['font'] = "Sohid_bangla"
-                    if o_type == 'text':
-                        ov['splitMode'] = 'word'
                 else:
                     ov['font'] = "Audiowide-Regular_english"
 
@@ -353,7 +359,7 @@ class DataVisualizationGenerator:
 
                 ov['start'] = start
                 ov['duration'] = duration
-                ov['zIndex'] = 60 if o_type == 'text' else 50
+                ov['zIndex'] = 50
 
                 # Spatial Clamping & Safe Region Shift (Avoid 960, 540 or 960, 700 to pass QA Center check!)
                 pos = ov.get('position', {})
@@ -382,7 +388,6 @@ class DataVisualizationGenerator:
                 ov['position'] = {"x": ax, "y": ay}
 
                 # High-fidelity data injection based on the visual indicator type
-                var = ov.get('indicator_type') or ov.get('chart_type')
                 if var == 'milestoneTracker' or var == 'milestoneTimeline':
                     if scene_idx == 0:
                         ov['milestones'] = [
@@ -496,11 +501,6 @@ def main():
                     "duration_in_frames": 300,
                     "overlays": [
                         {
-                            "type": "text",
-                            "content": "ঢাকা বাংলাদেশের রাজধানী এবং এটি একটি জনবহুল মেগাসিটি। অতিরিক্ত জনঘনত্বের কারণে ঢাকার জ্যাম তীব্র রূপ ধারণ করেছে।",
-                            "position": {"x": 960, "y": 320}
-                        },
-                        {
                             "type": "indicator",
                             "indicator_type": "statGrid",
                             "label": "পরিসংখ্যান চিত্র"
@@ -511,11 +511,6 @@ def main():
                     "scene_id": "SCENE_2",
                     "duration_in_frames": 300,
                     "overlays": [
-                        {
-                            "type": "text",
-                            "content": "১৯৭১ সালের ২৬ মার্চ প্রথম প্রহরে বঙ্গবন্ধু শেখ মুজিবুর রহমান বাংলাদেশের স্বাধীনতা ঘোষণা করেন।",
-                            "position": {"x": 960, "y": 320}
-                        },
                         {
                             "type": "indicator",
                             "indicator_type": "milestoneTracker",
