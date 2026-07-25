@@ -20,15 +20,8 @@ def print_banner(text):
 
 # 1. Mount Google Drive
 print_banner("📂 MOUNTING GOOGLE DRIVE")
-if not os.path.exists('/content/drive'):
-    try:
-        from google.colab import drive
-        drive.mount('/content/drive')
-    except Exception as e:
-        print("⚠️ Standard mount failed: ", e)
-        print("💡 TIP: Please click the folder icon on the left panel of Colab and click the 'Mount Drive' button to mount your Drive instantly and securely in your WebView!")
-else:
-    print("✅ Google Drive is already mounted and ready!")
+from google.colab import drive
+drive.mount('/content/drive')
 
 # 2. Setup Project Environment
 PROJECT_NAME = "counterism-engine"
