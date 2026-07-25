@@ -55,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
     private ValueCallback<Uri[]> uploadMessage;
 
     // Standard User-Agents
-    private final String DESKTOP_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15";
+    private final String DESKTOP_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
     private final String MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"; // Bypassed UA without "; wv"
 
     // The automated pipeline python script from colab.md
@@ -425,16 +425,48 @@ public class MainActivity extends AppCompatActivity {
                                              .replace("\n", "\\n")
                                              .replace("\r", "");
 
-                // universal command to insert text at the active cursor position in WebViews (works in Monaco / Colab cells)
-                String jsPaste = "try {" +
-                        "  if (document.activeElement) {" +
-                        "    document.execCommand('insertText', false, '" + escapedText + "');" +
+                // Traverse shadow roots and nested iframes to find deep active element, then execute insertText on its iframe document or use input value simulation fallback
+                String jsPaste = "(function() {" +
+                        "try {" +
+                        "  function getDeepActive() {" +
+                        "    let el = document.activeElement;" +
+                        "    while (el && el.shadowRoot && el.shadowRoot.activeElement) {" +
+                        "      el = el.shadowRoot.activeElement;" +
+                        "    }" +
+                        "    while (el && el.contentDocument && el.contentDocument.activeElement) {" +
+                        "      el = el.contentDocument.activeElement;" +
+                        "      while (el && el.shadowRoot && el.shadowRoot.activeElement) {" +
+                        "        el = el.shadowRoot.activeElement;" +
+                        "      }" +
+                        "    }" +
+                        "    return el;" +
                         "  }" +
-                        "} catch(e) {}";
+                        "  let active = getDeepActive();" +
+                        "  if (active) {" +
+                        "    active.focus();" +
+                        "    let doc = active.ownerDocument || document;" +
+                        "    let success = doc.execCommand('insertText', false, '" + escapedText + "');" +
+                        "    if (!success && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {" +
+                        "      let start = active.selectionStart || 0;" +
+                        "      let end = active.selectionEnd || 0;" +
+                        "      let val = active.value || '';" +
+                        "      active.value = val.substring(0, start) + '" + escapedText + "' + val.substring(end);" +
+                        "      active.setSelectionRange(start + '" + escapedText + "'.length, start + '" + escapedText + "'.length);" +
+                        "      let evt = new Event('input', { bubbles: true });" +
+                        "      active.dispatchEvent(evt);" +
+                        "    }" +
+                        "    return 'success';" +
+                        "  }" +
+                        "} catch(e) {" +
+                        "  return e.toString();" +
+                        "}" +
+                        "return 'none';" +
+                        "})()";
 
-                webView.evaluateJavascript(jsPaste, value ->
-                    Toast.makeText(MainActivity.this, "Injected clipboard code into editor cursor position!", Toast.LENGTH_SHORT).show()
-                );
+                webView.evaluateJavascript(jsPaste, value -> {
+                    Toast.makeText(MainActivity.this, "Pasted text successfully into focused cell or terminal!", Toast.LENGTH_SHORT).show();
+                    Log.d(TAG, "Deep smart paste evaluation result: " + value);
+                });
             } else {
                 Toast.makeText(this, "Clipboard is empty or does not contain text.", Toast.LENGTH_SHORT).show();
             }
