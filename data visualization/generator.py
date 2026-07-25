@@ -210,10 +210,11 @@ class DataVisualizationGenerator:
             f"{story}\n\n"
             "--- STRICT DESIGN & COMPONENT RULES (MUST OBEY) ---\n"
             "1. NO TEXT LAYERS ALLOWED: Do not generate any overlays of type 'text'. There must be absolutely ZERO text narrative overlays.\n"
-            "2. CLEAN & COGNITIVE VISUALIZATION VALUES:\n"
+            "2. EXACTLY ONE VISUAL OVERLAY PER SCENE: Each scene must contain EXACTLY ONE visual overlay (no more, no less). You must pick only the single most relevant Bklit UI indicator/KPI to visualize the entire main topic of that scene.\n"
+            "3. CLEAN & COGNITIVE VISUALIZATION VALUES:\n"
             "   - PERCENTAGE INDICATORS: Indicator types like 'percentageCounter', 'activity_ring', 'circularProgress', 'semiGauge', 'ringChart', and 'metricRing' must receive clean numbers as their 'value' (e.g. '৯৫' or 95). DO NOT include '%', 'percent', or qualitative words in their 'value' because the React engine renders the percent suffix automatically. Double percent signs (e.g. '৯৫%%') or text in circular progress triggers rendering errors.\n"
             "   - TEXT STATUSES: If you want to display qualitative text words (such as 'আশঙ্কাজনক', 'CRITICAL', 'তীব্র', 'ONLINE', 'ACTIVE'), you MUST use 'statusBadge' or 'tech_badge' indicator types. NEVER use qualitative strings like 'CRITICAL' or 'High' in progress rings, speedometers, charts, or progress bars which expect numeric values.\n"
-            "3. NO OVERCROWDING: Ensure the screen feels incredibly spacious and high-end. Keep a cinematic negative space. Limit visual overlays to 1-2 per scene.\n"
+            "   - 'statusBadge' TEXT REQUISITE: If you choose 'statusBadge', the text to render MUST be assigned to the 'status' field (e.g. 'status': 'আশঙ্কাজনক'), in addition to 'value'.\n"
             "4. BKLIT UI COMPONENT TYPES:\n"
             "   - INDICATORS (kpiNumber, percentageCounter, deltaIndicator, milestoneTracker, statGrid, ringChart, stepIndicator, statusBadge, tech_badge)\n"
             "   - CHARTS (glass_area, neon_bar, step_area, pie_donut_glass)\n"
@@ -259,7 +260,9 @@ class DataVisualizationGenerator:
         """
         Applies meticulous, line-by-line hardening to the manifest:
         - Drops any overlays of type 'text' to strictly prevent narrative text overlays.
+        - Enforces exactly ONE visual overlay per scene.
         - Sanitizes values to ensure percent meters only have pure numbers and text is converted to badge types.
+        - Synchronizes 'status' and 'value' fields for status badges to prevent 'SYSTEM ONLINE' default.
         - Harmonizes timing and stagger entries.
         - Resolves spatial collisions and clamps layout to secure broadcast margins.
         - Directs typography rules to valid registered fonts (Bangla / English).
@@ -313,6 +316,10 @@ class DataVisualizationGenerator:
                     ov['type'] = 'shadcn_indicator'
                     o_type = 'shadcn_indicator'
 
+                # Map tech_badge directly to statusBadge inside indicator for sleek and stable rendering
+                if o_type == 'indicator' and ov.get('indicator_type') == 'tech_badge':
+                    ov['indicator_type'] = 'statusBadge'
+
                 ov['type'] = o_type
 
                 if not ov.get('id'):
@@ -335,13 +342,19 @@ class DataVisualizationGenerator:
                         val = val.replace('+', '').strip()
                         ov['value'] = val
 
-                    # If value is non-numeric text like "সংকট আসন্ন" or "CRITICAL", convert to a safe badge type or replace with 85
+                    # If value is non-numeric text like "সংকট আসন্ন" or "CRITICAL", convert to a safe badge type
                     has_letters = any(c.isalpha() for c in val) or any('\u0980' <= c <= '\u09FF' for c in val)
                     if has_letters or val.lower() in ['critical', 'risk', 'high', 'alarm', 'সংকট আসন্ন', 'আশঙ্কাজনক']:
                         # Automatically mutate to status badge to render beautifully
                         ov['indicator_type'] = 'statusBadge'
                         var = 'statusBadge'
                         print(f"   🔧 Mutated numeric '{ov['id']}' with non-numeric value '{val}' to 'statusBadge'")
+
+                # CRITICAL: Synchronize status for StatusBadge to prevent 'SYSTEM ONLINE' blinking fallback!
+                if var == 'statusBadge':
+                    # Always copy the qualitative text value to the status field
+                    ov['status'] = val
+                    print(f"   🔧 Mapped qualitative status field for statusBadge '{ov['id']}': '{val}'")
 
                 # Typography Hardening
                 content = str(ov.get('content', ov.get('label', ''))).strip()
@@ -423,6 +436,12 @@ class DataVisualizationGenerator:
                         ov['steps'] = ["ছয় দফা আন্দোলন", "৭০-এর সাধারণ নির্বাচন", "স্বাধীনতার ঘোষণা"] if is_bn else ["Six Point Demand", "General Election", "Independence Declaration"]
 
                 valid_overlays.append(ov)
+
+            # STRICTION 3: Each scene can have only ONE visual element overlay!
+            # Keep only the primary visual overlay to make the presentation clean, elegant and minimalistic.
+            if len(valid_overlays) > 1:
+                print(f"   🧹 Trimming overlays from {len(valid_overlays)} to EXACTLY ONE per scene.")
+                valid_overlays = valid_overlays[:1]
 
             scene['overlays'] = valid_overlays
 
