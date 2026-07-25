@@ -56,8 +56,8 @@ public class MainActivity extends AppCompatActivity {
     private ValueCallback<Uri[]> uploadMessage;
 
     // Standard User-Agents
-    // Chromebook Desktop UA is Chromium-based, bypasses secure login blocks perfectly, and renders all SVG icons beautifully on startup
-    private final String DESKTOP_USER_AGENT = "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    // Firefox Desktop UA is Gecko-based, bypasses secure login blocks perfectly, and renders all SVG icons beautifully on startup
+    private final String DESKTOP_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0";
     private final String MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"; // Bypassed UA without "; wv"
 
     // The automated pipeline python script from colab.md
