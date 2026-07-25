@@ -88,7 +88,7 @@
                 android:textColor="#FFFFFF" />
         </LinearLayout>
 
-        <!-- Quick copy colab.md content script -->
+        <!-- Quick actions layout: Copy, Paste, and View Toggle -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -98,21 +98,38 @@
 
             <Button
                 android:id="@+id/btnCopyColabCode"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="📋 COPY COLAB.MD PYTHON CODE"
-                android:textSize="11sp"
-                android:backgroundTint="#FF9800"
-                android:textColor="#FFFFFF" />
-
-            <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                android:text="Sync Google Drive &amp; run the automation code seamlessly!"
+                android:layout_weight="1.1"
+                android:text="📋 COPY CODE"
                 android:textSize="10sp"
-                android:textColor="#666666" />
+                android:backgroundTint="#FF9800"
+                android:textColor="#FFFFFF"
+                android:padding="4dp" />
+
+            <Button
+                android:id="@+id/btnPasteCode"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.1"
+                android:layout_marginStart="4dp"
+                android:text="📥 PASTE CODE"
+                android:textSize="10sp"
+                android:backgroundTint="#009688"
+                android:textColor="#FFFFFF"
+                android:padding="4dp" />
+
+            <Button
+                android:id="@+id/btnToggleView"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.2"
+                android:layout_marginStart="4dp"
+                android:text="🖥️ TOGGLE VIEW"
+                android:textSize="10sp"
+                android:backgroundTint="#673AB7"
+                android:textColor="#FFFFFF"
+                android:padding="4dp" />
         </LinearLayout>
     </LinearLayout>
 
