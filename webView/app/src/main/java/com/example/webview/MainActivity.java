@@ -72,8 +72,15 @@ public class MainActivity extends AppCompatActivity {
         "    print(\"=\"*80)\n\n" +
         "# 1. Mount Google Drive\n" +
         "print_banner(\"📂 MOUNTING GOOGLE DRIVE\")\n" +
-        "from google.colab import drive\n" +
-        "drive.mount('/content/drive')\n\n" +
+        "if not os.path.exists('/content/drive'):\n" +
+        "    try:\n" +
+        "        from google.colab import drive\n" +
+        "        drive.mount('/content/drive')\n" +
+        "    except Exception as e:\n" +
+        "        print(\"⚠️ Standard mount failed: \", e)\n" +
+        "        print(\"💡 TIP: Please click the folder icon on the left panel of Colab and click the 'Mount Drive' button to mount your Drive instantly and securely in your WebView!\")\n" +
+        "else:\n" +
+        "    print(\"✅ Google Drive is already mounted and ready!\")\n\n" +
         "# 2. Setup Project Environment\n" +
         "PROJECT_NAME = \"counterism-engine\"\n" +
         "DRIVE_BASE_PATH = \"/content/drive/MyDrive/Counterism_Studio_V4\"\n" +
