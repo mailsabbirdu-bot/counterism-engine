@@ -46,8 +46,8 @@ else:
     print("✅ Engine already cloned.")
 
 %cd {PROJECT_PATH}
-# Fetch and checkout active feature branch containing the loop fixes
-!git fetch origin && git checkout feature/evidence-asyncio-loop-fix || true
+# Fetch and checkout active branch feature/data-visualization-pipeline to ensure latest logic is executed
+!git fetch origin && git checkout feature/data-visualization-pipeline || true
 
 # 4. Locate story.txt
 story_file = None
@@ -73,6 +73,9 @@ else:
 
 # 5. Run the Manual Pipeline Interactive Generator
 print_banner("🧠 DATA VISUALIZATION GENERATOR INTERACTION")
+
+# Install pydantic if missing
+!pip install -q pydantic
 
 # Run the pipeline interactive loops using %run magic to cleanly handle spaces in folder path
 %run "data visualization/generator.py" \

@@ -36,8 +36,8 @@ if not os.path.exists(PROJECT_NAME):
     print(f"🚀 Cloning repository: {REPO_URL}")
     !git clone {REPO_URL}
 %cd {PROJECT_NAME}
-# Fetch and checkout active feature branch containing the threading loop fix
-!git fetch origin && git checkout feature/evidence-asyncio-loop-fix || true
+# Fetch and checkout active branch feature/data-visualization-pipeline to ensure latest logic is executed
+!git fetch origin && git checkout feature/data-visualization-pipeline || true
 
 # --- 3. SYNC ASSETS & MANIFEST ---
 print_banner("📡 SYNCING ASSETS & MANIFEST")

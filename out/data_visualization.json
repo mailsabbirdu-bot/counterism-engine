@@ -68,7 +68,7 @@
       "overlays": [
         {
           "type": "indicator",
-          "indicator_type": "percentageCounter",
+          "indicator_type": "statusBadge",
           "label": "শহরায়ণ বৃদ্ধি",
           "value": "৯৫",
           "position": {
