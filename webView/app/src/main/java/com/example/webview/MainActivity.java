@@ -42,9 +42,16 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvServiceStatus;
     private Button btnToggleService;
     private Button btnCopyColabCode;
+    private Button btnPasteCode;
+    private Button btnToggleView;
 
     private boolean isServiceRunning = false;
+    private boolean isDesktopMode = true; // Default is Desktop Mode for Colab fully active execution
     private ValueCallback<Uri[]> uploadMessage;
+
+    // Standard User-Agents
+    private final String DESKTOP_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15";
+    private final String MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"; // Bypassed UA without "; wv"
 
     // The automated pipeline python script from colab.md
     private final String COLAB_PYTHON_SCRIPT =
@@ -150,6 +157,8 @@ public class MainActivity extends AppCompatActivity {
         tvServiceStatus = findViewById(R.id.tvServiceStatus);
         btnToggleService = findViewById(R.id.btnToggleService);
         btnCopyColabCode = findViewById(R.id.btnCopyColabCode);
+        btnPasteCode = findViewById(R.id.btnPasteCode);
+        btnToggleView = findViewById(R.id.btnToggleView);
 
         ImageButton btnBack = findViewById(R.id.btnBack);
         ImageButton btnForward = findViewById(R.id.btnForward);
@@ -189,6 +198,33 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        // Paste clipboard text programmatically into active document element
+        btnPasteCode.setOnClickListener(v -> performSmartPaste());
+
+        // Long click on WebView also triggers smart paste as an intuitive fallback
+        webView.setOnLongClickListener(v -> {
+            performSmartPaste();
+            return true;
+        });
+
+        // Toggle layout user agent mode between Desktop & Mobile view
+        btnToggleView.setOnClickListener(v -> {
+            isDesktopMode = !isDesktopMode;
+            WebSettings settings = webView.getSettings();
+            if (isDesktopMode) {
+                settings.setUserAgentString(DESKTOP_USER_AGENT);
+                btnToggleView.setText("🖥️ DESKTOP");
+                btnToggleView.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#673AB7")));
+                Toast.makeText(this, "Switched to Desktop Layout (macOS Safari UA)", Toast.LENGTH_SHORT).show();
+            } else {
+                settings.setUserAgentString(MOBILE_USER_AGENT);
+                btnToggleView.setText("📱 MOBILE");
+                btnToggleView.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#E91E63")));
+                Toast.makeText(this, "Switched to Mobile Layout (Android Chrome Bypass UA)", Toast.LENGTH_SHORT).show();
+            }
+            webView.reload();
+        });
+
         // Toggle Foreground Service for persistent run
         btnToggleService.setOnClickListener(v -> {
             if (!isServiceRunning) {
@@ -217,8 +253,7 @@ public class MainActivity extends AppCompatActivity {
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
 
         // Crucial: Use a Macintosh Safari Desktop User-Agent to bypass Google login restrictions in WebViews
-        String desktopUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15";
-        settings.setUserAgentString(desktopUA);
+        settings.setUserAgentString(DESKTOP_USER_AGENT);
 
         // Enable cookies and third party cookies
         CookieManager cookieManager = CookieManager.getInstance();
@@ -273,6 +308,37 @@ public class MainActivity extends AppCompatActivity {
 
         // Initial Page load
         webView.loadUrl("https://colab.research.google.com");
+    }
+
+    private void performSmartPaste() {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard != null && clipboard.hasPrimaryClip()) {
+            ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
+            CharSequence textChar = item.getText();
+            if (textChar != null) {
+                String rawText = textChar.toString();
+                // Safely escape backslashes, single quotes, and newlines for Javascript evaluation
+                String escapedText = rawText.replace("\\", "\\\\")
+                                             .replace("'", "\\'")
+                                             .replace("\n", "\\n")
+                                             .replace("\r", "");
+
+                // universal command to insert text at the active cursor position in WebViews (works in Monaco / Colab cells)
+                String jsPaste = "try {" +
+                        "  if (document.activeElement) {" +
+                        "    document.execCommand('insertText', false, '" + escapedText + "');" +
+                        "  }" +
+                        "} catch(e) {}";
+
+                webView.evaluateJavascript(jsPaste, value ->
+                    Toast.makeText(MainActivity.this, "Injected clipboard code into editor cursor position!", Toast.LENGTH_SHORT).show()
+                );
+            } else {
+                Toast.makeText(this, "Clipboard is empty or does not contain text.", Toast.LENGTH_SHORT).show();
+            }
+        } else {
+            Toast.makeText(this, "No text found on clipboard.", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void checkNotificationPermissionAndStartService() {
