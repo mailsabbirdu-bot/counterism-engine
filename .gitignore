@@ -6,3 +6,8 @@ dist
 build
 __pycache__
 *.pyc
+
+# Android WebView App Gradle files
+webView/.gradle/
+webView/app/build/
+webView/.idea/
