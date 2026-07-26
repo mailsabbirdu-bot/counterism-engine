@@ -1,0 +1,61 @@
+{
+  "project_id": "data_visualization_project",
+  "global_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "scenes": [
+    {
+      "scene_id": "SCENE_2",
+      "duration_in_frames": 300,
+      "background": {
+        "background_type": "procedural",
+        "procedural_config": {
+          "variant": "neon_grid"
+        }
+      },
+      "overlays": [
+        {
+          "type": "indicator",
+          "indicator_type": "statusBadge",
+          "label": "শহরায়ণ বৃদ্ধি",
+          "value": "৯৫",
+          "position": {
+            "x": 1370,
+            "y": 730
+          },
+          "zIndex": 50,
+          "id": "ov_2_1",
+          "status": "৯৫",
+          "font": "Sohid_bangla",
+          "start": 15,
+          "duration": 255
+        }
+      ],
+      "transition": {
+        "type": "cinematicMatchCut",
+        "duration": 15
+      },
+      "beats": [
+        {
+          "frame": 15,
+          "event": "ov_2_1_reveal"
+        }
+      ],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "ov_2_1",
+            "startFrame": 0,
+            "duration": 150,
+            "style": "slow_push",
+            "zoom": 1.1,
+            "ease": "cubicOut"
+          }
+        ]
+      }
+    }
+  ]
+}
