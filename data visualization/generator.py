@@ -105,44 +105,45 @@ class DataVisualizationGenerator:
             self.story_scenes["SCENE_01"] = story_content
 
     @staticmethod
-    def has_important_numerical_data(text: str) -> bool:
+    def extract_all_numbers(text: str) -> List[str]:
         """
-        Detects if scene text has important numerical data.
-        Trivial grammatical counters/indefinite articles like "একটি", "একটা", "একই", "একজন", "এক" are ignored.
+        Extracts all candidate numerical statistics/values from narration.
+        Handles English/Bangla digits and crore/lakh/thousand/etc compound strings.
         """
         if not text:
-            return False
+            return []
+        text = re.sub(r'\s+', ' ', text)
 
-        # Clean trivial Bengali articles
-        text_to_check = text
-        for trivial in ["একটি", "একটা", "একই", "একজন", "এক"]:
-            text_to_check = re.sub(rf'\b{trivial}\b', '', text_to_check)
-            text_to_check = text_to_check.replace(trivial, "")
+        # Match pattern of digits and optional multipliers, e.g. "২ কোটি ৩০ লাখ", "১৮ লাখ", "৬ হাজার", "৩০৬", "৭"
+        pattern = r'[0-9০-৯]+\s*(?:কোটি|লাখ|হাজার|শত)?(?:\s*[0-9০-৯]+\s*(?:কোটি|লাখ|হাজার|শত)?)?'
+        matches = re.findall(pattern, text)
 
-        # Check for multi-digit Bengali or English digits (e.g. "২৬", "১৯৭১", "১২", "১০০")
-        if re.search(r'[0-9০-৯]{2,}', text_to_check):
-            return True
+        cleaned = []
+        for m in matches:
+            m = m.strip()
+            if not m:
+                continue
+            # Ignore trivial single articles/counters
+            if m in ["একটি", "একটা", "একই", "একজন", "এক", "1", "১"]:
+                continue
+            cleaned.append(m)
+        return cleaned
 
-        # Check for non-1 Bengali or English single digits (e.g. "২", "৩", "9")
-        if re.search(r'[2-9২-৯]', text_to_check):
-            return True
+    @staticmethod
+    def normalize_number(num_str: str) -> str:
+        """Normalizes numerical value to allow accurate matching and cross-scene deduplication."""
+        digits_map = {'০':'0', '১':'1', '২':'2', '৩':'3', '৪':'4', '৫':'5', '৬':'6', '৭':'7', '৮':'8', '৯':'9'}
+        normalized = "".join(digits_map.get(c, c) for c in num_str)
+        normalized = normalized.lower().strip()
+        normalized = re.sub(r'\s+', '', normalized)
+        for suffix in ["বর্গকিলোমিটার", "কিলোমিটার", "টন", "মানুষ", "যানবাহন", "টি", "টা", "sqkm", "km", "tons"]:
+            normalized = normalized.replace(suffix, "")
+        return normalized
 
-        # Check for important numeric indicators/words
-        indicators = [
-            "কোটি", "লক্ষ", "হাজার", "শত", "শতাংশ", "পার্সেন্ট", "%", "ডলার", "টাকা",
-            "মিলিয়ন", "বিলিয়ন", "ক্রোর", "percent", "million", "billion", "thousand",
-            "double", "দ্বিগুণ", "তিনগুণ", "শতকরা"
-        ]
-        for ind in indicators:
-            if ind in text_to_check:
-                return True
-
-        # Handle standalone "১" or "1" if it has safe units indicating importance
-        if re.search(r'[1১]', text_to_check):
-            if any(suffix in text_to_check for suffix in ["১ম", "1st", "১ নম্বর", "১ নং", "১টি", "1টি"]):
-                return True
-
-        return False
+    @classmethod
+    def has_important_numerical_data(cls, text: str) -> bool:
+        """Checks if there is important numerical data in the text (excluding trivial articles)."""
+        return len(cls.extract_all_numbers(text)) > 0
 
     def _interact_with_gemini(self, prompt: str, score: int = 100) -> str:
         """Launches copy-paste interactive UI in Colab or terminal fallback."""
@@ -251,19 +252,20 @@ class DataVisualizationGenerator:
             "--- STRICT DESIGN & COMPONENT RULES (MUST OBEY) ---\n"
             "1. NO TEXT LAYERS ALLOWED: Do NOT generate any overlays of type 'text'. There must be absolutely ZERO text narrative overlays. The scene must ONLY visualize numerical data.\n"
             "2. EXACTLY ONE VISUAL OVERLAY PER SCENE: Each scene must contain EXACTLY ONE visual overlay (no more, no less). You must pick only the single most relevant Bklit UI indicator/KPI/chart to visualize the entire main numerical topic of that scene. A minimalistic approach is mandatory.\n"
-            "3. ONLY VISUALIZE IMPORTANT NUMERICAL DATA: Trivial numerical words or grammatical articles/counters (like 'একটি', 'একটা', 'এক', 'one', 'a') must be completely ignored. Do NOT display or visualize them. Only display important numerical data such as years (e.g., '১৯৭১'), percentages (e.g., '৯৫'), specific counts, or stats.\n"
-            "4. SKIP SCENES WITH NO IMPORTANT NUMERICAL DATA: If a scene narration has no important numerical data (excluding trivial articles/counters like 'একটি'), you MUST completely skip that scene. Do not include it in the JSON at all.\n"
-            "5. CLEAN & COGNITIVE VISUALIZATION VALUES:\n"
+            "3. STRICT NUMERICAL MATCHING: The numerical 'value' parameter in the JSON overlay MUST match the exact numerical value mentioned in that scene's narration text in the story (e.g. if the story says '৩০৬', the JSON 'value' must be '৩০৬'). No hallucinations or mismatched digits are allowed!\n"
+            "4. NO REPEATED DATA: Never visualize the same numerical metric or data point twice across different scenes. If a metric/data point has already been visualized in an earlier scene, ignore it and visualize a different fresh numerical statistic, or omit/skip the scene if it contains only repeated data.\n"
+            "5. SKIP SCENES WITH NO NEW IMPORTANT NUMERICAL DATA: If a scene narration has no important numerical data (excluding trivial articles/counters like 'একটি', 'একটা', 'এক'), or has ONLY repeated data already visualized in previous scenes, you MUST completely skip that scene. Do not include it in the JSON at all.\n"
+            "6. CLEAN & COGNITIVE VISUALIZATION VALUES:\n"
             "   - PERCENTAGE INDICATORS: Indicator types like 'percentageCounter', 'activity_ring', 'circularProgress', 'semiGauge', 'ringChart', and 'metricRing' must receive clean numbers as their 'value' (e.g. '৯৫' or 95). DO NOT include '%', 'percent', or qualitative words in their 'value' because the React engine renders the percent suffix automatically. Double percent signs (e.g. '৯৫%%') or text in circular progress triggers rendering errors.\n"
             "   - TEXT STATUSES: If you want to display qualitative text words (such as 'আশঙ্কাজনক', 'CRITICAL', 'তীব্র', 'ONLINE', 'ACTIVE'), you MUST use 'statusBadge' or 'tech_badge' indicator types. NEVER use qualitative strings like 'CRITICAL' or 'High' in progress rings, speedometers, charts, or progress bars which expect numeric values.\n"
             "   - 'statusBadge' TEXT REQUISITE: If you choose 'statusBadge', the text to render MUST be assigned to the 'status' field (e.g. 'status': 'আশঙ্কাজনক'), in addition to 'value'.\n"
-            "6. BKLIT UI COMPONENT TYPES:\n"
+            "7. BKLIT UI COMPONENT TYPES:\n"
             "   - INDICATORS (kpiNumber, percentageCounter, deltaIndicator, milestoneTracker, statGrid, ringChart, stepIndicator, statusBadge, tech_badge)\n"
             "   - CHARTS (glass_area, neon_bar, step_area, pie_donut_glass)\n"
             "   - OTHER (timeline, milestoneTimeline, batteryLevel)\n"
-            "7. HIGH-FIDELITY INJECTIONS: If the scene is in Bangla, use exquisite Bangla labeling and numeric formatting for KPIs/Indicators (e.g., '২,২৪,০০,০০০+', '৯৫', '২৬ মার্চ ১৯৭১').\n"
-            "8. TYPOGRAPHY RULES: All components must set 'font': 'Sohid_bangla' if they have Bangla labels, or 'Audiowide-Regular_english' for English.\n"
-            "9. TIMING & SEQUENCING: Stagger the entry of layers to create a premium, fluid viewing experience.\n\n"
+            "8. HIGH-FIDELITY INJECTIONS: If the scene is in Bangla, use exquisite Bangla labeling and numeric formatting for KPIs/Indicators (e.g., '২,২৪,০০,০০০+', '৯৫', '২৬ মার্চ ১৯৭১').\n"
+            "9. TYPOGRAPHY RULES: All components must set 'font': 'Sohid_bangla' if they have Bangla labels, or 'Audiowide-Regular_english' for English.\n"
+            "10. TIMING & SEQUENCING: Stagger the entry of layers to create a premium, fluid viewing experience.\n\n"
             "--- JSON SCHEMA STRUCTURE ---\n"
             "Output your design as a single valid JSON block formatted as follows:\n"
             "{\n"
@@ -310,7 +312,7 @@ class DataVisualizationGenerator:
         - Directs typography rules to valid registered fonts (Bangla / English).
         - Automatically populates rich data templates based on story content.
         - Implements beautiful camera motion presets.
-        - Drops scenes that do not contain important numerical data in their story narration.
+        - Runs post-Gemini evaluation to strictly align numerical values with story narration and deduplicate them.
         """
         if not data or 'scenes' not in data:
             return data
@@ -318,12 +320,13 @@ class DataVisualizationGenerator:
         print("🛡️ Applying elite hardening pipeline to JSON schema...")
 
         hardened_scenes = []
+        visualized_numbers = set()
 
         for scene_idx, scene in enumerate(data['scenes']):
             s_id = scene.get('scene_id', f"SCENE_{scene_idx+1}")
             scene['scene_id'] = s_id
 
-            # Locate the original story narration text to run programmatic skip filtering
+            # Locate the original story narration text to run programmatic evaluation and filtering
             narration = self.story_scenes.get(s_id, "")
             if not narration:
                 match = re.search(r'\d+', s_id)
@@ -334,9 +337,19 @@ class DataVisualizationGenerator:
                             narration = self.story_scenes[k]
                             break
 
-            # If we have original scene narration, filter strictly:
-            if narration and not self.has_important_numerical_data(narration):
-                print(f"   🚫 Skipped scene '{s_id}' because narration has no important numerical data: '{narration.strip()}'")
+            if not narration:
+                # Fallback check if we can't find narration text at all
+                print(f"   ⚠️ Narration text for scene '{s_id}' not found. Skipping evaluation.")
+                hardened_scenes.append(scene)
+                continue
+
+            # 1. Post-Gemini Evaluation: Extract candidate stats and filter out already-visualized numbers
+            candidates = self.extract_all_numbers(narration)
+            fresh_candidates = [c for c in candidates if self.normalize_number(c) not in visualized_numbers]
+
+            # If no new, unrepeated numerical data in narration, completely skip this scene!
+            if not fresh_candidates:
+                print(f"   🚫 Skipped scene '{s_id}' because it has no new important numerical data (all repeated/none): '{narration.strip()}'")
                 continue
 
             if 'duration_in_frames' not in scene:
@@ -364,7 +377,7 @@ class DataVisualizationGenerator:
                 o_type = str(ov.get('type', 'text')).lower()
                 ov_id = str(ov.get('id', ''))
 
-                # STRICTION 1: Aggressively drop any 'text' overlays (including if ID starts with txt)
+                # STRICTION 1: Aggressively drop any 'text' overlays
                 if o_type == 'text' or o_type == 'text_overlay' or ov_id.startswith('txt_'):
                     print(f"   🗑️ Dropped text layer '{ov.get('id')}' to preserve visualization-only focus.")
                     continue
@@ -389,30 +402,45 @@ class DataVisualizationGenerator:
                 # STRICTION 2: Cognitive Visual Value Cleansing
                 var = ov.get('indicator_type') or ov.get('chart_type')
 
-                # Check indicator values for non-sense format
-                val = str(ov.get('value', '')).strip()
+                # Check indicator values for non-sense format and run self-correction!
+                ov_val = str(ov.get('value', '')).strip()
+                norm_ov_val = self.normalize_number(ov_val)
+
+                # Post-Gemini automatic correction and alignment with the story candidates
+                normalized_fresh = [self.normalize_number(c) for c in fresh_candidates]
+                if norm_ov_val in normalized_fresh:
+                    # It's a clean match! Retain the story-grounded value.
+                    matched_idx = normalized_fresh.index(norm_ov_val)
+                    final_value = fresh_candidates[matched_idx]
+                    ov['value'] = final_value
+                    visualized_numbers.add(norm_ov_val)
+                else:
+                    # Auto-correction: Replace mismatched or hallucinated value with the first fresh value from the story narration
+                    final_value = fresh_candidates[0]
+                    print(f"   🔧 AUTO-CORRECTION: Aligned mismatched value '{ov_val}' to story value '{final_value}' in '{ov['id']}'")
+                    ov['value'] = final_value
+                    visualized_numbers.add(self.normalize_number(final_value))
 
                 # Clean percentage double signs
                 if var in ['percentageCounter', 'activity_ring', 'circularProgress', 'semiGauge', 'ringChart', 'metricRing', 'deltaIndicator']:
-                    if '%' in val:
-                        val = val.replace('%', '').strip()
-                        ov['value'] = val
-                        print(f"   🔧 Cleansed percentage metric '{ov['id']}': {val}% -> {val}")
-                    if '+' in val and var != 'deltaIndicator':
-                        val = val.replace('+', '').strip()
-                        ov['value'] = val
+                    val_str = str(ov['value'])
+                    if '%' in val_str:
+                        val_str = val_str.replace('%', '').strip()
+                        ov['value'] = val_str
+                    if '+' in val_str and var != 'deltaIndicator':
+                        val_str = val_str.replace('+', '').strip()
+                        ov['value'] = val_str
 
                     # If value is non-numeric text, convert to statusBadge
-                    has_letters = any(c.isalpha() for c in val) or any('\u0980' <= c <= '\u09FF' for c in val)
-                    if has_letters or val.lower() in ['critical', 'risk', 'high', 'alarm', 'সংকট আসন্ন', 'আশঙ্কাজনক']:
+                    has_letters = any(c.isalpha() for c in val_str) or any('\u0980' <= c <= '\u09FF' for c in val_str)
+                    if has_letters or val_str.lower() in ['critical', 'risk', 'high', 'alarm', 'সংকট আসন্ন', 'আশঙ্কাজনক']:
                         ov['indicator_type'] = 'statusBadge'
                         var = 'statusBadge'
-                        print(f"   🔧 Mutated numeric '{ov['id']}' with non-numeric value '{val}' to 'statusBadge'")
 
                 # CRITICAL: Synchronize status for StatusBadge to prevent 'SYSTEM ONLINE' blinking fallback!
                 if var == 'statusBadge':
-                    ov['status'] = val
-                    print(f"   🔧 Mapped qualitative status field for statusBadge '{ov['id']}': '{val}'")
+                    ov['status'] = ov['value']
+                    print(f"   🔧 Mapped qualitative status field for statusBadge '{ov['id']}': '{ov['status']}'")
 
                 # Typography Hardening
                 content = str(ov.get('content', ov.get('label', ''))).strip()

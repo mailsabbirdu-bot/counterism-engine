@@ -105,7 +105,7 @@ export const DataIndicatorEngine: React.FC<{ overlay: any }> = ({ overlay }) => 
     >
       <div style={{
         opacity: progress,
-        transform: `scale(${0.8 + progress * 0.2}) translateY(${(1 - exit) * -50}px)`,
+        transform: `scale(${(0.8 + progress * 0.2) * 1.35}) translateY(${(1 - exit) * -50}px)`,
         filter: `blur(${(1 - exit) * 10}px)`
       }}>
         {renderIndicator()}

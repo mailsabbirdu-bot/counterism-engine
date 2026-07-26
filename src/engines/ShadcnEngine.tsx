@@ -69,7 +69,7 @@ export const ShadcnEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
     >
       <div style={{
         opacity: progress,
-        transform: `scale(${0.9 + progress * 0.1}) translateY(${(1 - exit) * -50}px)`,
+        transform: `scale(${(0.9 + progress * 0.1) * 1.25}) translateY(${(1 - exit) * -50}px)`,
         filter: `blur(${(1 - exit) * 10}px)`,
         fontFamily: font
       }}>

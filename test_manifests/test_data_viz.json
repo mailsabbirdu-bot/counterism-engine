@@ -7,6 +7,56 @@
   },
   "scenes": [
     {
+      "scene_id": "SCENE_1",
+      "duration_in_frames": 300,
+      "background": {
+        "background_type": "procedural",
+        "procedural_config": {
+          "variant": "neon_grid"
+        }
+      },
+      "overlays": [
+        {
+          "type": "indicator",
+          "indicator_type": "kpiNumber",
+          "label": "ঘনবসতি র্যাংক",
+          "value": "৩০৬",
+          "position": {
+            "x": 1370,
+            "y": 730
+          },
+          "zIndex": 50,
+          "id": "ov_1_1",
+          "font": "Sohid_bangla",
+          "start": 15,
+          "duration": 255
+        }
+      ],
+      "transition": {
+        "type": "cinematicMatchCut",
+        "duration": 15
+      },
+      "beats": [
+        {
+          "frame": 15,
+          "event": "ov_1_1_reveal"
+        }
+      ],
+      "camera": {
+        "enabled": true,
+        "shots": [
+          {
+            "targetId": "ov_1_1",
+            "startFrame": 0,
+            "duration": 150,
+            "style": "slow_push",
+            "zoom": 1.1,
+            "ease": "cubicOut"
+          }
+        ]
+      }
+    },
+    {
       "scene_id": "SCENE_2",
       "duration_in_frames": 300,
       "background": {
@@ -20,14 +70,14 @@
           "type": "indicator",
           "indicator_type": "statusBadge",
           "label": "শহরায়ণ বৃদ্ধি",
-          "value": "৯৫",
+          "value": "১৮ লাখ",
           "position": {
             "x": 1370,
             "y": 730
           },
           "zIndex": 50,
           "id": "ov_2_1",
-          "status": "৯৫",
+          "status": "১৮ লাখ",
           "font": "Sohid_bangla",
           "start": 15,
           "duration": 255
