@@ -68,7 +68,7 @@
       "overlays": [
         {
           "type": "indicator",
-          "indicator_type": "statusBadge",
+          "indicator_type": "dashboardCard",
           "label": "শহরায়ণ বৃদ্ধি",
           "value": "১৮ লাখ",
           "position": {
@@ -77,7 +77,6 @@
           },
           "zIndex": 50,
           "id": "ov_2_1",
-          "status": "১৮ লাখ",
           "font": "Sohid_bangla",
           "start": 15,
           "duration": 255

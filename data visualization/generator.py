@@ -217,8 +217,8 @@ class DataVisualizationGenerator:
                                 "type": "indicator",
                                 "indicator_type": "kpiNumber",
                                 "label": "ঘনবসতি র্যাংক",
-                                "value": "#১",
-                                "position": {"x": 1370, "y": 760},
+                                "value": "৩০৬",
+                                "position": {"x": 1370, "y": 730},
                                 "zIndex": 50
                             }
                         ]
@@ -230,10 +230,10 @@ class DataVisualizationGenerator:
                         "overlays": [
                             {
                                 "type": "indicator",
-                                "indicator_type": "percentageCounter",
+                                "indicator_type": "kpiNumber",
                                 "label": "শহরায়ণ বৃদ্ধি",
-                                "value": "৯৫",
-                                "position": {"x": 1370, "y": 760},
+                                "value": "১৮ লাখ",
+                                "position": {"x": 1370, "y": 730},
                                 "zIndex": 50
                             }
                         ]
@@ -252,20 +252,36 @@ class DataVisualizationGenerator:
             "--- STRICT DESIGN & COMPONENT RULES (MUST OBEY) ---\n"
             "1. NO TEXT LAYERS ALLOWED: Do NOT generate any overlays of type 'text'. There must be absolutely ZERO text narrative overlays. The scene must ONLY visualize numerical data.\n"
             "2. EXACTLY ONE VISUAL OVERLAY PER SCENE: Each scene must contain EXACTLY ONE visual overlay (no more, no less). You must pick only the single most relevant Bklit UI indicator/KPI/chart to visualize the entire main numerical topic of that scene. A minimalistic approach is mandatory.\n"
-            "3. STRICT NUMERICAL MATCHING: The numerical 'value' parameter in the JSON overlay MUST match the exact numerical value mentioned in that scene's narration text in the story (e.g. if the story says '৩০৬', the JSON 'value' must be '৩০৬'). No hallucinations or mismatched digits are allowed!\n"
-            "4. NO REPEATED DATA: Never visualize the same numerical metric or data point twice across different scenes. If a metric/data point has already been visualized in an earlier scene, ignore it and visualize a different fresh numerical statistic, or omit/skip the scene if it contains only repeated data.\n"
-            "5. SKIP SCENES WITH NO NEW IMPORTANT NUMERICAL DATA: If a scene narration has no important numerical data (excluding trivial articles/counters like 'একটি', 'একটা', 'এক'), or has ONLY repeated data already visualized in previous scenes, you MUST completely skip that scene. Do not include it in the JSON at all.\n"
-            "6. CLEAN & COGNITIVE VISUALIZATION VALUES:\n"
+            "3. MANDATORY COMPONENT VARIETY (DO NOT REPEAT): Never use the same type of indicator or chart across different scenes in the video. You MUST choose a unique component for each scene from the exhaustive list of options below. Ensure high visual diversity!\n"
+            "4. STRICT NUMERICAL MATCHING: The numerical 'value' parameter in the JSON overlay MUST match the exact numerical value mentioned in that scene's narration text in the story (e.g. if the story says '৩০৬', the JSON 'value' must be '৩০৬'). No hallucinations or mismatched digits are allowed!\n"
+            "5. NO REPEATED DATA: Never visualize the same numerical metric or data point twice across different scenes. If a metric/data point has already been visualized in an earlier scene, ignore it and visualize a different fresh numerical statistic, or omit/skip the scene if it contains only repeated data.\n"
+            "6. SKIP SCENES WITH NO NEW IMPORTANT NUMERICAL DATA: If a scene narration has no important numerical data (excluding trivial articles/counters like 'একটি', 'একটা', 'এক'), or has ONLY repeated data already visualized in previous scenes, you MUST completely skip that scene. Do not include it in the JSON at all.\n"
+            "7. AVAILABLE HIGH-FIDELITY BKLIT UI COMPONENT OPTIONS:\n"
+            "   You must choose from this categorised list to achieve high visual diversity:\n"
+            "   [CATEGORY A: Simple KPIs & Panels]\n"
+            "     - 'kpiNumber': Bold glowing numerical value display\n"
+            "     - 'dashboardCard': Sleek KPI card with labels and trend indicator\n"
+            "     - 'techMetric': Large futuristic system-load meter\n"
+            "     - 'statusBadge' / 'tech_badge': Sleek technical glowing capsule badge\n"
+            "   [CATEGORY B: Progress & Circular Rings]\n"
+            "     - 'circularProgress': High-end glowing numeric progress ring\n"
+            "     - 'activity_ring': Concentric load indicator arc\n"
+            "     - 'metricRing': Dynamic ring showing precise ratio or load\n"
+            "     - 'progressBar': Horizontal progress status bar\n"
+            "   [CATEGORY C: Gauges & Dials]\n"
+            "     - 'speedometer': Full analog rotating speedometer dial\n"
+            "     - 'semiGauge': 180-degree speed/gauge needle\n"
+            "     - 'batteryLevel' / 'battery_pack': Clean battery pack load cells\n"
+            "   [CATEGORY D: Charts & Timelines]\n"
+            "     - 'glass_area': area chart with glowing glassmorphist fill\n"
+            "     - 'neon_bar': bars chart with neon glowing gradients\n"
+            "     - 'statGrid': A structured grid comparing 2 distinct sub-metrics\n"
+            "8. CLEAN & COGNITIVE VISUALIZATION VALUES:\n"
             "   - PERCENTAGE INDICATORS: Indicator types like 'percentageCounter', 'activity_ring', 'circularProgress', 'semiGauge', 'ringChart', and 'metricRing' must receive clean numbers as their 'value' (e.g. '৯৫' or 95). DO NOT include '%', 'percent', or qualitative words in their 'value' because the React engine renders the percent suffix automatically. Double percent signs (e.g. '৯৫%%') or text in circular progress triggers rendering errors.\n"
-            "   - TEXT STATUSES: If you want to display qualitative text words (such as 'আশঙ্কাজনক', 'CRITICAL', 'তীব্র', 'ONLINE', 'ACTIVE'), you MUST use 'statusBadge' or 'tech_badge' indicator types. NEVER use qualitative strings like 'CRITICAL' or 'High' in progress rings, speedometers, charts, or progress bars which expect numeric values.\n"
             "   - 'statusBadge' TEXT REQUISITE: If you choose 'statusBadge', the text to render MUST be assigned to the 'status' field (e.g. 'status': 'আশঙ্কাজনক'), in addition to 'value'.\n"
-            "7. BKLIT UI COMPONENT TYPES:\n"
-            "   - INDICATORS (kpiNumber, percentageCounter, deltaIndicator, milestoneTracker, statGrid, ringChart, stepIndicator, statusBadge, tech_badge)\n"
-            "   - CHARTS (glass_area, neon_bar, step_area, pie_donut_glass)\n"
-            "   - OTHER (timeline, milestoneTimeline, batteryLevel)\n"
-            "8. HIGH-FIDELITY INJECTIONS: If the scene is in Bangla, use exquisite Bangla labeling and numeric formatting for KPIs/Indicators (e.g., '২,২৪,০০,০০০+', '৯৫', '২৬ মার্চ ১৯৭১').\n"
-            "9. TYPOGRAPHY RULES: All components must set 'font': 'Sohid_bangla' if they have Bangla labels, or 'Audiowide-Regular_english' for English.\n"
-            "10. TIMING & SEQUENCING: Stagger the entry of layers to create a premium, fluid viewing experience.\n\n"
+            "9. HIGH-FIDELITY INJECTIONS: If the scene is in Bangla, use exquisite Bangla labeling and numeric formatting for KPIs/Indicators (e.g., '২,২৪,০০,০০০+', '৯৫', '২৬ মার্চ ১৯৭১').\n"
+            "10. TYPOGRAPHY RULES: All components must set 'font': 'Sohid_bangla' if they have Bangla labels, or 'Audiowide-Regular_english' for English.\n"
+            "11. TIMING & SEQUENCING: Stagger the entry of layers to create a premium, fluid viewing experience.\n\n"
             "--- JSON SCHEMA STRUCTURE ---\n"
             "Output your design as a single valid JSON block formatted as follows:\n"
             "{\n"
@@ -313,6 +329,7 @@ class DataVisualizationGenerator:
         - Automatically populates rich data templates based on story content.
         - Implements beautiful camera motion presets.
         - Runs post-Gemini evaluation to strictly align numerical values with story narration and deduplicate them.
+        - Programmatically enforces visual variety, automatically rotating repeated indicator types to visually diverse choices.
         """
         if not data or 'scenes' not in data:
             return data
@@ -321,6 +338,10 @@ class DataVisualizationGenerator:
 
         hardened_scenes = []
         visualized_numbers = set()
+        used_indicator_types = set()
+
+        # Rotation fallback for repeated generic indicator types to guarantee maximum visual variety
+        rotation_options = ["kpiNumber", "dashboardCard", "techMetric", "statusBadge", "circularProgress", "semiGauge", "speedometer", "batteryLevel", "progressBar"]
 
         for scene_idx, scene in enumerate(data['scenes']):
             s_id = scene.get('scene_id', f"SCENE_{scene_idx+1}")
@@ -338,7 +359,6 @@ class DataVisualizationGenerator:
                             break
 
             if not narration:
-                # Fallback check if we can't find narration text at all
                 print(f"   ⚠️ Narration text for scene '{s_id}' not found. Skipping evaluation.")
                 hardened_scenes.append(scene)
                 continue
@@ -399,8 +419,27 @@ class DataVisualizationGenerator:
                 if not ov.get('id'):
                     ov['id'] = f"ov_{scene_idx+1}_{ov_idx+1}"
 
-                # STRICTION 2: Cognitive Visual Value Cleansing
-                var = ov.get('indicator_type') or ov.get('chart_type')
+                # STRICTION 2: Cognitive Visual Value Cleansing & Smart Type Mapping
+                var = ov.get('indicator_type') or ov.get('chart_type') or 'kpiNumber'
+
+                # Force unique visual varieties programmatically
+                if o_type == 'indicator' or o_type == 'shadcn_indicator':
+                    # If this indicator type was already used in a previous scene, rotate to a new unused type!
+                    if var in used_indicator_types:
+                        rotated_type = None
+                        for option in rotation_options:
+                            if option not in used_indicator_types:
+                                rotated_type = option
+                                break
+                        if not rotated_type:
+                            # If all options are used, fall back to any option that rotates
+                            rotated_type = rotation_options[scene_idx % len(rotation_options)]
+
+                        print(f"   🔄 PROGRAMMATIC VARIETY ROTATION: Swapped repeated type '{var}' to unused type '{rotated_type}' in scene '{s_id}'")
+                        ov['indicator_type'] = rotated_type
+                        var = rotated_type
+
+                    used_indicator_types.add(var)
 
                 # Check indicator values for non-sense format and run self-correction!
                 ov_val = str(ov.get('value', '')).strip()
@@ -409,13 +448,11 @@ class DataVisualizationGenerator:
                 # Post-Gemini automatic correction and alignment with the story candidates
                 normalized_fresh = [self.normalize_number(c) for c in fresh_candidates]
                 if norm_ov_val in normalized_fresh:
-                    # It's a clean match! Retain the story-grounded value.
                     matched_idx = normalized_fresh.index(norm_ov_val)
                     final_value = fresh_candidates[matched_idx]
                     ov['value'] = final_value
                     visualized_numbers.add(norm_ov_val)
                 else:
-                    # Auto-correction: Replace mismatched or hallucinated value with the first fresh value from the story narration
                     final_value = fresh_candidates[0]
                     print(f"   🔧 AUTO-CORRECTION: Aligned mismatched value '{ov_val}' to story value '{final_value}' in '{ov['id']}'")
                     ov['value'] = final_value
