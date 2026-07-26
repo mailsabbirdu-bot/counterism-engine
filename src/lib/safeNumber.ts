@@ -39,7 +39,8 @@ export const safeNumber = (val: any, fallback: number = 0): number => {
 };
 
 /**
- * Checks if a value represents a numeric or numeric-like string (including Bangla numbers).
+ * Checks if a value represents a purely numeric or simple percentage-like value.
+ * Compounds with words (like "১৮ লাখ") return false to prevent truncating/formatting bugs.
  */
 export const isNumericValue = (val: any): boolean => {
   if (val === undefined || val === null) return false;
@@ -49,7 +50,9 @@ export const isNumericValue = (val: any): boolean => {
   const hasBangla = hasBanglaDigits(str);
   const cleanStr = (hasBangla ? banglaToEnglishDigits(str) : str).replace(/,/g, '');
 
-  return /-?\d+(\.\d+)?/.test(cleanStr);
+  // Strip optional trailing '%' or '+' symbols
+  const strictlyNumeric = cleanStr.replace(/[%\+]$/, '').trim();
+  return /^-?\d+(\.\d+)?$/.test(strictlyNumeric);
 };
 
 /**
