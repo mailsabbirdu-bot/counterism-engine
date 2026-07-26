@@ -214,8 +214,8 @@ class DataVisualizationGenerator:
                         "background": {"background_type": "procedural", "procedural_config": {"variant": "neon_grid"}},
                         "overlays": [
                             {
-                                "type": "indicator",
-                                "indicator_type": "kpiNumber",
+                                "id": "ind_1_1",
+                                "type": "kpiNumber",  # Mistakenly set as type
                                 "label": "ঘনবসতি র্যাংক",
                                 "value": "৩০৬",
                                 "position": {"x": 1370, "y": 730},
@@ -229,6 +229,7 @@ class DataVisualizationGenerator:
                         "background": {"background_type": "procedural", "procedural_config": {"variant": "neon_grid"}},
                         "overlays": [
                             {
+                                "id": "ind_2_1",
                                 "type": "indicator",
                                 "indicator_type": "kpiNumber",
                                 "label": "শহরায়ণ বৃদ্ধি",
@@ -330,6 +331,7 @@ class DataVisualizationGenerator:
         - Implements beautiful camera motion presets.
         - Runs post-Gemini evaluation to strictly align numerical values with story narration and deduplicate them.
         - Programmatically enforces visual variety, automatically rotating repeated indicator types to visually diverse choices.
+        - Strictly normalizes type structures, ensuring type: 'indicator' is assigned and indicator_type is correct (camelCase).
         """
         if not data or 'scenes' not in data:
             return data
@@ -342,6 +344,32 @@ class DataVisualizationGenerator:
 
         # Rotation fallback for repeated generic indicator types to guarantee maximum visual variety
         rotation_options = ["kpiNumber", "dashboardCard", "techMetric", "statusBadge", "circularProgress", "semiGauge", "speedometer", "batteryLevel", "progressBar"]
+
+        # Lowercase mapping to canonical camelCase names for absolute safety (prevents empty canvas)
+        CANONICAL_INDICATORS = {
+            "kpinumber": "kpiNumber",
+            "kpi": "kpiNumber",
+            "counter": "kpiNumber",
+            "dashboardcard": "dashboardCard",
+            "techmetric": "techMetric",
+            "statusbadge": "statusBadge",
+            "circularprogress": "circularProgress",
+            "activity_ring": "activity_ring",
+            "activityring": "activity_ring",
+            "metricring": "metricRing",
+            "progressbar": "progressBar",
+            "speedometer": "speedometer",
+            "semigauge": "semiGauge",
+            "batterylevel": "batteryLevel",
+            "battery_pack": "battery_pack",
+            "batterypack": "battery_pack",
+            "milestonetimeline": "milestoneTimeline",
+            "milestonetracker": "milestoneTracker",
+            "statgrid": "statGrid",
+            "stepindicator": "stepIndicator",
+            "tech_badge": "statusBadge",
+            "techbadge": "statusBadge"
+        }
 
         for scene_idx, scene in enumerate(data['scenes']):
             s_id = scene.get('scene_id', f"SCENE_{scene_idx+1}")
@@ -394,7 +422,26 @@ class DataVisualizationGenerator:
             valid_overlays = []
 
             for ov_idx, ov in enumerate(overlays):
-                o_type = str(ov.get('type', 'text')).lower()
+                o_type_lower = str(ov.get('type', 'indicator')).lower()
+                ind_type_lower = str(ov.get('indicator_type', '')).lower()
+
+                # STRICT STRUCTURE NORMALIZATION: Prevents empty canvases due to invalid types
+                target_indicator_type = None
+                if o_type_lower in CANONICAL_INDICATORS:
+                    target_indicator_type = CANONICAL_INDICATORS[o_type_lower]
+                elif ind_type_lower in CANONICAL_INDICATORS:
+                    target_indicator_type = CANONICAL_INDICATORS[ind_type_lower]
+
+                if target_indicator_type:
+                    ov['type'] = 'indicator'
+                    ov['indicator_type'] = target_indicator_type
+                else:
+                    # Default fallback to kpiNumber if unrecognized to prevent blank canvas
+                    ov['type'] = 'indicator'
+                    if 'indicator_type' not in ov:
+                        ov['indicator_type'] = 'kpiNumber'
+
+                o_type = 'indicator'
                 ov_id = str(ov.get('id', ''))
 
                 # STRICTION 1: Aggressively drop any 'text' overlays
@@ -402,44 +449,28 @@ class DataVisualizationGenerator:
                     print(f"   🗑️ Dropped text layer '{ov.get('id')}' to preserve visualization-only focus.")
                     continue
 
-                # Normalize types to registry
-                if o_type == 'kpi' or o_type == 'counter':
-                    ov['type'] = 'indicator'
-                    o_type = 'indicator'
-                elif o_type == 'kpi_card':
-                    ov['type'] = 'shadcn_indicator'
-                    o_type = 'shadcn_indicator'
-
-                # Map tech_badge directly to statusBadge inside indicator for sleek and stable rendering
-                if o_type == 'indicator' and ov.get('indicator_type') == 'tech_badge':
-                    ov['indicator_type'] = 'statusBadge'
-
-                ov['type'] = o_type
-
                 if not ov.get('id'):
                     ov['id'] = f"ov_{scene_idx+1}_{ov_idx+1}"
 
                 # STRICTION 2: Cognitive Visual Value Cleansing & Smart Type Mapping
-                var = ov.get('indicator_type') or ov.get('chart_type') or 'kpiNumber'
+                var = ov.get('indicator_type', 'kpiNumber')
 
                 # Force unique visual varieties programmatically
-                if o_type == 'indicator' or o_type == 'shadcn_indicator':
-                    # If this indicator type was already used in a previous scene, rotate to a new unused type!
-                    if var in used_indicator_types:
-                        rotated_type = None
-                        for option in rotation_options:
-                            if option not in used_indicator_types:
-                                rotated_type = option
-                                break
-                        if not rotated_type:
-                            # If all options are used, fall back to any option that rotates
-                            rotated_type = rotation_options[scene_idx % len(rotation_options)]
+                # If this indicator type was already used in a previous scene, rotate to a new unused type!
+                if var in used_indicator_types:
+                    rotated_type = None
+                    for option in rotation_options:
+                        if option not in used_indicator_types:
+                            rotated_type = option
+                            break
+                    if not rotated_type:
+                        rotated_type = rotation_options[scene_idx % len(rotation_options)]
 
-                        print(f"   🔄 PROGRAMMATIC VARIETY ROTATION: Swapped repeated type '{var}' to unused type '{rotated_type}' in scene '{s_id}'")
-                        ov['indicator_type'] = rotated_type
-                        var = rotated_type
+                    print(f"   🔄 PROGRAMMATIC VARIETY ROTATION: Swapped repeated type '{var}' to unused type '{rotated_type}' in scene '{s_id}'")
+                    ov['indicator_type'] = rotated_type
+                    var = rotated_type
 
-                    used_indicator_types.add(var)
+                used_indicator_types.add(var)
 
                 # Check indicator values for non-sense format and run self-correction!
                 ov_val = str(ov.get('value', '')).strip()
