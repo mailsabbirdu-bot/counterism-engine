@@ -140,6 +140,66 @@ class DataVisualizationGenerator:
             normalized = normalized.replace(suffix, "")
         return normalized
 
+    @staticmethod
+    def parse_to_numeric_value(text: str) -> float:
+        """
+        Parses a compound number string (like "২ কোটি ৩০ লাখ" or "1.8 Million" or "2,30,00,000")
+        to a standard float value for mathematical equivalence checking.
+        """
+        if not text:
+            return 0.0
+
+        # Map Bengali digits to English
+        digits_map = {'০':'0', '১':'1', '২':'2', '৩':'3', '৪':'4', '৫':'5', '৬':'6', '৭':'7', '৮':'8', '৯':'9'}
+        clean = "".join(digits_map.get(c, c) for c in text).lower().strip()
+
+        # Remove commas
+        clean = clean.replace(",", "")
+
+        # Multipliers map
+        multipliers = {
+            "কোটি": 10000000,
+            "crore": 10000000,
+            "cr": 10000000,
+            "লাখ": 100000,
+            "লক্ষ": 100000,
+            "lakh": 100000,
+            "lacs": 100000,
+            "lac": 100000,
+            "হাজার": 1000,
+            "thousand": 1000,
+            "k": 1000,
+            "শত": 100,
+            "hundred": 100,
+            "মিলিয়ন": 1000000,
+            "million": 1000000,
+            "m": 1000000,
+            "বিলিয়ন": 1000000000,
+            "billion": 1000000000,
+            "b": 1000000000,
+        }
+
+        total = 0.0
+        has_multiplier = False
+
+        for word, mult in multipliers.items():
+            if word in clean:
+                has_multiplier = True
+                pattern = rf'(\d+(?:\.\d+)?)\s*{word}'
+                match = re.search(pattern, clean)
+                if match:
+                    total += float(match.group(1)) * mult
+
+        if has_multiplier:
+            return total
+
+        # Fallback: extract the first number in clean
+        match = re.search(rf'-?\d+(?:\.\d+)?', clean)
+        if match:
+            return float(match.group(0))
+
+        return 0.0
+
     @classmethod
     def has_important_numerical_data(cls, text: str) -> bool:
         """Checks if there is important numerical data in the text (excluding trivial articles)."""
@@ -342,8 +402,9 @@ class DataVisualizationGenerator:
         visualized_numbers = set()
         used_indicator_types = set()
 
-        # Rotation fallback for repeated generic indicator types to guarantee maximum visual variety
-        rotation_options = ["kpiNumber", "dashboardCard", "techMetric", "statusBadge", "circularProgress", "semiGauge", "speedometer", "batteryLevel", "progressBar"]
+        # Group components by whether they dynamically append percentage '%' sign to prevent severe display errors
+        NON_PERCENTAGE_INDICATORS = ["kpiNumber", "dashboardCard", "statusBadge", "speedometer", "semiGauge", "statGrid", "stepIndicator"]
+        PERCENTAGE_INDICATORS = ["percentageCounter", "activity_ring", "circularProgress", "metricRing", "techMetric", "batteryLevel", "semiGauge"]
 
         # Lowercase mapping to canonical camelCase names for absolute safety (prevents empty canvas)
         CANONICAL_INDICATORS = {
@@ -452,19 +513,64 @@ class DataVisualizationGenerator:
                 if not ov.get('id'):
                     ov['id'] = f"ov_{scene_idx+1}_{ov_idx+1}"
 
-                # STRICTION 2: Cognitive Visual Value Cleansing & Smart Type Mapping
-                var = ov.get('indicator_type', 'kpiNumber')
+                # Check indicator values for non-sense format and run mathematically-sound self-correction!
+                ov_val = str(ov.get('value', '')).strip()
+                norm_ov_val = self.normalize_number(ov_val)
+                float_ov_val = self.parse_to_numeric_value(ov_val)
 
-                # Force unique visual varieties programmatically
-                # If this indicator type was already used in a previous scene, rotate to a new unused type!
-                if var in used_indicator_types:
+                # Post-Gemini automatic correction and alignment with the story candidates
+                matched_candidate = None
+                for candidate in fresh_candidates:
+                    float_candidate = self.parse_to_numeric_value(candidate)
+                    norm_candidate = self.normalize_number(candidate)
+
+                    # Exact string match or mathematical match (with absolute tolerance of 1.0)
+                    if norm_ov_val == norm_candidate or (float_ov_val > 0 and abs(float_ov_val - float_candidate) < 1.0):
+                        matched_candidate = candidate
+                        break
+
+                if matched_candidate:
+                    # Grounded match found successfully!
+                    ov['value'] = matched_candidate
+                    visualized_numbers.add(self.normalize_number(matched_candidate))
+                else:
+                    # Auto-correction: Replace mismatched/hallucinated value with the first fresh value from the story narration
+                    final_value = fresh_candidates[0]
+                    print(f"   🔧 AUTO-CORRECTION: Aligned mismatched value '{ov_val}' to story value '{final_value}' in '{ov['id']}'")
+                    ov['value'] = final_value
+                    visualized_numbers.add(self.normalize_number(final_value))
+
+                # STRICTION 2: Cognitive Visual Value Cleansing & Smart Type Mapping based on percentage checking
+                var = ov.get('indicator_type', 'kpiNumber')
+                val_str = str(ov.get('value', ''))
+
+                # Determine if the resolved value is a percentage to avoid rendering percentage signs incorrectly
+                is_pct = "%" in val_str or "পার্সেন্ট" in val_str or "শতাংশ" in val_str or "percent" in val_str.lower() or "শতকরা" in val_str
+                allowed_options = PERCENTAGE_INDICATORS if is_pct else NON_PERCENTAGE_INDICATORS
+
+                # Check compatibility first
+                if var not in allowed_options:
                     rotated_type = None
-                    for option in rotation_options:
+                    for option in allowed_options:
                         if option not in used_indicator_types:
                             rotated_type = option
                             break
                     if not rotated_type:
-                        rotated_type = rotation_options[scene_idx % len(rotation_options)]
+                        rotated_type = allowed_options[scene_idx % len(allowed_options)]
+
+                    print(f"   🔄 VALUE TYPE TYPE-CORRECTION: Swapped incompatible indicator type '{var}' to '{rotated_type}' for value '{val_str}'")
+                    ov['indicator_type'] = rotated_type
+                    var = rotated_type
+
+                # Variety Enforcement: If this indicator type was already used in a previous scene, rotate to a new unused type from the allowed list!
+                elif var in used_indicator_types:
+                    rotated_type = None
+                    for option in allowed_options:
+                        if option not in used_indicator_types:
+                            rotated_type = option
+                            break
+                    if not rotated_type:
+                        rotated_type = allowed_options[scene_idx % len(allowed_options)]
 
                     print(f"   🔄 PROGRAMMATIC VARIETY ROTATION: Swapped repeated type '{var}' to unused type '{rotated_type}' in scene '{s_id}'")
                     ov['indicator_type'] = rotated_type
@@ -472,26 +578,8 @@ class DataVisualizationGenerator:
 
                 used_indicator_types.add(var)
 
-                # Check indicator values for non-sense format and run self-correction!
-                ov_val = str(ov.get('value', '')).strip()
-                norm_ov_val = self.normalize_number(ov_val)
-
-                # Post-Gemini automatic correction and alignment with the story candidates
-                normalized_fresh = [self.normalize_number(c) for c in fresh_candidates]
-                if norm_ov_val in normalized_fresh:
-                    matched_idx = normalized_fresh.index(norm_ov_val)
-                    final_value = fresh_candidates[matched_idx]
-                    ov['value'] = final_value
-                    visualized_numbers.add(norm_ov_val)
-                else:
-                    final_value = fresh_candidates[0]
-                    print(f"   🔧 AUTO-CORRECTION: Aligned mismatched value '{ov_val}' to story value '{final_value}' in '{ov['id']}'")
-                    ov['value'] = final_value
-                    visualized_numbers.add(self.normalize_number(final_value))
-
                 # Clean percentage double signs
                 if var in ['percentageCounter', 'activity_ring', 'circularProgress', 'semiGauge', 'ringChart', 'metricRing', 'deltaIndicator']:
-                    val_str = str(ov['value'])
                     if '%' in val_str:
                         val_str = val_str.replace('%', '').strip()
                         ov['value'] = val_str
