@@ -104,6 +104,46 @@ class DataVisualizationGenerator:
             self.story_scenes["SCENE_1"] = story_content
             self.story_scenes["SCENE_01"] = story_content
 
+    @staticmethod
+    def has_important_numerical_data(text: str) -> bool:
+        """
+        Detects if scene text has important numerical data.
+        Trivial grammatical counters/indefinite articles like "একটি", "একটা", "একই", "একজন", "এক" are ignored.
+        """
+        if not text:
+            return False
+
+        # Clean trivial Bengali articles
+        text_to_check = text
+        for trivial in ["একটি", "একটা", "একই", "একজন", "এক"]:
+            text_to_check = re.sub(rf'\b{trivial}\b', '', text_to_check)
+            text_to_check = text_to_check.replace(trivial, "")
+
+        # Check for multi-digit Bengali or English digits (e.g. "২৬", "১৯৭১", "১২", "১০০")
+        if re.search(r'[0-9০-৯]{2,}', text_to_check):
+            return True
+
+        # Check for non-1 Bengali or English single digits (e.g. "২", "৩", "9")
+        if re.search(r'[2-9২-৯]', text_to_check):
+            return True
+
+        # Check for important numeric indicators/words
+        indicators = [
+            "কোটি", "লক্ষ", "হাজার", "শত", "শতাংশ", "পার্সেন্ট", "%", "ডলার", "টাকা",
+            "মিলিয়ন", "বিলিয়ন", "ক্রোর", "percent", "million", "billion", "thousand",
+            "double", "দ্বিগুণ", "তিনগুণ", "শতকরা"
+        ]
+        for ind in indicators:
+            if ind in text_to_check:
+                return True
+
+        # Handle standalone "১" or "1" if it has safe units indicating importance
+        if re.search(r'[1১]', text_to_check):
+            if any(suffix in text_to_check for suffix in ["১ম", "1st", "১ নম্বর", "১ নং", "১টি", "1টি"]):
+                return True
+
+        return False
+
     def _interact_with_gemini(self, prompt: str, score: int = 100) -> str:
         """Launches copy-paste interactive UI in Colab or terminal fallback."""
         if self.manual:
@@ -209,19 +249,21 @@ class DataVisualizationGenerator:
             "--- STORY DESCRIPTION ---\n"
             f"{story}\n\n"
             "--- STRICT DESIGN & COMPONENT RULES (MUST OBEY) ---\n"
-            "1. NO TEXT LAYERS ALLOWED: Do not generate any overlays of type 'text'. There must be absolutely ZERO text narrative overlays.\n"
-            "2. EXACTLY ONE VISUAL OVERLAY PER SCENE: Each scene must contain EXACTLY ONE visual overlay (no more, no less). You must pick only the single most relevant Bklit UI indicator/KPI to visualize the entire main topic of that scene.\n"
-            "3. CLEAN & COGNITIVE VISUALIZATION VALUES:\n"
+            "1. NO TEXT LAYERS ALLOWED: Do NOT generate any overlays of type 'text'. There must be absolutely ZERO text narrative overlays. The scene must ONLY visualize numerical data.\n"
+            "2. EXACTLY ONE VISUAL OVERLAY PER SCENE: Each scene must contain EXACTLY ONE visual overlay (no more, no less). You must pick only the single most relevant Bklit UI indicator/KPI/chart to visualize the entire main numerical topic of that scene. A minimalistic approach is mandatory.\n"
+            "3. ONLY VISUALIZE IMPORTANT NUMERICAL DATA: Trivial numerical words or grammatical articles/counters (like 'একটি', 'একটা', 'এক', 'one', 'a') must be completely ignored. Do NOT display or visualize them. Only display important numerical data such as years (e.g., '১৯৭১'), percentages (e.g., '৯৫'), specific counts, or stats.\n"
+            "4. SKIP SCENES WITH NO IMPORTANT NUMERICAL DATA: If a scene narration has no important numerical data (excluding trivial articles/counters like 'একটি'), you MUST completely skip that scene. Do not include it in the JSON at all.\n"
+            "5. CLEAN & COGNITIVE VISUALIZATION VALUES:\n"
             "   - PERCENTAGE INDICATORS: Indicator types like 'percentageCounter', 'activity_ring', 'circularProgress', 'semiGauge', 'ringChart', and 'metricRing' must receive clean numbers as their 'value' (e.g. '৯৫' or 95). DO NOT include '%', 'percent', or qualitative words in their 'value' because the React engine renders the percent suffix automatically. Double percent signs (e.g. '৯৫%%') or text in circular progress triggers rendering errors.\n"
             "   - TEXT STATUSES: If you want to display qualitative text words (such as 'আশঙ্কাজনক', 'CRITICAL', 'তীব্র', 'ONLINE', 'ACTIVE'), you MUST use 'statusBadge' or 'tech_badge' indicator types. NEVER use qualitative strings like 'CRITICAL' or 'High' in progress rings, speedometers, charts, or progress bars which expect numeric values.\n"
             "   - 'statusBadge' TEXT REQUISITE: If you choose 'statusBadge', the text to render MUST be assigned to the 'status' field (e.g. 'status': 'আশঙ্কাজনক'), in addition to 'value'.\n"
-            "4. BKLIT UI COMPONENT TYPES:\n"
+            "6. BKLIT UI COMPONENT TYPES:\n"
             "   - INDICATORS (kpiNumber, percentageCounter, deltaIndicator, milestoneTracker, statGrid, ringChart, stepIndicator, statusBadge, tech_badge)\n"
             "   - CHARTS (glass_area, neon_bar, step_area, pie_donut_glass)\n"
             "   - OTHER (timeline, milestoneTimeline, batteryLevel)\n"
-            "5. HIGH-FIDELITY INJECTIONS: If the scene is in Bangla, use exquisite Bangla labeling and numeric formatting for KPIs/Indicators (e.g., '২,২৪,০০,০০০+', '৯৫', '২৬ মার্চ ১৯৭১').\n"
-            "6. TYPOGRAPHY RULES: All components must set 'font': 'Sohid_bangla' if they have Bangla labels, or 'Audiowide-Regular_english' for English.\n"
-            "7. TIMING & SEQUENCING: Stagger the entry of layers to create a premium, fluid viewing experience.\n\n"
+            "7. HIGH-FIDELITY INJECTIONS: If the scene is in Bangla, use exquisite Bangla labeling and numeric formatting for KPIs/Indicators (e.g., '২,২৪,০০,০০০+', '৯৫', '২৬ মার্চ ১৯৭১').\n"
+            "8. TYPOGRAPHY RULES: All components must set 'font': 'Sohid_bangla' if they have Bangla labels, or 'Audiowide-Regular_english' for English.\n"
+            "9. TIMING & SEQUENCING: Stagger the entry of layers to create a premium, fluid viewing experience.\n\n"
             "--- JSON SCHEMA STRUCTURE ---\n"
             "Output your design as a single valid JSON block formatted as follows:\n"
             "{\n"
@@ -262,21 +304,40 @@ class DataVisualizationGenerator:
         - Drops any overlays of type 'text' to strictly prevent narrative text overlays.
         - Enforces exactly ONE visual overlay per scene.
         - Sanitizes values to ensure percent meters only have pure numbers and text is converted to badge types.
-        - Synchronizes 'status' and 'value' fields for status badges to prevent 'SYSTEM ONLINE' default.
+        - Synchronizes 'status' and 'value' fields for status badges to prevent 'SYSTEM ONLINE' blinking fallback!
         - Harmonizes timing and stagger entries.
         - Resolves spatial collisions and clamps layout to secure broadcast margins.
         - Directs typography rules to valid registered fonts (Bangla / English).
         - Automatically populates rich data templates based on story content.
         - Implements beautiful camera motion presets.
+        - Drops scenes that do not contain important numerical data in their story narration.
         """
         if not data or 'scenes' not in data:
             return data
 
         print("🛡️ Applying elite hardening pipeline to JSON schema...")
 
+        hardened_scenes = []
+
         for scene_idx, scene in enumerate(data['scenes']):
             s_id = scene.get('scene_id', f"SCENE_{scene_idx+1}")
             scene['scene_id'] = s_id
+
+            # Locate the original story narration text to run programmatic skip filtering
+            narration = self.story_scenes.get(s_id, "")
+            if not narration:
+                match = re.search(r'\d+', s_id)
+                if match:
+                    num = int(match.group())
+                    for k in [f"SCENE_{num}", f"SCENE_{num:02d}", f"দৃশ্য_{num}", f"দৃশ্য_{num:02d}"]:
+                        if k in self.story_scenes:
+                            narration = self.story_scenes[k]
+                            break
+
+            # If we have original scene narration, filter strictly:
+            if narration and not self.has_important_numerical_data(narration):
+                print(f"   🚫 Skipped scene '{s_id}' because narration has no important numerical data: '{narration.strip()}'")
+                continue
 
             if 'duration_in_frames' not in scene:
                 scene['duration_in_frames'] = 300
@@ -333,7 +394,6 @@ class DataVisualizationGenerator:
 
                 # Clean percentage double signs
                 if var in ['percentageCounter', 'activity_ring', 'circularProgress', 'semiGauge', 'ringChart', 'metricRing', 'deltaIndicator']:
-                    # Remove % and + signs to prevent double formatting
                     if '%' in val:
                         val = val.replace('%', '').strip()
                         ov['value'] = val
@@ -342,17 +402,15 @@ class DataVisualizationGenerator:
                         val = val.replace('+', '').strip()
                         ov['value'] = val
 
-                    # If value is non-numeric text like "সংকট আসন্ন" or "CRITICAL", convert to a safe badge type
+                    # If value is non-numeric text, convert to statusBadge
                     has_letters = any(c.isalpha() for c in val) or any('\u0980' <= c <= '\u09FF' for c in val)
                     if has_letters or val.lower() in ['critical', 'risk', 'high', 'alarm', 'সংকট আসন্ন', 'আশঙ্কাজনক']:
-                        # Automatically mutate to status badge to render beautifully
                         ov['indicator_type'] = 'statusBadge'
                         var = 'statusBadge'
                         print(f"   🔧 Mutated numeric '{ov['id']}' with non-numeric value '{val}' to 'statusBadge'")
 
                 # CRITICAL: Synchronize status for StatusBadge to prevent 'SYSTEM ONLINE' blinking fallback!
                 if var == 'statusBadge':
-                    # Always copy the qualitative text value to the status field
                     ov['status'] = val
                     print(f"   🔧 Mapped qualitative status field for statusBadge '{ov['id']}': '{val}'")
 
@@ -392,12 +450,10 @@ class DataVisualizationGenerator:
                 # Avoid center stacking generic center warnings
                 if abs(ax - 960) < 20:
                     if abs(ay - 540) < 20 or abs(ay - 700) < 20:
-                        # Move to beautiful Rule of Thirds safe regions
                         ax = 1370
                         ay = 760
 
-                # Clamping with generous broadcast safe margins mathematically calculated:
-                # l >= 150, r <= 1770, t >= 150, b <= 930
+                # Clamping with generous broadcast safe margins:
                 base_w, base_h = self.TYPE_SIZES.get(o_type, (600, 400))
                 ax = max(150 + base_w // 2, min(1770 - base_w // 2, ax))
                 ay = max(150 + base_h // 2, min(930 - base_h // 2, ay))
@@ -438,7 +494,6 @@ class DataVisualizationGenerator:
                 valid_overlays.append(ov)
 
             # STRICTION 3: Each scene can have only ONE visual element overlay!
-            # Keep only the primary visual overlay to make the presentation clean, elegant and minimalistic.
             if len(valid_overlays) > 1:
                 print(f"   🧹 Trimming overlays from {len(valid_overlays)} to EXACTLY ONE per scene.")
                 valid_overlays = valid_overlays[:1]
@@ -464,6 +519,9 @@ class DataVisualizationGenerator:
                     })
                 scene['camera'] = {"enabled": True, "shots": shots}
 
+            hardened_scenes.append(scene)
+
+        data['scenes'] = hardened_scenes
         return data
 
 def main():

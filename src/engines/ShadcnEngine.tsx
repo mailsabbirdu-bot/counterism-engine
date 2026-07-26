@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { interpolate, useCurrentFrame, useVideoConfig, Easing, spring } from 'remotion';
-import { safeNumber } from '../lib/safeNumber';
+import { safeNumber, isNumericValue, formatWithLocaleAndBangla } from '../lib/safeNumber';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid,
@@ -374,16 +374,6 @@ const ShadcnIndicator = ({ overlay, relativeFrame, fps, font }: any) => {
         return String(val);
     };
 
-    const getNumericValue = (val: any, fallback = 75) => {
-        if (typeof val === 'number') return val;
-        if (typeof val === 'string') {
-            const clean = val.replace(/[০-৯]/g, (m) => String(['০','১','২','৩','৪','৫','৬','৭','৮','৯'].indexOf(m)));
-            const parsed = parseInt(clean.replace(/[^0-9]/g, ''));
-            if (!isNaN(parsed)) return parsed;
-        }
-        return fallback;
-    };
-
     switch(type) {
         case 'metric_tile':
             return (
@@ -407,7 +397,8 @@ const ShadcnIndicator = ({ overlay, relativeFrame, fps, font }: any) => {
                 </div>
             );
         case 'activity_ring':
-            const progress = interpolate(safeFrame, [10, 70], [0, getNumericValue(overlay.value, 75)], { extrapolateRight: 'clamp' });
+            const targetVal = safeNumber(overlay.value, 75);
+            const progress = interpolate(safeFrame, [10, 70], [0, targetVal], { extrapolateRight: 'clamp' });
             return (
                 <div className="relative w-48 h-48 flex items-center justify-center">
                     <svg className="w-full h-full -rotate-90">
@@ -415,7 +406,7 @@ const ShadcnIndicator = ({ overlay, relativeFrame, fps, font }: any) => {
                         <circle cx="96" cy="96" r="80" fill="none" stroke={mainColor} strokeWidth="12" strokeDasharray="502" strokeDashoffset={502 - (502 * progress / 100)} strokeLinecap="round" />
                     </svg>
                     <div className="absolute flex flex-col items-center">
-                        <span className="text-white text-5xl font-black tabular-nums tracking-tighter">{Math.round(progress)}%</span>
+                        <span className="text-white text-5xl font-black tabular-nums tracking-tighter">{formatWithLocaleAndBangla(progress, overlay.value)}%</span>
                         <span className="text-white/30 text-[8px] font-bold uppercase tracking-widest">{overlay.label || 'LOAD'}</span>
                     </div>
                 </div>
@@ -518,14 +509,21 @@ const ShadcnIndicator = ({ overlay, relativeFrame, fps, font }: any) => {
         case 'step_indicator_glass':
             return (
                 <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
-                    {[1,2,3,4].map(i => (<div key={i} className={cn("w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm", i <= (overlay.value || 2) ? "bg-indigo-600 text-white shadow-lg" : "bg-white/5 text-white/20")}>{i}</div>))}
+                    {[1,2,3,4].map(i => (<div key={i} className={cn("w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm", i <= safeNumber(overlay.value, 2) ? "bg-indigo-600 text-white shadow-lg" : "bg-white/5 text-white/20")}>{i}</div>))}
                 </div>
             );
         case 'battery_pack':
+            const batteryProgress = interpolate(safeFrame, [0, 80], [0, safeNumber(overlay.value, 100)], { extrapolateRight: 'clamp' });
             return (
                 <div className="bg-zinc-900 p-6 rounded-3xl border border-white/10 flex items-center gap-6 w-64">
-                    <div className="relative w-12 h-20 border-2 border-white/20 rounded-lg p-1"><div className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-3 bg-white/20 rounded-t-sm"/><div className="w-full bg-emerald-500 rounded-sm" style={{ height: '75%', marginTop: '25%' }}/></div>
-                    <div className="flex flex-col"><span className="text-white text-3xl font-black leading-none">75%</span><span className="text-white/20 text-[8px] font-bold uppercase mt-1">Power Cell</span></div>
+                    <div className="relative w-12 h-20 border-2 border-white/20 rounded-lg p-1">
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-3 bg-white/20 rounded-t-sm"/>
+                        <div className="w-full bg-emerald-500 rounded-sm" style={{ height: `${batteryProgress}%`, marginTop: `${100 - batteryProgress}%` }}/>
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-white text-3xl font-black leading-none">{formatWithLocaleAndBangla(batteryProgress, overlay.value)}%</span>
+                        <span className="text-white/20 text-[8px] font-bold uppercase mt-1">Power Cell</span>
+                    </div>
                 </div>
             );
         case 'media_controls':

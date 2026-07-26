@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
-import { safeNumber } from '../lib/safeNumber';
+import { safeNumber, isNumericValue, formatWithLocaleAndBangla } from '../lib/safeNumber';
 import { ArrowUp, ArrowDown, Timer, Calendar, Flag, Activity, Zap, Shield, Cpu, Cloud, Globe, Database, Target, Trophy, Info } from 'lucide-react';
 
 export const DataIndicatorEngine: React.FC<{ overlay: any }> = ({ overlay }) => {
@@ -125,11 +125,12 @@ const StatGrid = ({ overlay, relativeFrame, fps }: any) => {
         const reveal = spring({ frame: safeFrame - i * 10, fps, config: { damping: 12 } });
         const targetValue = safeNumber(stat.value, 0);
         const val = interpolate(safeFrame - 20 - i * 10, [0, 50], [0, targetValue], { extrapolateRight: 'clamp' });
+
         return (
           <div key={i} className="p-4 bg-white/5 rounded-2xl border border-white/5" style={{ opacity: reveal, transform: `translateY(${(1-reveal)*20}px)` }}>
             <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">{stat.label}</p>
             <p className="text-white text-2xl font-black tabular-nums">
-                {isNaN(Number(stat.value)) ? stat.value : Math.round(val)}{stat.suffix}
+                {!isNumericValue(stat.value) ? stat.value : formatWithLocaleAndBangla(val, stat.value)}{stat.suffix}
             </p>
           </div>
         );
@@ -143,6 +144,8 @@ const TechMetric = ({ overlay, relativeFrame, fps }: any) => {
   const fontStyle = { fontFamily: overlay.font || 'Inter' };
   const pulse = Math.sin(safeFrame * 0.1) * 0.1 + 0.9;
   const targetValue = safeNumber(overlay.value, 85);
+  const val = interpolate(safeFrame, [10, 60], [0, targetValue], { extrapolateRight: 'clamp' });
+
   return (
     <div className="flex items-center gap-6 bg-blue-950/40 backdrop-blur-3xl p-8 rounded-full border-2 border-blue-500/30 shadow-[0_0_50px_rgba(59,130,246,0.2)]" style={fontStyle}>
        <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center shadow-lg animate-pulse" style={{ transform: `scale(${pulse})` }}>
@@ -151,7 +154,7 @@ const TechMetric = ({ overlay, relativeFrame, fps }: any) => {
        <div className="flex flex-col">
           <span className="text-blue-400 text-xs font-black uppercase tracking-widest leading-none mb-1">{overlay.label || 'SYSTEM LOAD'}</span>
           <div className="text-white text-6xl font-black tabular-nums leading-none tracking-tighter">
-            {isNaN(Number(overlay.value)) ? overlay.value : Math.round(interpolate(safeFrame, [10, 60], [0, targetValue], { extrapolateRight: 'clamp' }))}%
+            {!isNumericValue(overlay.value) ? overlay.value : formatWithLocaleAndBangla(val, overlay.value)}%
           </div>
        </div>
     </div>
@@ -187,7 +190,7 @@ const BatteryLevel = ({ overlay, relativeFrame, fps }: any) => {
                 <div className="w-full bg-emerald-500 rounded-lg shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all" style={{ height: `${progress}%`, marginTop: `${100 - progress}%` }} />
             </div>
             <div className="text-center">
-                <p className="text-white text-3xl font-black tabular-nums">{Math.round(progress)}%</p>
+                <p className="text-white text-3xl font-black tabular-nums">{formatWithLocaleAndBangla(progress, overlay.value)}%</p>
                 <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">{overlay.label || 'POWER'}</p>
             </div>
         </div>
@@ -204,7 +207,7 @@ const ScoreCard = ({ overlay, relativeFrame, fps }: any) => {
        <div className="bg-zinc-900/90 backdrop-blur-xl p-10 rounded-[1.4rem] flex flex-col items-center min-w-[280px]" style={fontStyle}>
           <Trophy size={48} className="text-yellow-400 mb-4" />
           <span className="text-white/40 text-xs font-bold uppercase tracking-widest mb-1">{overlay.label}</span>
-          <span className="text-white text-8xl font-black tabular-nums tracking-tighter">{val.toFixed(1)}</span>
+          <span className="text-white text-8xl font-black tabular-nums tracking-tighter">{formatWithLocaleAndBangla(val, overlay.value, 1)}</span>
           <div className="h-1 w-20 bg-indigo-500 rounded-full mt-4" />
        </div>
     </div>
@@ -240,7 +243,7 @@ const MultiProgress = ({ overlay, relativeFrame, fps }: any) => {
                     <div key={i} className="flex flex-col gap-2">
                         <div className="flex justify-between text-[10px] font-black uppercase text-white/40 tracking-widest">
                             <span>{item.label}</span>
-                            <span>{Math.round(progress)}%</span>
+                            <span>{formatWithLocaleAndBangla(progress, item.value)}%</span>
                         </div>
                         <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                             <div className="h-full bg-blue-500 rounded-full" style={{ width: `${progress}%`, backgroundColor: item.color || '#3b82f6' }} />
@@ -261,7 +264,7 @@ const Speedometer = ({ overlay, relativeFrame, fps }: any) => {
     return (
         <div className="relative w-80 h-80 flex flex-col items-center justify-center bg-zinc-900 rounded-full border-8 border-white/5 shadow-2xl overflow-hidden" style={fontStyle}>
             <div className="absolute inset-4 rounded-full border-2 border-white/5 border-dashed animate-spin" style={{ animationDuration: '20s' }} />
-            <div className="text-white text-7xl font-black leading-none">{Math.round(val)}</div>
+            <div className="text-white text-7xl font-black leading-none">{formatWithLocaleAndBangla(val, overlay.value)}</div>
             <div className="text-white/30 text-xs font-bold uppercase tracking-[0.3em] mt-2">{overlay.label || 'SPEED'}</div>
             <div className="absolute bottom-10 w-1 h-32 bg-rose-500 origin-top rounded-full shadow-[0_0_15px_rgba(244,63,94,0.8)]" style={{ transform: `rotate(${rotation}deg)` }} />
         </div>
@@ -366,7 +369,7 @@ const DashboardCard = ({ overlay, relativeFrame, fps }: any) => {
       </div>
       <h4 className="text-white/40 text-sm font-bold uppercase tracking-widest mb-2" style={fontStyle}>{overlay.label}</h4>
       <div className="text-white text-5xl font-black mb-4 tabular-nums" style={fontStyle}>
-        {overlay.prefix}{isNaN(Number(overlay.value)) ? overlay.value : Math.round(value).toLocaleString()}{overlay.suffix}
+        {overlay.prefix}{!isNumericValue(overlay.value) ? overlay.value : formatWithLocaleAndBangla(value, overlay.value)}{overlay.suffix}
       </div>
       <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold" style={fontStyle}>
          <ArrowUp size={16} />
@@ -447,7 +450,7 @@ const ProgressBar = ({ overlay, relativeFrame, fps }: any) => {
     <div className="bg-zinc-900/90 backdrop-blur-xl p-10 rounded-3xl border border-white/10 w-[600px]" style={fontStyle}>
       <div className="flex justify-between items-end mb-4">
         <span className="text-white text-2xl font-black uppercase tracking-widest" style={fontStyle}>{overlay.label}</span>
-        <span className="text-blue-400 text-4xl font-black" style={fontStyle}>{isNaN(Number(overlay.value)) ? overlay.value : Math.round(progress)}%</span>
+        <span className="text-blue-400 text-4xl font-black" style={fontStyle}>{!isNumericValue(overlay.value) ? overlay.value : formatWithLocaleAndBangla(progress, overlay.value)}%</span>
       </div>
       <div className="h-6 w-full bg-white/10 rounded-full overflow-hidden border-2 border-white/5">
         <div
@@ -479,7 +482,7 @@ const CircularProgress = ({ overlay, relativeFrame, fps }: any) => {
         }}
       />
       <div className="flex flex-col items-center justify-center z-10" style={fontStyle}>
-         <span className="text-white text-7xl font-black tabular-nums" style={fontStyle}>{isNaN(Number(overlay.value)) ? overlay.value : Math.round(progress)}%</span>
+         <span className="text-white text-7xl font-black tabular-nums" style={fontStyle}>{!isNumericValue(overlay.value) ? overlay.value : formatWithLocaleAndBangla(progress, overlay.value)}%</span>
          <span className="text-white/40 text-xs font-bold uppercase tracking-[0.2em]" style={fontStyle}>{overlay.label}</span>
       </div>
     </div>
@@ -513,7 +516,7 @@ const SemiGauge = ({ overlay, relativeFrame, fps }: any) => {
       />
       <div className="absolute bottom-4 flex flex-col items-center" style={fontStyle}>
          <div className="text-white text-5xl font-black" style={fontStyle}>
-            <span style={fontStyle}>{isNaN(Number(overlay.value)) ? overlay.value : Math.round(progress)}</span>
+            <span style={fontStyle}>{!isNumericValue(overlay.value) ? overlay.value : formatWithLocaleAndBangla(progress, overlay.value)}</span>
             <span style={fontStyle}>{overlay.suffix}</span>
          </div>
          <div className="text-white/40 text-sm font-bold uppercase" style={fontStyle}>{overlay.label}</div>
@@ -573,7 +576,7 @@ const KPINumber = ({ overlay, relativeFrame, fps }: any) => {
     <div className="flex flex-col items-center justify-center bg-zinc-900/80 backdrop-blur-xl p-12 rounded-[3rem] border border-white/20 shadow-2xl min-w-[500px]" style={fontStyle}>
       <span className="text-white/60 text-3xl uppercase tracking-[0.4em] mb-8 font-black" style={fontStyle}>{overlay.label}</span>
       <div className="text-9xl font-black tracking-tighter tabular-nums flex items-baseline" style={{ ...fontStyle, color: overlay.color || 'white' }}>
-        <span style={fontStyle}>{isNaN(Number(overlay.value)) ? overlay.value : Math.round(value).toLocaleString()}</span>
+        <span style={fontStyle}>{!isNumericValue(overlay.value) ? overlay.value : formatWithLocaleAndBangla(value, overlay.value)}</span>
         {overlay.suffix && <span className="ml-4 text-6xl" style={fontStyle}>{overlay.suffix}</span>}
       </div>
     </div>
@@ -591,7 +594,7 @@ const PercentageCounter = ({ overlay, relativeFrame, fps }: any) => {
   return (
     <div className="flex items-center justify-center bg-blue-600 p-16 rounded-full shadow-[0_0_80px_rgba(37,99,235,0.4)] border-4 border-white/30" style={{ ...fontStyle, backgroundColor: overlay.color || '#2563eb' }}>
        <div className="text-white text-9xl font-black tabular-nums" style={fontStyle}>
-         {isNaN(Number(overlay.value)) ? overlay.value : Math.round(value)}%
+         {!isNumericValue(overlay.value) ? overlay.value : formatWithLocaleAndBangla(value, overlay.value)}%
        </div>
     </div>
   );
@@ -610,14 +613,14 @@ const ComparisonKPI = ({ overlay, relativeFrame, fps }: any) => {
       <div className="flex flex-col items-center" style={fontStyle}>
         <span className="text-white/40 text-sm font-bold uppercase mb-2" style={fontStyle}>{overlay.label1}</span>
         <div className="text-white text-6xl font-black tabular-nums" style={fontStyle}>
-            {isNaN(Number(overlay.value1)) ? overlay.value1 : Math.round(v1).toLocaleString()}
+            {!isNumericValue(overlay.value1) ? overlay.value1 : formatWithLocaleAndBangla(v1, overlay.value1)}
         </div>
       </div>
       <div className="w-[2px] bg-white/10 self-stretch" />
       <div className="flex flex-col items-center" style={fontStyle}>
         <span className="text-white/40 text-sm font-bold uppercase mb-2" style={fontStyle}>{overlay.label2}</span>
         <div className="text-blue-400 text-6xl font-black tabular-nums" style={fontStyle}>
-            {isNaN(Number(overlay.value2)) ? overlay.value2 : Math.round(v2).toLocaleString()}
+            {!isNumericValue(overlay.value2) ? overlay.value2 : formatWithLocaleAndBangla(v2, overlay.value2)}
         </div>
       </div>
     </div>
@@ -639,7 +642,7 @@ const DeltaIndicator = ({ overlay, relativeFrame, fps }: any) => {
       <div className="flex flex-col" style={fontStyle}>
         <span className="text-white/40 text-xs font-bold uppercase tracking-widest" style={fontStyle}>{overlay.label || 'Change'}</span>
         <div className={`text-6xl font-black tabular-nums ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`} style={{ ...fontStyle, opacity: progress, transform: `translateX(${(1-progress) * -20}px)` }}>
-          {isPositive ? '+' : ''}{targetValue}%
+          {isPositive ? '+' : ''}{!isNumericValue(overlay.value) ? overlay.value : formatWithLocaleAndBangla(targetValue, overlay.value)}%
         </div>
       </div>
     </div>
