@@ -17,8 +17,8 @@
       },
       "overlays": [
         {
+          "id": "ind_1_1",
           "type": "indicator",
-          "indicator_type": "kpiNumber",
           "label": "ঘনবসতি র্যাংক",
           "value": "৩০৬",
           "position": {
@@ -26,7 +26,7 @@
             "y": 730
           },
           "zIndex": 50,
-          "id": "ov_1_1",
+          "indicator_type": "kpiNumber",
           "font": "Sohid_bangla",
           "start": 15,
           "duration": 255
@@ -39,14 +39,14 @@
       "beats": [
         {
           "frame": 15,
-          "event": "ov_1_1_reveal"
+          "event": "ind_1_1_reveal"
         }
       ],
       "camera": {
         "enabled": true,
         "shots": [
           {
-            "targetId": "ov_1_1",
+            "targetId": "ind_1_1",
             "startFrame": 0,
             "duration": 150,
             "style": "slow_push",
@@ -67,6 +67,7 @@
       },
       "overlays": [
         {
+          "id": "ind_2_1",
           "type": "indicator",
           "indicator_type": "dashboardCard",
           "label": "শহরায়ণ বৃদ্ধি",
@@ -76,7 +77,6 @@
             "y": 730
           },
           "zIndex": 50,
-          "id": "ov_2_1",
           "font": "Sohid_bangla",
           "start": 15,
           "duration": 255
@@ -89,14 +89,14 @@
       "beats": [
         {
           "frame": 15,
-          "event": "ov_2_1_reveal"
+          "event": "ind_2_1_reveal"
         }
       ],
       "camera": {
         "enabled": true,
         "shots": [
           {
-            "targetId": "ov_2_1",
+            "targetId": "ind_2_1",
             "startFrame": 0,
             "duration": 150,
             "style": "slow_push",
