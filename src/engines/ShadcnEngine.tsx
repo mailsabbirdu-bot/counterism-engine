@@ -391,7 +391,7 @@ const ShadcnIndicator = ({ overlay, relativeFrame, fps, font }: any) => {
                 <div className="bg-blue-600 px-8 py-4 rounded-full flex items-center gap-4 shadow-[0_0_40px_rgba(37,99,235,0.4)] border-2 border-white/20">
                     <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center"><Zap size={20} className="text-white fill-white" /></div>
                     <div className="flex flex-col">
-                        <span className="text-white/60 text-[8px] font-black uppercase tracking-tighter">System Power</span>
+                        <span className="text-white/60 text-[8px] font-black uppercase tracking-tighter">{overlay.label || overlay.title || 'System Power'}</span>
                         <span className="text-white text-2xl font-black leading-none uppercase">{renderValue(overlay.value)}</span>
                     </div>
                 </div>
