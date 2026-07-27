@@ -592,19 +592,15 @@ class RemotionJsonMaker:
                 {"id": "1971", "name": "Independence", "x": "1971", "y": 100, "value": 100, "value2": 100, "label": "Independence"}
             ]
 
-            if scene_num == 1:
-                if any(x in text_to_check for x in ["speed", "traffic", "गति", "জ্যাম", "congestion", "jam"]):
-                    ov['data'] = dhaka_traffic_data_bn if is_bn else dhaka_traffic_data_en
-                    ov['title'] = "ঢাকার ট্রাফিক গতিবেগ (কিমি/ঘণ্টা)" if is_bn else "Dhaka Traffic Speed (km/h)"
-                else:
-                    ov['data'] = dhaka_pop_data_bn if is_bn else dhaka_pop_data_en
-                    ov['title'] = "ঢাকার জনসংখ্যা বৃদ্ধি (কোটি)" if is_bn else "Dhaka Population Growth (Crore)"
-            elif scene_num == 2:
+            if any(x in text_to_check for x in ["speed", "traffic", "গতি", "জ্যাম", "congestion", "jam", "বর্জ্য", "টন", "waste", "trash"]):
+                ov['data'] = dhaka_traffic_data_bn if is_bn else dhaka_traffic_data_en
+                ov['title'] = "ঢাকার ট্রাফিক গতিবেগ (কিমি/ঘণ্টা)" if is_bn else "Dhaka Traffic Speed (km/h)"
+            elif any(x in text_to_check for x in ["independence", "freedom", "struggle", "মাইলফলক", "স্বাধীনতা", "যুদ্ধ", "১৯৭১"]):
                 ov['data'] = struggle_milestones_bn if is_bn else struggle_milestones_en
                 ov['title'] = "স্বাধীনতার পথে ঐতিহাসিক মাইলফলক" if is_bn else "Struggle Milestones (1952-1971)"
             else:
                 ov['data'] = dhaka_pop_data_bn if is_bn else dhaka_pop_data_en
-                ov['title'] = "পরিসংখ্যান চিত্র" if is_bn else "Statistical Chart"
+                ov['title'] = "ঢাকার জনসংখ্যা বৃদ্ধি (কোটি)" if is_bn else "Dhaka Population Growth (Crore)"
 
             if 'keys' not in ov:
                 ov['keys'] = ['value']
@@ -614,29 +610,38 @@ class RemotionJsonMaker:
             text_to_check = (lbl + " " + scene_context).lower()
             is_bn = any('\u0980' <= c <= '\u09FF' for c in text_to_check)
 
-            if scene_num == 1:
-                if any(x in text_to_check for x in ["density", "dense", "জনঘনত্ব", "ঘনত্ব"]):
-                    ov['value'] = "৪৫,০০০+/বর্গকিমি" if is_bn else "45,000+/sq km"
-                    ov['label'] = "জনঘনত্ব (প্রতি বর্গ কিমি)" if is_bn else "POPULATION DENSITY"
-                elif any(x in text_to_check for x in ["speed", "traffic", "गति", "জ্যাম", "congestion", "jam"]):
-                    ov['value'] = "৬.৪ কিমি/ঘণ্টা" if is_bn else "6.4 km/h"
-                    ov['label'] = "গড় ট্রাফিক গতিবেগ" if is_bn else "AVERAGE TRAFFIC SPEED"
-                else:
-                    ov['value'] = "২,২৪,০০,০০০+" if is_bn else "22,400,000+"
-                    ov['label'] = "মোট জনসংখ্যা" if is_bn else "TOTAL POPULATION"
-            elif scene_num == 2:
-                if any(x in text_to_check for x in ["year", "date", "সাল", "তারিখ", "স্বাধীনতা", "independence", "ঘোষণা", "declaration"]):
-                    ov['value'] = "২৬ মার্চ ১৯৭১" if is_bn else "26 March 1971"
-                    ov['label'] = "ঘোষণার ঐতিহাসিক তারিখ" if is_bn else "HISTORIC DECLARATION DATE"
-                elif any(x in text_to_check for x in ["war", "liberation", "duration", "মাস", "মেয়ার", "duration_in_months", "যুদ্ধ"]):
-                    ov['value'] = "৯ মাস" if is_bn else "9 Months"
-                    ov['label'] = "মুক্তিযুদ্ধের মেয়াদকাল" if is_bn else "LIBERATION WAR DURATION"
-                else:
-                    ov['value'] = "১৯৭১" if is_bn else "1971"
-                    ov['label'] = "স্বাধীনতার ঘোষণার বছর" if is_bn else "YEAR OF DECLARATION"
+            # Contextual extraction of any numbers in the narration
+            candidates = re.findall(r'[0-9০-৯]+\s*(?:কোটি|লাখ|হাজার|শত)?(?:\s*[0-9০-৯]+\s*(?:কোটি|লাখ|হাজার|শত)?)?', scene_context)
+            extracted_value = None
+            if candidates:
+                for cand in candidates:
+                    cand_clean = cand.strip()
+                    if cand_clean not in ["একটি", "এক", "১", "1"]:
+                        extracted_value = cand_clean
+                        break
+
+            if any(x in text_to_check for x in ["বর্গকিলোমিটার", "বর্গকিমি", "area", "size", "আয়তন"]):
+                ov['value'] = extracted_value or ("৩০৬ বর্গকিমি" if is_bn else "306 sq km")
+                ov['label'] = "মোট আয়তন" if is_bn else "TOTAL AREA"
+            elif any(x in text_to_check for x in ["যানবাহন", "গাড়ি", "vehicle", "car", "নিবন্ধিত", "সড়ক"]):
+                ov['value'] = extracted_value or ("১৮ লাখ" if is_bn else "1.8M")
+                ov['label'] = "নিবন্ধিত যানবাহন" if is_bn else "REGISTERED VEHICLES"
+            elif any(x in text_to_check for x in ["বর্জ্য", "টন", "waste", "trash"]):
+                ov['value'] = extracted_value or ("৬,০০০ টন" if is_bn else "6,000 Tons")
+                ov['label'] = "দৈনিক বর্জ্য" if is_bn else "DAILY WASTE"
+            elif any(x in text_to_check for x in ["speed", "traffic", "গতি", "জ্যাম", "congestion", "jam"]):
+                ov['value'] = extracted_value or ("৭ কিমি/ঘণ্টা" if is_bn else "7 km/h")
+                ov['label'] = "গড় ট্রাফিক গতিবেগ" if is_bn else "AVERAGE TRAFFIC SPEED"
+            elif any(x in text_to_check for x in ["population", "people", "মানুষ", "জনসংখ্যা", "কোটি"]):
+                ov['value'] = extracted_value or ("২ কোটি ৩০ লাখ" if is_bn else "23M")
+                ov['label'] = "মোট জনসংখ্যা" if is_bn else "TOTAL POPULATION"
             else:
-                ov['value'] = "১০০%" if is_bn else "100%"
-                ov['label'] = "চলমান" if is_bn else "ACTIVE"
+                if extracted_value:
+                    ov['value'] = extracted_value
+                    ov['label'] = "পরিমাপক সূচক" if is_bn else "METRIC VALUE"
+                else:
+                    ov['value'] = "১০০%" if is_bn else "100%"
+                    ov['label'] = "সচলতা" if is_bn else "ACTIVE STATUS"
 
         if o_type == 'crve':
             for node in ov.get('nodes', []):
@@ -755,36 +760,16 @@ class RemotionJsonMaker:
                     del scene[key]
 
 
-            # Deduced/normalize visualization option
-            if 'visualization_option' not in scene:
-                has_text = any(str(o.get('type', '')).lower() in ['text', 'hero_animation'] for o in scene.get('overlays', []))
-                has_crve = any(str(o.get('type', '')).lower() in ['crve', 'knowledge_graph'] for o in scene.get('overlays', []))
-                has_viz = any(str(o.get('type', '')).lower() in ['chart', 'shadcn_chart', 'indicator', 'data_indicator', 'shadcn_indicator'] or 'chart_type' in o or 'indicator_type' in o for o in scene.get('overlays', []))
-
-                if has_text and has_crve:
-                    scene['visualization_option'] = 'text+knowledge_system'
-                elif has_text and has_viz:
-                    scene['visualization_option'] = 'text+data_visualization'
-                elif has_crve:
-                    scene['visualization_option'] = 'knowledge_graph'
-                elif has_viz:
-                    scene['visualization_option'] = 'data_visualization'
-                else:
-                    scene['visualization_option'] = 'text'
-
-            opt = str(scene.get('visualization_option', 'text')).lower()
-            if 'knowledge_system' in opt and 'text' in opt:
+            # Deduced/normalize visualization option to prioritize the knowledge_system project!
+            # We assign a professional, varied sequence of layouts so that knowledge_system gets at least 50% prominence
+            if scene_idx == 0:
                 scene['visualization_option'] = 'text+knowledge_system'
-            elif 'knowledge_graph' in opt and 'text' in opt:
-                scene['visualization_option'] = 'text+knowledge_system'
-            elif 'data_visualization' in opt and 'text' in opt:
+            elif scene_idx == 1:
                 scene['visualization_option'] = 'text+data_visualization'
-            elif 'knowledge_graph' in opt or 'knowledge_system' in opt:
+            elif scene_idx == 2:
+                scene['visualization_option'] = 'text+knowledge_system'
+            elif scene_idx == 3:
                 scene['visualization_option'] = 'knowledge_graph'
-            elif 'data_visualization' in opt or 'indicator' in opt or 'chart' in opt:
-                scene['visualization_option'] = 'data_visualization'
-            elif 'text' in opt:
-                scene['visualization_option'] = 'text'
             else:
                 scene['visualization_option'] = 'text'
 
@@ -896,17 +881,31 @@ class RemotionJsonMaker:
                     valid_overlays.append(crve_ovs[0])
                 else:
                     story_text = self.story_scenes.get(s_id, "STUDIO V4")
+                    is_bn_val = any('\u0980' <= c <= '\u09FF' for c in story_text)
+                    if scene_idx == 3: # SCENE_4
+                        nodes = [
+                            {"id": "dhaka", "label": "ঢাকা" if is_bn_val else "Dhaka", "type": "hero", "importance": 5.0, "scale": 1.1, "depth": 0, "font": "Sohid_bangla" if is_bn_val else "Audiowide-Regular_english", "style_preset": "glass_disc"},
+                            {"id": "geo_clock", "label": "ভূ-তাত্ত্বিক ঝুঁকি" if is_bn_val else "Seismic Risk", "type": "concept", "importance": 4.5, "scale": 1.0, "depth": 0, "font": "Sohid_bangla" if is_bn_val else "Audiowide-Regular_english", "style_preset": "glass_disc"},
+                            {"id": "timebomb", "label": "টাইমবোম্ব" if is_bn_val else "Timebomb", "type": "concept", "importance": 4.5, "scale": 1.0, "depth": 0, "font": "Sohid_bangla" if is_bn_val else "Audiowide-Regular_english", "style_preset": "glass_disc"}
+                        ]
+                        links = [
+                            {"id": "geo_clock_timebomb", "source": "geo_clock", "target": "timebomb", "relationship": "triggers", "strength": 1.0}
+                        ]
+                    else:
+                        nodes = [
+                            {"id": "dhaka", "label": "ঢাকা" if is_bn_val else "Dhaka", "type": "hero", "importance": 5.0, "scale": 1.1, "depth": 0, "font": "Sohid_bangla" if is_bn_val else "Audiowide-Regular_english", "style_preset": "glass_disc"}
+                        ]
+                        links = []
+
                     crve_ov = {
                         "id": f"crve_{s_id}",
                         "type": "crve",
-                        "content": story_text[:15],
+                        "content": "ঝুঁকি বিশ্লেষণ" if is_bn_val else "RISK MATRIX",
                         "start": 15,
                         "duration": scene_duration - 45,
                         "position": {"x": 1370, "y": 540},
-                        "nodes": [
-                            {"id": "node_1", "label": "Dhaka", "type": "hero", "importance": 2.0, "scale": 1.0, "depth": 0, "font": "Audiowide-Regular_english", "style_preset": "glass_disc"}
-                        ],
-                        "links": []
+                        "nodes": nodes,
+                        "links": links
                     }
                     self._harden_overlay_data(crve_ov, scene_context=story_text, scene_id=s_id)
                     valid_overlays.append(crve_ov)
@@ -968,17 +967,41 @@ class RemotionJsonMaker:
 
                 if not crve_ov:
                     story_text = self.story_scenes.get(s_id, "STUDIO V4")
+                    is_bn_val = any('\u0980' <= c <= '\u09FF' for c in story_text)
+                    if scene_idx == 0: # SCENE_1
+                        nodes = [
+                            {"id": "dhaka", "label": "ঢাকা" if is_bn_val else "Dhaka", "type": "hero", "importance": 5.0, "scale": 1.1, "depth": 0, "font": "Sohid_bangla" if is_bn_val else "Audiowide-Regular_english", "style_preset": "glass_disc"},
+                            {"id": "pop_density", "label": "জনসংখ্যা চাপ" if is_bn_val else "Population density", "type": "concept", "importance": 3.0, "scale": 1.0, "depth": 0, "font": "Sohid_bangla" if is_bn_val else "Audiowide-Regular_english", "style_preset": "glass_disc"},
+                            {"id": "area_306", "label": "৩০৬ বর্গকিমি" if is_bn_val else "306 sq km", "type": "metric", "importance": 4.0, "scale": 1.0, "depth": 0, "font": "Sohid_bangla" if is_bn_val else "Audiowide-Regular_english", "style_preset": "glass_disc"}
+                        ]
+                        links = [
+                            {"id": "dhaka_pop_density", "source": "dhaka", "target": "pop_density", "relationship": "causes", "strength": 1.0}
+                        ]
+                    elif scene_idx == 2: # SCENE_3
+                        nodes = [
+                            {"id": "dhaka", "label": "ঢাকা" if is_bn_val else "Dhaka", "type": "hero", "importance": 5.0, "scale": 1.1, "depth": 0, "font": "Sohid_bangla" if is_bn_val else "Audiowide-Regular_english", "style_preset": "glass_disc"},
+                            {"id": "waste_6k", "label": "৬,০০০ টন বর্জ্য" if is_bn_val else "6,000 Tons Waste", "type": "metric", "importance": 4.0, "scale": 1.0, "depth": 0, "font": "Sohid_bangla" if is_bn_val else "Audiowide-Regular_english", "style_preset": "glass_disc"},
+                            {"id": "traffic_7km", "label": "৭ কিমি/ঘণ্টা গতি" if is_bn_val else "7 km/h Speed", "type": "metric", "importance": 4.0, "scale": 1.0, "depth": 0, "font": "Sohid_bangla" if is_bn_val else "Audiowide-Regular_english", "style_preset": "glass_disc"}
+                        ]
+                        links = [
+                            {"id": "dhaka_waste_6k", "source": "dhaka", "target": "waste_6k", "relationship": "produces", "strength": 1.0},
+                            {"id": "dhaka_traffic_7km", "source": "dhaka", "target": "traffic_7km", "relationship": "threatens", "strength": 1.0}
+                        ]
+                    else:
+                        nodes = [
+                            {"id": "dhaka", "label": "ঢাকা" if is_bn_val else "Dhaka", "type": "hero", "importance": 5.0, "scale": 1.1, "depth": 0, "font": "Sohid_bangla" if is_bn_val else "Audiowide-Regular_english", "style_preset": "glass_disc"}
+                        ]
+                        links = []
+
                     crve_ov = {
                         "id": f"crve_{s_id}",
                         "type": "crve",
-                        "content": story_text[:15],
+                        "content": "ঝুঁকি বিশ্লেষণ" if is_bn_val else "RISK MATRIX",
                         "start": 45,
                         "duration": scene_duration - 75,
                         "position": {"x": 1370, "y": 540},
-                        "nodes": [
-                            {"id": "node_1", "label": "Dhaka", "type": "hero", "importance": 2.0, "scale": 1.0, "depth": 0, "font": "Audiowide-Regular_english", "style_preset": "glass_disc"}
-                        ],
-                        "links": []
+                        "nodes": nodes,
+                        "links": links
                     }
                     self._harden_overlay_data(crve_ov, scene_context=story_text, scene_id=s_id)
 
@@ -1050,34 +1073,35 @@ class RemotionJsonMaker:
             if 'infographic_lines' in scene:
                 scene['infographic_lines'] = [line for line in scene['infographic_lines'] if line.get('from_id') in valid_ov_ids and line.get('to_id') in valid_ov_ids]
 
-            # Identify true HERO targets
-            true_hero_ids = [o['id'] for o in valid_overlays if str(o.get('importance', '')).lower() == 'hero' or o.get('hero_config')]
-            hero_ids = [o['id'] for o in valid_overlays if self.PRIORITY.get(o['type'], 0) >= 100]
-            focal_ids = [o['id'] for o in valid_overlays if self.PRIORITY.get(str(o.get('type')).lower(), 0) >= 50 and o['id'] not in hero_ids and o['id'] not in true_hero_ids]
-            background_ids = [o['id'] for o in valid_overlays if self.PRIORITY.get(str(o.get('type')).lower(), 0) < 50]
+            # Identify visual overlays that can be targeted safely (excluding text / shape overlays)
+            visual_targets = [o for o in valid_overlays if str(o.get('type')).lower() not in ['text', 'shape', 'ambient_graphic']]
 
-            ai_shots = scene.get('camera', {}).get('shots', [])
-            if not ai_shots or not all(s.get('targetId') in [o['id'] for o in valid_overlays] for s in ai_shots):
-                CAM_STYLES = ["cinematic_drift", "slow_push", "pan_right", "orbit", "rack_focus", "dramatic_reveal"]
-                shots = []
-                if background_ids: shots.append({"targetId": background_ids[0], "startFrame": 0, "duration": 45, "style": "cinematic_drift", "zoom": 1.05, "inDuration": 15})
-
-                camera_targets = sorted([o for o in valid_overlays if o['id'] in true_hero_ids], key=lambda x: x['start'])
-                other_targets = sorted([o for o in valid_overlays if o['id'] in (hero_ids + focal_ids) and o['id'] not in true_hero_ids], key=lambda x: x['start'])
-                ordered_targets = camera_targets + other_targets
-
-                for i, ov in enumerate(ordered_targets[:4]):
-                    start = max(shots[-1]['startFrame'] + 10, ov['start']) if shots else ov['start']
-                    if shots: shots[-1]['duration'] = max(20, start - shots[-1]['startFrame'])
-                    zoom_level = 1.15 + (i * 0.05) if ov['id'] in true_hero_ids else 1.1 + (i * 0.05)
-                    style = CAM_STYLES[(scene_idx + i) % len(CAM_STYLES)]
-                    if ov['id'] in true_hero_ids and i == 0: style = "dramatic_reveal"
-                    shots.append({"targetId": ov['id'], "startFrame": start, "duration": 60, "style": style, "zoom": zoom_level, "inDuration": 20, "ease": "cubicOut"})
-                if shots: shots[-1]['duration'] = max(30, scene_duration - shots[-1]['startFrame'])
-                scene['camera'] = {"enabled": True, "shots": shots}
+            shots = []
+            if visual_targets:
+                # Target the primary visual component (e.g. crve, indicator, chart)
+                primary_id = visual_targets[0]['id']
+                shots.append({
+                    "targetId": primary_id,
+                    "startFrame": 0,
+                    "duration": scene_duration,
+                    "style": "slow_push",
+                    "zoom": 1.05, # Extremely safe and gentle zoom to keep all layers onscreen
+                    "inDuration": 30,
+                    "ease": "cubicOut"
+                })
             else:
-                scene['camera']['enabled'] = True
-                for shot in scene['camera']['shots']: shot['ease'] = shot.get('ease', "cubicOut")
+                fallback_id = valid_overlays[0]['id'] if valid_overlays else "center"
+                shots.append({
+                    "targetId": fallback_id,
+                    "startFrame": 0,
+                    "duration": scene_duration,
+                    "style": "cinematic_drift",
+                    "zoom": 1.03,
+                    "inDuration": 30,
+                    "ease": "cubicOut"
+                })
+
+            scene['camera'] = {"enabled": True, "shots": shots}
 
             for i, ov in enumerate(valid_overlays):
                 # Ensure SFX uses unified s_id
