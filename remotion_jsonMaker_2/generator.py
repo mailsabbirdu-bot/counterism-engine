@@ -1228,10 +1228,12 @@ class RemotionJsonMaker:
                     if found: break
                 if found: break
 
-            ov['position'] = {"x": int(best_pos[0]), "y": int(best_pos[1])}
+            cx = max(final_w/2 + 20, min(1920 - final_w/2 - 20, best_pos[0]))
+            cy = max(final_h/2 + 20, min(1080 - final_h/2 - 20, best_pos[1]))
+            ov['position'] = {"x": int(cx), "y": int(cy)}
             ov['visual_anchor'] = True
             if ov.get('hero_config'): ov['hero_config']['start'] = max(ov['start'] + 10, ov['hero_config'].get('start', 0))
-            placed_boxes.append((ov['id'], best_pos[0]-final_w/2, best_pos[1]-final_h/2, best_pos[0]+final_w/2, best_pos[1]+final_h/2, ov['start'], ov['start']+ov['duration'], imp))
+            placed_boxes.append((ov['id'], cx-final_w/2, cy-final_h/2, cx+final_w/2, cy+final_h/2, ov['start'], ov['start']+ov['duration'], imp))
 
     def apply_qa_patches(self, data: Dict[str, Any], feedback: List[str]) -> Dict[str, Any]:
         """v2.0: Automatically applies deterministic JSON patches from QA feedback."""
