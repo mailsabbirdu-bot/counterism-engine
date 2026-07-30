@@ -165,6 +165,67 @@
             android:layout_marginStart="6dp" />
     </LinearLayout>
 
+    <!-- Gemini API Key Input for background / locked phone runs -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#EDE7F6"
+        android:padding="8dp"
+        android:gravity="center_vertical">
+
+        <EditText
+            android:id="@+id/etApiKey"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Enter Gemini API Key (for locked/background runs)..."
+            android:singleLine="true"
+            android:textSize="11sp"
+            android:background="#FFFFFF"
+            android:padding="6dp" />
+
+        <Button
+            android:id="@+id/btnSaveKey"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="💾 SAVE KEY"
+            android:textSize="10sp"
+            android:backgroundTint="#673AB7"
+            android:textColor="#FFFFFF"
+            android:layout_marginStart="6dp" />
+    </LinearLayout>
+
+    <!-- Tabs layout for Colab & Gemini WebViews -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#ECEFF1"
+        android:padding="6dp">
+
+        <Button
+            android:id="@+id/btnTabColab"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🔬 COLAB VIEW"
+            android:textSize="12sp"
+            android:backgroundTint="#2196F3"
+            android:textColor="#FFFFFF"
+            android:layout_marginEnd="4dp" />
+
+        <Button
+            android:id="@+id/btnTabGemini"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🤖 GEMINI VIEW"
+            android:textSize="12sp"
+            android:backgroundTint="#78909C"
+            android:textColor="#FFFFFF" />
+    </LinearLayout>
+
     <!-- Container to support dynamic multi-tab popups cleanly (e.g. Google Drive auth redirects) -->
     <LinearLayout
         android:id="@+id/webViewContainer"
@@ -177,6 +238,12 @@
             android:id="@+id/webView"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
+
+        <WebView
+            android:id="@+id/geminiWebView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
     </LinearLayout>
 
 </LinearLayout>
