@@ -1553,6 +1553,27 @@ class RemotionJsonMaker:
                             navigator.clipboard.writeText({json.dumps(copy_payload)});
                             document.getElementById('copy-'+u_id).innerText = "COPIED!";
                         }};
+
+                        // Agent Automation postMessage link
+                        setInterval(() => {{
+                            window.parent.postMessage({{
+                                type: 'HUMAN_LOOP_PROMPT',
+                                prompt: {json.dumps(copy_payload)},
+                                uId: u_id,
+                                promptType: 'json_maker'
+                            }}, '*');
+                        }}, 3000);
+
+                        window.addEventListener('message', (event) => {{
+                            if (event.data && event.data.type === 'HUMAN_LOOP_REPLY' && event.data.uId === u_id) {{
+                                let val = event.data.reply;
+                                document.getElementById('paste-'+u_id).value = val;
+                                setTimeout(() => {{
+                                    document.getElementById('submit-'+u_id).click();
+                                }}, 500);
+                            }}
+                        }});
+
                         return new Promise((resolve) => {{
                             document.getElementById('submit-'+u_id).onclick = () => {{
                                 const val = document.getElementById('paste-'+u_id).value.trim();
