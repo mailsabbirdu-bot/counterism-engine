@@ -4,5 +4,5 @@
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews"
     android:canRetrieveWindowContent="true"
-    android:packageNames="com.google.android.apps.bard,com.google.android.googlequicksearchbox,com.example.webview"
+    android:packageNames="com.google.android.apps.bard,com.google.android.googlequicksearchbox,com.example.webview,com.example.webview_2"
     android:notificationTimeout="100" />
