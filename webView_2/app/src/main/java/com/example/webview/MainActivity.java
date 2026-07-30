@@ -78,10 +78,6 @@ public class MainActivity extends AppCompatActivity {
     private int geminiState = 0; // 0: Idle, 1: Send Prompt, 2: Wait Response
     private long geminiStateTimestamp = 0;
 
-    // Gemini API Key Input Views
-    private EditText etApiKey;
-    private Button btnSaveKey;
-
     private boolean isServiceRunning = false;
     private boolean isDesktopMode = true; // Default is Desktop Mode for Colab fully active execution
     private ValueCallback<Uri[]> uploadMessage;
@@ -210,19 +206,6 @@ public class MainActivity extends AppCompatActivity {
         btnTabGemini.setOnClickListener(v -> switchTab(false));
 
         setupGeminiWebView();
-
-        // Initialize Gemini API Key Input Views and load saved key
-        etApiKey = findViewById(R.id.etApiKey);
-        btnSaveKey = findViewById(R.id.btnSaveKey);
-
-        String savedKey = getSharedPreferences("WebViewPrefs", MODE_PRIVATE).getString("gemini_api_key", "");
-        etApiKey.setText(savedKey);
-
-        btnSaveKey.setOnClickListener(v -> {
-            String key = etApiKey.getText().toString().trim();
-            getSharedPreferences("WebViewPrefs", MODE_PRIVATE).edit().putString("gemini_api_key", key).apply();
-            Toast.makeText(this, "Gemini API Key saved successfully!", Toast.LENGTH_SHORT).show();
-        });
 
         ImageButton btnBack = findViewById(R.id.btnBack);
         ImageButton btnForward = findViewById(R.id.btnForward);
@@ -817,106 +800,14 @@ public class MainActivity extends AppCompatActivity {
         sActiveType = type;
         sAutomationInProgress = true;
 
-        Log.d(TAG, "handleHumanLoop: Starting automation for uId: " + uId + " | type: " + type);
+        Log.d(TAG, "handleHumanLoop: Starting WebView automation for uId: " + uId + " | type: " + type);
         tvServiceStatus.setText("Background service: RUNNING\n🤖 AGENT: Processing prompt " + uId + "...");
         tvServiceStatus.setTextColor(Color.parseColor("#E91E63")); // Cyberpunk Pink for Agent activity!
 
-        // Check if phone is locked/screen off
-        android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
-        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        boolean isLocked = km != null && km.isKeyguardLocked();
-        boolean isScreenOn = pm != null && pm.isInteractive();
-
-        if (isLocked || !isScreenOn) {
-            Log.d(TAG, "Phone is LOCKED or screen is OFF. Running background API solver!");
-            callGeminiApi(prompt, uId, type);
-        } else {
-            Log.d(TAG, "Phone is UNLOCKED and interactive. Launching official Gemini app!");
-            launchGeminiApp();
-        }
-    }
-
-    private void launchGeminiApp() {
-        Intent intent = getPackageManager().getLaunchIntentForPackage("com.google.android.apps.bard");
-        if (intent == null) {
-            intent = getPackageManager().getLaunchIntentForPackage("com.google.android.googlequicksearchbox");
-        }
-        if (intent != null) {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(intent);
-            Toast.makeText(this, "🤖 Agent: Opening Gemini App...", Toast.LENGTH_SHORT).show();
-        } else {
-            Log.e(TAG, "Google Gemini App is not installed. Routing to background API solver!");
-            callGeminiApi(sActivePrompt, sActiveUId, sActiveType);
-        }
-    }
-
-    private void callGeminiApi(final String prompt, final String uId, final String type) {
-        final String apiKey = getSharedPreferences("WebViewPrefs", MODE_PRIVATE).getString("gemini_api_key", "");
-        if (apiKey.isEmpty()) {
-            Log.e(TAG, "No Gemini API Key found in SharedPreferences. Falling back to local solver!");
-            runLocalSolverFallback(prompt, uId, type);
-            return;
-        }
-
-        new Thread(() -> {
-            try {
-                Log.d(TAG, "callGeminiApi: Sending post request to developer Gemini API...");
-                java.net.URL url = new java.net.URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey);
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setDoOutput(true);
-
-                // Build payload
-                org.json.JSONObject payload = new org.json.JSONObject();
-                org.json.JSONArray contents = new org.json.JSONArray();
-                org.json.JSONObject contentObj = new org.json.JSONObject();
-                org.json.JSONArray parts = new org.json.JSONArray();
-                org.json.JSONObject partObj = new org.json.JSONObject();
-
-                partObj.put("text", prompt);
-                parts.put(partObj);
-                contentObj.put("parts", parts);
-                contents.put(contentObj);
-                payload.put("contents", contents);
-
-                java.io.OutputStream os = conn.getOutputStream();
-                os.write(payload.toString().getBytes("utf-8"));
-                os.close();
-
-                int responseCode = conn.getResponseCode();
-                if (responseCode == java.net.HttpURLConnection.HTTP_OK) {
-                    java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream()));
-                    StringBuilder response = new StringBuilder();
-                    String line;
-                    while ((line = in.readLine()) != null) {
-                        response.append(line);
-                    }
-                    in.close();
-
-                    org.json.JSONObject jsonResponse = new org.json.JSONObject(response.toString());
-                    String text = jsonResponse.getJSONArray("candidates")
-                                              .getJSONObject(0)
-                                              .getJSONObject("content")
-                                              .getJSONArray("parts")
-                                              .getJSONObject(0)
-                                              .getString("text");
-
-                    Log.d(TAG, "callGeminiApi: Response fetched successfully!");
-                    final String cleanedResponse = cleanGeminiResponse(text);
-                    runOnUiThread(() -> {
-                        pasteResponseAndSubmit(cleanedResponse);
-                    });
-                } else {
-                    Log.e(TAG, "callGeminiApi: Error response code from API: " + responseCode + ". Routing to local solver fallback!");
-                    runLocalSolverFallback(prompt, uId, type);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "callGeminiApi: Error sending HTTP request. Routing to local solver fallback!", e);
-                runLocalSolverFallback(prompt, uId, type);
-            }
-        }).start();
+        // Trigger WebView Gemini website automation (works in background/locked screen via WakeLock + Java Handlers!)
+        geminiState = 1; // Transition to state 1: Send Prompt
+        geminiStateTimestamp = System.currentTimeMillis();
+        Toast.makeText(this, "🤖 Agent: Automating Gemini website...", Toast.LENGTH_SHORT).show();
     }
 
     private void pollGeminiAutomation() {
