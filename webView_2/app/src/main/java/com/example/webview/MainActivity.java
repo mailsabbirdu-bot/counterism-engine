@@ -328,6 +328,15 @@ public class MainActivity extends AppCompatActivity {
                 "    if (window.hasAgenticPollingInjected) return;\n" +
                 "    window.hasAgenticPollingInjected = true;\n" +
                 "    console.log('Agentic Automation Polling Injected!');\n" +
+                "    \n" +
+                "    // Cross-origin HTML5 postMessage listener for sandboxed Colab output iframes\n" +
+                "    window.addEventListener('message', function(event) {\n" +
+                "        if (event.data && event.data.type === 'HUMAN_LOOP_PROMPT') {\n" +
+                "            console.log('Detected postMessage HUMAN_LOOP_PROMPT:', event.data);\n" +
+                "            AndroidApp.onHumanLoopDetected(event.data.prompt, event.data.uId, event.data.promptType);\n" +
+                "        }\n" +
+                "    });\n" +
+                "    \n" +
                 "    let lastProcessedId = '';\n" +
                 "    function findElements(root) {\n" +
                 "        if (!root) return null;\n" +
@@ -869,48 +878,25 @@ public class MainActivity extends AppCompatActivity {
                                              .replace("\n", "\\n")
                                              .replace("\r", "");
 
-            String jsPasteSubmit = "javascript:(function() {\n" +
-                    "    function findElements(root) {\n" +
-                    "        if (!root) return null;\n" +
-                    "        let copyBtn = root.querySelector('button[id^=\"copy-\"]');\n" +
-                    "        let pasteArea = root.querySelector('textarea[id^=\"paste-\"]');\n" +
-                    "        let submitBtn = root.querySelector('button[id^=\"submit-\"]');\n" +
-                    "        if (copyBtn && pasteArea && submitBtn) return { copyBtn, pasteArea, submitBtn };\n" +
-                    "        let iframes = root.querySelectorAll('iframe');\n" +
-                    "        for (let iframe of iframes) {\n" +
+            // Cross-origin HTML5 postMessage broadcast to all child frames
+            String jsBroadcast = "javascript:(function() {\n" +
+                    "    let msg = { type: 'HUMAN_LOOP_REPLY', uId: '" + sActiveUId + "', reply: '" + escapedResponse + "' };\n" +
+                    "    window.postMessage(msg, '*');\n" +
+                    "    function broadcast(win) {\n" +
+                    "        if (!win) return;\n" +
+                    "        for (let i = 0; i < win.frames.length; i++) {\n" +
                     "            try {\n" +
-                    "                if (iframe.contentDocument) {\n" +
-                    "                    let res = findElements(iframe.contentDocument);\n" +
-                    "                    if (res) return res;\n" +
-                    "                }\n" +
+                    "                win.frames[i].postMessage(msg, '*');\n" +
+                    "                broadcast(win.frames[i]);\n" +
                     "            } catch (e) {}\n" +
                     "        }\n" +
-                    "        let all = root.querySelectorAll('*');\n" +
-                    "        for (let el of all) {\n" +
-                    "            if (el.shadowRoot) {\n" +
-                    "                let res = findElements(el.shadowRoot);\n" +
-                    "                if (res) return res;\n" +
-                    "            }\n" +
-                    "        }\n" +
-                    "        return null;\n" +
                     "    }\n" +
-                    "    let res = findElements(document);\n" +
-                    "    if (res) {\n" +
-                    "        res.pasteArea.value = '" + escapedResponse + "';\n" +
-                    "        let evt = new Event('input', { bubbles: true });\n" +
-                    "        res.pasteArea.dispatchEvent(evt);\n" +
-                    "        let changeEvt = new Event('change', { bubbles: true });\n" +
-                    "        res.pasteArea.dispatchEvent(changeEvt);\n" +
-                    "        setTimeout(() => {\n" +
-                    "            res.submitBtn.click();\n" +
-                    "        }, 500);\n" +
-                    "        return 'success';\n" +
-                    "    }\n" +
-                    "    return 'not_found';\n" +
+                    "    broadcast(window);\n" +
+                    "    return 'broadcast_complete';\n" +
                     "})()";
 
-            webView.evaluateJavascript(jsPasteSubmit, value -> {
-                Log.d(TAG, "Paste and submit result: " + value);
+            webView.evaluateJavascript(jsBroadcast, value -> {
+                Log.d(TAG, "Cross-origin postMessage broadcast complete. Result: " + value);
                 Toast.makeText(MainActivity.this, "🤖 Agent: Submitted response back to Colab!", Toast.LENGTH_SHORT).show();
                 sAutomationInProgress = false;
                 tvServiceStatus.setText("Background service: RUNNING\n🤖 AGENT: Idle");

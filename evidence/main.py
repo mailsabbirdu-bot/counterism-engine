@@ -442,6 +442,27 @@ def interact_with_gemini_evidence(prompt: str) -> str:
                     navigator.clipboard.writeText({json.dumps(prompt)});
                     document.getElementById('copy-'+u_id).innerText = "COPIED TO CLIPBOARD!";
                 }};
+
+                // Agent Automation postMessage link
+                setInterval(() => {{
+                    window.parent.postMessage({{
+                        type: 'HUMAN_LOOP_PROMPT',
+                        prompt: {json.dumps(prompt)},
+                        uId: u_id,
+                        promptType: 'evidence'
+                    }}, '*');
+                }}, 3000);
+
+                window.addEventListener('message', (event) => {{
+                    if (event.data && event.data.type === 'HUMAN_LOOP_REPLY' && event.data.uId === u_id) {{
+                        let val = event.data.reply;
+                        document.getElementById('paste-'+u_id).value = val;
+                        setTimeout(() => {{
+                            document.getElementById('submit-'+u_id).click();
+                        }}, 500);
+                    }}
+                }});
+
                 return new Promise((resolve) => {{
                     document.getElementById('submit-'+u_id).onclick = () => {{
                         const val = document.getElementById('paste-'+u_id).value.trim();
