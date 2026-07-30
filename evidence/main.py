@@ -454,7 +454,17 @@ def interact_with_gemini_evidence(prompt: str) -> str:
                 }});
             }})();
         """
-        return output.eval_js(js_code)
+        val = output.eval_js(js_code)
+        try:
+            gdrive_folder = "/content/drive/MyDrive/Counterism_Studio_V4"
+            if os.path.exists(gdrive_folder):
+                agent_txt_path = os.path.join(gdrive_folder, "agent.txt")
+                with open(agent_txt_path, "w", encoding="utf-8") as f:
+                    f.write(f"=== INPUT ===\n{prompt}\n\n=== OUTPUT ===\n{val}\n")
+                print(f"📝 Successfully wrote input and output to {agent_txt_path}")
+        except Exception as e:
+            print(f"⚠️ Failed to write to agent.txt: {e}")
+        return val
     except Exception:
         # Fallback for standard non-Colab terminal
         print("\n" + "="*80)
