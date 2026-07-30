@@ -51,7 +51,10 @@ public class MainActivity extends AppCompatActivity {
             if (webView != null) {
                 injectPollingScript();
             }
-            automationHandler.postDelayed(this, 5000);
+            if (sAutomationInProgress) {
+                pollGeminiAutomation();
+            }
+            automationHandler.postDelayed(this, 3000); // Poll faster (3s) for responsive automation
         }
     };
     private static final int REQUEST_CODE_POST_NOTIFICATIONS = 101;
@@ -67,6 +70,17 @@ public class MainActivity extends AppCompatActivity {
     private EditText etJsCode;
     private Button btnRunJs;
     private LinearLayout webViewContainer;
+
+    // Dual WebView Views & State Machine
+    private WebView geminiWebView;
+    private Button btnTabColab;
+    private Button btnTabGemini;
+    private int geminiState = 0; // 0: Idle, 1: Send Prompt, 2: Wait Response
+    private long geminiStateTimestamp = 0;
+
+    // Gemini API Key Input Views
+    private EditText etApiKey;
+    private Button btnSaveKey;
 
     private boolean isServiceRunning = false;
     private boolean isDesktopMode = true; // Default is Desktop Mode for Colab fully active execution
@@ -186,6 +200,29 @@ public class MainActivity extends AppCompatActivity {
         etJsCode = findViewById(R.id.etJsCode);
         btnRunJs = findViewById(R.id.btnRunJs);
         webViewContainer = findViewById(R.id.webViewContainer);
+
+        // Initialize Dual WebView layout and tabs
+        geminiWebView = findViewById(R.id.geminiWebView);
+        btnTabColab = findViewById(R.id.btnTabColab);
+        btnTabGemini = findViewById(R.id.btnTabGemini);
+
+        btnTabColab.setOnClickListener(v -> switchTab(true));
+        btnTabGemini.setOnClickListener(v -> switchTab(false));
+
+        setupGeminiWebView();
+
+        // Initialize Gemini API Key Input Views and load saved key
+        etApiKey = findViewById(R.id.etApiKey);
+        btnSaveKey = findViewById(R.id.btnSaveKey);
+
+        String savedKey = getSharedPreferences("WebViewPrefs", MODE_PRIVATE).getString("gemini_api_key", "");
+        etApiKey.setText(savedKey);
+
+        btnSaveKey.setOnClickListener(v -> {
+            String key = etApiKey.getText().toString().trim();
+            getSharedPreferences("WebViewPrefs", MODE_PRIVATE).edit().putString("gemini_api_key", key).apply();
+            Toast.makeText(this, "Gemini API Key saved successfully!", Toast.LENGTH_SHORT).show();
+        });
 
         ImageButton btnBack = findViewById(R.id.btnBack);
         ImageButton btnForward = findViewById(R.id.btnForward);
@@ -723,6 +760,57 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // Agentic Automation Methods
+    private void switchTab(boolean isColab) {
+        runOnUiThread(() -> {
+            if (isColab) {
+                webView.setVisibility(View.VISIBLE);
+                geminiWebView.setVisibility(View.GONE);
+                btnTabColab.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#2196F3")));
+                btnTabGemini.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#78909C")));
+            } else {
+                webView.setVisibility(View.GONE);
+                geminiWebView.setVisibility(View.VISIBLE);
+                btnTabColab.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#78909C")));
+                btnTabGemini.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#673AB7")));
+            }
+        });
+    }
+
+    private void setupGeminiWebView() {
+        WebSettings settings = geminiWebView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+        settings.setUseWideViewPort(true);
+        settings.setLoadWithOverviewMode(true);
+        settings.setSupportZoom(true);
+        settings.setBuiltInZoomControls(true);
+        settings.setDisplayZoomControls(false);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
+
+        // Point to Chromebook Chrome Desktop UA to pass Google Sign-In checks flawlessly!
+        settings.setUserAgentString(DESKTOP_USER_AGENT);
+
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            cookieManager.setAcceptThirdPartyCookies(geminiWebView, true);
+        }
+
+        geminiWebView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                CookieManager.getInstance().flush();
+            }
+        });
+
+        // Load Gemini website immediately on startup
+        geminiWebView.loadUrl("https://gemini.google.com");
+    }
+
     private void handleHumanLoop(String prompt, String uId, String type) {
         sActivePrompt = prompt;
         sActiveUId = uId;
@@ -740,10 +828,10 @@ public class MainActivity extends AppCompatActivity {
         boolean isScreenOn = pm != null && pm.isInteractive();
 
         if (isLocked || !isScreenOn) {
-            Log.d(TAG, "Phone is LOCKED or screen is OFF. Running Background Solver Fallback!");
-            runBackgroundSolverFallback(prompt, uId, type);
+            Log.d(TAG, "Phone is LOCKED or screen is OFF. Running background API solver!");
+            callGeminiApi(prompt, uId, type);
         } else {
-            Log.d(TAG, "Phone is UNLOCKED and interactive. Opening official Gemini App!");
+            Log.d(TAG, "Phone is UNLOCKED and interactive. Launching official Gemini app!");
             launchGeminiApp();
         }
     }
@@ -756,14 +844,213 @@ public class MainActivity extends AppCompatActivity {
         if (intent != null) {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
-            Toast.makeText(this, "🤖 Agent: Opening Gemini...", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "🤖 Agent: Opening Gemini App...", Toast.LENGTH_SHORT).show();
         } else {
-            Log.e(TAG, "Google Gemini App is not installed. Running background solver fallback!");
-            runBackgroundSolverFallback(sActivePrompt, sActiveUId, sActiveType);
+            Log.e(TAG, "Google Gemini App is not installed. Routing to background API solver!");
+            callGeminiApi(sActivePrompt, sActiveUId, sActiveType);
         }
     }
 
-    private void runBackgroundSolverFallback(final String prompt, final String uId, final String type) {
+    private void callGeminiApi(final String prompt, final String uId, final String type) {
+        final String apiKey = getSharedPreferences("WebViewPrefs", MODE_PRIVATE).getString("gemini_api_key", "");
+        if (apiKey.isEmpty()) {
+            Log.e(TAG, "No Gemini API Key found in SharedPreferences. Falling back to local solver!");
+            runLocalSolverFallback(prompt, uId, type);
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                Log.d(TAG, "callGeminiApi: Sending post request to developer Gemini API...");
+                java.net.URL url = new java.net.URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey);
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+
+                // Build payload
+                org.json.JSONObject payload = new org.json.JSONObject();
+                org.json.JSONArray contents = new org.json.JSONArray();
+                org.json.JSONObject contentObj = new org.json.JSONObject();
+                org.json.JSONArray parts = new org.json.JSONArray();
+                org.json.JSONObject partObj = new org.json.JSONObject();
+
+                partObj.put("text", prompt);
+                parts.put(partObj);
+                contentObj.put("parts", parts);
+                contents.put(contentObj);
+                payload.put("contents", contents);
+
+                java.io.OutputStream os = conn.getOutputStream();
+                os.write(payload.toString().getBytes("utf-8"));
+                os.close();
+
+                int responseCode = conn.getResponseCode();
+                if (responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                    java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream()));
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = in.readLine()) != null) {
+                        response.append(line);
+                    }
+                    in.close();
+
+                    org.json.JSONObject jsonResponse = new org.json.JSONObject(response.toString());
+                    String text = jsonResponse.getJSONArray("candidates")
+                                              .getJSONObject(0)
+                                              .getJSONObject("content")
+                                              .getJSONArray("parts")
+                                              .getJSONObject(0)
+                                              .getString("text");
+
+                    Log.d(TAG, "callGeminiApi: Response fetched successfully!");
+                    final String cleanedResponse = cleanGeminiResponse(text);
+                    runOnUiThread(() -> {
+                        pasteResponseAndSubmit(cleanedResponse);
+                    });
+                } else {
+                    Log.e(TAG, "callGeminiApi: Error response code from API: " + responseCode + ". Routing to local solver fallback!");
+                    runLocalSolverFallback(prompt, uId, type);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "callGeminiApi: Error sending HTTP request. Routing to local solver fallback!", e);
+                runLocalSolverFallback(prompt, uId, type);
+            }
+        }).start();
+    }
+
+    private void pollGeminiAutomation() {
+        long elapsed = System.currentTimeMillis() - geminiStateTimestamp;
+
+        if (geminiState == 1) { // State 1: Send prompt
+            Log.d(TAG, "pollGeminiAutomation: Attempting to send prompt to Gemini Webview...");
+
+            String escapedPrompt = sActivePrompt.replace("\\", "\\\\")
+                                                 .replace("'", "\\'")
+                                                 .replace("\n", "\\n")
+                                                 .replace("\r", "");
+
+            String jsSend = "javascript:(function() {\n" +
+                    "    let editor = document.querySelector('.ql-editor') || document.querySelector('div[contenteditable=\"true\"]') || document.querySelector('textarea');\n" +
+                    "    if (editor) {\n" +
+                    "        editor.focus();\n" +
+                    "        if (editor.tagName === 'TEXTAREA' || editor.tagName === 'INPUT') {\n" +
+                    "            editor.value = '" + escapedPrompt + "';\n" +
+                    "        } else {\n" +
+                    "            editor.innerHTML = '<p>' + '" + escapedPrompt + "'.replace(/\\\\n/g, '<br>') + '</p>';\n" +
+                    "        }\n" +
+                    "        let evt = new Event('input', { bubbles: true });\n" +
+                    "        editor.dispatchEvent(evt);\n" +
+                    "        \n" +
+                    "        setTimeout(() => {\n" +
+                    "            let sendBtn = document.querySelector('button[aria-label*=\"Send\"]') || \n" +
+                    "                          document.querySelector('button[class*=\"send\"]') || \n" +
+                    "                          document.querySelector('.send-button-container button');\n" +
+                    "            if (sendBtn) {\n" +
+                    "                sendBtn.click();\n" +
+                    "                console.log('Clicked send button!');\n" +
+                    "            }\n" +
+                    "        }, 500);\n" +
+                    "        return 'success';\n" +
+                    "    }\n" +
+                    "    return 'not_found';\n" +
+                    "})()";
+
+            geminiWebView.evaluateJavascript(jsSend, value -> {
+                Log.d(TAG, "evaluateJavascript jsSend result: " + value);
+                if (value != null && value.contains("success")) {
+                    Log.d(TAG, "Successfully pasted and clicked send inside Gemini Webview!");
+                    geminiState = 2; // Transition to Wait Response
+                    geminiStateTimestamp = System.currentTimeMillis();
+                } else {
+                    if (elapsed > 15000) {
+                        Log.e(TAG, "Timed out waiting for Gemini editor. Routing to fallback solver!");
+                        geminiState = 0;
+                        runLocalSolverFallback(sActivePrompt, sActiveUId, sActiveType);
+                    }
+                }
+            });
+
+        } else if (geminiState == 2) { // State 2: Wait for response
+            Log.d(TAG, "pollGeminiAutomation: Polling for Gemini response to be ready...");
+
+            String jsPoll = "javascript:(function() {\n" +
+                    "    let responses = document.querySelectorAll('.model-response') || document.querySelectorAll('message-content') || document.querySelectorAll('.chat-content');\n" +
+                    "    if (responses.length > 0) {\n" +
+                    "        let lastResponse = responses[responses.length - 1];\n" +
+                    "        let isGenerating = document.querySelector('.generating') || document.querySelector('mat-progress-bar') || document.querySelector('.loading-spinner');\n" +
+                    "        if (isGenerating) {\n" +
+                    "            return JSON.stringify({ status: 'generating' });\n" +
+                    "        }\n" +
+                    "        let copyBtn = lastResponse.querySelector('button[aria-label*=\"Copy\"]') || \n" +
+                    "                      lastResponse.querySelector('button[class*=\"copy\"]') ||\n" +
+                    "                      document.querySelector('button[aria-label*=\"Copy\"]');\n" +
+                    "        if (copyBtn) {\n" +
+                    "            let text = lastResponse.innerText || lastResponse.textContent || '';\n" +
+                    "            return JSON.stringify({ status: 'ready', text: text });\n" +
+                    "        }\n" +
+                    "    }\n" +
+                    "    return JSON.stringify({ status: 'waiting' });\n" +
+                    "})()";
+
+            geminiWebView.evaluateJavascript(jsPoll, value -> {
+                Log.d(TAG, "evaluateJavascript jsPoll result: " + value);
+                if (value != null && !value.equals("null")) {
+                    try {
+                        String cleanJson = value;
+                        if (cleanJson.startsWith("\"") && cleanJson.endsWith("\"")) {
+                            cleanJson = cleanJson.substring(1, cleanJson.length() - 1)
+                                                 .replace("\\\"", "\"")
+                                                 .replace("\\\\", "\\");
+                        }
+                        org.json.JSONObject result = new org.json.JSONObject(cleanJson);
+                        String status = result.optString("status");
+
+                        if (status.equals("ready")) {
+                            String text = result.optString("text");
+                            if (text != null && !text.isEmpty()) {
+                                Log.d(TAG, "Gemini Response extracted successfully! Length: " + text.length());
+                                geminiState = 0; // Transition back to Idle
+
+                                String cleanedResponse = cleanGeminiResponse(text);
+                                pasteResponseAndSubmit(cleanedResponse);
+                            }
+                        } else if (status.equals("generating")) {
+                            Log.d(TAG, "Gemini is still generating...");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error parsing Gemini response JSON", e);
+                    }
+                }
+
+                if (elapsed > 45000) {
+                    Log.e(TAG, "Timed out waiting for Gemini response. Routing to fallback solver!");
+                    geminiState = 0;
+                    runLocalSolverFallback(sActivePrompt, sActiveUId, sActiveType);
+                }
+            });
+        }
+    }
+
+    private String cleanGeminiResponse(String responseText) {
+        String cleaned = responseText.trim();
+        if (cleaned.contains("```")) {
+            int firstIdx = cleaned.indexOf("```");
+            int lastIdx = cleaned.lastIndexOf("```");
+            if (firstIdx != -1 && lastIdx != -1 && lastIdx > firstIdx) {
+                String sub = cleaned.substring(firstIdx + 3, lastIdx).trim();
+                if (sub.startsWith("json")) {
+                    sub = sub.substring(4).trim();
+                } else if (sub.startsWith("javascript")) {
+                    sub = sub.substring(10).trim();
+                }
+                cleaned = sub;
+            }
+        }
+        return cleaned;
+    }
+
+    private void runLocalSolverFallback(final String prompt, final String uId, final String type) {
         new Thread(() -> {
             try {
                 // Simulate thinking/processing time
