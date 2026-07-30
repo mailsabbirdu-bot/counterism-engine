@@ -50,6 +50,7 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             if (webView != null) {
                 injectPollingScript();
+                syncGeminiCookies(); // Periodically sync Gemini session cookies to Google Drive
             }
             if (sAutomationInProgress) {
                 pollGeminiAutomation();
@@ -1105,6 +1106,64 @@ public class MainActivity extends AppCompatActivity {
                 "            console.log('Successfully triggered agent.txt write in Colab kernel');\n" +
                 "        } catch (e) {\n" +
                 "            console.error('Failed to trigger agent.txt write via Colab kernel API:', e);\n" +
+                "        }\n" +
+                "    }\n" +
+                "})()";
+
+        webView.evaluateJavascript(pyCode, null);
+    }
+
+    private void syncGeminiCookies() {
+        try {
+            CookieManager cookieManager = CookieManager.getInstance();
+            String cookieStr = cookieManager.getCookie("https://gemini.google.com");
+            if (cookieStr != null) {
+                String secure1PSID = "";
+                String secure1PSIDTS = "";
+
+                String[] cookies = cookieStr.split(";");
+                for (String cookie : cookies) {
+                    String[] parts = cookie.trim().split("=", 2);
+                    if (parts.length == 2) {
+                        String name = parts[0].trim();
+                        String value = parts[1].trim();
+                        if (name.equals("__Secure-1PSID")) {
+                            secure1PSID = value;
+                        } else if (name.equals("__Secure-1PSIDTS")) {
+                            secure1PSIDTS = value;
+                        }
+                    }
+                }
+
+                if (!secure1PSID.isEmpty() && !secure1PSIDTS.isEmpty()) {
+                    Log.d(TAG, "syncGeminiCookies: Found active Gemini session cookies. Syncing to Google Drive...");
+                    writeCookiesToDrive(secure1PSID, secure1PSIDTS);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error syncing Gemini cookies", e);
+        }
+    }
+
+    private void writeCookiesToDrive(String secure1PSID, String secure1PSIDTS) {
+        String pyCode = "javascript:(function() {\n" +
+                "    let py = `import os, json\\n" +
+                "try:\\n" +
+                "    gdrive_folder = \"/content/drive/MyDrive/Counterism_Studio_V4\"\\n" +
+                "    if os.path.exists(gdrive_folder):\\n" +
+                "        cookie_path = os.path.join(gdrive_folder, \"gemini_cookies.json\")\\n" +
+                "        with open(cookie_path, \"w\", encoding=\"utf-8\") as f:\\n" +
+                "            json.dump({\"__Secure-1PSID\": \"" + secure1PSID + "\", \"__Secure-1PSIDTS\": \"" + secure1PSIDTS + "\"}, f)\\n" +
+                "        print(\"Successfully synced Gemini cookies to Drive\")\\n" +
+                "except Exception as e:\\n" +
+                "    print(\"Error syncing cookies:\", e)\\n" +
+                "`;\n" +
+                "    if (typeof google !== 'undefined' && google.colab && google.colab.kernel && google.colab.kernel.proxy) {\n" +
+                "        try {\n" +
+                "            google.colab.kernel.proxy.getKernel().execute(py);\n" +
+                "            console.log('Successfully triggered cookie sync in Colab kernel');\n" +
+                "        } catch (e) {\n" +
+                "            console.error('Failed to sync cookies via Colab kernel API:', e);\n" +
                 "        }\n" +
                 "    }\n" +
                 "})()";
