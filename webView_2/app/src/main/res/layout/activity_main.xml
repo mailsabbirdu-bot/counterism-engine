@@ -215,4 +215,66 @@
             android:visibility="gone" />
     </LinearLayout>
 
+    <!-- Agent Monospace Status Terminal (Cyberpunk Themed & Collapsible) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#1E1E1E">
+
+        <!-- Terminal Header Bar (Tap to toggle) -->
+        <LinearLayout
+            android:id="@+id/llTerminalHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="#263238"
+            android:padding="8dp"
+            android:gravity="center_vertical"
+            android:clickable="true"
+            android:focusable="true">
+
+            <TextView
+                android:id="@+id/tvTerminalTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="💻 AGENT TERMINAL: IDLE"
+                android:textColor="#00E5FF"
+                android:textStyle="bold"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:id="@+id/tvTerminalToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="▲ EXPAND"
+                android:textColor="#FF4081"
+                android:textStyle="bold"
+                android:textSize="11sp"
+                android:fontFamily="monospace" />
+        </LinearLayout>
+
+        <!-- Scrolling Monospace logs -->
+        <ScrollView
+            android:id="@+id/svTerminalLogs"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:background="#121212"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvTerminalLogs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="[SYSTEM] Terminal initialized. Awaiting Colab runs...\n"
+                android:textColor="#00FF66"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:lineSpacingMultiplier="1.2" />
+        </ScrollView>
+    </LinearLayout>
+
 </LinearLayout>
