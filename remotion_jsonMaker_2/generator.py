@@ -1456,6 +1456,89 @@ class RemotionJsonMaker:
         return {"word": max(words, key=len), "start": 45} if words else None
 
     def _interact_with_gemini(self, prompt: str, previous_json: str = None, errors: List[str] = None, score: int = 0, surgical_mode: bool = False, stubborn_issues: List[str] = None) -> str:
+        # Check if we can execute using synced cookies from Drive
+        cookie_path = "/content/drive/MyDrive/Counterism_Studio_V4/gemini_cookies.json"
+        if os.path.exists(cookie_path):
+            print("🤖 Automated Agent: Found synced Gemini cookies! Executing via gemini_webapi...")
+            try:
+                import gemini_webapi
+            except ImportError:
+                print("📡 gemini_webapi is not installed. Installing dynamically...")
+                import subprocess
+                subprocess.check_call(["pip", "install", "-U", "gemini-webapi"])
+                import gemini_webapi
+
+            try:
+                with open(cookie_path, "r", encoding="utf-8") as f:
+                    cookie_data = json.load(f)
+                psid = cookie_data.get("__Secure-1PSID", "")
+                psidts = cookie_data.get("__Secure-1PSIDTS", "")
+
+                if psid and psidts:
+                    result_container = []
+                    error_container = []
+
+                    async def async_worker():
+                        from gemini_webapi import GeminiClient
+                        try:
+                            client = GeminiClient(psid, psidts)
+                            await client.init()
+                            chat = client.start_chat()
+
+                            # Prepare full re-prompt payload if previous json exists
+                            full_payload = prompt
+                            if previous_json:
+                                full_payload = f"--- INSTRUCTIONS ---\n{prompt}\n\n--- PREVIOUS JSON ---\n{previous_json}\n\n"
+                                if errors:
+                                    full_payload += f"--- ERRORS TO REPAIR ---\n" + "\n".join(errors) + "\n\n"
+
+                            response = await chat.send_message(full_payload)
+                            result_container.append(response.text)
+                        except Exception as ex:
+                            error_container.append(ex)
+
+                    import threading
+                    import asyncio
+
+                    def thread_runner():
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            loop.run_until_complete(async_worker())
+                        finally:
+                            loop.close()
+
+                    thread = threading.Thread(target=thread_runner)
+                    thread.start()
+                    thread.join()
+
+                    if not error_container and result_container:
+                        resp_text = result_container[0]
+                        cleaned = resp_text.strip()
+                        if "```" in cleaned:
+                            import re
+                            m = re.search(r'```(?:json|javascript)?(.*?)```', cleaned, re.DOTALL)
+                            if m:
+                                cleaned = m.group(1).strip()
+
+                        # Save to agent.txt on Drive
+                        try:
+                            gdrive_folder = "/content/drive/MyDrive/Counterism_Studio_V4"
+                            if os.path.exists(gdrive_folder):
+                                agent_txt_path = os.path.join(gdrive_folder, "agent.txt")
+                                with open(agent_txt_path, "w", encoding="utf-8") as f:
+                                    f.write(f"=== INPUT ===\n{prompt}\n\n=== OUTPUT ===\n{cleaned}\n")
+                                print(f"📝 Automatically logged input/output to {agent_txt_path}")
+                        except:
+                            pass
+
+                        return cleaned
+                    else:
+                        if error_container:
+                            print(f"⚠️ gemini_webapi execution failed: {error_container[0]}")
+            except Exception as e:
+                print(f"⚠️ Error executing via gemini_webapi: {e}")
+
         if self.manual:
             try:
                 from google.colab import output
