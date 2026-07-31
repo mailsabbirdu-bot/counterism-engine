@@ -28,6 +28,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -78,6 +79,13 @@ public class MainActivity extends AppCompatActivity {
     private Button btnTabGemini;
     private int geminiState = 0; // 0: Idle, 1: Send Prompt, 2: Wait Response
     private long geminiStateTimestamp = 0;
+
+    // Collapsible Terminal Views
+    private LinearLayout llTerminalHeader;
+    private TextView tvTerminalTitle;
+    private TextView tvTerminalToggle;
+    private ScrollView svTerminalLogs;
+    private TextView tvTerminalLogs;
 
     private boolean isServiceRunning = false;
     private boolean isDesktopMode = true; // Default is Desktop Mode for Colab fully active execution
@@ -207,6 +215,25 @@ public class MainActivity extends AppCompatActivity {
         btnTabGemini.setOnClickListener(v -> switchTab(false));
 
         setupGeminiWebView();
+
+        // Initialize Collapsible Terminal Views
+        llTerminalHeader = findViewById(R.id.llTerminalHeader);
+        tvTerminalTitle = findViewById(R.id.tvTerminalTitle);
+        tvTerminalToggle = findViewById(R.id.tvTerminalToggle);
+        svTerminalLogs = findViewById(R.id.svTerminalLogs);
+        tvTerminalLogs = findViewById(R.id.tvTerminalLogs);
+
+        llTerminalHeader.setOnClickListener(v -> {
+            if (svTerminalLogs.getVisibility() == View.GONE) {
+                svTerminalLogs.setVisibility(View.VISIBLE);
+                tvTerminalToggle.setText("▼ COLLAPSE");
+            } else {
+                svTerminalLogs.setVisibility(View.GONE);
+                tvTerminalToggle.setText("▲ EXPAND");
+            }
+        });
+
+        addLog("SYSTEM: Monospace terminal initialized. Awaiting Colab runs...");
 
         ImageButton btnBack = findViewById(R.id.btnBack);
         ImageButton btnForward = findViewById(R.id.btnForward);
@@ -795,6 +822,23 @@ public class MainActivity extends AppCompatActivity {
         geminiWebView.loadUrl("https://gemini.google.com");
     }
 
+    public void addLog(final String msg) {
+        runOnUiThread(() -> {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault());
+            String time = sdf.format(new java.util.Date());
+            String formattedMsg = "[" + time + "] " + msg + "\n";
+            tvTerminalLogs.append(formattedMsg);
+
+            // Auto scroll to bottom
+            svTerminalLogs.post(() -> svTerminalLogs.fullScroll(View.FOCUS_DOWN));
+
+            // Update terminal title header for active steps
+            if (msg.startsWith("🤖 AGENT:")) {
+                tvTerminalTitle.setText("💻 " + msg);
+            }
+        });
+    }
+
     private void handleHumanLoop(String prompt, String uId, String type) {
         sActivePrompt = prompt;
         sActiveUId = uId;
@@ -802,6 +846,7 @@ public class MainActivity extends AppCompatActivity {
         sAutomationInProgress = true;
 
         Log.d(TAG, "handleHumanLoop: Starting WebView automation for uId: " + uId + " | type: " + type);
+        addLog("🤖 AGENT: Detected prompt for " + uId + " (Type: " + type + "). Start automation!");
         tvServiceStatus.setText("Background service: RUNNING\n🤖 AGENT: Processing prompt " + uId + "...");
         tvServiceStatus.setTextColor(Color.parseColor("#E91E63")); // Cyberpunk Pink for Agent activity!
 
@@ -816,6 +861,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (geminiState == 1) { // State 1: Send prompt
             Log.d(TAG, "pollGeminiAutomation: Attempting to send prompt to Gemini Webview...");
+            addLog("🤖 AGENT: Locating Gemini editor & inserting prompt...");
 
             String escapedPrompt = sActivePrompt.replace("\\", "\\\\")
                                                  .replace("'", "\\'")
@@ -823,26 +869,54 @@ public class MainActivity extends AppCompatActivity {
                                                  .replace("\r", "");
 
             String jsSend = "javascript:(function() {\n" +
-                    "    let editor = document.querySelector('.ql-editor') || document.querySelector('div[contenteditable=\"true\"]') || document.querySelector('textarea');\n" +
+                    "    let editor = document.querySelector('.ql-editor') || \n" +
+                    "                 document.querySelector('div[contenteditable=\"true\"]') || \n" +
+                    "                 document.querySelector('textarea') ||\n" +
+                    "                 document.querySelector('rich-textarea div');\n" +
                     "    if (editor) {\n" +
                     "        editor.focus();\n" +
-                    "        if (editor.tagName === 'TEXTAREA' || editor.tagName === 'INPUT') {\n" +
-                    "            editor.value = '" + escapedPrompt + "';\n" +
-                    "        } else {\n" +
-                    "            editor.innerHTML = '<p>' + '" + escapedPrompt + "'.replace(/\\\\n/g, '<br>') + '</p>';\n" +
+                    "        // Use execCommand to insert text natively so rich-text state updates correctly!\n" +
+                    "        document.execCommand('selectAll', false, null);\n" +
+                    "        document.execCommand('delete', false, null);\n" +
+                    "        document.execCommand('insertText', false, '" + escapedPrompt + "');\n" +
+                    "        \n" +
+                    "        // Fallback setting if execCommand failed\n" +
+                    "        if (editor.innerText.indexOf('" + escapedPrompt.substring(0, Math.min(10, escapedPrompt.length())) + "') === -1) {\n" +
+                    "            if (editor.tagName === 'TEXTAREA' || editor.tagName === 'INPUT') {\n" +
+                    "                editor.value = '" + escapedPrompt + "';\n" +
+                    "            } else {\n" +
+                    "                editor.innerHTML = '<p>' + '" + escapedPrompt + "'.replace(/\\\\n/g, '<br>') + '</p>';\n" +
+                    "            }\n" +
                     "        }\n" +
+                    "        \n" +
+                    "        // Dispatch standard framework events\n" +
                     "        let evt = new Event('input', { bubbles: true });\n" +
                     "        editor.dispatchEvent(evt);\n" +
+                    "        let changeEvt = new Event('change', { bubbles: true });\n" +
+                    "        editor.dispatchEvent(changeEvt);\n" +
                     "        \n" +
+                    "        // Click send button after small framework sync delay\n" +
                     "        setTimeout(() => {\n" +
                     "            let sendBtn = document.querySelector('button[aria-label*=\"Send\"]') || \n" +
+                    "                          document.querySelector('button[aria-label*=\"send\"]') || \n" +
                     "                          document.querySelector('button[class*=\"send\"]') || \n" +
-                    "                          document.querySelector('.send-button-container button');\n" +
+                    "                          document.querySelector('button:has(svg)') ||\n" +
+                    "                          document.querySelector('.send-button-container button') ||\n" +
+                    "                          document.querySelector('button[aria-label*=\"প্রেরণ\"]');\n" +
                     "            if (sendBtn) {\n" +
+                    "                sendBtn.focus();\n" +
                     "                sendBtn.click();\n" +
-                    "                console.log('Clicked send button!');\n" +
+                    "                console.log('Send button clicked via automation!');\n" +
+                    "            } else {\n" +
+                    "                let svgs = document.querySelectorAll('svg');\n" +
+                    "                for (let svg of svgs) {\n" +
+                    "                    let p = svg.parentElement;\n" +
+                    "                    if (p && p.tagName === 'BUTTON') {\n" +
+                    "                        p.click(); break;\n" +
+                    "                    }\n" +
+                    "                }\n" +
                     "            }\n" +
-                    "        }, 500);\n" +
+                    "        }, 800);\n" +
                     "        return 'success';\n" +
                     "    }\n" +
                     "    return 'not_found';\n" +
@@ -852,11 +926,13 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "evaluateJavascript jsSend result: " + value);
                 if (value != null && value.contains("success")) {
                     Log.d(TAG, "Successfully pasted and clicked send inside Gemini Webview!");
+                    addLog("🤖 AGENT: Prompt successfully sent to Gemini! Waiting for reply...");
                     geminiState = 2; // Transition to Wait Response
                     geminiStateTimestamp = System.currentTimeMillis();
                 } else {
                     if (elapsed > 15000) {
                         Log.e(TAG, "Timed out waiting for Gemini editor. Routing to fallback solver!");
+                        addLog("🤖 AGENT: Timeout locating Gemini editor. Falling back to local solver.");
                         geminiState = 0;
                         runLocalSolverFallback(sActivePrompt, sActiveUId, sActiveType);
                     }
@@ -902,13 +978,14 @@ public class MainActivity extends AppCompatActivity {
                             String text = result.optString("text");
                             if (text != null && !text.isEmpty()) {
                                 Log.d(TAG, "Gemini Response extracted successfully! Length: " + text.length());
+                                addLog("🤖 AGENT: Response extracted! Length=" + text.length() + ". Submitting back to Colab...");
                                 geminiState = 0; // Transition back to Idle
 
                                 String cleanedResponse = cleanGeminiResponse(text);
                                 pasteResponseAndSubmit(cleanedResponse);
                             }
                         } else if (status.equals("generating")) {
-                            Log.d(TAG, "Gemini is still generating...");
+                            addLog("🤖 AGENT: Gemini is currently generating output...");
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Error parsing Gemini response JSON", e);
@@ -917,6 +994,7 @@ public class MainActivity extends AppCompatActivity {
 
                 if (elapsed > 45000) {
                     Log.e(TAG, "Timed out waiting for Gemini response. Routing to fallback solver!");
+                    addLog("🤖 AGENT: Timeout waiting for Gemini reply. Falling back to local solver.");
                     geminiState = 0;
                     runLocalSolverFallback(sActivePrompt, sActiveUId, sActiveType);
                 }
@@ -1076,6 +1154,7 @@ public class MainActivity extends AppCompatActivity {
 
             webView.evaluateJavascript(jsBroadcast, value -> {
                 Log.d(TAG, "Cross-origin postMessage broadcast complete. Result: " + value);
+                addLog("🤖 AGENT: Response successfully submitted back to Colab!");
                 Toast.makeText(MainActivity.this, "🤖 Agent: Submitted response back to Colab!", Toast.LENGTH_SHORT).show();
                 sAutomationInProgress = false;
                 tvServiceStatus.setText("Background service: RUNNING\n🤖 AGENT: Idle");
@@ -1137,6 +1216,7 @@ public class MainActivity extends AppCompatActivity {
 
                 if (!secure1PSID.isEmpty() && !secure1PSIDTS.isEmpty()) {
                     Log.d(TAG, "syncGeminiCookies: Found active Gemini session cookies. Syncing to Google Drive...");
+                    addLog("SYSTEM: Synced Gemini session cookies to Google Drive.");
                     writeCookiesToDrive(secure1PSID, secure1PSIDTS);
                 }
             }
