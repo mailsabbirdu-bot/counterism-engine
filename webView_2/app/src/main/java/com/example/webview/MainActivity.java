@@ -379,9 +379,15 @@ public class MainActivity extends AppCompatActivity {
                 "    \n" +
                 "    // Cross-origin HTML5 postMessage listener for sandboxed Colab output iframes\n" +
                 "    window.addEventListener('message', function(event) {\n" +
-                "        if (event.data && event.data.type === 'HUMAN_LOOP_PROMPT') {\n" +
-                "            console.log('Detected postMessage HUMAN_LOOP_PROMPT:', event.data);\n" +
-                "            AndroidApp.onHumanLoopDetected(event.data.prompt, event.data.uId, event.data.promptType);\n" +
+                "        if (event.data) {\n" +
+                "            if (event.data.type === 'HUMAN_LOOP_PROMPT') {\n" +
+                "                console.log('Detected postMessage HUMAN_LOOP_PROMPT:', event.data);\n" +
+                "                AndroidApp.onHumanLoopDetected(event.data.prompt, event.data.uId, event.data.promptType);\n" +
+                "            } else if (event.data.type === 'GET_GEMINI_COOKIES') {\n" +
+                "                console.log('Detected GET_GEMINI_COOKIES request.');\n" +
+                "                let cookiesJson = AndroidApp.getGeminiCookiesJson();\n" +
+                "                event.source.postMessage({ type: 'SET_GEMINI_COOKIES', cookies: JSON.parse(cookiesJson) }, '*');\n" +
+                "            }\n" +
                 "        }\n" +
                 "    });\n" +
                 "    \n" +
@@ -1259,6 +1265,43 @@ public class MainActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 handleHumanLoop(prompt, uId, type);
             });
+        }
+
+        @JavascriptInterface
+        public String getGeminiCookiesJson() {
+            try {
+                CookieManager cookieManager = CookieManager.getInstance();
+                String cookieStr = cookieManager.getCookie("https://gemini.google.com");
+                if (cookieStr != null) {
+                    String secure1PSID = "";
+                    String secure1PSIDTS = "";
+
+                    String[] cookies = cookieStr.split(";");
+                    for (String cookie : cookies) {
+                        String[] parts = cookie.trim().split("=", 2);
+                        if (parts.length == 2) {
+                            String name = parts[0].trim();
+                            String value = parts[1].trim();
+                            if (name.equals("__Secure-1PSID")) {
+                                secure1PSID = value;
+                            } else if (name.equals("__Secure-1PSIDTS")) {
+                                secure1PSIDTS = value;
+                            }
+                        }
+                    }
+
+                    if (!secure1PSID.isEmpty() && !secure1PSIDTS.isEmpty()) {
+                        org.json.JSONObject obj = new org.json.JSONObject();
+                        obj.put("__Secure-1PSID", secure1PSID);
+                        obj.put("__Secure-1PSIDTS", secure1PSIDTS);
+                        addLog("SYSTEM: Synced Gemini cookies directly to Colab python.");
+                        return obj.toString();
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error getting cookies JSON", e);
+            }
+            return "{}";
         }
     }
 }
