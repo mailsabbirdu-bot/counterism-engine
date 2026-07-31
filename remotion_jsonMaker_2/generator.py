@@ -1456,6 +1456,41 @@ class RemotionJsonMaker:
         return {"word": max(words, key=len), "start": 45} if words else None
 
     def _interact_with_gemini(self, prompt: str, previous_json: str = None, errors: List[str] = None, score: int = 0, surgical_mode: bool = False, stubborn_issues: List[str] = None) -> str:
+        # 0. Request active Gemini cookies from top-level window and natively write to Google Drive via Python
+        try:
+            from google.colab import output
+            import json
+            js_get_cookies = """
+                (async () => {
+                    return new Promise((resolve) => {
+                        const handler = (event) => {
+                            if (event.data && event.data.type === 'SET_GEMINI_COOKIES') {
+                                window.removeEventListener('message', handler);
+                                resolve(JSON.stringify(event.data.cookies));
+                            }
+                        };
+                        window.addEventListener('message', handler);
+                        window.top.postMessage({ type: 'GET_GEMINI_COOKIES' }, '*');
+                        setTimeout(() => {
+                            window.removeEventListener('message', handler);
+                            resolve(null);
+                        }, 2500);
+                    });
+                })()
+            """
+            cookies_json_str = output.eval_js(js_get_cookies)
+            if cookies_json_str:
+                cookies_data = json.loads(cookies_json_str)
+                if cookies_data.get("__Secure-1PSID") and cookies_data.get("__Secure-1PSIDTS"):
+                    gdrive_folder = "/content/drive/MyDrive/Counterism_Studio_V4"
+                    if os.path.exists(gdrive_folder):
+                        cookie_path = os.path.join(gdrive_folder, "gemini_cookies.json")
+                        with open(cookie_path, "w", encoding="utf-8") as f:
+                            json.dump(cookies_data, f)
+                        print("🍪 Successfully synced Gemini cookies to Drive natively via Python!")
+        except Exception as e:
+            print(f"⚠️ Native cookie sync request failed: {e}")
+
         # Check if we can execute using synced cookies from Drive
         cookie_path = "/content/drive/MyDrive/Counterism_Studio_V4/gemini_cookies.json"
         if os.path.exists(cookie_path):
@@ -1637,9 +1672,9 @@ class RemotionJsonMaker:
                             document.getElementById('copy-'+u_id).innerText = "COPIED!";
                         }};
 
-                        // Agent Automation postMessage link
+                        // Agent Automation postMessage link - use window.top to reach MainActivity
                         setInterval(() => {{
-                            window.parent.postMessage({{
+                            window.top.postMessage({{
                                 type: 'HUMAN_LOOP_PROMPT',
                                 prompt: {json.dumps(copy_payload)},
                                 uId: u_id,
