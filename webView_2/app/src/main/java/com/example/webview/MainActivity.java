@@ -884,6 +884,12 @@ public class MainActivity extends AppCompatActivity {
 
         Log.d(TAG, "handleHumanLoop: Starting WebView automation for uId: " + uId + " | type: " + type);
         addLog("🤖 AGENT: Detected prompt for " + uId + " (Type: " + type + ")! Total length: " + prompt.length() + " chars.");
+        addLog("🤖 AGENT: Prompt successfully captured and copied to clipboard!");
+        addLog("🤖 AGENT: Automatically switching to Gemini View tab...");
+
+        // Auto switch tab to Gemini
+        switchTab(false);
+
         addLog("🤖 AGENT: Commencing hands-free web automation cycle...");
         tvServiceStatus.setText("Background service: RUNNING\n🤖 AGENT: Processing prompt " + uId + "...");
         tvServiceStatus.setTextColor(Color.parseColor("#E91E63")); // Cyberpunk Pink for Agent activity!
@@ -1016,10 +1022,20 @@ public class MainActivity extends AppCompatActivity {
                             String text = result.optString("text");
                             if (text != null && !text.isEmpty()) {
                                 Log.d(TAG, "Gemini Response extracted successfully! Length: " + text.length());
-                                addLog("🤖 AGENT: Response extracted! Length=" + text.length() + ". Submitting back to Colab...");
+                                addLog("🤖 AGENT: Response generated! Full length: " + text.length() + " chars.");
                                 geminiState = 0; // Transition back to Idle
 
                                 String cleanedResponse = cleanGeminiResponse(text);
+
+                                // Copy the cleaned response JSON part to the system clipboard
+                                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                                ClipData clip = ClipData.newPlainText("Gemini Corrected JSON", cleanedResponse);
+                                if (clipboard != null) {
+                                    clipboard.setPrimaryClip(clip);
+                                    addLog("🤖 AGENT: Copied only the clean JSON part of the Gemini response to the clipboard!");
+                                }
+
+                                addLog("🤖 AGENT: Submitting response back to Colab...");
                                 pasteResponseAndSubmit(cleanedResponse);
                             }
                         } else if (status.equals("generating")) {
@@ -1198,6 +1214,8 @@ public class MainActivity extends AppCompatActivity {
             webView.evaluateJavascript(jsBroadcast, value -> {
                 Log.d(TAG, "Cross-origin postMessage broadcast complete. Result: " + value);
                 addLog("🤖 AGENT: Response successfully submitted back to Colab!");
+                addLog("🤖 AGENT: Automatically switching back to Colab View tab...");
+                switchTab(true); // Switch back to Colab View automatically!
                 Toast.makeText(MainActivity.this, "🤖 Agent: Submitted response back to Colab!", Toast.LENGTH_SHORT).show();
                 sAutomationInProgress = false;
                 tvServiceStatus.setText("Background service: RUNNING\n🤖 AGENT: Idle");
