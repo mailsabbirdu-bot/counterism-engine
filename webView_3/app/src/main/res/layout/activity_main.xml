@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#FFFFFF">
+
+    <!-- Top Toolbar for URL/Controls -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#2196F3"
+        android:padding="8dp"
+        android:gravity="center_vertical">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_back"
+            android:contentDescription="Back" />
+
+        <ImageButton
+            android:id="@+id/btnForward"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_forward"
+            android:contentDescription="Forward" />
+
+        <EditText
+            android:id="@+id/etUrl"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            android:layout_marginStart="8dp"
+            android:background="#FFFFFF"
+            android:padding="8dp"
+            android:singleLine="true"
+            android:inputType="textUri"
+            android:text="https://colab.research.google.com"
+            android:textSize="14sp" />
+
+        <ImageButton
+            android:id="@+id/btnGo"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_go"
+            android:contentDescription="Go" />
+    </LinearLayout>
+
+    <!-- Background Sync & Service Control Banner -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#F5F5F5"
+        android:padding="10dp"
+        android:elevation="4dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvServiceStatus"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Background service: STOPPED"
+                android:textColor="#333333"
+                android:textStyle="bold"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnToggleService"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="START BACKGROUND RUN"
+                android:textSize="11sp"
+                android:backgroundTint="#4CAF50"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
+
+        <!-- Quick actions layout: Copy, Paste, and View Toggle -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical">
+
+            <Button
+                android:id="@+id/btnCopyColabCode"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.1"
+                android:text="📋 COPY CODE"
+                android:textSize="10sp"
+                android:backgroundTint="#FF9800"
+                android:textColor="#FFFFFF"
+                android:padding="4dp" />
+
+            <Button
+                android:id="@+id/btnPasteCode"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.1"
+                android:layout_marginStart="4dp"
+                android:text="📥 PASTE CODE"
+                android:textSize="10sp"
+                android:backgroundTint="#009688"
+                android:textColor="#FFFFFF"
+                android:padding="4dp" />
+
+            <Button
+                android:id="@+id/btnToggleView"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.2"
+                android:layout_marginStart="4dp"
+                android:text="🖥️ TOGGLE VIEW"
+                android:textSize="10sp"
+                android:backgroundTint="#673AB7"
+                android:textColor="#FFFFFF"
+                android:padding="4dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Custom JavaScript Runner Console -->
+    <LinearLayout
+        android:id="@+id/llJsConsole"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#E0F7FA"
+        android:padding="8dp"
+        android:gravity="center_vertical">
+
+        <EditText
+            android:id="@+id/etJsCode"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Type custom JavaScript to execute in page..."
+            android:singleLine="true"
+            android:textSize="12sp"
+            android:background="#FFFFFF"
+            android:padding="6dp" />
+
+        <Button
+            android:id="@+id/btnRunJs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⚡ RUN JS"
+            android:textSize="10sp"
+            android:backgroundTint="#00BCD4"
+            android:textColor="#FFFFFF"
+            android:layout_marginStart="6dp" />
+    </LinearLayout>
+
+    <!-- Container to support dynamic multi-tab popups cleanly (e.g. Google Drive auth redirects) -->
+    <LinearLayout
+        android:id="@+id/webViewContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <WebView
+            android:id="@+id/webView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </LinearLayout>
+
+    <!-- Agent Monospace Status Terminal (Cyberpunk Themed & Collapsible) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#1E1E1E">
+
+        <!-- Terminal Header Bar (Tap to toggle) -->
+        <LinearLayout
+            android:id="@+id/llTerminalHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="#263238"
+            android:padding="8dp"
+            android:gravity="center_vertical"
+            android:clickable="true"
+            android:focusable="true">
+
+            <TextView
+                android:id="@+id/tvTerminalTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="💻 AGENT TERMINAL: IDLE"
+                android:textColor="#00E5FF"
+                android:textStyle="bold"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:id="@+id/tvTerminalToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="▼ COLLAPSE"
+                android:textColor="#FF4081"
+                android:textStyle="bold"
+                android:textSize="11sp"
+                android:fontFamily="monospace" />
+        </LinearLayout>
+
+        <!-- Scrolling Monospace logs -->
+        <ScrollView
+            android:id="@+id/svTerminalLogs"
+            android:layout_width="match_parent"
+            android:layout_height="160dp"
+            android:background="#121212"
+            android:padding="8dp"
+            android:visibility="visible">
+
+            <TextView
+                android:id="@+id/tvTerminalLogs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="[SYSTEM] Terminal initialized. Awaiting Colab runs...\n"
+                android:textColor="#00FF66"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:lineSpacingMultiplier="1.2" />
+        </ScrollView>
+    </LinearLayout>
+
+</LinearLayout>
