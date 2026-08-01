@@ -1501,43 +1501,43 @@ class RemotionJsonMaker:
                 f"{re.search(r'STORY:.*?(?=TIMESTAMPS:)', prompt, re.DOTALL).group() if 'STORY:' in prompt else prompt[:500]}"
             )
 
-        return get_gemini_response(copy_payload)
+        return self.get_automated_gemini_response(copy_payload)
 
-def get_gemini_response(prompt_text):
-    """
-    Automated file-bridge function replacing terminal/HTML UI widgets.
-    Writes prompt to Google Drive and waits for reply.txt from Android worker.
-    """
-    bridge_dir = "/content/drive/MyDrive/gemini_bridge"
-    os.makedirs(bridge_dir, exist_ok=True)
+    def get_automated_gemini_response(self, prompt_text):
+        """
+        Automated file-bridge function replacing terminal/HTML UI widgets.
+        Writes prompt to Google Drive and waits for reply.txt from Android worker.
+        """
+        bridge_dir = "/content/drive/MyDrive/gemini_bridge"
+        os.makedirs(bridge_dir, exist_ok=True)
 
-    prompt_file = os.path.join(bridge_dir, "prompt.txt")
-    reply_file = os.path.join(bridge_dir, "reply.txt")
+        prompt_file = os.path.join(bridge_dir, "prompt.txt")
+        reply_file = os.path.join(bridge_dir, "reply.txt")
 
-    # Clear leftover stale files
-    if os.path.exists(reply_file):
-        try: os.remove(reply_file)
-        except Exception: pass
-
-    print(f"[Bridge] Writing prompt to Drive: {prompt_file}")
-    with open(prompt_file, "w", encoding="utf-8") as f:
-        f.write(prompt_text)
-
-    print("[Bridge] Waiting for Android app to process and write reply.txt...")
-    while not os.path.exists(reply_file):
-        time.sleep(3)
-
-    print("[Bridge] Reply detected! Reading response...")
-    with open(reply_file, "r", encoding="utf-8") as f:
-        response_text = f.read()
-
-    # Clean up bridge directory for the next iteration
-    for file_path in [prompt_file, reply_file]:
-        if os.path.exists(file_path):
-            try: os.remove(file_path)
+        # Clear leftover stale files
+        if os.path.exists(reply_file):
+            try: os.remove(reply_file)
             except Exception: pass
 
-    return response_text
+        print(f"[BRIDGE] Writing prompt to: {prompt_file}")
+        with open(prompt_file, "w", encoding="utf-8") as f:
+            f.write(prompt_text)
+
+        print("[BRIDGE] Waiting for Android app to output reply.txt...")
+        while not os.path.exists(reply_file):
+            time.sleep(3)
+
+        print("[BRIDGE] Reply detected! Reading response...")
+        with open(reply_file, "r", encoding="utf-8") as f:
+            response_text = f.read()
+
+        # Clean up bridge directory for the next iteration
+        for file_path in [prompt_file, reply_file]:
+            if os.path.exists(file_path):
+                try: os.remove(file_path)
+                except Exception: pass
+
+        return response_text
 
     def _compact_timestamps(self, ts_content: str) -> str:
         self.raw_timestamps = ts_content
