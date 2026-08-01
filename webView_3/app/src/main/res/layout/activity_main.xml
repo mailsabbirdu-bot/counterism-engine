@@ -165,6 +165,36 @@
             android:layout_marginStart="6dp" />
     </LinearLayout>
 
+    <!-- Tabs layout for Colab & Gemini WebViews -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#ECEFF1"
+        android:padding="6dp">
+
+        <Button
+            android:id="@+id/btnTabColab"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🔬 COLAB VIEW"
+            android:textSize="12sp"
+            android:backgroundTint="#2196F3"
+            android:textColor="#FFFFFF"
+            android:layout_marginEnd="4dp" />
+
+        <Button
+            android:id="@+id/btnTabGemini"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🤖 GEMINI VIEW"
+            android:textSize="12sp"
+            android:backgroundTint="#78909C"
+            android:textColor="#FFFFFF" />
+    </LinearLayout>
+
     <!-- Container to support dynamic multi-tab popups cleanly (e.g. Google Drive auth redirects) -->
     <LinearLayout
         android:id="@+id/webViewContainer"
@@ -177,6 +207,12 @@
             android:id="@+id/webView"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
+
+        <WebView
+            android:id="@+id/geminiWebView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- Agent Monospace Status Terminal (Cyberpunk Themed & Collapsible) -->

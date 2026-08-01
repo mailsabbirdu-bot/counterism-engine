@@ -43,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int FILE_CHOOSER_REQUEST_CODE = 202;
 
     private WebView webView;
+    private WebView geminiWebView;
     private EditText etUrl;
     private TextView tvServiceStatus;
     private Button btnToggleService;
@@ -52,6 +53,10 @@ public class MainActivity extends AppCompatActivity {
     private EditText etJsCode;
     private Button btnRunJs;
     private LinearLayout webViewContainer;
+
+    // Tabs layout controls
+    private Button btnTabColab;
+    private Button btnTabGemini;
 
     // Monospace Terminal UI Components
     private LinearLayout llTerminalHeader;
@@ -66,6 +71,13 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean colabDetectedLogged = false;
 
+    // State machine controls for upgraded automated Gemini flow
+    private String sActivePrompt = "";
+    private String sActiveUId = "";
+    private boolean sAutomationInProgress = false;
+    private int geminiState = 0; // 0: Idle, 1: Paste/Send, 2: Wait/Copy Response
+    private long geminiStateTimestamp = 0;
+
     // Standard User-Agents
     private final String DESKTOP_USER_AGENT = "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
     private final String MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
@@ -78,7 +90,10 @@ public class MainActivity extends AppCompatActivity {
             if (webView != null) {
                 injectPollingScript();
             }
-            automationHandler.postDelayed(this, 2000); // Poll every 2 seconds
+            if (sAutomationInProgress) {
+                pollGeminiAutomation();
+            }
+            automationHandler.postDelayed(this, 2500); // Poll every 2.5 seconds
         }
     };
 
@@ -182,6 +197,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize view components
         webView = findViewById(R.id.webView);
+        geminiWebView = findViewById(R.id.geminiWebView);
         etUrl = findViewById(R.id.etUrl);
         tvServiceStatus = findViewById(R.id.tvServiceStatus);
         btnToggleService = findViewById(R.id.btnToggleService);
@@ -191,6 +207,13 @@ public class MainActivity extends AppCompatActivity {
         etJsCode = findViewById(R.id.etJsCode);
         btnRunJs = findViewById(R.id.btnRunJs);
         webViewContainer = findViewById(R.id.webViewContainer);
+
+        // Tab Buttons
+        btnTabColab = findViewById(R.id.btnTabColab);
+        btnTabGemini = findViewById(R.id.btnTabGemini);
+
+        btnTabColab.setOnClickListener(v -> switchTab(true));
+        btnTabGemini.setOnClickListener(v -> switchTab(false));
 
         // Initialize Monospace Terminal Views
         llTerminalHeader = findViewById(R.id.llTerminalHeader);
@@ -217,14 +240,18 @@ public class MainActivity extends AppCompatActivity {
 
         // Setup toolbar listeners
         btnBack.setOnClickListener(v -> {
-            if (webView.canGoBack()) {
-                webView.goBack();
+            if (isColabActive()) {
+                if (webView.canGoBack()) webView.goBack();
+            } else {
+                if (geminiWebView.canGoBack()) geminiWebView.goBack();
             }
         });
 
         btnForward.setOnClickListener(v -> {
-            if (webView.canGoForward()) {
-                webView.goForward();
+            if (isColabActive()) {
+                if (webView.canGoForward()) webView.goForward();
+            } else {
+                if (geminiWebView.canGoForward()) geminiWebView.goForward();
             }
         });
 
@@ -233,11 +260,16 @@ public class MainActivity extends AppCompatActivity {
             if (!url.startsWith("http://") && !url.startsWith("https://")) {
                 url = "https://" + url;
             }
-            webView.loadUrl(url);
+            if (isColabActive()) {
+                webView.loadUrl(url);
+            } else {
+                geminiWebView.loadUrl(url);
+            }
         });
 
         // Initialize WebView settings
         setupWebView();
+        setupGeminiWebView();
 
         // Copy Python Script to clipboard
         btnCopyColabCode.setOnClickListener(v -> {
@@ -256,25 +288,30 @@ public class MainActivity extends AppCompatActivity {
         btnToggleView.setOnClickListener(v -> {
             isDesktopMode = !isDesktopMode;
             WebSettings settings = webView.getSettings();
+            WebSettings gemSettings = geminiWebView.getSettings();
             if (isDesktopMode) {
                 settings.setUserAgentString(DESKTOP_USER_AGENT);
+                gemSettings.setUserAgentString(DESKTOP_USER_AGENT);
                 btnToggleView.setText("🖥️ DESKTOP");
                 btnToggleView.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#673AB7")));
                 Toast.makeText(this, "Switched to Desktop Layout (Chrome Desktop UA)", Toast.LENGTH_SHORT).show();
             } else {
                 settings.setUserAgentString(MOBILE_USER_AGENT);
+                gemSettings.setUserAgentString(MOBILE_USER_AGENT);
                 btnToggleView.setText("📱 MOBILE");
                 btnToggleView.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#E91E63")));
                 Toast.makeText(this, "Switched to Mobile Layout (Android Chrome Bypass UA)", Toast.LENGTH_SHORT).show();
             }
             webView.reload();
+            geminiWebView.reload();
         });
 
         // Execute Custom JavaScript inside WebView context
         btnRunJs.setOnClickListener(v -> {
             String js = etJsCode.getText().toString().trim();
             if (!js.isEmpty()) {
-                webView.evaluateJavascript(js, value -> {
+                WebView active = isColabActive() ? webView : geminiWebView;
+                active.evaluateJavascript(js, value -> {
                     Toast.makeText(MainActivity.this, "JS Result: " + value, Toast.LENGTH_LONG).show();
                     Log.d(TAG, "Custom JavaScript executed. Result: " + value);
                 });
@@ -296,7 +333,29 @@ public class MainActivity extends AppCompatActivity {
         requestBatteryOptimizationBypass();
 
         // Start periodic active automation checking
-        automationHandler.postDelayed(automationRunnable, 2000);
+        automationHandler.postDelayed(automationRunnable, 2500);
+    }
+
+    private boolean isColabActive() {
+        return webView.getVisibility() == View.VISIBLE;
+    }
+
+    private void switchTab(boolean isColab) {
+        runOnUiThread(() -> {
+            if (isColab) {
+                webView.setVisibility(View.VISIBLE);
+                geminiWebView.setVisibility(View.GONE);
+                btnTabColab.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#2196F3")));
+                btnTabGemini.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#78909C")));
+                etUrl.setText(webView.getUrl());
+            } else {
+                webView.setVisibility(View.GONE);
+                geminiWebView.setVisibility(View.VISIBLE);
+                btnTabColab.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#78909C")));
+                btnTabGemini.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#673AB7")));
+                etUrl.setText(geminiWebView.getUrl());
+            }
+        });
     }
 
     public void addLog(final String msg) {
@@ -310,7 +369,7 @@ public class MainActivity extends AppCompatActivity {
             svTerminalLogs.post(() -> svTerminalLogs.fullScroll(View.FOCUS_DOWN));
 
             // Update terminal title header status dynamically
-            if (msg.contains("Copy button found") || msg.contains("copied to clipboard")) {
+            if (msg.contains("Copy button found") || msg.contains("copied to clipboard") || msg.contains("Switching to Gemini")) {
                 tvTerminalTitle.setText("💻 AGENT: ACTIVE AUTOMATION");
             }
         });
@@ -406,39 +465,33 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowContentAccess(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
 
-        // Crucial: Support multiple windows to capture Google Drive mounts or popups cleanly inside separate temporary tabs
         settings.setSupportMultipleWindows(true);
-
-        // Add Javascript Interface for Copy Automation
-        webView.addJavascriptInterface(new AgenticAutomationInterface(), "AndroidApp");
-
-        // Initial default: Chromebook Chrome Desktop UA
         settings.setUserAgentString(DESKTOP_USER_AGENT);
 
-        // Enable cookies and third party cookies
         CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.setAcceptCookie(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             cookieManager.setAcceptThirdPartyCookies(webView, true);
         }
 
+        webView.addJavascriptInterface(new AgenticAutomationInterface(), "AndroidApp");
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                etUrl.setText(url);
+                if (isColabActive()) etUrl.setText(url);
                 return false;
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                etUrl.setText(url);
+                if (isColabActive()) etUrl.setText(url);
                 CookieManager.getInstance().flush();
             }
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
-            // For Android 5.0+ - File Upload Support
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
                 if (uploadMessage != null) {
@@ -466,7 +519,6 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
 
-            // Capture new tab/window creation (like Google Drive Sync popups) and overlay a secondary tab safely
             @Override
             public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
                 Log.d(TAG, "onCreateWindow triggered");
@@ -544,6 +596,246 @@ public class MainActivity extends AppCompatActivity {
         webView.loadUrl("https://colab.research.google.com");
     }
 
+    private void setupGeminiWebView() {
+        WebSettings settings = geminiWebView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+        settings.setUseWideViewPort(true);
+        settings.setLoadWithOverviewMode(true);
+        settings.setSupportZoom(true);
+        settings.setBuiltInZoomControls(true);
+        settings.setDisplayZoomControls(false);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
+
+        settings.setUserAgentString(DESKTOP_USER_AGENT);
+
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            cookieManager.setAcceptThirdPartyCookies(geminiWebView, true);
+        }
+
+        geminiWebView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                if (!isColabActive()) etUrl.setText(url);
+                return false;
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (!isColabActive()) etUrl.setText(url);
+                CookieManager.getInstance().flush();
+            }
+        });
+
+        geminiWebView.loadUrl("https://gemini.google.com");
+    }
+
+    // Upgraded Gemini Automation State Machine
+    private void pollGeminiAutomation() {
+        long elapsed = System.currentTimeMillis() - geminiStateTimestamp;
+
+        if (geminiState == 1) { // Paste and send prompt
+            Log.d(TAG, "pollGeminiAutomation: Attempting to locate and paste prompt into Gemini...");
+
+            String escapedPrompt = sActivePrompt.replace("\\", "\\\\")
+                                                 .replace("'", "\\'")
+                                                 .replace("\n", "\\n")
+                                                 .replace("\r", "");
+
+            String jsSend = "javascript:(function() {\n" +
+                    "    let editor = document.querySelector('.ql-editor') || \n" +
+                    "                 document.querySelector('div[contenteditable=\"true\"]') || \n" +
+                    "                 document.querySelector('textarea') ||\n" +
+                    "                 document.querySelector('rich-textarea div');\n" +
+                    "    if (editor) {\n" +
+                    "        editor.focus();\n" +
+                    "        document.execCommand('selectAll', false, null);\n" +
+                    "        document.execCommand('delete', false, null);\n" +
+                    "        document.execCommand('insertText', false, '" + escapedPrompt + "');\n" +
+                    "        \n" +
+                    "        if (editor.innerText.indexOf('" + escapedPrompt.substring(0, Math.min(10, escapedPrompt.length())) + "') === -1) {\n" +
+                    "            if (editor.tagName === 'TEXTAREA' || editor.tagName === 'INPUT') {\n" +
+                    "                editor.value = '" + escapedPrompt + "';\n" +
+                    "            } else {\n" +
+                    "                editor.innerHTML = '<p>' + '" + escapedPrompt + "'.replace(/\\\\n/g, '<br>') + '</p>';\n" +
+                    "            }\n" +
+                    "        }\n" +
+                    "        \n" +
+                    "        let evt = new Event('input', { bubbles: true });\n" +
+                    "        editor.dispatchEvent(evt);\n" +
+                    "        let changeEvt = new Event('change', { bubbles: true });\n" +
+                    "        editor.dispatchEvent(changeEvt);\n" +
+                    "        \n" +
+                    "        setTimeout(() => {\n" +
+                    "            let sendBtn = document.querySelector('button[aria-label*=\"Send\"]') || \n" +
+                    "                          document.querySelector('button[aria-label*=\"send\"]') || \n" +
+                    "                          document.querySelector('button[class*=\"send\"]') || \n" +
+                    "                          document.querySelector('button:has(svg)') ||\n" +
+                    "                          document.querySelector('.send-button-container button');\n" +
+                    "            if (sendBtn) {\n" +
+                    "                sendBtn.focus();\n" +
+                    "                sendBtn.click();\n" +
+                    "                console.log('Send button clicked!');\n" +
+                    "            } else {\n" +
+                    "                let svgs = document.querySelectorAll('svg');\n" +
+                    "                for (let svg of svgs) {\n" +
+                    "                    let p = svg.parentElement;\n" +
+                    "                    if (p && p.tagName === 'BUTTON') {\n" +
+                    "                        p.click(); break;\n" +
+                    "                    }\n" +
+                    "                }\n" +
+                    "            }\n" +
+                    "        }, 1000);\n" +
+                    "        return 'success';\n" +
+                    "    }\n" +
+                    "    return 'not_found';\n" +
+                    "})()";
+
+            geminiWebView.evaluateJavascript(jsSend, value -> {
+                Log.d(TAG, "Gemini send script evaluation: " + value);
+                if (value != null && value.contains("success")) {
+                    addLog("🤖 AGENT: Gemini textbox detected.");
+                    addLog("🤖 AGENT: Pasting copied text into Gemini...");
+                    addLog("🤖 AGENT: Clicking submit button...");
+                    addLog("🤖 AGENT: Waiting for full response creation...");
+                    geminiState = 2; // Transition to Wait Response
+                    geminiStateTimestamp = System.currentTimeMillis();
+                } else {
+                    if (elapsed > 20000) {
+                        addLog("⚠️ ERROR: Timed out waiting for Gemini editor container.");
+                        sAutomationInProgress = false;
+                        geminiState = 0;
+                        switchTab(true);
+                    }
+                }
+            });
+
+        } else if (geminiState == 2) { // Wait for response & Extract JSON
+            Log.d(TAG, "pollGeminiAutomation: Polling for completed response...");
+
+            String jsPoll = "javascript:(function() {\n" +
+                    "    let responses = document.querySelectorAll('.model-response') || document.querySelectorAll('message-content') || document.querySelectorAll('.chat-content');\n" +
+                    "    if (responses.length > 0) {\n" +
+                    "        let lastResponse = responses[responses.length - 1];\n" +
+                    "        let isGenerating = document.querySelector('.generating') || document.querySelector('mat-progress-bar') || document.querySelector('.loading-spinner');\n" +
+                    "        if (isGenerating) {\n" +
+                    "            return JSON.stringify({ status: 'generating' });\n" +
+                    "        }\n" +
+                    "        let copyBtn = lastResponse.querySelector('button[aria-label*=\"Copy\"]') || \n" +
+                    "                      lastResponse.querySelector('button[class*=\"copy\"]') ||\n" +
+                    "                      document.querySelector('button[aria-label*=\"Copy\"]');\n" +
+                    "        if (copyBtn) {\n" +
+                    "            let text = lastResponse.innerText || lastResponse.textContent || '';\n" +
+                    "            return JSON.stringify({ status: 'ready', text: text });\n" +
+                    "        }\n" +
+                    "    }\n" +
+                    "    return JSON.stringify({ status: 'waiting' });\n" +
+                    "})()";
+
+            geminiWebView.evaluateJavascript(jsPoll, value -> {
+                Log.d(TAG, "Gemini response poll result: " + value);
+                if (value != null && !value.equals("null")) {
+                    try {
+                        String cleanJson = value;
+                        if (cleanJson.startsWith("\"") && cleanJson.endsWith("\"")) {
+                            cleanJson = cleanJson.substring(1, cleanJson.length() - 1)
+                                                 .replace("\\\"", "\"")
+                                                 .replace("\\\\", "\\");
+                        }
+                        org.json.JSONObject result = new org.json.JSONObject(cleanJson);
+                        String status = result.optString("status");
+
+                        if (status.equals("ready")) {
+                            String text = result.optString("text");
+                            if (text != null && !text.isEmpty()) {
+                                addLog("🤖 AGENT: Full response generated by Gemini.");
+                                addLog("🤖 AGENT: Extracting JSON part of response...");
+
+                                String jsonOnly = extractJsonFromResponse(text);
+
+                                // Write to device clipboard
+                                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                                ClipData clip = ClipData.newPlainText("Copied JSON reply", jsonOnly);
+                                if (clipboard != null) {
+                                    clipboard.setPrimaryClip(clip);
+                                    addLog("🤖 AGENT: JSON copied to clipboard!");
+                                    Toast.makeText(MainActivity.this, "JSON auto-copied to clipboard!", Toast.LENGTH_SHORT).show();
+                                }
+
+                                addLog("🤖 AGENT: Automation task completed. Switching back to Colab view.");
+                                geminiState = 0;
+                                sAutomationInProgress = false;
+                                switchTab(true);
+                            }
+                        } else if (status.equals("generating")) {
+                            Log.d(TAG, "Gemini is currently generating answer...");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error parsing Gemini polling result JSON", e);
+                    }
+                }
+
+                if (elapsed > 60000) { // 60s timeout
+                    addLog("⚠️ ERROR: Timed out waiting for Gemini complete response.");
+                    geminiState = 0;
+                    sAutomationInProgress = false;
+                    switchTab(true);
+                }
+            });
+        }
+    }
+
+    private String extractJsonFromResponse(String rawResponse) {
+        String cleaned = rawResponse.trim();
+        if (cleaned.contains("```")) {
+            int firstIdx = cleaned.indexOf("```");
+            int lastIdx = cleaned.lastIndexOf("```");
+            if (firstIdx != -1 && lastIdx != -1 && lastIdx > firstIdx) {
+                String sub = cleaned.substring(firstIdx + 3, lastIdx).trim();
+                if (sub.startsWith("json")) {
+                    sub = sub.substring(4).trim();
+                } else if (sub.startsWith("javascript")) {
+                    sub = sub.substring(10).trim();
+                }
+                cleaned = sub;
+            }
+        }
+
+        int startBrace = cleaned.indexOf('{');
+        int startBracket = cleaned.indexOf('[');
+        int startIdx = -1;
+        if (startBrace != -1 && startBracket != -1) {
+            startIdx = Math.min(startBrace, startBracket);
+        } else if (startBrace != -1) {
+            startIdx = startBrace;
+        } else if (startBracket != -1) {
+            startIdx = startBracket;
+        }
+
+        int endBrace = cleaned.lastIndexOf('}');
+        int endBracket = cleaned.lastIndexOf(']');
+        int endIdx = -1;
+        if (endBrace != -1 && endBracket != -1) {
+            endIdx = Math.max(endBrace, endBracket);
+        } else if (endBrace != -1) {
+            endIdx = endBrace;
+        } else if (endBracket != -1) {
+            endIdx = endBracket;
+        }
+
+        if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
+            cleaned = cleaned.substring(startIdx, endIdx + 1).trim();
+        }
+
+        return cleaned;
+    }
+
     private void performSmartPaste() {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard != null && clipboard.hasPrimaryClip()) {
@@ -593,7 +885,8 @@ public class MainActivity extends AppCompatActivity {
                         "return 'none';" +
                         "})()";
 
-                webView.evaluateJavascript(jsPaste, value -> {
+                WebView active = isColabActive() ? webView : geminiWebView;
+                active.evaluateJavascript(jsPaste, value -> {
                     Toast.makeText(MainActivity.this, "Pasted text successfully!", Toast.LENGTH_SHORT).show();
                     Log.d(TAG, "Smart paste evaluation result: " + value);
                 });
@@ -701,37 +994,45 @@ public class MainActivity extends AppCompatActivity {
                 ((WebView) activePopup).destroy();
                 Log.d(TAG, "Successfully closed authorization tab via onBackPressed");
             }
-            webView.setVisibility(View.VISIBLE);
-            etUrl.setText(webView.getUrl());
+            WebView active = isColabActive() ? webView : geminiWebView;
+            active.setVisibility(View.VISIBLE);
+            etUrl.setText(active.getUrl());
             Toast.makeText(this, "Closed authorization tab.", Toast.LENGTH_SHORT).show();
-        } else if (webView.canGoBack()) {
+        } else if (isColabActive() && webView.canGoBack()) {
             webView.goBack();
+        } else if (!isColabActive() && geminiWebView.canGoBack()) {
+            geminiWebView.goBack();
         } else {
             super.onBackPressed();
         }
     }
 
-    // Agentic JavaScript Interface Class
+    // Upgraded Agentic JavaScript Interface Class
     public class AgenticAutomationInterface {
         @JavascriptInterface
         public void onCopyButtonDetected(final String uId, final String promptText) {
             runOnUiThread(() -> {
-                addLog("🤖 AGENT: Copy button found with ID: copy-" + uId);
+                addLog("🤖 AGENT: Colab run detected!");
+                addLog("🤖 AGENT: Copy button found!");
 
-                // Copy directly to system clipboard
+                // Copy directly to device's native system clipboard
                 ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                 ClipData clip = ClipData.newPlainText("Copied Prompt from Colab", promptText);
                 if (clipboard != null) {
                     clipboard.setPrimaryClip(clip);
                     addLog("🤖 AGENT: Prompt copied to clipboard!");
 
-                    String snippet = promptText.trim();
-                    if (snippet.length() > 150) {
-                        snippet = snippet.substring(0, 150) + "...";
-                    }
-                    addLog("📝 Prompt Snippet:\n" + snippet);
+                    sActivePrompt = promptText;
+                    sActiveUId = uId;
+                    sAutomationInProgress = true;
+                    geminiState = 1; // Transition to Paste/Send state
+                    geminiStateTimestamp = System.currentTimeMillis();
 
-                    Toast.makeText(MainActivity.this, "Prompt auto-copied to clipboard!", Toast.LENGTH_SHORT).show();
+                    // Automatically switch to Gemini WebView tab and start processing
+                    addLog("🤖 AGENT: Switching to Gemini tab to process the prompt...");
+                    switchTab(false);
+
+                    Toast.makeText(MainActivity.this, "Prompt auto-copied & transitioning to Gemini!", Toast.LENGTH_SHORT).show();
                 } else {
                     addLog("⚠️ ERROR: ClipboardManager is not available.");
                 }
