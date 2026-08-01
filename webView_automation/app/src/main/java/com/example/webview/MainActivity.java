@@ -27,6 +27,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -41,6 +42,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int FILE_CHOOSER_REQUEST_CODE = 202;
 
     private WebView webView;
+    private WebView geminiWebView;
     private EditText etUrl;
     private TextView tvServiceStatus;
     private Button btnToggleService;
@@ -50,6 +52,15 @@ public class MainActivity extends AppCompatActivity {
     private EditText etJsCode;
     private Button btnRunJs;
     private LinearLayout webViewContainer;
+
+    // Tabs & Terminal UI Components
+    private Button btnTabColab;
+    private Button btnTabGemini;
+    private LinearLayout llTerminalHeader;
+    private TextView tvTerminalTitle;
+    private TextView tvTerminalToggle;
+    private ScrollView svTerminalLogs;
+    private TextView tvTerminalLogs;
 
     private boolean isServiceRunning = false;
     private boolean isDesktopMode = true; // Default is Desktop Mode for Colab fully active execution
@@ -62,9 +73,8 @@ public class MainActivity extends AppCompatActivity {
     private volatile boolean mRunBridgeWorker = true;
 
     // Standard User-Agents
-    // Chromebook Desktop UA is Chromium-based, bypasses secure login blocks perfectly, and renders all SVG icons beautifully on startup
     private final String DESKTOP_USER_AGENT = "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-    private final String MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"; // Bypassed UA without "; wv"
+    private final String MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
 
     // The automated pipeline python script from colab.md
     private final String COLAB_PYTHON_SCRIPT =
@@ -166,6 +176,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize view components
         webView = findViewById(R.id.webView);
+        geminiWebView = findViewById(R.id.geminiWebView);
         etUrl = findViewById(R.id.etUrl);
         tvServiceStatus = findViewById(R.id.tvServiceStatus);
         btnToggleService = findViewById(R.id.btnToggleService);
@@ -176,20 +187,33 @@ public class MainActivity extends AppCompatActivity {
         btnRunJs = findViewById(R.id.btnRunJs);
         webViewContainer = findViewById(R.id.webViewContainer);
 
+        // Initialize Tab & Terminal Buttons
+        btnTabColab = findViewById(R.id.btnTabColab);
+        btnTabGemini = findViewById(R.id.btnTabGemini);
+        llTerminalHeader = findViewById(R.id.llTerminalHeader);
+        tvTerminalTitle = findViewById(R.id.tvTerminalTitle);
+        tvTerminalToggle = findViewById(R.id.tvTerminalToggle);
+        svTerminalLogs = findViewById(R.id.svTerminalLogs);
+        tvTerminalLogs = findViewById(R.id.tvTerminalLogs);
+
+        // Setup toolbar buttons
         ImageButton btnBack = findViewById(R.id.btnBack);
         ImageButton btnForward = findViewById(R.id.btnForward);
         ImageButton btnGo = findViewById(R.id.btnGo);
 
-        // Setup toolbar listeners
         btnBack.setOnClickListener(v -> {
-            if (webView.canGoBack()) {
+            if (webView.getVisibility() == View.VISIBLE && webView.canGoBack()) {
                 webView.goBack();
+            } else if (geminiWebView.getVisibility() == View.VISIBLE && geminiWebView.canGoBack()) {
+                geminiWebView.goBack();
             }
         });
 
         btnForward.setOnClickListener(v -> {
-            if (webView.canGoForward()) {
+            if (webView.getVisibility() == View.VISIBLE && webView.canGoForward()) {
                 webView.goForward();
+            } else if (geminiWebView.getVisibility() == View.VISIBLE && geminiWebView.canGoForward()) {
+                geminiWebView.goForward();
             }
         });
 
@@ -198,11 +222,33 @@ public class MainActivity extends AppCompatActivity {
             if (!url.startsWith("http://") && !url.startsWith("https://")) {
                 url = "https://" + url;
             }
-            webView.loadUrl(url);
+            if (webView.getVisibility() == View.VISIBLE) {
+                webView.loadUrl(url);
+            } else {
+                geminiWebView.loadUrl(url);
+            }
         });
 
-        // Initialize WebView settings
+        // Tab switches
+        btnTabColab.setOnClickListener(v -> switchTab(true));
+        btnTabGemini.setOnClickListener(v -> switchTab(false));
+
+        // Terminal Toggle collapse
+        llTerminalHeader.setOnClickListener(v -> {
+            if (svTerminalLogs.getVisibility() == View.GONE) {
+                svTerminalLogs.setVisibility(View.VISIBLE);
+                tvTerminalToggle.setText("▼ COLLAPSE");
+            } else {
+                svTerminalLogs.setVisibility(View.GONE);
+                tvTerminalToggle.setText("▲ EXPAND");
+            }
+        });
+
+        addLog("SYSTEM: Monospace terminal initialized. Awaiting Colab runs...");
+
+        // Setup WebViews
         setupWebView();
+        setupGeminiWebView();
 
         // Copy Python Script to clipboard
         btnCopyColabCode.setOnClickListener(v -> {
@@ -214,34 +260,37 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Paste clipboard text programmatically into active document element
+        // Paste clipboard text programmatically
         btnPasteCode.setOnClickListener(v -> performSmartPaste());
 
-        // Note: webView.setOnLongClickListener is NOT set here to restore Android's native text selection highlighting and standard actions
-
-        // Toggle layout user agent mode between Desktop & Mobile view
+        // Toggle layout Desktop vs Mobile modes
         btnToggleView.setOnClickListener(v -> {
             isDesktopMode = !isDesktopMode;
             WebSettings settings = webView.getSettings();
+            WebSettings gSettings = geminiWebView.getSettings();
             if (isDesktopMode) {
                 settings.setUserAgentString(DESKTOP_USER_AGENT);
+                gSettings.setUserAgentString(DESKTOP_USER_AGENT);
                 btnToggleView.setText("🖥️ DESKTOP");
                 btnToggleView.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#673AB7")));
-                Toast.makeText(this, "Switched to Desktop Layout (Chrome Desktop UA)", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Switched to Desktop Layout", Toast.LENGTH_SHORT).show();
             } else {
                 settings.setUserAgentString(MOBILE_USER_AGENT);
+                gSettings.setUserAgentString(MOBILE_USER_AGENT);
                 btnToggleView.setText("📱 MOBILE");
                 btnToggleView.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#E91E63")));
-                Toast.makeText(this, "Switched to Mobile Layout (Android Chrome Bypass UA)", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Switched to Mobile Layout", Toast.LENGTH_SHORT).show();
             }
             webView.reload();
+            geminiWebView.reload();
         });
 
-        // Execute Custom JavaScript inside WebView context
+        // Custom Javascript evaluation execution
         btnRunJs.setOnClickListener(v -> {
             String js = etJsCode.getText().toString().trim();
             if (!js.isEmpty()) {
-                webView.evaluateJavascript(js, value -> {
+                WebView active = (webView.getVisibility() == View.VISIBLE) ? webView : geminiWebView;
+                active.evaluateJavascript(js, value -> {
                     Toast.makeText(MainActivity.this, "JS Result: " + value, Toast.LENGTH_LONG).show();
                     Log.d(TAG, "Custom JavaScript executed. Result: " + value);
                 });
@@ -250,7 +299,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Toggle Foreground Service for persistent run
+        // Toggle background persistence Foreground Service
         btnToggleService.setOnClickListener(v -> {
             if (!isServiceRunning) {
                 checkNotificationPermissionAndStartService();
@@ -259,11 +308,45 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Check and prompt for ignoring battery optimization to safeguard background runs
         requestBatteryOptimizationBypass();
 
         // Start headless socket bridge background worker thread
         startBridgeWorker();
+    }
+
+    private void switchTab(boolean isColab) {
+        runOnUiThread(() -> {
+            if (isColab) {
+                webView.setVisibility(View.VISIBLE);
+                geminiWebView.setVisibility(View.GONE);
+                etUrl.setText(webView.getUrl());
+                btnTabColab.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#2196F3")));
+                btnTabGemini.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#78909C")));
+            } else {
+                webView.setVisibility(View.GONE);
+                geminiWebView.setVisibility(View.VISIBLE);
+                etUrl.setText(geminiWebView.getUrl());
+                btnTabColab.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#78909C")));
+                btnTabGemini.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#673AB7")));
+            }
+        });
+    }
+
+    private void addLog(final String msg) {
+        runOnUiThread(() -> {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault());
+            String time = sdf.format(new java.util.Date());
+            String formattedMsg = "[" + time + "] " + msg + "\n";
+            tvTerminalLogs.append(formattedMsg);
+
+            // Auto scroll to bottom
+            svTerminalLogs.post(() -> svTerminalLogs.fullScroll(View.FOCUS_DOWN));
+
+            // Update terminal status header text
+            if (msg.contains("Extracted") || msg.contains("Socket Bridge")) {
+                tvTerminalTitle.setText("💻 AGENT: ACTIVE AUTOMATION");
+            }
+        });
     }
 
     private void startBridgeWorker() {
@@ -273,13 +356,11 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 while (mRunBridgeWorker) {
                     try {
-                        // Sleep 3 seconds between checks as requested
                         Thread.sleep(3000);
                     } catch (InterruptedException e) {
                         break;
                     }
 
-                    // Extract cookies on UI thread and trigger the bridge (always run to allow fallback solver)
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
@@ -322,6 +403,7 @@ public class MainActivity extends AppCompatActivity {
                         mSecure1PSID = secure1PSID;
                         mSecure1PSIDTS = secure1PSIDTS;
                         Log.d(TAG, "🤖 Harvester: Extracted active Gemini cookies!");
+                        addLog("Harvester: Successfully extracted/updated active Gemini session cookies!");
                     }
                 }
             }
@@ -331,74 +413,26 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void triggerColabBridge() {
+        if (mSecure1PSID.isEmpty() || mSecure1PSIDTS.isEmpty()) {
+            // Logs once in a while or prints a status wait
+            Log.d(TAG, "Awaiting active Gemini cookies... Please switch to GEMINI VIEW tab to log in.");
+            return;
+        }
+
         String escapedPSID = mSecure1PSID.replace("\\", "\\\\").replace("'", "\\'");
         String escapedPSIDTS = mSecure1PSIDTS.replace("\\", "\\\\").replace("'", "\\'");
 
         String js = "javascript:(function() {\n" +
                 "    if (typeof google !== 'undefined' && google.colab && google.colab.kernel && google.colab.kernel.proxy) {\n" +
-                "        let py = `import os, json, threading, asyncio, sys, re\\n" +
-                "def solve_locally(prompt_text, reply_path, prompt_path):\\n" +
-                "    print('🤖 Bridge Python: Running Local Fallback Solver...')\\n" +
-                "    if 'EVIDENCE ACQUISITION PLAN' in prompt_text or 'evidence_tasks' in prompt_text:\\n" +
-                "        json_builder = []\\n" +
-                "        pattern = r'Scene\\\\s*\\\\[?(SCENE_\\\\d+)\\\\]?:\\\\s*\"([^\"]+)\"'\\n" +
-                "        matches = re.findall(pattern, prompt_text, re.IGNORECASE)\\n" +
-                "        for s_id, narration in matches:\\n" +
-                "            query = 'Dhaka traffic congestion megacity'\\n" +
-                "            pref_site = 'prothomalo.com'\\n" +
-                "            fallback_q = 'Dhaka'\\n" +
-                "            intent = 'documentary_evidence'\\n" +
-                "            if 'স্বাধীনতা' in narration or '২৬ মার্চ' in narration or 'independence' in narration:\\n" +
-                "                query = 'Declaration of Independence Bangladesh 1971'\\n" +
-                "                pref_site = 'wikipedia.org'\\n" +
-                "                fallback_q = 'Bangladesh'\\n" +
-                "            elif 'দূষণ' in narration or 'বর্জ্য' in narration or 'waste' in narration:\\n" +
-                "                query = 'environmental plastic pollution waste'\\n" +
-                "                pref_site = 'thedailystar.net'\\n" +
-                "                fallback_q = 'Bangladesh'\\n" +
-                "            json_builder.append({\\n" +
-                "                'scene_id': s_id,\\n" +
-                "                'intent': intent,\\n" +
-                "                'query': query,\\n" +
-                "                'preferred_site': pref_site,\\n" +
-                "                'fallback_query': fallback_q\\n" +
-                "            })\\n" +
-                "        if not json_builder:\\n" +
-                "            json_builder = [\\n" +
-                "                {\\n" +
-                "                    'scene_id': 'SCENE_1',\\n" +
-                "                    'intent': 'documentary_evidence',\\n" +
-                "                    'query': 'Dhaka traffic congestion megacity',\\n" +
-                "                    'preferred_site': 'prothomalo.com',\\n" +
-                "                    'fallback_query': 'Dhaka'\\n" +
-                "                },\\n" +
-                "                {\\n" +
-                "                    'scene_id': 'SCENE_2',\\n" +
-                "                    'intent': 'documentary_evidence',\\n" +
-                "                    'query': 'Declaration of Independence Bangladesh 1971',\\n" +
-                "                    'preferred_site': 'wikipedia.org',\\n" +
-                "                    'fallback_query': 'Bangladesh'\\n" +
-                "                }\\n" +
-                "            ]\\n" +
-                "        response = json.dumps({'evidence_tasks': json_builder}, indent=2)\\n" +
-                "    else:\\n" +
-                "        first_brace = prompt_text.find('{')\\n" +
-                "        last_brace = prompt_text.rfind('}')\\n" +
-                "        if first_brace != -1 and last_brace != -1 and last_brace > first_brace:\\n" +
-                "            response = prompt_text[first_brace:last_brace+1]\\n" +
-                "            try:\\n" +
-                "                json.loads(response)\\n" +
-                "            except:\\n" +
-                "                response = '{\"scenes\": []}'\\n" +
-                "        else:\\n" +
-                "            response = '{\"scenes\": []}'\\n" +
-                "    with open(reply_path, 'w', encoding='utf-8') as f:\\n" +
-                "        f.write(response)\\n" +
-                "    if os.path.exists(prompt_path):\\n" +
-                "        os.remove(prompt_path)\\n" +
-                "    print('🤖 Bridge Python: Local Fallback solved and written successfully!')\\n" +
-                "\\n" +
+                "        let py = `import os, json, threading, asyncio, sys\\n" +
                 "def process_bridge():\\n" +
+                "    try:\\n" +
+                "        import gemini_webapi\\n" +
+                "    except ImportError:\\n" +
+                "        import subprocess\\n" +
+                "        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-U', 'gemini-webapi'])\\n" +
+                "        import gemini_webapi\\n" +
+                "    from gemini_webapi import GeminiClient\\n" +
                 "    bridge_dir = '/content/drive/MyDrive/gemini_bridge'\\n" +
                 "    prompt_path = os.path.join(bridge_dir, 'prompt.txt')\\n" +
                 "    reply_path = os.path.join(bridge_dir, 'reply.txt')\\n" +
@@ -407,20 +441,8 @@ public class MainActivity extends AppCompatActivity {
                 "        with open(prompt_path, 'r', encoding='utf-8') as f:\\n" +
                 "            prompt = f.read()\\n" +
                 "        if not prompt.strip(): return\\n" +
-                "        psid = \\\"" + escapedPSID + "\\\"\\n" +
-                "        psidts = \\\"" + escapedPSIDTS + "\\\"\\n" +
-                "        if not psid or not psidts:\\n" +
-                "            solve_locally(prompt, reply_path, prompt_path)\\n" +
-                "            return\\n" +
-                "        try:\\n" +
-                "            import gemini_webapi\\n" +
-                "        except ImportError:\\n" +
-                "            import subprocess\\n" +
-                "            subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-U', 'gemini-webapi'])\\n" +
-                "            import gemini_webapi\\n" +
-                "        from gemini_webapi import GeminiClient\\n" +
                 "        print('🤖 Socket Bridge: Prompt detected, calling gemini-webapi...')\\n" +
-                "        client = GeminiClient(psid, psidts)\\n" +
+                "        client = GeminiClient(\\\"" + escapedPSID + "\\\", \\\"" + escapedPSIDTS + "\\\")\\n" +
                 "        async def run_query():\\n" +
                 "            await client.init()\\n" +
                 "            chat = client.start_chat()\\n" +
@@ -437,11 +459,13 @@ public class MainActivity extends AppCompatActivity {
                 "        if os.path.exists(prompt_path): os.remove(prompt_path)\\n" +
                 "        print('🤖 Socket Bridge: Successfully wrote reply and deleted prompt.txt')\\n" +
                 "    except Exception as ex:\\n" +
-                "        print('⚠️ Bridge error, running local fallback:', ex)\\n" +
+                "        print('⚠️ Bridge error:', ex)\\n" +
                 "        try:\\n" +
-                "            solve_locally(prompt, reply_path, prompt_path)\\n" +
+                "            with open(reply_path, 'w', encoding='utf-8') as f:\\n" +
+                "                f.write('ERROR: ' + str(ex))\\n" +
+                "            if os.path.exists(prompt_path): os.remove(prompt_path)\\n" +
                 "        except: pass\\n" +
-                "threading.Thread(target=process_bridge, daemon=True).start()`;\n" +
+                "threading.Thread(target=process_bridge, daemon=True).start()`;\\n" +
                 "        try {\n" +
                 "            google.colab.kernel.proxy.getKernel().execute(py);\n" +
                 "        } catch(e) {}\n" +
@@ -449,15 +473,6 @@ public class MainActivity extends AppCompatActivity {
                 "})()";
 
         webView.evaluateJavascript(js, null);
-    }
-
-    @Override
-    protected void onDestroy() {
-        mRunBridgeWorker = false;
-        if (mBridgeWorkerThread != null) {
-            mBridgeWorkerThread.interrupt();
-        }
-        super.onDestroy();
     }
 
     private void setupWebView() {
@@ -473,14 +488,10 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
-
-        // Crucial: Support multiple windows to capture Google Drive mounts or popups cleanly inside separate temporary tabs
         settings.setSupportMultipleWindows(true);
 
-        // Initial default: Chromebook Chrome Desktop UA (renders play buttons and icons perfectly, and passes sign-in)
         settings.setUserAgentString(DESKTOP_USER_AGENT);
 
-        // Enable cookies and third party cookies
         CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.setAcceptCookie(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -498,13 +509,11 @@ public class MainActivity extends AppCompatActivity {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 etUrl.setText(url);
-                // Flush cookies to ensure credential propagation across domains
                 CookieManager.getInstance().flush();
             }
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
-            // For Android 5.0+ - File Upload Support (vital for adding custom manifests)
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
                 if (uploadMessage != null) {
@@ -532,7 +541,6 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
 
-            // Capture new tab/window creation (like Google Drive Sync popups) and overlay a secondary tab safely
             @Override
             public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
                 Log.d(TAG, "onCreateWindow triggered");
@@ -560,14 +568,13 @@ public class MainActivity extends AppCompatActivity {
                 newWebView.setWebViewClient(new WebViewClient() {
                     @Override
                     public boolean shouldOverrideUrlLoading(WebView v, String url) {
-                        return false; // Load OAuth redirect flows inside the secondary tab itself
+                        return false;
                     }
 
                     @Override
                     public void onPageFinished(WebView v, String url) {
                         super.onPageFinished(v, url);
                         etUrl.setText(url);
-                        // Flush cookies so OAuth credentials propagate immediately to main WebView
                         CookieManager.getInstance().flush();
                     }
                 });
@@ -580,14 +587,13 @@ public class MainActivity extends AppCompatActivity {
                             webViewContainer.removeView(window);
                         }
                         window.destroy();
-                        // Restore visibility of original Colab session WebView
                         webView.setVisibility(View.VISIBLE);
                         etUrl.setText(webView.getUrl());
                     }
                 });
 
                 if (webViewContainer != null) {
-                    webView.setVisibility(View.GONE); // Hide background Colab session
+                    webView.setVisibility(View.GONE);
                     webViewContainer.addView(newWebView);
                 }
 
@@ -609,8 +615,40 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Initial Page load
         webView.loadUrl("https://colab.research.google.com");
+    }
+
+    private void setupGeminiWebView() {
+        WebSettings settings = geminiWebView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+        settings.setUseWideViewPort(true);
+        settings.setLoadWithOverviewMode(true);
+        settings.setSupportZoom(true);
+        settings.setBuiltInZoomControls(true);
+        settings.setDisplayZoomControls(false);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
+
+        settings.setUserAgentString(DESKTOP_USER_AGENT);
+
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            cookieManager.setAcceptThirdPartyCookies(geminiWebView, true);
+        }
+
+        geminiWebView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                CookieManager.getInstance().flush();
+            }
+        });
+
+        geminiWebView.loadUrl("https://gemini.google.com");
     }
 
     private void performSmartPaste() {
@@ -620,13 +658,11 @@ public class MainActivity extends AppCompatActivity {
             CharSequence textChar = item.getText();
             if (textChar != null) {
                 String rawText = textChar.toString();
-                // Safely escape backslashes, single quotes, and newlines for Javascript evaluation
                 String escapedText = rawText.replace("\\", "\\\\")
                                              .replace("'", "\\'")
                                              .replace("\n", "\\n")
                                              .replace("\r", "");
 
-                // Traverse shadow roots and nested iframes to find deep active element, then execute insertText on its iframe document or use input value simulation fallback
                 String jsPaste = "(function() {" +
                         "try {" +
                         "  function getDeepActive() {" +
@@ -664,15 +700,11 @@ public class MainActivity extends AppCompatActivity {
                         "return 'none';" +
                         "})()";
 
-                webView.evaluateJavascript(jsPaste, value -> {
-                    Toast.makeText(MainActivity.this, "Pasted text successfully into focused cell or terminal!", Toast.LENGTH_SHORT).show();
-                    Log.d(TAG, "Deep smart paste evaluation result: " + value);
+                WebView active = (webView.getVisibility() == View.VISIBLE) ? webView : geminiWebView;
+                active.evaluateJavascript(jsPaste, value -> {
+                    Toast.makeText(MainActivity.this, "Pasted successfully!", Toast.LENGTH_SHORT).show();
                 });
-            } else {
-                Toast.makeText(this, "Clipboard is empty or does not contain text.", Toast.LENGTH_SHORT).show();
             }
-        } else {
-            Toast.makeText(this, "No text found on clipboard.", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -696,7 +728,7 @@ public class MainActivity extends AppCompatActivity {
         tvServiceStatus.setTextColor(Color.parseColor("#4CAF50"));
         btnToggleService.setText("STOP BACKGROUND RUN");
         btnToggleService.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#F44336")));
-        Toast.makeText(this, "Foreground service started! Execution is active in background.", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Foreground service started!", Toast.LENGTH_SHORT).show();
     }
 
     private void stopBackgroundService() {
@@ -758,28 +790,41 @@ public class MainActivity extends AppCompatActivity {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startBackgroundService();
             } else {
-                Toast.makeText(this, "Notification permission is required to run in background.", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Notification permission required.", Toast.LENGTH_LONG).show();
             }
         }
     }
 
     @Override
     public void onBackPressed() {
-        // Intercept back click if a dynamic popup tab WebView is overlayed inside webViewContainer
-        if (webViewContainer != null && webViewContainer.getChildCount() > 1) {
-            View activePopup = webViewContainer.getChildAt(1);
+        if (webViewContainer != null && webViewContainer.getChildCount() > 2) {
+            View activePopup = webViewContainer.getChildAt(2);
             if (activePopup instanceof WebView) {
                 webViewContainer.removeView(activePopup);
                 ((WebView) activePopup).destroy();
-                Log.d(TAG, "Successfully closed authorization tab via onBackPressed");
+                Log.d(TAG, "Closed popup tab");
             }
-            webView.setVisibility(View.VISIBLE);
-            etUrl.setText(webView.getUrl());
-            Toast.makeText(this, "Closed authorization tab.", Toast.LENGTH_SHORT).show();
-        } else if (webView.canGoBack()) {
-            webView.goBack();
+            if (webView.getVisibility() == View.VISIBLE) {
+                etUrl.setText(webView.getUrl());
+            } else {
+                etUrl.setText(geminiWebView.getUrl());
+            }
         } else {
-            super.onBackPressed();
+            WebView active = (webView.getVisibility() == View.VISIBLE) ? webView : geminiWebView;
+            if (active.canGoBack()) {
+                active.goBack();
+            } else {
+                super.onBackPressed();
+            }
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        mRunBridgeWorker = false;
+        if (mBridgeWorkerThread != null) {
+            mBridgeWorkerThread.interrupt();
+        }
+        super.onDestroy();
     }
 }
