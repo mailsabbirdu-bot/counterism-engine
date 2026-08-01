@@ -1642,6 +1642,40 @@ class RemotionJsonMaker:
                         f"{re.search(r'STORY:.*?(?=TIMESTAMPS:)', prompt, re.DOTALL).group() if 'STORY:' in prompt else prompt[:500]}"
                     )
 
+                active_prompt_path = "/content/active_prompt.json"
+                try:
+                    with open(active_prompt_path, "w", encoding="utf-8") as f:
+                        json.dump({
+                            "uId": u_id,
+                            "prompt": copy_payload,
+                            "type": "json_maker",
+                            "status": "pending",
+                            "reply": ""
+                        }, f, ensure_ascii=False, indent=2)
+                except Exception as e:
+                    print(f"⚠️ Failed to write /content/active_prompt.json: {e}")
+
+                try:
+                    def check_reply(query_u_id):
+                        try:
+                            import os, json
+                            if os.path.exists('/content/active_prompt.json'):
+                                with open('/content/active_prompt.json', 'r', encoding='utf-8') as f:
+                                    data = json.load(f)
+                                if data.get('uId') == query_u_id and data.get('status') == 'replied':
+                                    reply = data.get('reply', '')
+                                    try:
+                                        os.remove('/content/active_prompt.json')
+                                    except:
+                                        pass
+                                    return {"reply": reply}
+                        except Exception as ex:
+                            pass
+                        return {"reply": "NONE"}
+                    output.register_callback('notebook.check_reply', check_reply)
+                except Exception as e:
+                    pass
+
                 js_code = f"""
                     (async () => {{
                         const u_id = "{u_id}";
@@ -1691,6 +1725,27 @@ class RemotionJsonMaker:
                                 }}, 500);
                             }}
                         }});
+
+                        // Python kernel check reply polling fallback
+                        const checkInterval = setInterval(() => {{
+                            if (typeof google !== 'undefined' && google.colab && google.colab.kernel) {{
+                                google.colab.kernel.invokeFunction('notebook.check_reply', [u_id], {{}})
+                                    .then(result => {{
+                                        if (result && result.data && result.data['application/json']) {{
+                                            let val = result.data['application/json'];
+                                            if (val && val.reply && val.reply !== 'NONE') {{
+                                                document.getElementById('paste-'+u_id).value = val.reply;
+                                                clearInterval(checkInterval);
+                                                setTimeout(() => {{
+                                                    document.getElementById('submit-'+u_id).click();
+                                                }}, 500);
+                                            }}
+                                        }}
+                                    }}).catch(err => {{
+                                        console.error('Error invoking check_reply:', err);
+                                    }});
+                            }}
+                        }}, 3000);
 
                         return new Promise((resolve) => {{
                             document.getElementById('submit-'+u_id).onclick = () => {{

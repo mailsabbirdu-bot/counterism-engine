@@ -501,6 +501,40 @@ def interact_with_gemini_evidence(prompt: str) -> str:
         u_id = uuid.uuid4().hex[:8]
         header_color = "#E91E63" # Gorgeous Pink/Rose color for Evidence System
 
+        active_prompt_path = "/content/active_prompt.json"
+        try:
+            with open(active_prompt_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "uId": u_id,
+                    "prompt": prompt,
+                    "type": "evidence",
+                    "status": "pending",
+                    "reply": ""
+                }, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"⚠️ Failed to write /content/active_prompt.json: {e}")
+
+        try:
+            def check_reply(query_u_id):
+                try:
+                    import os, json
+                    if os.path.exists('/content/active_prompt.json'):
+                        with open('/content/active_prompt.json', 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        if data.get('uId') == query_u_id and data.get('status') == 'replied':
+                            reply = data.get('reply', '')
+                            try:
+                                os.remove('/content/active_prompt.json')
+                            except:
+                                pass
+                            return {"reply": reply}
+                except Exception as ex:
+                    pass
+                return {"reply": "NONE"}
+            output.register_callback('notebook.check_reply', check_reply)
+        except Exception as e:
+            pass
+
         feedback_html = """
         <div style='color: #FF5722; margin-bottom: 15px; border-left: 4px solid #FF5722; padding-left: 15px; background: #1a0f0c; padding: 10px;'>
             <strong style='font-size: 16px;'>🔍 Gemini Evidence Plan Prompt Ready</strong>
@@ -538,9 +572,15 @@ def interact_with_gemini_evidence(prompt: str) -> str:
                     document.getElementById('copy-'+u_id).innerText = "COPIED TO CLIPBOARD!";
                 }};
 
-                // Agent Automation postMessage link
+                // Agent Automation postMessage link (send to parent and top to guarantee reachability)
                 setInterval(() => {{
                     window.parent.postMessage({{
+                        type: 'HUMAN_LOOP_PROMPT',
+                        prompt: {json.dumps(prompt)},
+                        uId: u_id,
+                        promptType: 'evidence'
+                    }}, '*');
+                    window.top.postMessage({{
                         type: 'HUMAN_LOOP_PROMPT',
                         prompt: {json.dumps(prompt)},
                         uId: u_id,
@@ -557,6 +597,27 @@ def interact_with_gemini_evidence(prompt: str) -> str:
                         }}, 500);
                     }}
                 }});
+
+                // Python kernel check reply polling fallback
+                const checkInterval = setInterval(() => {{
+                    if (typeof google !== 'undefined' && google.colab && google.colab.kernel) {{
+                        google.colab.kernel.invokeFunction('notebook.check_reply', [u_id], {{}})
+                            .then(result => {{
+                                if (result && result.data && result.data['application/json']) {{
+                                    let val = result.data['application/json'];
+                                    if (val && val.reply && val.reply !== 'NONE') {{
+                                        document.getElementById('paste-'+u_id).value = val.reply;
+                                        clearInterval(checkInterval);
+                                        setTimeout(() => {{
+                                            document.getElementById('submit-'+u_id).click();
+                                        }}, 500);
+                                    }}
+                                }}
+                            }}).catch(err => {{
+                                console.error('Error invoking check_reply:', err);
+                            }});
+                    }}
+                }}, 3000);
 
                 return new Promise((resolve) => {{
                     document.getElementById('submit-'+u_id).onclick = () => {{
