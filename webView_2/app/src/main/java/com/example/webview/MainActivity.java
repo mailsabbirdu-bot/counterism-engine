@@ -51,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             if (webView != null) {
                 injectPollingScript();
+                pollColabKernelForPrompt(); // Periodically check Colab kernel for prompts
                 syncGeminiCookies(); // Periodically sync Gemini session cookies to Google Drive
             }
             if (sAutomationInProgress) {
@@ -59,6 +60,28 @@ public class MainActivity extends AppCompatActivity {
             automationHandler.postDelayed(this, 3000); // Poll faster (3s) for responsive automation
         }
     };
+
+    private void pollColabKernelForPrompt() {
+        String pyCode = "javascript:(function() {\n" +
+                "    let py = 'import os, json, google.colab\\n' +\n" +
+                "             'try:\\n' +\n" +
+                "             '    if os.path.exists(\"/content/active_prompt.json\"):\\n' +\n" +
+                "             '        with open(\"/content/active_prompt.json\", \"r\", encoding=\"utf-8\") as f:\\n' +\n" +
+                "             '            data = json.load(f)\\n' +\n" +
+                "             '        if data.get(\"status\") == \"pending\":\\n' +\n" +
+                "             '            escaped_data = json.dumps(data)\\n' +\n" +
+                "             '            google.colab.output.eval_js(f\"window.top.postMessage({{\\'type\\': \\'KERNEL_PROMPT\\', \\'data\\': {escaped_data}}}, \\'*\\')\")\\n' +\n" +
+                "             'except Exception as e:\\n' +\n" +
+                "             '    pass';\n" +
+                "    if (typeof google !== 'undefined' && google.colab && google.colab.kernel && google.colab.kernel.proxy) {\n" +
+                "        try {\n" +
+                "            google.colab.kernel.proxy.getKernel().execute(py);\n" +
+                "        } catch (e) {}\n" +
+                "    }\n" +
+                "})()";
+
+        webView.evaluateJavascript(pyCode, null);
+    }
     private static final int REQUEST_CODE_POST_NOTIFICATIONS = 101;
     private static final int FILE_CHOOSER_REQUEST_CODE = 202;
 
@@ -383,6 +406,10 @@ public class MainActivity extends AppCompatActivity {
                 "            if (event.data.type === 'HUMAN_LOOP_PROMPT') {\n" +
                 "                console.log('Detected postMessage HUMAN_LOOP_PROMPT:', event.data);\n" +
                 "                AndroidApp.onHumanLoopDetected(event.data.prompt, event.data.uId, event.data.promptType);\n" +
+                "            } else if (event.data.type === 'KERNEL_PROMPT') {\n" +
+                "                console.log('Detected KERNEL_PROMPT:', event.data.data);\n" +
+                "                let pData = event.data.data;\n" +
+                "                AndroidApp.onHumanLoopDetected(pData.prompt, pData.uId, pData.type);\n" +
                 "            } else if (event.data.type === 'GET_GEMINI_COOKIES') {\n" +
                 "                console.log('Detected GET_GEMINI_COOKIES request.');\n" +
                 "                let cookiesJson = AndroidApp.getGeminiCookiesJson();\n" +
@@ -846,13 +873,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void handleHumanLoop(String prompt, String uId, String type) {
+        if (sActiveUId.equals(uId) && sAutomationInProgress) {
+            // Already processing this uId, skip duplicate triggers
+            return;
+        }
         sActivePrompt = prompt;
         sActiveUId = uId;
         sActiveType = type;
         sAutomationInProgress = true;
 
         Log.d(TAG, "handleHumanLoop: Starting WebView automation for uId: " + uId + " | type: " + type);
-        addLog("🤖 AGENT: Detected prompt for " + uId + " (Type: " + type + "). Start automation!");
+        addLog("🤖 AGENT: Detected prompt for " + uId + " (Type: " + type + ")! Total length: " + prompt.length() + " chars.");
+        addLog("🤖 AGENT: Commencing hands-free web automation cycle...");
         tvServiceStatus.setText("Background service: RUNNING\n🤖 AGENT: Processing prompt " + uId + "...");
         tvServiceStatus.setTextColor(Color.parseColor("#E91E63")); // Cyberpunk Pink for Agent activity!
 
@@ -1133,8 +1165,13 @@ public class MainActivity extends AppCompatActivity {
 
     public void pasteResponseAndSubmit(final String response) {
         runOnUiThread(() -> {
+            addLog("🤖 AGENT: Writing results to Google Drive (Counterism_Studio_V4/agent.txt)...");
             // Write to agent.txt on Google Drive first
             writeAgentTxtToDrive(sActivePrompt, response);
+
+            addLog("🤖 AGENT: Submitting response back to Colab kernel for uId: " + sActiveUId);
+            // Write the reply back to the Python kernel
+            writeReplyToKernel(sActiveUId, response);
 
             String escapedResponse = response.replace("\\", "\\\\")
                                              .replace("'", "\\'")
@@ -1167,6 +1204,34 @@ public class MainActivity extends AppCompatActivity {
                 tvServiceStatus.setTextColor(Color.parseColor("#4CAF50"));
             });
         });
+    }
+
+    private void writeReplyToKernel(String uId, String reply) {
+        addLog("🤖 AGENT: Executing base64 reply write in Python kernel for safe decoding...");
+        String base64Reply = android.util.Base64.encodeToString(reply.getBytes(java.nio.charset.StandardCharsets.UTF_8), android.util.Base64.NO_WRAP);
+        String pyCode = "javascript:(function() {\n" +
+                "    let py = 'import os, json, base64\\n' +\n" +
+                "             'try:\\n' +\n" +
+                "             '    if os.path.exists(\"/content/active_prompt.json\"):\\n' +\n" +
+                "             '        with open(\"/content/active_prompt.json\", \"r\", encoding=\"utf-8\") as f:\\n' +\n" +
+                "             '            data = json.load(f)\\n' +\n" +
+                "             '        if data.get(\"uId\") == \"" + uId + "\":\\n' +\n" +
+                "             '            decoded = base64.b64decode(\"" + base64Reply + "\").decode(\"utf-8\")\\n' +\n" +
+                "             '            data[\"status\"] = \"replied\"\\n' +\n" +
+                "             '            data[\"reply\"] = decoded\\n' +\n" +
+                "             '            with open(\"/content/active_prompt.json\", \"w\", encoding=\"utf-8\") as f:\\n' +\n" +
+                "             '                json.dump(data, f)\\n' +\n" +
+                "             '            print(\"Successfully wrote reply to kernel\")\\n' +\n" +
+                "             'except Exception as e:\\n' +\n" +
+                "             '    print(\"Error writing reply:\", e)';\n" +
+                "    if (typeof google !== 'undefined' && google.colab && google.colab.kernel && google.colab.kernel.proxy) {\n" +
+                "        try {\n" +
+                "            google.colab.kernel.proxy.getKernel().execute(py);\n" +
+                "        } catch (e) {}\n" +
+                "    }\n" +
+                "})()";
+
+        webView.evaluateJavascript(pyCode, null);
     }
 
     private void writeAgentTxtToDrive(String prompt, String response) {
