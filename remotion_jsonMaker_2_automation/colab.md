@@ -91,7 +91,7 @@ if not shutil.which('ffmpeg'):
     !apt-get update -y -qq && apt-get install -y -qq ffmpeg build-essential
 else:
     print("✅ ffmpeg and build-essential are already installed. Skipping slow apt-get update.")
-!pip install -q -r remotion_jsonMaker/requirements.txt
+!pip install -q -r remotion_jsonMaker_2_automation/requirements.txt
 
 # 👁️ VISUAL EYE STAGE
 print_banner("👁️ VISUAL EYE: PERCEPTION STAGE")
@@ -111,10 +111,10 @@ if videos:
 else:
     print("⚠️ No videos found for analysis.")
 
-%cd remotion_jsonMaker
+%cd remotion_jsonMaker_2_automation
 
 # 4. Generate Master JSON
-print_banner("🧠 GEMINI MANUAL INTERACTION")
+print_banner("🧠 GEMINI AUTOMATION INTERACTION")
 FPS_UPDATE_FILE = f"{DRIVE_BASE_PATH}/manifests/fps_update.txt"
 
 %run generator.py \
