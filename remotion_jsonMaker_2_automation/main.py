@@ -491,40 +491,43 @@ def fetch_gemini_response_via_webapi(prompt: str) -> str:
 
 def interact_with_gemini_evidence(prompt: str) -> str:
     """Zero-UI, File-Based Socket Bridge loop checking for reply.txt from Drive."""
-    bridge_dir = "/content/drive/MyDrive/Counterism_Studio_V4/gemini_bridge"
+    return get_gemini_response(prompt)
+
+def get_gemini_response(prompt_text):
+    """
+    Automated file-bridge function replacing terminal/HTML UI widgets.
+    Writes prompt to Google Drive and waits for reply.txt from Android worker.
+    """
+    bridge_dir = "/content/drive/MyDrive/gemini_bridge"
     os.makedirs(bridge_dir, exist_ok=True)
-    prompt_path = os.path.join(bridge_dir, "prompt.txt")
-    reply_path = os.path.join(bridge_dir, "reply.txt")
 
-    # Write prompt.txt
-    print(f"📡 File-Based Bridge: Writing prompt.txt to {prompt_path}...")
-    with open(prompt_path, "w", encoding="utf-8") as f:
-        f.write(prompt)
+    prompt_file = os.path.join(bridge_dir, "prompt.txt")
+    reply_file = os.path.join(bridge_dir, "reply.txt")
 
-    # Poll for reply.txt
-    print("⏳ File-Based Bridge: Polling for reply.txt from Drive (waiting for Android app automation)...")
-    while not os.path.exists(reply_path):
+    # Clear leftover stale files
+    if os.path.exists(reply_file):
+        try: os.remove(reply_file)
+        except Exception: pass
+
+    print(f"[Bridge] Writing prompt to Drive: {prompt_file}")
+    with open(prompt_file, "w", encoding="utf-8") as f:
+        f.write(prompt_text)
+
+    print("[Bridge] Waiting for Android app to process and write reply.txt...")
+    while not os.path.exists(reply_file):
         time.sleep(3)
 
-    # Read reply.txt
-    print("✅ File-Based Bridge: reply.txt detected! Reading response...")
-    with open(reply_path, "r", encoding="utf-8") as f:
-        reply_text = f.read()
+    print("[Bridge] Reply detected! Reading response...")
+    with open(reply_file, "r", encoding="utf-8") as f:
+        response_text = f.read()
 
-    # Delete both prompt.txt and reply.txt to reset the socket bridge
-    try:
-        os.remove(prompt_path)
-        print("🧹 File-Based Bridge: Deleted prompt.txt")
-    except Exception as e:
-        print(f"⚠️ Error deleting prompt.txt: {e}")
+    # Clean up bridge directory for the next iteration
+    for file_path in [prompt_file, reply_file]:
+        if os.path.exists(file_path):
+            try: os.remove(file_path)
+            except Exception: pass
 
-    try:
-        os.remove(reply_path)
-        print("🧹 File-Based Bridge: Deleted reply.txt")
-    except Exception as e:
-        print(f"⚠️ Error deleting reply.txt: {e}")
-
-    return reply_text
+    return response_text
 
 def generate_evidence_prompt(story_content: str, scenes: List[str]) -> str:
     """Generates a detailed prompt for Gemini to decide query, preferred_site, and fallbacks."""

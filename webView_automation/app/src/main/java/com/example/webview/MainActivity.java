@@ -345,7 +345,7 @@ public class MainActivity extends AppCompatActivity {
                 "        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-U', 'gemini-webapi'])\\n" +
                 "        import gemini_webapi\\n" +
                 "    from gemini_webapi import GeminiClient\\n" +
-                "    bridge_dir = '/content/drive/MyDrive/Counterism_Studio_V4/gemini_bridge'\\n" +
+                "    bridge_dir = '/content/drive/MyDrive/gemini_bridge'\\n" +
                 "    prompt_path = os.path.join(bridge_dir, 'prompt.txt')\\n" +
                 "    reply_path = os.path.join(bridge_dir, 'reply.txt')\\n" +
                 "    if not os.path.exists(prompt_path): return\\n" +
