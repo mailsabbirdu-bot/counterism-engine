@@ -23,6 +23,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.JavascriptInterface;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -71,6 +72,7 @@ public class MainActivity extends AppCompatActivity {
     private String mSecure1PSIDTS = "";
     private Thread mBridgeWorkerThread = null;
     private volatile boolean mRunBridgeWorker = true;
+    private long mLastWarnTime = 0;
 
     // Standard User-Agents
     private final String DESKTOP_USER_AGENT = "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -343,7 +345,7 @@ public class MainActivity extends AppCompatActivity {
             svTerminalLogs.post(() -> svTerminalLogs.fullScroll(View.FOCUS_DOWN));
 
             // Update terminal status header text
-            if (msg.contains("Extracted") || msg.contains("Socket Bridge")) {
+            if (msg.contains("Extracted") || msg.contains("Socket Bridge") || msg.contains("Success")) {
                 tvTerminalTitle.setText("💻 AGENT: ACTIVE AUTOMATION");
             }
         });
@@ -382,7 +384,8 @@ public class MainActivity extends AppCompatActivity {
             String[] targetUrls = {
                 "https://gemini.google.com",
                 "https://google.com",
-                "https://chat.google.com"
+                "https://chat.google.com",
+                "https://accounts.google.com"
             };
 
             String secure1PSID = "";
@@ -412,7 +415,7 @@ public class MainActivity extends AppCompatActivity {
                     mSecure1PSID = secure1PSID;
                     mSecure1PSIDTS = secure1PSIDTS;
                     Log.d(TAG, "🤖 Harvester: Extracted active Gemini cookies!");
-                    addLog("Harvester: Successfully extracted/updated active Gemini session cookies!");
+                    addLog("Harvester: Successfully extracted active Gemini session cookies (PSID length=" + secure1PSID.length() + ")");
                 }
             }
         } catch (Exception e) {
@@ -422,8 +425,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void triggerColabBridge() {
         if (mSecure1PSID.isEmpty() || mSecure1PSIDTS.isEmpty()) {
-            // Logs once in a while or prints a status wait
-            Log.d(TAG, "Awaiting active Gemini cookies... Please switch to GEMINI VIEW tab to log in.");
+            long now = System.currentTimeMillis();
+            if (now - mLastWarnTime > 15000) {
+                addLog("🔑 Harvester: Awaiting Gemini session cookies... Please select 'GEMINI VIEW' tab and log in.");
+                mLastWarnTime = now;
+            }
             return;
         }
 
@@ -432,24 +438,51 @@ public class MainActivity extends AppCompatActivity {
 
         String js = "javascript:(function() {\n" +
                 "    if (typeof google !== 'undefined' && google.colab && google.colab.kernel && google.colab.kernel.proxy) {\n" +
+                "        if (window.hasActiveBridgeRunning) return;\n" +
+                "        window.hasActiveBridgeRunning = true;\n" +
+                "        \n" +
+                "        // Set up postMessage communication bridge to log back to app terminal\n" +
+                "        if (!window.hasPostMessageBridgeSetup) {\n" +
+                "            window.hasPostMessageBridgeSetup = true;\n" +
+                "            window.addEventListener('message', function(event) {\n" +
+                "                if (event.data && event.data.type === 'BRIDGE_LOG') {\n" +
+                "                    AndroidApp.onBridgeLog(event.data.msg);\n" +
+                "                }\n" +
+                "            });\n" +
+                "        }\n" +
+                "        \n" +
                 "        let py = `import os, json, threading, asyncio, sys\\n" +
-                "def process_bridge():\\n" +
+                "def log_to_app(msg):\\n" +
                 "    try:\\n" +
-                "        import gemini_webapi\\n" +
-                "    except ImportError:\\n" +
-                "        import subprocess\\n" +
-                "        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-U', 'gemini-webapi'])\\n" +
-                "        import gemini_webapi\\n" +
-                "    from gemini_webapi import GeminiClient\\n" +
+                "        from google.colab import output\\n" +
+                "        escaped = json.dumps(msg)\\n" +
+                "        output.eval_js(f\\\"window.top.postMessage({{'type': 'BRIDGE_LOG', 'msg': {escaped}}}, '*')\\\")\\n" +
+                "    except: pass\\n" +
+                "\\n" +
+                "def process_bridge():\\n" +
                 "    bridge_dir = '/content/drive/MyDrive/gemini_bridge'\\n" +
                 "    prompt_path = os.path.join(bridge_dir, 'prompt.txt')\\n" +
                 "    reply_path = os.path.join(bridge_dir, 'reply.txt')\\n" +
                 "    if not os.path.exists(prompt_path): return\\n" +
                 "    try:\\n" +
+                "        log_to_app('🤖 Python Bridge: prompt.txt detected! Reading content...')\\n" +
                 "        with open(prompt_path, 'r', encoding='utf-8') as f:\\n" +
                 "            prompt = f.read()\\n" +
-                "        if not prompt.strip(): return\\n" +
-                "        print('🤖 Socket Bridge: Prompt detected, calling gemini-webapi...')\\n" +
+                "        if not prompt.strip():\\n" +
+                "            log_to_app('⚠️ Python Bridge: prompt.txt is empty!')\\n" +
+                "            return\\n" +
+                "        \\n" +
+                "        log_to_app('🤖 Python Bridge: Initializing gemini-webapi...')\\n" +
+                "        try:\\n" +
+                "            import gemini_webapi\\n" +
+                "        except ImportError:\\n" +
+                "            log_to_app('📡 Python Bridge: Installing gemini-webapi package...')\\n" +
+                "            import subprocess\\n" +
+                "            subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-U', 'gemini-webapi'])\\n" +
+                "            import gemini_webapi\\n" +
+                "            \\n" +
+                "        from gemini_webapi import GeminiClient\\n" +
+                "        log_to_app('🤖 Python Bridge: Authenticating with Gemini using cookies...')\\n" +
                 "        \\n" +
                 "        result_container = []\\n" +
                 "        error_container = []\\n" +
@@ -459,6 +492,7 @@ public class MainActivity extends AppCompatActivity {
                 "                client = GeminiClient(\\\"" + escapedPSID + "\\\", \\\"" + escapedPSIDTS + "\\\")\\n" +
                 "                await client.init()\\n" +
                 "                chat = client.start_chat()\\n" +
+                "                log_to_app('🤖 Python Bridge: Sending query to Gemini...')\\n" +
                 "                response = await chat.send_message(prompt)\\n" +
                 "                result_container.append(response.text)\\n" +
                 "            except Exception as inner_ex:\\n" +
@@ -485,22 +519,25 @@ public class MainActivity extends AppCompatActivity {
                 "            m = re.search(r'```(?:json|javascript)?(.*?)```', cleaned, re.DOTALL)\\n" +
                 "            if m: cleaned = m.group(1).strip()\\n" +
                 "            \\n" +
+                "        log_to_app('🤖 Python Bridge: Writing response to reply.txt...')\\n" +
                 "        with open(reply_path, 'w', encoding='utf-8') as f:\\n" +
                 "            f.write(cleaned)\\n" +
                 "            \\n" +
                 "        if os.path.exists(prompt_path): os.remove(prompt_path)\\n" +
-                "        print('🤖 Socket Bridge: Successfully wrote reply and deleted prompt.txt')\\n" +
+                "        log_to_app('🤖 Python Bridge: Completed successfully! Deleted prompt.txt')\\n" +
                 "    except Exception as ex:\\n" +
-                "        print('⚠️ Bridge error:', ex)\\n" +
+                "        log_to_app('❌ Python Bridge Error: ' + str(ex))\\n" +
                 "        try:\\n" +
                 "            with open(reply_path, 'w', encoding='utf-8') as f:\\n" +
                 "                f.write('ERROR: ' + str(ex))\\n" +
                 "            if os.path.exists(prompt_path): os.remove(prompt_path)\\n" +
                 "        except: pass\\n" +
-                "threading.Thread(target=process_bridge, daemon=True).start()`;\\n" +
+                "threading.Thread(target=process_bridge, daemon=True).start()`;\n" +
                 "        try {\n" +
                 "            google.colab.kernel.proxy.getKernel().execute(py);\n" +
                 "        } catch(e) {}\n" +
+                "        \n" +
+                "        setTimeout(() => { window.hasActiveBridgeRunning = false; }, 2000);\n" +
                 "    }\n" +
                 "})()";
 
@@ -529,6 +566,9 @@ public class MainActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             cookieManager.setAcceptThirdPartyCookies(webView, true);
         }
+
+        // Add Javascript Interface to support direct python logging to app console!
+        webView.addJavascriptInterface(new BridgeLoggerInterface(), "AndroidApp");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -858,5 +898,15 @@ public class MainActivity extends AppCompatActivity {
             mBridgeWorkerThread.interrupt();
         }
         super.onDestroy();
+    }
+
+    // Direct Python-to-Java bridge logger interface class
+    public class BridgeLoggerInterface {
+        @JavascriptInterface
+        public void onBridgeLog(final String msg) {
+            runOnUiThread(() -> {
+                addLog(msg);
+            });
+        }
     }
 }
