@@ -379,32 +379,40 @@ public class MainActivity extends AppCompatActivity {
     private void harvestGeminiCookies() {
         try {
             CookieManager cookieManager = CookieManager.getInstance();
-            String cookieStr = cookieManager.getCookie("https://gemini.google.com");
-            if (cookieStr != null) {
-                String secure1PSID = "";
-                String secure1PSIDTS = "";
+            String[] targetUrls = {
+                "https://gemini.google.com",
+                "https://google.com",
+                "https://chat.google.com"
+            };
 
-                String[] cookies = cookieStr.split(";");
-                for (String cookie : cookies) {
-                    String[] parts = cookie.trim().split("=", 2);
-                    if (parts.length == 2) {
-                        String name = parts[0].trim();
-                        String value = parts[1].trim();
-                        if (name.equals("__Secure-1PSID")) {
-                            secure1PSID = value;
-                        } else if (name.equals("__Secure-1PSIDTS")) {
-                            secure1PSIDTS = value;
+            String secure1PSID = "";
+            String secure1PSIDTS = "";
+
+            for (String url : targetUrls) {
+                String cookieStr = cookieManager.getCookie(url);
+                if (cookieStr != null) {
+                    String[] cookies = cookieStr.split(";");
+                    for (String cookie : cookies) {
+                        String[] parts = cookie.trim().split("=", 2);
+                        if (parts.length == 2) {
+                            String name = parts[0].trim();
+                            String value = parts[1].trim();
+                            if (name.equals("__Secure-1PSID")) {
+                                secure1PSID = value;
+                            } else if (name.equals("__Secure-1PSIDTS")) {
+                                secure1PSIDTS = value;
+                            }
                         }
                     }
                 }
+            }
 
-                if (!secure1PSID.isEmpty() && !secure1PSIDTS.isEmpty()) {
-                    if (!secure1PSID.equals(mSecure1PSID) || !secure1PSIDTS.equals(mSecure1PSIDTS)) {
-                        mSecure1PSID = secure1PSID;
-                        mSecure1PSIDTS = secure1PSIDTS;
-                        Log.d(TAG, "🤖 Harvester: Extracted active Gemini cookies!");
-                        addLog("Harvester: Successfully extracted/updated active Gemini session cookies!");
-                    }
+            if (!secure1PSID.isEmpty() && !secure1PSIDTS.isEmpty()) {
+                if (!secure1PSID.equals(mSecure1PSID) || !secure1PSIDTS.equals(mSecure1PSIDTS)) {
+                    mSecure1PSID = secure1PSID;
+                    mSecure1PSIDTS = secure1PSIDTS;
+                    Log.d(TAG, "🤖 Harvester: Extracted active Gemini cookies!");
+                    addLog("Harvester: Successfully extracted/updated active Gemini session cookies!");
                 }
             }
         } catch (Exception e) {
@@ -442,20 +450,44 @@ public class MainActivity extends AppCompatActivity {
                 "            prompt = f.read()\\n" +
                 "        if not prompt.strip(): return\\n" +
                 "        print('🤖 Socket Bridge: Prompt detected, calling gemini-webapi...')\\n" +
-                "        client = GeminiClient(\\\"" + escapedPSID + "\\\", \\\"" + escapedPSIDTS + "\\\")\\n" +
+                "        \\n" +
+                "        result_container = []\\n" +
+                "        error_container = []\\n" +
+                "        \\n" +
                 "        async def run_query():\\n" +
-                "            await client.init()\\n" +
-                "            chat = client.start_chat()\\n" +
-                "            response = await chat.send_message(prompt)\\n" +
-                "            return response.text\\n" +
-                "        result = asyncio.run(run_query())\\n" +
-                "        cleaned = result.strip()\\n" +
+                "            try:\\n" +
+                "                client = GeminiClient(\\\"" + escapedPSID + "\\\", \\\"" + escapedPSIDTS + "\\\")\\n" +
+                "                await client.init()\\n" +
+                "                chat = client.start_chat()\\n" +
+                "                response = await chat.send_message(prompt)\\n" +
+                "                result_container.append(response.text)\\n" +
+                "            except Exception as inner_ex:\\n" +
+                "                error_container.append(inner_ex)\\n" +
+                "                \\n" +
+                "        def thread_runner():\\n" +
+                "            loop = asyncio.new_event_loop()\\n" +
+                "            asyncio.set_event_loop(loop)\\n" +
+                "            try:\\n" +
+                "                loop.run_until_complete(run_query())\\n" +
+                "            finally:\\n" +
+                "                loop.close()\\n" +
+                "                \\n" +
+                "        t = threading.Thread(target=thread_runner)\\n" +
+                "        t.start()\\n" +
+                "        t.join()\\n" +
+                "        \\n" +
+                "        if error_container:\\n" +
+                "            raise error_container[0]\\n" +
+                "            \\n" +
+                "        cleaned = result_container[0].strip()\\n" +
                 "        if '```' in cleaned:\\n" +
                 "            import re\\n" +
                 "            m = re.search(r'```(?:json|javascript)?(.*?)```', cleaned, re.DOTALL)\\n" +
                 "            if m: cleaned = m.group(1).strip()\\n" +
+                "            \\n" +
                 "        with open(reply_path, 'w', encoding='utf-8') as f:\\n" +
                 "            f.write(cleaned)\\n" +
+                "            \\n" +
                 "        if os.path.exists(prompt_path): os.remove(prompt_path)\\n" +
                 "        print('🤖 Socket Bridge: Successfully wrote reply and deleted prompt.txt')\\n" +
                 "    except Exception as ex:\\n" +
